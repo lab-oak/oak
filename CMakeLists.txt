@@ -41,3 +41,8 @@ add_executable(chall src/chall.cc)
 add_dependencies(chall build_client_release)
 target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(chall PRIVATE libpkmn_chance lrslib128)
+
+add_executable(generate src/generate.cc)
+add_dependencies(generate build_client_release)
+target_include_directories(generate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(generate PRIVATE libpkmn_chance lrslib128 eigen)

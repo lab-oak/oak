@@ -94,7 +94,8 @@ public:
   uint8_t _cols;
 
   struct Outcome {
-    float value;
+    float p1_value;
+    float p2_value;
     uint8_t p1_index;
     uint8_t p2_index;
   };
@@ -113,8 +114,8 @@ public:
   template <typename Outcome> void update(const Outcome &outcome) noexcept {
     ++this->p1_visits[outcome.p1_index];
     ++this->p2_visits[outcome.p2_index];
-    p1_score[outcome.p1_index] += outcome.value;
-    p2_score[outcome.p2_index] += 1 - outcome.value;
+    p1_score[outcome.p1_index] += outcome.p1_value;
+    p2_score[outcome.p2_index] += outcome.p2_value;
   }
 
   template <typename PRNG, typename Outcome>

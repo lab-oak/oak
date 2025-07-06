@@ -32,14 +32,13 @@ public:
     return &node;
   }
 
-  // Node *operator[](auto p1_index, auto p2_index, auto obs) {
-  //   return _map[{p1_index, p2_index, obs}].get();
-  // }
+  Node *operator[](auto p1_index, auto p2_index, auto obs) {
+    return _map[{p1_index, p2_index, obs}].get();
+  }
 
-  // std::unique_ptr<Node> release_child(auto p1_index, auto p2_index, auto obs)
-  // {
-  //   return std::move(_map[{p1_index, p2_index, obs}]);
-  // }
+  std::unique_ptr<Node> release_child(auto p1_index, auto p2_index, auto obs) {
+    return std::move(_map[{p1_index, p2_index, obs}]);
+  }
 };
 
 template <typename BanditData, typename Obs, size_t size,

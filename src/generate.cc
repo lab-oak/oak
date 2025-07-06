@@ -2,9 +2,14 @@
 #include <battle/strings.h>
 #include <battle/view.h>
 #include <data/options.h>
+#include <nn/encoding.h>
+#include <nn/net.h>
 #include <pi/exp3.h>
 #include <pi/mcts.h>
 #include <pi/ucb.h>
+#include <train/build-trajectory.h>
+#include <train/compressed-frame.h>
+#include <train/frame.h>
 
 #include <util/random.h>
 
@@ -27,16 +32,48 @@ using Obs = std::array<uint8_t, 16>;
 using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
 using UCBNode = Tree::Node<UCB::JointBanditData, Obs>;
 
-// WIP BattleNetwork, for forward pass
-struct BattleNetwork {
-  void load(std::string) const {}
-};
+namespace NN {
 
-// Let this also implement the team builder logic, is_terminal(), etc
-struct BuildNetwork {};
+constexpr auto build_net_hidden_dim = 512;
+
+using BuildNet = EmbeddingNet<Encode::Team::in_dim, build_net_hidden_dim,
+                              Encode::Team::out_dim, true, false>;
+}; // namespace NN
 
 // Stats for sample team matchup matrix
-struct TeamPool {};
+struct TeamPool {
+
+  static constexpr auto n_teams = SampleTeams::teams.size();
+
+  // struct Matchup {
+  //   std::atomic<size_t> n_games{};
+  //   std::atomic<size_t> total_score{};
+  // };
+
+  // using Key = std::pair<uint32_t, uint32_t>;
+  // std::unordered_map<Key, Matchup> map;
+
+  // void update(const auto p1_index, const auto p2_index, const auto score) {
+  //   if (p1_index == p2_index) {
+  //     return;
+  //   } else if (p1_index > p2_index) {
+  //     return update(p2_index, p1_index, 2 - score);
+  //   }
+  //   auto &matchup_data = map[Key{static_cast<uint32_t>(p1_index),
+  //                                static_cast<uint32_t>(p2_index)}];
+  //   matchup_data.n_games += 1;
+  //   matchup_data.total_score += score;
+  // }
+
+  // auto value_matrix_flat() const {
+  //   std::array<float, n_teams * n_teams> matrix_flat;
+  //   for (auto i = 0; i < n_teams; ++i) {
+  //     for (auto j = 0; j < n_teams; ++j) {
+  //       // const auto &mu =
+  //     }
+  //   }
+  // }
+};
 
 namespace RuntimeOptions {
 
@@ -53,6 +90,8 @@ char policy_mode; // (n)ash, (e)mpirical, (m)ix
 double policy_temp = 1.0;
 double policy_min_prob = 0.0; // zerod if below this threshold
 double mix_nash_weight = 1.0; // (m)ix mode only
+
+bool keep_node = true; // reuse the search tree after update
 }; // namespace Search
 
 namespace TeamGen {
@@ -78,16 +117,14 @@ bool suspended = false;
 std::string start_datetime;
 std::atomic<size_t> buffer_filename{};
 std::atomic<size_t> frame_counter{};
-BuildNetwork build_network{}; // is not battle specific unlike the net
+NN::BuildNet build_network{}; // is not battle specific unlike the net
 TeamPool team_pool{};
 }; // namespace RuntimeData
-
-using BattleData = MonteCarlo::Input;
 
 // Data that should persist over a game. The network has a cache and we may keep
 // the search sub-tree.
 struct SearchData {
-  BattleNetwork battle_network;
+  NN::Network battle_network;
   std::unique_ptr<Exp3Node> exp3_unique_node;
   std::unique_ptr<UCBNode> ucb_unique_node;
 };
@@ -155,7 +192,7 @@ BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
 }
 
 Init::Team get_team(prng &device) {
-  using RuntimeOptions::TeamGen;
+  using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(SampleTeams::teams.size());
   auto team = SampleTeams::teams[index];
@@ -163,12 +200,12 @@ Init::Team get_team(prng &device) {
   // randomly delete mons/moves for the net to fill in
   for (auto p = 0; p < 6; ++p) {
     const auto r = device.uniform();
-    if (r < TeamGen::pokemon_delete_prob) {
+    if (r < pokemon_delete_prob) {
       // TODO: mask this pokemon entry (implementation specific)
     } else {
       for (auto m = 0; m < 4; ++m) {
         const auto rm = device.uniform();
-        if (rm < TeamGen::move_delete_prob) {
+        if (rm < move_delete_prob) {
           // TODO: mask this move (implementation specific)
         }
       }
@@ -187,18 +224,19 @@ Init::Team get_team(prng &device) {
 }
 
 // run search, use output to update battle data and nodes and training frame
-void search(prng &device, const BattleData &battle_data,
-            SearchData &search_data, CompressedTrainingFrame game_buffer) {
+auto search(prng &device, const BattleData &battle_data,
+            SearchData &search_data, Train::CompressedFrames<> game_buffer) {
   using namespace RuntimeOptions::Search;
 
   auto run_search_model = [&](auto &unique_node, auto &model) {
     auto &node = *unique_node;
     MCTS search;
     if (count_mode == 'i' || count_mode == 'n') {
-      return search.run(count, node, model, battle_data);
+      return search.run(count, node, battle_data, model);
     } else if (count_mode == 't') {
-      return search.run(std::chrono::milliseconds{count}, node, model,
-                        battle_data);
+      // return search.run(std::chrono::milliseconds{count}, node, battle_data,
+      //                   model);
+      return MCTS::Output{};
     }
     throw std::runtime_error("Invalid count mode char.");
   };
@@ -263,7 +301,7 @@ std::pair<int, int> sample(prng &device, auto &output) {
 // either reset the node or swap it with its child
 void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
   auto update_node = [&](auto &unique_node) {
-    if (Options::keep_node) {
+    if (RuntimeOptions::Search::keep_node) {
       auto *child = (*unique_node)[i1, i2, obs];
       if (!child) {
         unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
@@ -288,21 +326,21 @@ void generate(uint64_t seed) {
       RuntimeOptions::training_frames_target_size_mb << 20;
   const size_t thread_frame_buffer_size =
       (RuntimeOptions::training_frames_target_size_mb + 1) << 20;
-  auto buffer = new uint8_t[thread_frame_buffer_size]{};
+  auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
 
   while (!RuntimeData::terminated) {
     const auto p1_team = get_team(device);
     const auto p2_team = get_team(device);
 
-    BattleData battle_data{Init::battle(p1_team, p2_team, device.uniform_64()),
-                           {}};
+    const auto bd = Init::battle_data(p1_team, p2_team, device.uniform_64());
+    BattleData battle_data{bd.first, bd.second, {}};
     pkmn_gen1_battle_options battle_options{};
     battle_data.result = Init::update(battle_data.battle, 0, 0, battle_options);
 
-    SearchData search_data{BattleNetwork{}, std::make_unique<Exp3Node>(),
+    SearchData search_data{NN::Network{}, std::make_unique<Exp3Node>(),
                            std::make_unique<UCBNode>()};
-    Train::CompressedTrainingFrame training_frames{battle_data.battle};
+    Train::CompressedFrames<> training_frames{battle_data.battle};
 
     try {
       // playout game

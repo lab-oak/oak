@@ -51,7 +51,8 @@ template <size_t log_size = 64> struct DebugLog {
 
   void save_data_to_path(std::string path = "") const {
     if (path.empty()) {
-      const auto *battle_prng_bytes = frames.front().data() + Layout::Offsets::Battle::rng;
+      const auto *battle_prng_bytes =
+          frames.front().data() + Layout::Offsets::Battle::rng;
       const auto *seed = std::bit_cast<const uint64_t *>(battle_prng_bytes);
       path = (std::filesystem::current_path() / "logs" / std::to_string(*seed))
                  .string();

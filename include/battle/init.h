@@ -277,6 +277,8 @@ struct Boosts {
   int def;
   int spe;
   int spc;
+
+  bool operator==(const Boosts &) const noexcept = default;
 };
 
 struct Set {

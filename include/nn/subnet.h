@@ -21,31 +21,33 @@ struct EmbeddingNet {
   }
 };
 
-constexpr auto pokemon_out_dim = 39;
-constexpr auto active_out_dim = 55;
-
 struct MainNet {
   static constexpr int in_dim = 512;
   static constexpr int hidden_dim = 32;
-  static constexpr int out_dim = 1;
+  static constexpr int policy_out_dim = 151 + 165;
 
-  Affine<in_dim, hidden_dim> fc0;
-  Affine<hidden_dim, hidden_dim> fc1;
-  Affine<hidden_dim, out_dim, false> fc2;
+  Affine<in_dim, hidden_dim> fc_0;
+  Affine<hidden_dim, hidden_dim> value_fc1;
+  Affine<hidden_dim, 1, false> value_fc2;
+  Affine<hidden_dim, hidden_dim> policy_fc1;
+  Affine<hidden_dim, policy_out_dim, false> policy_fc2;
 
   bool read_parameters(std::istream &stream) {
-    return fc0.read_parameters(stream) && fc1.read_parameters(stream) &&
-           fc2.read_parameters(stream);
+    return fc_0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
+           value_fc2.read_parameters(stream);
   }
 
-  float propagate(const float *input_data, float *output_data) const {
+  float propagate(const float *input_data, float *policy_output) const {
     static thread_local float b0[hidden_dim];
-    static thread_local float b1[hidden_dim];
-    static thread_local float b2[out_dim];
-    fc0.propagate(input_data, b0);
-    fc1.propagate(b0, b1);
-    fc2.propagate(b1, b2);
-    return 1 / (1 + std::exp(-b2[0]));
+    static thread_local float value_b1[hidden_dim];
+    static thread_local float value_b2[1];
+    static thread_local float policy_b1[hidden_dim];
+    fc_0.propagate(input_data, b0);
+    value_fc1.propagate(b0, value_b1);
+    value_fc2.propagate(value_b1, value_b2);
+    policy_fc1.propagate(b0, policy_b1);
+    policy_fc2.propagate(policy_b1, policy_output);
+    return 1 / (1 + std::exp(-value_b2[0]));
   }
 };
 

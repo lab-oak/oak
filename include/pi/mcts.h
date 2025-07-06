@@ -158,8 +158,8 @@ struct MCTS {
       }
 
       LRSNash::FastInput solve_input{static_cast<int>(output.m),
-                                    static_cast<int>(output.n),
-                                    solve_matrix.data(), discretize_factor};
+                                     static_cast<int>(output.n),
+                                     solve_matrix.data(), discretize_factor};
       // 2 extra entries for output denom, nash value
       std::array<float, 9 + 2> nash1{}, nash2{};
       LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
@@ -202,7 +202,8 @@ struct MCTS {
   }
 
   template <typename Options>
-  std::pair<float, float> run_iteration(auto *node, auto &input, auto &model, size_t depth = 0) {
+  std::pair<float, float> run_iteration(auto *node, auto &input, auto &model,
+                                        size_t depth = 0) {
 
     auto &battle = input.battle;
     auto &durations = input.durations;
@@ -297,7 +298,9 @@ struct MCTS {
       [[likely]] {
         print("Initializing node");
         ++total_nodes;
-        if constexpr (requires { model.inference(input); }) {
+        if constexpr (requires {
+                        model.inference(input.battle, input.durations);
+                      }) {
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
               PKMN_GEN1_MAX_CHOICES);
@@ -305,7 +308,8 @@ struct MCTS {
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
               PKMN_GEN1_MAX_CHOICES);
           node->stats().init(m, n);
-          return model.inference(input);
+          const float value = model.inference(input.battle, input.durations);
+          return {value, 1 - value};
         } else {
           return init_stats_and_rollout(node->stats(), device, battle, result);
         }
@@ -327,7 +331,8 @@ struct MCTS {
   }
 
   std::pair<float, float> init_stats_and_rollout(auto &stats, auto &prng,
-                               pkmn_gen1_battle &battle, pkmn_result result) {
+                                                 pkmn_gen1_battle &battle,
+                                                 pkmn_result result) {
 
     auto seed = prng.uniform_64();
     auto m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,

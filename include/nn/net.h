@@ -8,11 +8,11 @@ namespace NN {
 
 struct Network {
 
-  constexpr auto pokemon_hidden_dim = 32;
-  constexpr auto pokemon_out_dim = 39;
-  constexpr auto active_hidden_dim = 32;
-  constexpr auto active_out_dim = 55;
-  constexpr auto side_out_dim = 256;
+  static constexpr auto pokemon_hidden_dim = 32;
+  static constexpr auto pokemon_out_dim = 39;
+  static constexpr auto active_hidden_dim = 32;
+  static constexpr auto active_out_dim = 55;
+  static constexpr auto side_out_dim = 256;
 
   // leading dims is hp percent
   static_assert((1 + active_out_dim) + 5 * (1 + pokemon_out_dim) ==
@@ -23,6 +23,7 @@ struct Network {
   using ActiveSubnet =
       EmbeddingNet<Encode::Active::in_dim, active_hidden_dim, active_out_dim>;
 
+  prng device{};
   PokemonSubnet p;
   ActiveSubnet a;
   MainNet m;
@@ -38,12 +39,12 @@ struct Network {
     static thread_local float active_input[2][1][Encode::Active::in_dim];
     static thread_local float pokemon_output[2][5][pokemon_out_dim];
     static thread_local float active_output[2][1][active_out_dim];
-    static thread_local main_input[256][2];
+    static thread_local float main_input[256][2];
 
     const auto &b = View::ref(battle);
 
     for (auto s = 0; s < 2; ++s) {
-      const auto &dur = View::ref(durations).duration(side);
+      const auto &dur = View::ref(durations).duration(s);
       const auto &side = b.side(s);
 
       auto k = 0;

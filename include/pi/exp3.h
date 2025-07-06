@@ -25,8 +25,9 @@ namespace Exp3 {
 //   x = _mm256_min_ps(x, _mm256_set1_ps(88.3762626647949f));
 
 //   // Range reduction: x * log2(e)
-//   __m256 fx = _mm256_mul_ps(x, _mm256_set1_ps(1.44269504088896341f)); // log2(e)
-//   fx = _mm256_round_ps(fx, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+//   __m256 fx = _mm256_mul_ps(x, _mm256_set1_ps(1.44269504088896341f)); //
+//   log2(e) fx = _mm256_round_ps(fx, _MM_FROUND_TO_NEAREST_INT |
+//   _MM_FROUND_NO_EXC);
 
 //   // Compute exp(x) = 2^n * exp(r)
 //   __m256 tmp = _mm256_mul_ps(fx, _mm256_set1_ps(0.693359375f));
@@ -94,7 +95,8 @@ namespace Exp3 {
 //   // forecast[8] = final / sum;
 // }
 
-// void softmax(std::array<float, 9> &forecast, const std::array<float, 9> &gains,
+// void softmax(std::array<float, 9> &forecast, const std::array<float, 9>
+// &gains,
 //              float eta) {
 //   softmax_simd(forecast.data(), gains.data(), eta);
 // }
@@ -303,6 +305,5 @@ public:
 
 // static_assert(sizeof(JointBanditData<.1f, true>) == 128);
 // static_assert(sizeof(JointBanditData<.1f, false>) == 76);
-
 
 }; // namespace Exp3
