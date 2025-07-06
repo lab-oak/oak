@@ -1,0 +1,9 @@
+[submodule "extern/lrsnash"]
+	path = extern/lrsnash
+	url = https://github.com/lab-oak/lrsnash
+[submodule "extern/engine"]
+	path = extern/engine
+	url = https://github.com/lab-oak/engine
+[submodule "extern/eigen"]
+	path = extern/eigen
+	url = https://github.com/PX4/eigen

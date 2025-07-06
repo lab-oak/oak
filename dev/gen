@@ -1,0 +1,1 @@
+node ./extern/pokemon-showdown/dist/data/random-battles/gen.js "$@"

@@ -1,0 +1,1 @@
+rm -r build && echo "rm'd build directory"; mkdir build && echo "mkdir build"; cd build && echo "cd build" && cmake -DCMAKE_BUILD_TYPE="Release" ..; make; cd ..

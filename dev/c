@@ -1,0 +1,1 @@
+rm -r extern/engine/zig-out; rm -r extern/engine/.zig-cache
