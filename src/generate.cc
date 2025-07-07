@@ -77,16 +77,18 @@ struct TeamPool {
 
 namespace RuntimeOptions {
 
+size_t n_threads = 1;
+
 namespace Search {
 // dur
-size_t count;
-char count_mode; // (n)/(i)terations, (t)ime
+size_t count = 1000;
+char count_mode = 'i'; // (n)/(i)terations, (t)ime
 // node
-char bandit_mode; // (e)xp3, (u)cb
+char bandit_mode = 'e'; // (e)xp3, (u)cb
 // input
 std::string battle_network_path;
 
-char policy_mode; // (n)ash, (e)mpirical, (m)ix
+char policy_mode = 'n'; // (n)ash, (e)mpirical, (m)ix
 double policy_temp = 1.0;
 double policy_min_prob = 0.0; // zerod if below this threshold
 double mix_nash_weight = 1.0; // (m)ix mode only
@@ -102,14 +104,57 @@ std::string build_network_path;
 // team gen protocal is pick from sample teams, randomly omit set data, have
 // the network fill it back in and produce a trajectory using t1 search eval +
 // game score as the reward
-double modify_team_prob;
-double pokemon_delete_prob;
-double move_delete_prob;
+double modify_team_prob = 0;
+double pokemon_delete_prob = 0;
+double move_delete_prob = 0;
 }; // namespace TeamGen
 
 size_t training_frames_target_size_mb = 8;
 
 }; // namespace RuntimeOptions
+
+void parse_options(int argc, char **argv) {
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+
+    if (arg.starts_with("--n-threads=")) {
+      RuntimeOptions::n_threads = std::stoul(arg.substr(12));
+    } else if (arg.starts_with("--count=")) {
+      RuntimeOptions::Search::count = std::stoul(arg.substr(8));
+    } else if (arg.starts_with("--count-mode=")) {
+      RuntimeOptions::Search::count_mode = arg[13];
+    } else if (arg.starts_with("--bandit-mode=")) {
+      RuntimeOptions::Search::bandit_mode = arg[14];
+    } else if (arg.starts_with("--battle-network-path=")) {
+      RuntimeOptions::Search::battle_network_path = arg.substr(23);
+    } else if (arg.starts_with("--policy-mode=")) {
+      RuntimeOptions::Search::policy_mode = arg[14];
+    } else if (arg.starts_with("--policy-temp=")) {
+      RuntimeOptions::Search::policy_temp = std::stod(arg.substr(14));
+    } else if (arg.starts_with("--policy-min-prob=")) {
+      RuntimeOptions::Search::policy_min_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--mix-nash-weight=")) {
+      RuntimeOptions::Search::mix_nash_weight = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--keep-node=")) {
+      RuntimeOptions::Search::keep_node =
+          (arg.substr(13) == "1" || arg.substr(13) == "true");
+    } else if (arg.starts_with("--build-network-path=")) {
+      RuntimeOptions::TeamGen::build_network_path = arg.substr(22);
+    } else if (arg.starts_with("--modify-team-prob=")) {
+      RuntimeOptions::TeamGen::modify_team_prob = std::stod(arg.substr(21));
+    } else if (arg.starts_with("--pokemon-delete-prob=")) {
+      RuntimeOptions::TeamGen::pokemon_delete_prob = std::stod(arg.substr(24));
+    } else if (arg.starts_with("--move-delete-prob=")) {
+      RuntimeOptions::TeamGen::move_delete_prob = std::stod(arg.substr(21));
+    } else if (arg.starts_with("--training-frames-target-size-mb=")) {
+      RuntimeOptions::training_frames_target_size_mb =
+          std::stoul(arg.substr(34));
+    } else {
+      throw std::runtime_error("Invalid arg: " + arg);
+      std::cerr << "Unknown option: " << arg << "\n";
+    }
+  }
+}
 
 namespace RuntimeData {
 bool terminated = false;
@@ -173,14 +218,10 @@ BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
     }
 
     const auto index = device.sample_pdf(output);
-    // std::cout << "index: " << index << " sampled. Prob: " << output[index] <<
-    // std::endl;
     traj.frames[i++] =
         ActionPolicy{static_cast<uint16_t>(index), output[index]};
     input[index] = 1;
     const auto [s, m] = species_move_list(index);
-    // std::cout << "net chose " << species_string(s) << " : " << move_string(m)
-    //           << std::endl;
     apply_index_to_team(team, s, m);
 
     if (complete) {
@@ -201,12 +242,12 @@ Init::Team get_team(prng &device) {
   for (auto p = 0; p < 6; ++p) {
     const auto r = device.uniform();
     if (r < pokemon_delete_prob) {
-      // TODO: mask this pokemon entry (implementation specific)
+      team[p] = {};
     } else {
       for (auto m = 0; m < 4; ++m) {
         const auto rm = device.uniform();
         if (rm < move_delete_prob) {
-          // TODO: mask this move (implementation specific)
+          team[p].moves[m] = Data::Move::None;
         }
       }
     }
@@ -215,9 +256,10 @@ Init::Team get_team(prng &device) {
   const bool unchanged = (team == SampleTeams::teams[index]);
 
   if (unchanged) {
-    // update team pool data
+    // update team pool data TODO
   } else {
-    // generate replay buffer for net
+    const auto traj = finish_team(team, RuntimeData::build_network, device);
+    // save traj to buffer or smth TODO
   }
 
   return team;
@@ -234,9 +276,8 @@ auto search(prng &device, const BattleData &battle_data,
     if (count_mode == 'i' || count_mode == 'n') {
       return search.run(count, node, battle_data, model);
     } else if (count_mode == 't') {
-      // return search.run(std::chrono::milliseconds{count}, node, battle_data,
-      //                   model);
-      return MCTS::Output{};
+      std::chrono::milliseconds ms{count};
+      return search.run(ms, node, battle_data, model);
     }
     throw std::runtime_error("Invalid count mode char.");
   };
@@ -302,11 +343,13 @@ std::pair<int, int> sample(prng &device, auto &output) {
 void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
   auto update_node = [&](auto &unique_node) {
     if (RuntimeOptions::Search::keep_node) {
-      auto *child = (*unique_node)[i1, i2, obs];
-      if (!child) {
+      auto child = (*unique_node)[i1, i2, obs];
+      if (child == unique_node->_map.end()) {
         unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
       } else {
-        auto unique_child = unique_node->release_child(i1, i2, obs);
+        auto unique_child =
+            std::make_unique<std::decay_t<decltype(*unique_node)>>(
+                std::move((*child).second));
         unique_node.swap(unique_child);
       }
     } else {
@@ -329,7 +372,7 @@ void generate(uint64_t seed) {
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
 
-  while (!RuntimeData::terminated) {
+  while (true) {
     const auto p1_team = get_team(device);
     const auto p2_team = get_team(device);
 
@@ -345,6 +388,11 @@ void generate(uint64_t seed) {
     try {
       // playout game
       while (!pkmn_result_type(battle_data.result)) {
+
+        if (RuntimeData::terminated) {
+          return;
+        } // TODO handle saving
+
         // search and sample actions
         const auto output =
             search(device, battle_data, search_data, training_frames);
@@ -379,6 +427,9 @@ void generate(uint64_t seed) {
     training_frames.write(buffer + frame_buffer_write_index);
     frame_buffer_write_index += n_bytes_frames;
 
+    // stats
+    RuntimeData::frame_counter.fetch_add(training_frames.updates.size()); 
+
     if (frame_buffer_write_index >= training_frames_target_size) {
       // write
       const auto filename =
@@ -387,7 +438,7 @@ void generate(uint64_t seed) {
           RuntimeData::start_datetime + "-" + filename;
       int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
       if (fd >= 0) {
-        write(fd, buffer, frame_buffer_write_index);
+        const auto write_result = write(fd, buffer, frame_buffer_write_index);
         close(fd);
       } else {
         std::cerr << "Failed to write buffer to " << full_path << std::endl;
@@ -403,9 +454,13 @@ void generate(uint64_t seed) {
 void print_thread_fn() {
   size_t done = 0;
   int sec = 10;
-  while (!RuntimeData::terminated) {
-    for (int i = 0; i < sec && !RuntimeData::terminated; ++i)
+  while (true) {
+    for (int i = 0; i < sec; ++i) {
+      if (RuntimeData::terminated) {
+        return;
+      }
       sleep(1);
+    }
     const auto more = RuntimeData::frame_counter.load();
     std::cout << (more - done) / (float)sec << " samples/sec." << std::endl;
     done = more;
@@ -428,8 +483,10 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
+  parse_options(argc, argv);
+
   uint64_t seed = 123456789;
-  int threads = std::thread::hardware_concurrency();
+  int threads = RuntimeOptions::n_threads;
 
   prng device{seed};
 

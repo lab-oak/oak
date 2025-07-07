@@ -5,6 +5,7 @@
 #include <data/moves.h>
 #include <data/species.h>
 #include <data/status.h>
+#include <data/strings.h>
 #include <data/types.h>
 #include <util/random.h>
 
@@ -12,6 +13,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -293,6 +295,16 @@ struct Set {
 };
 
 using Team = std::array<Set, 6>;
+
+void print_team(const auto &team) {
+  for (const auto &set : team) {
+    std::cout << species_string(set.species) << ": ";
+    for (const auto moveid : set.moves) {
+      std::cout << move_string(moveid) << ' ';
+    }
+    std::cout << std::endl;
+  }
+}
 
 struct Config {
   std::array<Set, 6> pokemon;

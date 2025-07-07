@@ -10,14 +10,13 @@
 
 namespace Tree {
 
-template <typename BanditData, typename Obs> class Node {
-private:
-  using ChanceMap =
-      std::map<std::tuple<uint8_t, uint8_t, Obs>, Node<BanditData, Obs>>;
+template <typename BanditData, typename Obs> struct Node {
+  using Key = std::tuple<uint8_t, uint8_t, Obs>;
+  using Value = Node<BanditData, Obs>;
+  using ChanceMap = std::map<Key, Value>;
   BanditData _data;
   ChanceMap _map;
 
-public:
   const auto &stats() const noexcept { return _data; }
   auto &stats() noexcept { return _data; }
 
@@ -32,9 +31,13 @@ public:
     return &node;
   }
 
-  Node *operator[](auto p1_index, auto p2_index, auto obs) {
-    return _map[{p1_index, p2_index, obs}].get();
+  auto operator[](auto p1_index, auto p2_index, auto obs) {
+    return _map.find({p1_index, p2_index, obs});
   }
+
+  // Node *operator[](auto p1_index, auto p2_index, auto obs) {
+  //   return _map[{p1_index, p2_index, obs}].get();
+  // }
 
   std::unique_ptr<Node> release_child(auto p1_index, auto p2_index, auto obs) {
     return std::move(_map[{p1_index, p2_index, obs}]);

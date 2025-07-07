@@ -52,6 +52,7 @@ struct Network {
       for (k = 1; k < 6; ++k) {
       }
     }
+    return 0;
   }
 };
 

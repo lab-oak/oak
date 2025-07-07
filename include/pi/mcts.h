@@ -111,8 +111,7 @@ struct MCTS {
       }
       output.duration +=
           std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-    }
-    if constexpr (requires { *dur; }) {
+    } else if constexpr (requires { *dur; }) {
       const auto start = std::chrono::high_resolution_clock::now();
       while (*dur) {
         ++output.iterations;
