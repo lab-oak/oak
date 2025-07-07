@@ -18,6 +18,7 @@
 #include <csignal>
 #include <cstring>
 #include <exception>
+#include <format>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -26,12 +27,23 @@
 #include <stdio.h>
 #include <unistd.h>
 
-constexpr size_t n_sample_teams = SampleTeams::teams.size();
+#ifdef DEBUG
+constexpr bool debug = true;
+#else
+constexpr bool debug = false;
+#endif
 
-using Obs = std::array<uint8_t, 16>;
-using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
-using UCBNode = Tree::Node<UCB::JointBanditData, Obs>;
+void print(const auto &data, const bool newline = true) {
+  if constexpr (!debug) {
+    return;
+  }
+  std::cout << data;
+  if (newline) {
+    std::cout << std::endl;
+  }
+}
 
+// TODO move to nn?
 namespace NN {
 
 constexpr auto build_net_hidden_dim = 512;
@@ -44,50 +56,50 @@ using BuildNet = EmbeddingNet<Encode::Team::in_dim, build_net_hidden_dim,
 struct TeamPool {
 
   static constexpr auto n_teams = SampleTeams::teams.size();
+  static constexpr auto n_entries = n_teams * (n_teams - 1) / 2;
 
-  // struct Matchup {
-  //   std::atomic<size_t> n_games{};
-  //   std::atomic<size_t> total_score{};
-  // };
+  struct Entry {
+    std::atomic<size_t> n;
+    std::atomic<size_t> v;
+  };
 
-  // using Key = std::pair<uint32_t, uint32_t>;
-  // std::unordered_map<Key, Matchup> map;
+  std::array<Entry, n_entries> entries{};
 
-  // void update(const auto p1_index, const auto p2_index, const auto score) {
-  //   if (p1_index == p2_index) {
-  //     return;
-  //   } else if (p1_index > p2_index) {
-  //     return update(p2_index, p1_index, 2 - score);
-  //   }
-  //   auto &matchup_data = map[Key{static_cast<uint32_t>(p1_index),
-  //                                static_cast<uint32_t>(p2_index)}];
-  //   matchup_data.n_games += 1;
-  //   matchup_data.total_score += score;
-  // }
+  static constexpr size_t flat(auto i, auto j) {
+    if (i < j) {
+      return flat(j, i);
+    }
+    return i * (i - 1) / 2 + j;
+  }
 
-  // auto value_matrix_flat() const {
-  //   std::array<float, n_teams * n_teams> matrix_flat;
-  //   for (auto i = 0; i < n_teams; ++i) {
-  //     for (auto j = 0; j < n_teams; ++j) {
-  //       // const auto &mu =
-  //     }
-  //   }
-  // }
+  Entry &operator()(auto i, auto j) { return entries[flat(i, j)]; }
+
+  void update(auto i, auto j, auto score) {
+    if (i < j) {
+      return update(j, i, 2 - score);
+    }
+    auto &entry = (*this)(i, j);
+    entry.n.fetch_add(1);
+    entry.v.fetch_add(score);
+  }
 };
 
 namespace RuntimeOptions {
 
 size_t n_threads = 1;
+size_t training_frames_target_size_mb = 8;
 
 namespace Search {
-// dur
-size_t count = 1000;
+
+// iterations/time per search
+size_t count = 1 << 10;
 char count_mode = 'i'; // (n)/(i)terations, (t)ime
-// node
+
+// search algo, model type/path
 char bandit_mode = 'e'; // (e)xp3, (u)cb
-// input
 std::string battle_network_path;
 
+// move selection
 char policy_mode = 'n'; // (n)ash, (e)mpirical, (m)ix
 double policy_temp = 1.0;
 double policy_min_prob = 0.0; // zerod if below this threshold
@@ -97,19 +109,18 @@ bool keep_node = true; // reuse the search tree after update
 }; // namespace Search
 
 namespace TeamGen {
-// required since an untrained random network can still act as the source
+
+// required since an untrained random network can still act as the source of
 // randomness while also generating training data
 std::string build_network_path;
 
-// team gen protocal is pick from sample teams, randomly omit set data, have
+// team gen protocal: pick from sample teams, randomly omit set data, have
 // the network fill it back in and produce a trajectory using t1 search eval +
 // game score as the reward
 double modify_team_prob = 0;
 double pokemon_delete_prob = 0;
 double move_delete_prob = 0;
 }; // namespace TeamGen
-
-size_t training_frames_target_size_mb = 8;
 
 }; // namespace RuntimeOptions
 
@@ -159,34 +170,40 @@ void parse_options(int argc, char **argv) {
 namespace RuntimeData {
 bool terminated = false;
 bool suspended = false;
-std::string start_datetime;
-std::atomic<size_t> buffer_filename{};
+std::string start_datetime =
+    std::format("{:%F %T}\n", std::chrono::system_clock::now());
+std::atomic<size_t> buffer_counter{};
 std::atomic<size_t> frame_counter{};
 NN::BuildNet build_network{}; // is not battle specific unlike the net
 TeamPool team_pool{};
 }; // namespace RuntimeData
 
-// Data that should persist over a game. The network has a cache and we may keep
-// the search sub-tree.
+using Obs = std::array<uint8_t, 16>;
+using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
+using UCBNode = Tree::Node<UCB::JointBanditData, Obs>;
+
+// Data that should persist only over a game - not the program or thread
+// lifetime. The build network uses a game-specific cache. It is not universal
+// unlike the build network.
 struct SearchData {
   NN::Network battle_network;
   std::unique_ptr<Exp3Node> exp3_unique_node;
   std::unique_ptr<UCBNode> ucb_unique_node;
 };
 
-BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
-                            auto &device) {
+Train::BuildTrajectory
+rollout_build_network(Init::Team &team, NN::BuildNet &build_net, auto &device) {
   using namespace Encode::Team;
-  BuildTrajectory traj{};
+  Train::BuildTrajectory traj{};
 
   auto i = 0;
   for (const auto &set : team) {
     if (set.species != Data::Species::None) {
-      traj.frames[i++] = ActionPolicy{species_move_table(set.species, 0), 0};
+      traj.frames[i++] = Train::ActionPolicy{species_move_table(set.species, 0), 0};
       for (const auto move : set.moves) {
         if (move != Data::Move::None) {
           traj.frames[i++] =
-              ActionPolicy{species_move_table(set.species, move), 0};
+              Train::ActionPolicy{species_move_table(set.species, move), 0};
         }
       }
     }
@@ -199,7 +216,9 @@ BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
 
   while (true) {
     mask = {};
-    bool complete = write_policy_mask(team, mask.data());
+
+    const bool only_requires_lead_selection =
+        write_policy_mask(team, mask.data());
 
     build_net.propagate(input.data(), output.data());
 
@@ -219,12 +238,12 @@ BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
 
     const auto index = device.sample_pdf(output);
     traj.frames[i++] =
-        ActionPolicy{static_cast<uint16_t>(index), output[index]};
+        Train::ActionPolicy{static_cast<uint16_t>(index), output[index]};
     input[index] = 1;
     const auto [s, m] = species_move_list(index);
     apply_index_to_team(team, s, m);
 
-    if (complete) {
+    if (only_requires_lead_selection) {
       break;
     }
   }
@@ -232,7 +251,11 @@ BuildTrajectory finish_team(Init::Team &team, NN::BuildNet &build_net,
   return traj;
 }
 
-Init::Team get_team(prng &device) {
+// produces a (modified) team from the pool and the index of unmodified team or
+// -1 if modified.
+std::pair<Init::Team, int>
+get_team(prng &device,
+         std::vector<Train::BuildTrajectory> &build_trajectories) {
   using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(SampleTeams::teams.size());
@@ -253,16 +276,15 @@ Init::Team get_team(prng &device) {
     }
   }
 
-  const bool unchanged = (team == SampleTeams::teams[index]);
+  // TODO wont produce traj if build net reconstructs a sample team
 
-  if (unchanged) {
-    // update team pool data TODO
-  } else {
-    const auto traj = finish_team(team, RuntimeData::build_network, device);
-    // save traj to buffer or smth TODO
+  const bool changed = (team != SampleTeams::teams[index]);
+  if (changed) {
+    build_trajectories.emplace_back(
+        rollout_build_network(team, RuntimeData::build_network, device));
   }
 
-  return team;
+  return {team, changed ? -1 : index};
 }
 
 // run search, use output to update battle data and nodes and training frame
@@ -372,9 +394,12 @@ void generate(uint64_t seed) {
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
 
+  // These are generated slowly so a vector is fine
+  std::vector<Train::BuildTrajectory> build_trajectories{};
+
   while (true) {
-    const auto p1_team = get_team(device);
-    const auto p2_team = get_team(device);
+    const auto [p1_team, p1_team_index] = get_team(device, build_trajectories);
+    const auto [p2_team, p2_team_index] = get_team(device, build_trajectories);
 
     const auto bd = Init::battle_data(p1_team, p2_team, device.uniform_64());
     BattleData battle_data{bd.first, bd.second, {}};
@@ -422,18 +447,23 @@ void generate(uint64_t seed) {
       continue;
     }
 
+    if ((p1_team_index >= 0) && (p2_team_index >= 0)) {
+      RuntimeData::team_pool.update(p1_team_index, p2_team_index,
+                                    Init::score(battle_data.result));
+    }
+
     training_frames.result = battle_data.result;
     const auto n_bytes_frames = training_frames.n_bytes();
     training_frames.write(buffer + frame_buffer_write_index);
     frame_buffer_write_index += n_bytes_frames;
 
     // stats
-    RuntimeData::frame_counter.fetch_add(training_frames.updates.size()); 
+    RuntimeData::frame_counter.fetch_add(training_frames.updates.size());
 
     if (frame_buffer_write_index >= training_frames_target_size) {
       // write
       const auto filename =
-          std::to_string(RuntimeData::buffer_filename.fetch_add(1));
+          std::to_string(RuntimeData::buffer_counter.fetch_add(1));
       const std::string full_path =
           RuntimeData::start_datetime + "-" + filename;
       int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);

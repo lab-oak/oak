@@ -2,6 +2,8 @@
 
 #include <battle/init.h>
 
+namespace Train {
+
 struct ActionPolicy {
   uint16_t action;
   uint16_t policy;
@@ -15,3 +17,5 @@ struct ActionPolicy {
 struct BuildTrajectory {
   std::array<ActionPolicy, 31> frames;
 };
+
+}; // namespace Train
