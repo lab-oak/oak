@@ -9,7 +9,7 @@ namespace SampleTeams {
 using enum Data::Move;
 using Data::Species;
 
-constexpr std::array<Init::Team, 17> teams{
+constexpr std::array<Init::Team, 16> teams{
     Init::Team{
         Init::Set{Species::Starmie, {Surf, Thunderbolt, ThunderWave, Recover}},
         Init::Set{Species::Exeggutor,

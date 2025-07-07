@@ -13,7 +13,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstring>
-#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -296,14 +296,16 @@ struct Set {
 
 using Team = std::array<Set, 6>;
 
-void print_team(const auto &team) {
+std::string team_string(const auto &team) {
+  std::stringstream ss{};
   for (const auto &set : team) {
-    std::cout << species_string(set.species) << ": ";
+    ss << species_string(set.species) << ": ";
     for (const auto moveid : set.moves) {
-      std::cout << move_string(moveid) << ' ';
+      ss << move_string(moveid) << ' ';
     }
-    std::cout << std::endl;
+    ss << '\n';
   }
+  return ss.str();
 }
 
 struct Config {
