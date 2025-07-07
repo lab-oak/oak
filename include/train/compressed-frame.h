@@ -28,7 +28,7 @@ constexpr out_type uncompress_probs(in_type x) {
   }
 }
 
-template <typename policy_type = uint8_t, typename eval_type = uint8_t>
+template <typename policy_type = uint16_t, typename eval_type = uint16_t>
 struct CompressedFrames {
 
   struct Update {
@@ -37,6 +37,7 @@ struct CompressedFrames {
     pkmn_choice c1, c2;
     // training
     eval_type eval;
+    eval_type eval_nash;
     std::vector<policy_type> p1_empirical;
     std::vector<policy_type> p1_nash;
     std::vector<policy_type> p2_empirical;
@@ -45,14 +46,16 @@ struct CompressedFrames {
     static constexpr size_t n_bytes_static(auto m, auto n) {
       // The leading byte is the combination m/n
       return 1 + 2 * sizeof(pkmn_result) + sizeof(eval_type) +
-             2 * (m + n) * sizeof(policy_type);
+             sizeof(eval_type) + 2 * (m + n) * sizeof(policy_type);
     }
 
     Update() = default;
     Update(const auto &search_output, pkmn_choice c1, pkmn_choice c2)
         : m{static_cast<uint8_t>(search_output.m)},
           n{static_cast<uint8_t>(search_output.n)}, c1{c1}, c2{c2},
-          eval{compress_probs<float, eval_type>(search_output.average_value)} {
+          eval{compress_probs<float, eval_type>(search_output.empirical_value)},
+          eval_nash{
+              compress_probs<float, eval_type>(search_output.nash_value)} {
       p1_empirical.resize(m);
       p1_nash.resize(m);
       p2_empirical.resize(n);
@@ -75,11 +78,14 @@ struct CompressedFrames {
 
     bool write(char *buffer) const {
       auto index = 0;
-      buffer[index] = (m - 1) + 16 * (n - 1);
+      buffer[index] = (m - 1) | ((n - 1) << 4);
       buffer[index + 1] = c1;
       buffer[index + 2] = c2;
       index += 3;
       std::memcpy(buffer + index, reinterpret_cast<const char *>(&eval),
+                  sizeof(eval_type));
+      index += sizeof(eval_type);
+      std::memcpy(buffer + index, reinterpret_cast<const char *>(&eval_nash),
                   sizeof(eval_type));
       index += sizeof(eval_type);
       std::memcpy(buffer + index,
@@ -107,8 +113,11 @@ struct CompressedFrames {
       n = (mn / 16) + 1;
       c1 = static_cast<pkmn_choice>(buffer[1]);
       c2 = static_cast<pkmn_choice>(buffer[2]);
-      eval = *reinterpret_cast<const eval_type *>(buffer + 3);
-      auto index = 3 + sizeof(eval_type);
+      auto index = 3;
+      eval = *reinterpret_cast<const eval_type *>(buffer + index);
+      index += sizeof(eval_type);
+      eval_nash = *reinterpret_cast<const eval_type *>(buffer + index);
+      index += sizeof(eval_type);
       p1_empirical.resize(m);
       p1_nash.resize(m);
       p2_empirical.resize(n);

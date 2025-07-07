@@ -16,6 +16,8 @@ struct ActionPolicy {
 
 struct BuildTrajectory {
   std::array<ActionPolicy, 31> frames;
+  uint16_t eval;
+  uint16_t score;
 };
 
 }; // namespace Train

@@ -125,7 +125,7 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
   std::cout << "iterations: " << output.iterations
             << ", time: " << output.duration.count() / 1000.0 << " sec\n";
   std::cout << "value: " << std::fixed << std::setprecision(2)
-            << output.average_value << "\n";
+            << output.empirical_value << "\n";
 
   std::cout << "P1 emprical - ";
   print_strategy(battle.bytes, output.p1_choices, output.p1_empirical,

@@ -83,13 +83,17 @@ struct TeamPool {
     if (i < j) {
       return flat(j, i);
     }
-    return i * (i - 1) / 2 + j;
+    const auto index = i * (i - 1) / 2 + j;
+    assert(index < n_entries);
+    return index;
   }
 
   Entry &operator()(auto i, auto j) { return entries[flat(i, j)]; }
 
   void update(auto i, auto j, auto score) {
-    if (i < j) {
+    if (i == j) {
+      return;
+    } else if (i < j) {
       return update(j, i, 2 - score);
     }
     auto &entry = (*this)(i, j);
@@ -102,6 +106,7 @@ namespace RuntimeOptions {
 
 size_t n_threads = 0;
 size_t buffer_size_mb = 8;
+size_t max_build_traj = 1 << 13; // 1 mb per file at 128bits per traj
 size_t print_interval_sec = 30;
 
 namespace Search {
@@ -283,7 +288,7 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--move-delete-prob=")) {
       RuntimeOptions::TeamGen::move_delete_prob = std::stod(arg.substr(21));
     } else if (arg.starts_with("--buffer-size=")) {
-      RuntimeOptions::buffer_size_mb = std::stoul(arg.substr(34));
+      RuntimeOptions::buffer_size_mb = std::stoul(arg.substr(14));
     } else {
       throw std::runtime_error("Invalid arg: " + arg);
       std::cerr << "Unknown option: " << arg << "\n";
@@ -299,7 +304,8 @@ bool suspended = false;
 std::string start_datetime = std::format(
     "{:%F-%T}",
     std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
-std::atomic<size_t> buffer_counter{};
+std::atomic<size_t> battle_buffer_counter{};
+std::atomic<size_t> build_buffer_counter{};
 std::atomic<size_t> frame_counter{};
 NN::BuildNet build_network{}; // is not battle specific unlike the net
 TeamPool team_pool{};
@@ -381,9 +387,7 @@ rollout_build_network(Init::Team &team, NN::BuildNet &build_net, auto &device) {
 
 // produces a (modified) team from the pool and the index of unmodified team or
 // -1 if modified.
-std::pair<Init::Team, int>
-get_team(prng &device,
-         std::vector<Train::BuildTrajectory> &build_trajectories) {
+std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(SampleTeams::teams.size());
@@ -404,18 +408,17 @@ get_team(prng &device,
     }
   }
 
-  // TODO wont produce traj if build net reconstructs a sample team
-
   const bool changed = (team != SampleTeams::teams[index]);
+  Train::BuildTrajectory build_traj{};
   if (changed) {
     print("Team " + std::to_string(index) + " modified:");
     print(Init::team_string(team));
-    build_trajectories.emplace_back(
-        rollout_build_network(team, RuntimeData::build_network, device));
+    build_traj =
+        rollout_build_network(team, RuntimeData::build_network, device);
     print(Init::team_string(team));
   }
 
-  return {team, changed ? -1 : index};
+  return {team, changed ? -1 : index, build_traj};
 }
 
 // run search, use output to update battle data and nodes and training frame
@@ -479,6 +482,9 @@ std::pair<int, int> sample(prng &device, auto &output) {
       val /= sum;
     }
 
+    print("Processed policy:");
+    print(container_string(p));
+
     const auto index = device.sample_pdf(p);
     return index;
   };
@@ -490,8 +496,19 @@ std::pair<int, int> sample(prng &device, auto &output) {
     return {process_and_sample(output.p1_empirical),
             process_and_sample(output.p2_empirical)};
   } else if (policy_mode == 'm') {
-    // TODO: Implement mixed mode
-    throw std::runtime_error("Mix mode not implemented.");
+    const auto weighted_sum = [](const auto &a, const auto &b,
+                                 const auto alpha) {
+      auto result = a;
+      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
+                     [alpha](const auto &x, const auto &y) {
+                       return alpha * x + (decltype(alpha))(1) - alpha * y;
+                     });
+      return result;
+    };
+    return {process_and_sample(weighted_sum(output.p1_nash, output.p1_empirical,
+                                            mix_nash_weight)),
+            process_and_sample(weighted_sum(output.p2_nash, output.p2_empirical,
+                                            mix_nash_weight))};
   }
   throw std::runtime_error("Invalid policy mode.");
 }
@@ -528,13 +545,55 @@ void generate(uint64_t seed) {
                                           << 20;
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
-
   // These are generated slowly so a vector is fine
-  std::vector<Train::BuildTrajectory> build_trajectories{};
+  std::vector<Train::BuildTrajectory> build_buffer{};
+
+  const auto save_battle_buffer_to_disk = [&buffer, thread_frame_buffer_size,
+                                           &frame_buffer_write_index]() {
+    const auto filename =
+        std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
+        ".battle";
+    const auto full_path =
+        std::filesystem::path{RuntimeData::start_datetime} / filename;
+    int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+      const auto write_result = write(fd, buffer, frame_buffer_write_index);
+      close(fd);
+    } else {
+      std::cerr << "Failed to write buffer to " << full_path << std::endl;
+    }
+
+    std::memset(buffer, 0, thread_frame_buffer_size);
+    frame_buffer_write_index = 0;
+  };
+
+  const auto save_build_buffer_to_disk = [&build_buffer]() {
+    const auto filename =
+        std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
+        ".build";
+    const auto full_path =
+        std::filesystem::path{RuntimeData::start_datetime} / filename;
+
+    const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+      const size_t bytes_to_write =
+          build_buffer.size() * sizeof(Train::BuildTrajectory);
+      const ssize_t written = write(fd, build_buffer.data(), bytes_to_write);
+      close(fd);
+      if (written != static_cast<ssize_t>(bytes_to_write)) {
+        std::cerr << "Short write when flushing build buffer to " << full_path
+                  << " (" << written << '/' << bytes_to_write << " bytes)\n";
+      }
+    } else {
+      std::cerr << "Failed to open " << full_path << " for writing\n";
+    }
+
+    build_buffer.clear();
+  };
 
   while (true) {
-    const auto [p1_team, p1_team_index] = get_team(device, build_trajectories);
-    const auto [p2_team, p2_team_index] = get_team(device, build_trajectories);
+    auto [p1_team, p1_team_index, p1_build_traj] = get_team(device);
+    auto [p2_team, p2_team_index, p2_build_traj] = get_team(device);
 
     const auto bd = Init::battle_data(p1_team, p2_team, device.uniform_64());
     BattleData battle_data{bd.first, bd.second, {}};
@@ -546,13 +605,20 @@ void generate(uint64_t seed) {
     Train::CompressedFrames<> training_frames{battle_data.battle};
 
     size_t updates = 0;
+    float t1_eval = 0;
     try {
       // playout game
       while (!pkmn_result_type(battle_data.result)) {
 
+        while (RuntimeData::suspended) {
+          sleep(1);
+        }
+
         if (RuntimeData::terminated) {
+          save_battle_buffer_to_disk();
+          save_build_buffer_to_disk();
           return;
-        } // TODO handle saving
+        }
 
         print(Strings::battle_data_to_string(battle_data.battle,
                                              battle_data.durations, {}));
@@ -567,7 +633,7 @@ void generate(uint64_t seed) {
         const auto p1_choice = p1_choices[p1_index];
         const auto p2_choice = p2_choices[p2_index];
 
-        print("Value: " + std::to_string(output.average_value));
+        print("Value: " + std::to_string(output.empirical_value));
 
         std::vector<std::string> p1_labels{};
         std::vector<std::string> p2_labels{};
@@ -618,11 +684,24 @@ void generate(uint64_t seed) {
       continue;
     }
 
+    // build
     if ((p1_team_index >= 0) && (p2_team_index >= 0)) {
       RuntimeData::team_pool.update(p1_team_index, p2_team_index,
                                     Init::score(battle_data.result));
     }
+    if (p1_team_index == -1) {
+      p1_build_traj.score =
+          static_cast<uint16_t>(2 * Init::score(battle_data.result));
+      p1_build_traj.eval = training_frames.updates.front().eval;
+    }
+    if (p2_team_index == -1) {
+      p2_build_traj.score =
+          static_cast<uint16_t>(2 * (1 - Init::score(battle_data.result)));
+      p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
+                           training_frames.updates.front().eval;
+    }
 
+    // battle
     training_frames.result = battle_data.result;
     const auto n_bytes_frames = training_frames.n_bytes();
     training_frames.write(buffer + frame_buffer_write_index);
@@ -631,25 +710,11 @@ void generate(uint64_t seed) {
     // stats
     RuntimeData::frame_counter.fetch_add(training_frames.updates.size());
 
+    if (build_buffer.size() >= RuntimeOptions::max_build_traj) {
+      save_build_buffer_to_disk();
+    }
     if (frame_buffer_write_index >= training_frames_target_size) {
-      // write
-      print("Writing training frame buffer.");
-
-      const auto filename =
-          std::to_string(RuntimeData::buffer_counter.fetch_add(1));
-      const std::string full_path =
-          RuntimeData::start_datetime + "-" + filename;
-      int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-      if (fd >= 0) {
-        const auto write_result = write(fd, buffer, frame_buffer_write_index);
-        close(fd);
-      } else {
-        std::cerr << "Failed to write buffer to " << full_path << std::endl;
-      }
-
-      // reset buffer
-      std::memset(buffer, 0, thread_frame_buffer_size);
-      frame_buffer_write_index = 0;
+      save_battle_buffer_to_disk();
     }
   }
 
@@ -700,7 +765,18 @@ void create_working_dir() {
 }
 
 void cleanup() {
-  // save TeamPool stats
+  std::cout << "Sample Team Matchup Info" << std::endl;
+  for (auto i = 0; i < TeamPool::n_teams; ++i) {
+    for (auto j = 0; j < i; ++j) {
+      std::cout << i << ' ' << j << ": ";
+      const auto &entry = RuntimeData::team_pool(i, j);
+      if (entry.n) {
+        std::cout << entry.v / 2.0 / entry.n << std::endl;
+      } else {
+        std::cout << "N/A" << std::endl;
+      }
+    }
+  }
 }
 
 int main(int argc, char **argv) {

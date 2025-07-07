@@ -59,7 +59,8 @@ struct MCTS {
     size_t n;
     size_t iterations;
     double total_value;
-    double average_value;
+    double empirical_value;
+    double nash_value;
     std::array<pkmn_choice, 9> p1_choices;
     std::array<pkmn_choice, 9> p2_choices;
     std::array<double, 9> p1_empirical;
@@ -131,7 +132,7 @@ struct MCTS {
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     }
 
-    output.average_value = output.total_value / output.iterations;
+    output.empirical_value = output.total_value / output.iterations;
     const auto [c1, c2] = Init::choices(input.battle, input.result);
     output.m = c1.size();
     output.n = c2.size();
@@ -183,6 +184,7 @@ struct MCTS {
         output.p1_nash = output.p1_empirical;
         output.p2_nash = output.p2_empirical;
       }
+      output.nash_value = solve_output.value;
     }
 
     return output;
