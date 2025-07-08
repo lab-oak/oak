@@ -4,6 +4,7 @@
 #include <data/layout.h>
 #include <pi/mcts.h>
 
+#include <iomanip>
 #include <string>
 #include <vector>
 
