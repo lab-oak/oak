@@ -2,6 +2,7 @@
 
 #include <battle/strings.h>
 #include <data/layout.h>
+#include <pi/mcts.h>
 
 #include <string>
 #include <vector>

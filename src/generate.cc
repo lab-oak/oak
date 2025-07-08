@@ -393,15 +393,18 @@ std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   auto team = SampleTeams::teams[index];
 
   // randomly delete mons/moves for the net to fill in
-  for (auto p = 0; p < 6; ++p) {
-    const auto r = device.uniform();
-    if (r < pokemon_delete_prob) {
-      team[p] = {};
-    } else {
-      for (auto m = 0; m < 4; ++m) {
-        const auto rm = device.uniform();
-        if (rm < move_delete_prob) {
-          team[p].moves[m] = Data::Move::None;
+  const auto r = device.uniform();
+  if (r < modify_team_prob) {
+    for (auto p = 0; p < 6; ++p) {
+      const auto r = device.uniform();
+      if (r < pokemon_delete_prob) {
+        team[p] = {};
+      } else {
+        for (auto m = 0; m < 4; ++m) {
+          const auto rm = device.uniform();
+          if (rm < move_delete_prob) {
+            team[p].moves[m] = Data::Move::None;
+          }
         }
       }
     }

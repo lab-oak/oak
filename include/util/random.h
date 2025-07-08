@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <random>
 
 class prng {
@@ -25,7 +26,10 @@ public:
   double uniform() noexcept { return uniform_(engine); }
 
   // Random integer in [0, n)
-  int random_int(int n) noexcept { return uniform_64_(engine) % n; }
+  int random_int(int n) noexcept {
+    assert(n != 0);
+    return uniform_64_(engine) % n;
+  }
 
   uint64_t uniform_64() noexcept { return uniform_64_(engine); }
 
