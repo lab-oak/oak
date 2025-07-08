@@ -6,7 +6,7 @@ This project has two layers. The first is a header-only library that defines
 
 * *sound*, high performance MCTS for perfect information battles
 
-* both full-precision and fast, quantized nueral network implementations for CPU
+* both full-precision and fast, quantized neural network implementations for CPU
 
 * a lossless battle encoding for neural network inputs
 
