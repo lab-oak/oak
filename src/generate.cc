@@ -635,6 +635,7 @@ void generate(uint64_t seed) {
         if (RuntimeData::terminated) {
           save_battle_buffer_to_disk();
           save_build_buffer_to_disk();
+          delete[] buffer;
           return;
         }
 
@@ -742,8 +743,6 @@ void generate(uint64_t seed) {
       save_battle_buffer_to_disk();
     }
   }
-
-  delete[] buffer;
 }
 
 void print_thread_fn() {
