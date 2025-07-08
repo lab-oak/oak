@@ -306,6 +306,7 @@ std::string start_datetime = std::format(
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
 std::atomic<size_t> frame_counter{};
+std::atomic<size_t> traj_counter{};
 NN::BuildNet build_network{}; // is not battle specific unlike the net
 TeamPool team_pool{};
 }; // namespace RuntimeData
@@ -698,6 +699,7 @@ void generate(uint64_t seed) {
           static_cast<uint16_t>(2 * Init::score(battle_data.result));
       p1_build_traj.eval = training_frames.updates.front().eval;
       build_buffer.push_back(p1_build_traj);
+      RuntimeData::traj_counter.fetch_add(1);
     }
     if (p2_team_index == -1) {
       p2_build_traj.score =
@@ -705,6 +707,7 @@ void generate(uint64_t seed) {
       p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
                            training_frames.updates.front().eval;
       build_buffer.push_back(p2_build_traj);
+      RuntimeData::traj_counter.fetch_add(1);
     }
 
     // battle
@@ -728,8 +731,8 @@ void generate(uint64_t seed) {
 }
 
 void print_thread_fn() {
-  size_t done = 0;
-  int sec = 10;
+  size_t frames_done = 0;
+  size_t traj_done = 0;
   while (true) {
     for (int i = 0; i < RuntimeOptions::print_interval_sec; ++i) {
       if (RuntimeData::terminated) {
@@ -737,9 +740,17 @@ void print_thread_fn() {
       }
       sleep(1);
     }
-    const auto more = RuntimeData::frame_counter.load();
-    std::cout << (more - done) / (float)sec << " samples/sec." << std::endl;
-    done = more;
+    const auto frames_more = RuntimeData::frame_counter.load();
+    const auto traj_more = RuntimeData::traj_counter.load();
+    std::cout << (frames_more - frames_done) /
+                     (float)RuntimeOptions::print_interval_sec
+              << " battle frames/sec." << std::endl;
+    std::cout << (traj_more - traj_done) /
+                     (float)RuntimeOptions::print_interval_sec
+              << " build traj./sec." << std::endl;
+
+    frames_done = frames_more;
+    traj_done = traj_more;
   }
 }
 

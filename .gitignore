@@ -1,2 +1,5 @@
 /build
 /libpkmn
+*.battle
+*.build
+*/build-network
