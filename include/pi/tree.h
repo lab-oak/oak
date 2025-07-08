@@ -31,7 +31,7 @@ template <typename BanditData, typename Obs> struct Node {
     return &node;
   }
 
-  auto operator[](auto p1_index, auto p2_index, auto obs) {
+  auto get(auto p1_index, auto p2_index, auto obs) {
     return _map.find({p1_index, p2_index, obs});
   }
 
