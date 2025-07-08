@@ -105,9 +105,9 @@ struct TeamPool {
 
 namespace RuntimeOptions {
 
-size_t n_threads = 0;
-size_t buffer_size_mb = 8;
-size_t max_build_traj = 1 << 13; // 1 mb per file at 128bits per traj
+size_t threads = 0;
+size_t buffer_size_mb = 64;
+size_t max_build_traj = 1 << 16; // 8 mb per file at 128bits per traj
 size_t print_interval_sec = 30;
 
 namespace Search {
@@ -133,7 +133,7 @@ namespace TeamGen {
 
 // required since an untrained random network can still act as the source of
 // randomness while also generating training data
-std::string build_network_path;
+std::string build_network_path = "";
 
 // team gen protocal: pick from sample teams, randomly omit set data, have
 // the network fill it back in and produce a trajectory using t1 search eval +
@@ -173,7 +173,7 @@ std::string generate_help_text() {
         "teams that is updated whenever unmodified teams battle.\n";
 
   ss << "--karg={DEFAULT}\n";
-  ss << "--n-threads=" << RuntimeOptions::n_threads << "\n"
+  ss << "--threads=" << RuntimeOptions::threads << "\n"
      << "  Number of threads to use for parallel computation.\n\n";
 
   ss << "--buffer-size=" << RuntimeOptions::buffer_size_mb << "\n"
@@ -247,7 +247,7 @@ std::string generate_help_text() {
 
 bool parse_options(int argc, char **argv) {
   if (argc == 1) {
-    std::cout << "Usage: ./generate [OPTIONS]\nArg '--n-threads=' is "
+    std::cout << "Usage: ./generate [OPTIONS]\nArg '--threads=' is "
                  "required.\n--help for more."
               << std::endl;
     return true;
@@ -258,8 +258,8 @@ bool parse_options(int argc, char **argv) {
     if (arg.starts_with("--help")) {
       std::cout << generate_help_text() << std::endl;
       return true;
-    } else if (arg.starts_with("--n-threads=")) {
-      RuntimeOptions::n_threads = std::stoul(arg.substr(12));
+    } else if (arg.starts_with("--threads=")) {
+      RuntimeOptions::threads = std::stoul(arg.substr(10));
     } else if (arg.starts_with("--count=")) {
       RuntimeOptions::Search::count = std::stoul(arg.substr(8));
     } else if (arg.starts_with("--count-mode=")) {
@@ -294,7 +294,7 @@ bool parse_options(int argc, char **argv) {
     }
   }
 
-  return RuntimeOptions::n_threads == 0;
+  return RuntimeOptions::threads == 0;
 }
 
 namespace RuntimeData {
@@ -581,6 +581,8 @@ void generate(uint64_t seed) {
       const size_t bytes_to_write =
           build_buffer.size() * sizeof(Train::BuildTrajectory);
       const ssize_t written = write(fd, build_buffer.data(), bytes_to_write);
+      print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
+      print("build buffer - bytes written: " + std::to_string(written));
       close(fd);
       if (written != static_cast<ssize_t>(bytes_to_write)) {
         std::cerr << "Short write when flushing build buffer to " << full_path
@@ -695,12 +697,14 @@ void generate(uint64_t seed) {
       p1_build_traj.score =
           static_cast<uint16_t>(2 * Init::score(battle_data.result));
       p1_build_traj.eval = training_frames.updates.front().eval;
+      build_buffer.push_back(p1_build_traj);
     }
     if (p2_team_index == -1) {
       p2_build_traj.score =
           static_cast<uint16_t>(2 * (1 - Init::score(battle_data.result)));
       p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
                            training_frames.updates.front().eval;
+      build_buffer.push_back(p2_build_traj);
     }
 
     // battle
@@ -768,13 +772,18 @@ void create_working_dir() {
 
 void prepare() {
   if (RuntimeOptions::TeamGen::build_network_path == "") {
-    std::ofstream weight_path{RuntimeOptions::TeamGen::build_network_path,
-                              std::ios::binary};
-    RuntimeData::build_network.write_parameters(weight_path);
+    print("no build network path provided.");
+    const auto new_path =
+        std::filesystem::path{RuntimeData::start_datetime} / "build-network";
+    std::ofstream stream{new_path, std::ios::binary};
+    RuntimeData::build_network.write_parameters(stream);
   } else {
-    std::ifstream weight_path{RuntimeOptions::TeamGen::build_network_path,
-                              std::ios::binary};
-    RuntimeData::build_network.read_parameters(weight_path);
+    std::ifstream stream{RuntimeOptions::TeamGen::build_network_path,
+                         std::ios::binary};
+    const bool read_success =
+        RuntimeData::build_network.read_parameters(stream);
+    print("build net read success: " +
+          std::string(read_success ? "true" : "false"));
   }
 }
 
@@ -809,7 +818,7 @@ int main(int argc, char **argv) {
   prng device{seed};
 
   std::vector<std::thread> thread_pool;
-  for (int t = 0; t < RuntimeOptions::n_threads; ++t) {
+  for (int t = 0; t < RuntimeOptions::threads; ++t) {
     thread_pool.emplace_back(generate, device.uniform_64());
   }
   std::thread print_thread{print_thread_fn};
