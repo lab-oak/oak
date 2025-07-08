@@ -20,6 +20,7 @@
 #include <exception>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -245,7 +246,6 @@ std::string generate_help_text() {
 }
 
 bool parse_options(int argc, char **argv) {
-
   if (argc == 1) {
     std::cout << "Usage: ./generate [OPTIONS]\nArg '--n-threads=' is "
                  "required.\n--help for more."
@@ -273,25 +273,24 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--policy-temp=")) {
       RuntimeOptions::Search::policy_temp = std::stod(arg.substr(14));
     } else if (arg.starts_with("--policy-min-prob=")) {
-      RuntimeOptions::Search::policy_min_prob = std::stod(arg.substr(19));
+      RuntimeOptions::Search::policy_min_prob = std::stod(arg.substr(18));
     } else if (arg.starts_with("--mix-nash-weight=")) {
-      RuntimeOptions::Search::mix_nash_weight = std::stod(arg.substr(19));
+      RuntimeOptions::Search::mix_nash_weight = std::stod(arg.substr(18));
     } else if (arg.starts_with("--keep-node=")) {
       RuntimeOptions::Search::keep_node =
-          (arg.substr(13) == "1" || arg.substr(13) == "true");
+          (arg.substr(12) == "1" || arg.substr(12) == "true");
     } else if (arg.starts_with("--build-network-path=")) {
-      RuntimeOptions::TeamGen::build_network_path = arg.substr(22);
+      RuntimeOptions::TeamGen::build_network_path = arg.substr(21);
     } else if (arg.starts_with("--modify-team-prob=")) {
-      RuntimeOptions::TeamGen::modify_team_prob = std::stod(arg.substr(21));
+      RuntimeOptions::TeamGen::modify_team_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      RuntimeOptions::TeamGen::pokemon_delete_prob = std::stod(arg.substr(24));
+      RuntimeOptions::TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
     } else if (arg.starts_with("--move-delete-prob=")) {
-      RuntimeOptions::TeamGen::move_delete_prob = std::stod(arg.substr(21));
+      RuntimeOptions::TeamGen::move_delete_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--buffer-size=")) {
       RuntimeOptions::buffer_size_mb = std::stoul(arg.substr(14));
     } else {
       throw std::runtime_error("Invalid arg: " + arg);
-      std::cerr << "Unknown option: " << arg << "\n";
     }
   }
 
@@ -764,6 +763,18 @@ void create_working_dir() {
   }
 }
 
+void prepare() {
+  if (RuntimeOptions::TeamGen::build_network_path == "") {
+    std::ofstream weight_path{RuntimeOptions::TeamGen::build_network_path,
+                              std::ios::binary};
+    RuntimeData::build_network.write_parameters(weight_path);
+  } else {
+    std::ifstream weight_path{RuntimeOptions::TeamGen::build_network_path,
+                              std::ios::binary};
+    RuntimeData::build_network.read_parameters(weight_path);
+  }
+}
+
 void cleanup() {
   std::cout << "Sample Team Matchup Info" << std::endl;
   for (auto i = 0; i < TeamPool::n_teams; ++i) {
@@ -788,6 +799,8 @@ int main(int argc, char **argv) {
   }
 
   create_working_dir();
+
+  prepare();
 
   uint64_t seed = 123456789;
   prng device{seed};

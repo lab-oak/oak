@@ -1,7 +1,7 @@
 #include <battle/init.h>
 #include <battle/sample-teams.h>
-#include <util/random.h>
 #include <train/compressed-frame.h>
+#include <util/random.h>
 
 #include <iostream>
 #include <limits>
@@ -22,10 +22,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-
   fseek(file, 0, SEEK_END);
   size_t file_size = ftell(file);
-  rewind(file);  // move back to start of file
+  rewind(file);
 
   std::vector<char> buffer(file_size);
   fread(buffer.data(), 1, file_size, file);
@@ -38,7 +37,7 @@ int main(int argc, char **argv) {
     read_index += battle_frame.n_bytes();
     turns.push_back(battle_frame.updates.size());
   }
-  
+
   std::cout << "turn lengths:" << std::endl;
   for (const auto t : turns) {
     std::cout << t << std::endl;

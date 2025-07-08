@@ -20,16 +20,39 @@ public:
   WeightMatrix weights;
   OutputVector biases;
 
-  Affine() : weights(kOut, kIn) {}
+  Affine() : weights(kOut, kIn) {
+    const float k = 1.0f / std::sqrt(static_cast<float>(kIn));
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(-k, k);
+
+    for (std::size_t i = 0; i < kOut; ++i)
+      biases(i) = dist(gen);
+
+    for (std::size_t i = 0; i < kOut; ++i)
+      for (std::size_t j = 0; j < kIn; ++j)
+        weights(i, j) = dist(gen);
+  }
 
   bool read_parameters(std::istream &stream) {
     if (!stream.read(reinterpret_cast<char *>(biases.data()),
-                     kOut * sizeof(float)))
+                     kOut * sizeof(float))) {
       return false;
+    }
     if (!stream.read(reinterpret_cast<char *>(weights.data()),
-                     kOut * kIn * sizeof(float)))
+                     kOut * kIn * sizeof(float))) {
       return false;
+    }
     return true;
+  }
+
+  bool write_parameters(std::ostream &stream) const {
+    stream.write(reinterpret_cast<const char *>(biases.data()),
+                 kOut * sizeof(float));
+    stream.write(reinterpret_cast<const char *>(weights.data()),
+                 kOut * kIn * sizeof(float));
+    return !stream.fail();
   }
 
   void propagate(const float *input_data, float *output_data) const {

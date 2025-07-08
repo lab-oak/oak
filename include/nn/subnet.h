@@ -14,6 +14,10 @@ struct EmbeddingNet {
     return fc0.read_parameters(stream) && fc1.read_parameters(stream);
   }
 
+  bool write_parameters(std::ostream &stream) {
+    return fc0.write_parameters(stream) && fc1.write_parameters(stream);
+  }
+
   void propagate(const float *input_data, float *output_data) const {
     static thread_local float hidden_layer[hidden_dim];
     fc0.propagate(input_data, hidden_layer);
