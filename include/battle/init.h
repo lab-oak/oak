@@ -248,8 +248,8 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
       }
     }
     if (const auto confusion = duration.confusion()) {
-      const uint8_t max = 5 - confusion;
-      vol.set_confusion_left(static_cast<uint8_t>(device.random_int(max) + 1));
+      const uint8_t max = 6 - (confusion + (confusion == 1));
+      vol.set_confusion_left(static_cast<uint8_t>(device.random_int(max) + 1 + (confusion == 1)));
     }
     if (const auto disable = duration.disable()) {
       const uint8_t max = 8 - disable;
