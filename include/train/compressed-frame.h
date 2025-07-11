@@ -103,7 +103,7 @@ struct CompressedFrames {
       std::memcpy(buffer + index,
                   reinterpret_cast<const char *>(p2_nash.data()),
                   n * sizeof(policy_type));
-      // assert(index + sizeof(policy_type) * n == n_bytes());
+      assert(index + sizeof(policy_type) * n == n_bytes());
       return true;
     }
 
@@ -141,10 +141,7 @@ struct CompressedFrames {
   CompressedFrames(const pkmn_gen1_battle &battle) : battle{battle} {}
 
   auto n_bytes() const {
-    // leading two bytes stores the result of this function
-    // this allows us find the starting points of all the CompressedFrames
-    // in one large buffer without having to parse them
-    auto n = sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
+    auto n = 2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
     for (const auto &update : updates) {
       n += update.n_bytes();
     }
@@ -153,7 +150,8 @@ struct CompressedFrames {
 
   bool write(char *buffer) const {
     reinterpret_cast<uint16_t *>(buffer)[0] = n_bytes();
-    auto index = 2;
+    reinterpret_cast<uint16_t *>(buffer)[1] = updates.size();
+    auto index = 4;
     std::memcpy(buffer + index, battle.bytes, sizeof(pkmn_gen1_battle));
     index += sizeof(pkmn_gen1_battle);
     buffer[index] = static_cast<char>(result);
@@ -163,25 +161,26 @@ struct CompressedFrames {
       update.write(buffer + index);
       index += n;
     }
-    // std::cout << "write; index: " << index << " n_bytes: " << n_bytes()
-    //           << std::endl;
     assert(index == n_bytes());
     return true;
   }
 
   bool read(const char *buffer) {
-    const auto buffer_length = *reinterpret_cast<const uint16_t *>(buffer);
-    // std::cout << "read; buffer length: " << buffer_length << std::endl;
-    std::memcpy(battle.bytes, buffer + 2, sizeof(pkmn_gen1_battle));
+    const auto buffer_16 = reinterpret_cast<const uint16_t *>(buffer);
+    const auto buffer_length = buffer_16[0];
+    const auto n_updates = buffer_16[1];
+    std::memcpy(battle.bytes, buffer + 4, sizeof(pkmn_gen1_battle));
     auto index =
-        sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
+        2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle);
+    result = buffer[index];
+    ++index;
     while (index < buffer_length) {
       updates.emplace_back();
       auto &update = updates.back();
       update.read(buffer + index);
       index += update.n_bytes();
     }
-    // assert(index == buffer_length);
+    assert(index == buffer_length);
     return true;
   }
 };
