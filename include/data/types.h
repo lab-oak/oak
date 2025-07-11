@@ -65,16 +65,16 @@ constexpr static std::array<std::array<Effectiveness, 15>, 15> TYPE_CHART{
      {E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N,
       E::N, E::N, E::S}}};
 
-consteval auto get_effectiveness(Types attacking, Types defending) noexcept {
+consteval auto get_effectiveness(Types attacking, Types defending)  {
   return TYPE_CHART[static_cast<uint8_t>(attacking)]
                    [static_cast<uint8_t>(defending)];
 }
 
-constexpr bool is_special(const auto type) noexcept {
+constexpr bool is_special(const auto type)  {
   return static_cast<uint8_t>(type) >= 8;
 }
 
-constexpr bool is_physical(const auto type) noexcept {
+constexpr bool is_physical(const auto type)  {
   return static_cast<uint8_t>(type) < 8;
 }
 

@@ -49,21 +49,21 @@ struct uint24_t {
 
   constexpr uint24_t() = default;
 
-  constexpr uint24_t(uint32_t value) noexcept {
+  constexpr uint24_t(uint32_t value)  {
     _data[0] = value & 0xFF;
     _data[1] = (value >> 8) & 0xFF;
     _data[2] = (value >> 16) & 0xFF;
   }
 
-  constexpr operator uint32_t() const noexcept {
+  constexpr operator uint32_t() const  {
     return (static_cast<uint32_t>(_data[0]) |
             (static_cast<uint32_t>(_data[1]) << 8) |
             (static_cast<uint32_t>(_data[2]) << 16));
   }
 
-  constexpr auto value() const noexcept { return static_cast<uint32_t>(*this); }
+  constexpr auto value() const  { return static_cast<uint32_t>(*this); }
 
-  constexpr uint24_t &operator++() noexcept {
+  constexpr uint24_t &operator++()  {
     uint32_t value = static_cast<uint32_t>(*this) + 1;
     *this = uint24_t(value);
     return *this;
@@ -100,7 +100,7 @@ public:
     uint8_t p2_index;
   };
 
-  void init(auto rows, auto cols) noexcept {
+  void init(auto rows, auto cols)  {
     _rows = rows;
     _cols = cols;
     std::fill(p1_score.begin(), p1_score.begin() + rows, 0);
@@ -109,9 +109,9 @@ public:
     std::fill(this->p2_visits.begin(), this->p2_visits.begin() + cols, 1);
   }
 
-  bool is_init() const noexcept { return this->_rows != 0; }
+  bool is_init() const  { return this->_rows != 0; }
 
-  template <typename Outcome> void update(const Outcome &outcome) noexcept {
+  template <typename Outcome> void update(const Outcome &outcome)  {
     ++this->p1_visits[outcome.p1_index];
     ++this->p2_visits[outcome.p2_index];
     p1_score[outcome.p1_index] += outcome.p1_value;
@@ -119,7 +119,7 @@ public:
   }
 
   template <typename PRNG, typename Outcome>
-  void select(PRNG &device, Outcome &outcome) const noexcept {
+  void select(PRNG &device, Outcome &outcome) const  {
     if (_rows < 2) {
       outcome.p1_index = 0;
     } else {

@@ -20,28 +20,28 @@ using namespace Layout;
 struct Stats {
   uint8_t bytes[10];
 
-  uint16_t &hp() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 0); }
-  const uint16_t &hp() const noexcept {
+  uint16_t &hp()  { return *reinterpret_cast<uint16_t *>(bytes + 0); }
+  const uint16_t &hp() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 0);
   }
 
-  uint16_t &atk() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 2); }
-  const uint16_t &atk() const noexcept {
+  uint16_t &atk()  { return *reinterpret_cast<uint16_t *>(bytes + 2); }
+  const uint16_t &atk() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 2);
   }
 
-  uint16_t &def() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 4); }
-  const uint16_t &def() const noexcept {
+  uint16_t &def()  { return *reinterpret_cast<uint16_t *>(bytes + 4); }
+  const uint16_t &def() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 4);
   }
 
-  uint16_t &spe() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 6); }
-  const uint16_t &spe() const noexcept {
+  uint16_t &spe()  { return *reinterpret_cast<uint16_t *>(bytes + 6); }
+  const uint16_t &spe() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 6);
   }
 
-  uint16_t &spc() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 8); }
-  const uint16_t &spc() const noexcept {
+  uint16_t &spc()  { return *reinterpret_cast<uint16_t *>(bytes + 8); }
+  const uint16_t &spc() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 8);
   }
 };
@@ -54,50 +54,50 @@ struct MoveSlot {
 struct Pokemon {
   uint8_t bytes[24];
 
-  Stats &stats() noexcept { return *reinterpret_cast<Stats *>(bytes + 0); }
-  const Stats &stats() const noexcept {
+  Stats &stats()  { return *reinterpret_cast<Stats *>(bytes + 0); }
+  const Stats &stats() const  {
     return *reinterpret_cast<const Stats *>(bytes + 0);
   }
 
-  std::array<MoveSlot, 4> &moves() noexcept {
+  std::array<MoveSlot, 4> &moves()  {
     return *reinterpret_cast<std::array<MoveSlot, 4> *>(bytes + 10);
   }
-  const std::array<MoveSlot, 4> &moves() const noexcept {
+  const std::array<MoveSlot, 4> &moves() const  {
     return *reinterpret_cast<const std::array<MoveSlot, 4> *>(bytes + 10);
   }
 
-  MoveSlot &moves(size_t i) noexcept { return moves()[i]; }
-  const MoveSlot &moves(size_t i) const noexcept { return moves()[i]; }
+  MoveSlot &moves(size_t i)  { return moves()[i]; }
+  const MoveSlot &moves(size_t i) const  { return moves()[i]; }
 
-  uint16_t &hp() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 18); }
-  const uint16_t &hp() const noexcept {
+  uint16_t &hp()  { return *reinterpret_cast<uint16_t *>(bytes + 18); }
+  const uint16_t &hp() const  {
     return *reinterpret_cast<const uint16_t *>(bytes + 18);
   }
 
-  float percent() const noexcept {
+  float percent() const  {
     // Return ceil of current hp divided by max hp times 100
     return std::ceil(100.0f * hp() / stats().hp());
   }
 
-  Data::Status &status() noexcept {
+  Data::Status &status()  {
     return *reinterpret_cast<Data::Status *>(bytes + 20);
   }
-  const Data::Status &status() const noexcept {
+  const Data::Status &status() const  {
     return *reinterpret_cast<const Data::Status *>(bytes + 20);
   }
 
-  Data::Species &species() noexcept {
+  Data::Species &species()  {
     return *reinterpret_cast<Data::Species *>(bytes + 21);
   }
-  const Data::Species &species() const noexcept {
+  const Data::Species &species() const  {
     return *reinterpret_cast<const Data::Species *>(bytes + 21);
   }
 
-  uint8_t &types() noexcept { return bytes[22]; }
-  const uint8_t &types() const noexcept { return bytes[22]; }
+  uint8_t &types()  { return bytes[22]; }
+  const uint8_t &types() const  { return bytes[22]; }
 
-  uint8_t &level() noexcept { return bytes[23]; }
-  const uint8_t &level() const noexcept { return bytes[23]; }
+  uint8_t &level()  { return bytes[23]; }
+  const uint8_t &level() const  { return bytes[23]; }
 };
 
 // Align Volatiles for uint64_t access
@@ -149,41 +149,41 @@ uint8_t encode_i4(int8_t x) { return static_cast<uint8_t>(x) & 0x0F; }
 struct ActivePokemon {
   uint8_t bytes[32];
 
-  Stats &stats() noexcept { return *reinterpret_cast<Stats *>(bytes + 0); }
-  const Stats &stats() const noexcept {
+  Stats &stats()  { return *reinterpret_cast<Stats *>(bytes + 0); }
+  const Stats &stats() const  {
     return *reinterpret_cast<const Stats *>(bytes + 0);
   }
 
-  uint8_t boost_atk() const noexcept { return bytes[12] & 0b00001111; }
-  uint8_t boost_def() const noexcept { return (bytes[12] & 0b11110000) >> 4; }
-  uint8_t boost_spe() const noexcept { return bytes[13] & 0b00001111; }
-  uint8_t boost_spc() const noexcept { return (bytes[13] & 0b11110000) >> 4; }
-  uint8_t boost_acc() const noexcept { return bytes[14] & 0b00001111; }
-  uint8_t boost_eva() const noexcept { return (bytes[14] & 0b11110000) >> 4; }
+  uint8_t boost_atk() const  { return bytes[12] & 0b00001111; }
+  uint8_t boost_def() const  { return (bytes[12] & 0b11110000) >> 4; }
+  uint8_t boost_spe() const  { return bytes[13] & 0b00001111; }
+  uint8_t boost_spc() const  { return (bytes[13] & 0b11110000) >> 4; }
+  uint8_t boost_acc() const  { return bytes[14] & 0b00001111; }
+  uint8_t boost_eva() const  { return (bytes[14] & 0b11110000) >> 4; }
 
-  void set_boost_atk(int8_t value) noexcept {
+  void set_boost_atk(int8_t value)  {
     bytes[12] = (bytes[12] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_def(int8_t value) noexcept {
+  void set_boost_def(int8_t value)  {
     bytes[12] = (bytes[12] & 0b00001111) | (encode_i4(value) << 4);
   }
-  void set_boost_spe(int8_t value) noexcept {
+  void set_boost_spe(int8_t value)  {
     bytes[13] = (bytes[13] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_spc(int8_t value) noexcept {
+  void set_boost_spc(int8_t value)  {
     bytes[13] = (bytes[13] & 0b00001111) | (encode_i4(value) << 4);
   }
-  void set_boost_acc(int8_t value) noexcept {
+  void set_boost_acc(int8_t value)  {
     bytes[14] = (bytes[14] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_eva(int8_t value) noexcept {
+  void set_boost_eva(int8_t value)  {
     bytes[14] = (bytes[14] & 0b00001111) | (encode_i4(value) << 4);
   }
 
-  Volatiles &volatiles() noexcept {
+  Volatiles &volatiles()  {
     return *reinterpret_cast<Volatiles *>(bytes + 16);
   }
-  const Volatiles &volatiles() const noexcept {
+  const Volatiles &volatiles() const  {
     return *reinterpret_cast<const Volatiles *>(bytes + 16);
   }
 };
@@ -191,34 +191,34 @@ struct ActivePokemon {
 struct Side {
   uint8_t bytes[Sizes::Side];
 
-  Pokemon &pokemon(size_t slot) noexcept {
+  Pokemon &pokemon(size_t slot)  {
     return *reinterpret_cast<Pokemon *>(bytes + slot * Sizes::Pokemon);
   }
-  const Pokemon &pokemon(size_t slot) const noexcept {
+  const Pokemon &pokemon(size_t slot) const  {
     return *reinterpret_cast<const Pokemon *>(bytes + slot * Sizes::Pokemon);
   }
 
-  ActivePokemon &active() noexcept {
+  ActivePokemon &active()  {
     return *reinterpret_cast<ActivePokemon *>(bytes + Offsets::Side::active);
   }
-  const ActivePokemon &active() const noexcept {
+  const ActivePokemon &active() const  {
     return *reinterpret_cast<const ActivePokemon *>(bytes +
                                                     Offsets::Side::active);
   }
 
-  std::array<uint8_t, 6> &order() noexcept {
+  std::array<uint8_t, 6> &order()  {
     return *reinterpret_cast<std::array<uint8_t, 6> *>(bytes +
                                                        Offsets::Side::order);
   }
-  const std::array<uint8_t, 6> &order() const noexcept {
+  const std::array<uint8_t, 6> &order() const  {
     return *reinterpret_cast<const std::array<uint8_t, 6> *>(
         bytes + Offsets::Side::order);
   }
 
-  uint8_t &order(size_t i) noexcept {
+  uint8_t &order(size_t i)  {
     return (bytes + Offsets::Side::order)[i];
   }
-  const uint8_t &order(size_t i) const noexcept {
+  const uint8_t &order(size_t i) const  {
     return (bytes + Offsets::Side::order)[i];
   }
 };
@@ -226,57 +226,57 @@ struct Side {
 struct Battle {
   uint8_t bytes[PKMN_GEN1_BATTLE_SIZE];
 
-  Side &side(size_t side) noexcept {
+  Side &side(size_t side)  {
     return *reinterpret_cast<Side *>(bytes + side * Sizes::Side);
   }
-  const Side &side(size_t side) const noexcept {
+  const Side &side(size_t side) const  {
     return *reinterpret_cast<const Side *>(bytes + side * Sizes::Side);
   }
 };
 
-inline Battle &ref(pkmn_gen1_battle &battle) noexcept {
+inline Battle &ref(pkmn_gen1_battle &battle)  {
   return *reinterpret_cast<Battle *>(&battle);
 }
 
-inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
+inline const Battle &ref(const pkmn_gen1_battle &battle)  {
   return *reinterpret_cast<const Battle *>(&battle);
 }
 
 struct Duration {
   uint32_t data = 0;
 
-  uint8_t sleep(size_t slot) const noexcept {
+  uint8_t sleep(size_t slot) const  {
     return (data >> (3 * slot)) & 0b111;
   }
 
-  void set_sleep(size_t slot, uint8_t sleeps) noexcept {
+  void set_sleep(size_t slot, uint8_t sleeps)  {
     const uint32_t mask = 0b111 << (3 * slot);
     data = (data & ~mask) | ((sleeps & 0b111) << (3 * slot));
   }
 
-  uint8_t confusion() const noexcept { return (data >> 18) & 0b111; }
+  uint8_t confusion() const  { return (data >> 18) & 0b111; }
 
-  uint8_t disable() const noexcept { return (data >> 21) & 0b1111; }
+  uint8_t disable() const  { return (data >> 21) & 0b1111; }
 
-  uint8_t attacking() const noexcept { return (data >> 25) & 0b111; }
+  uint8_t attacking() const  { return (data >> 25) & 0b111; }
 
-  uint8_t binding() const noexcept { return (data >> 28) & 0b111; }
+  uint8_t binding() const  { return (data >> 28) & 0b111; }
 };
 
 struct Durations {
   Duration d[2];
 
-  Duration &duration(size_t i) noexcept { return d[i]; }
+  Duration &duration(size_t i)  { return d[i]; }
 
-  const Duration &duration(size_t i) const noexcept { return d[i]; }
+  const Duration &duration(size_t i) const  { return d[i]; }
 };
 
-inline Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
+inline Durations &ref(pkmn_gen1_chance_durations &durations)  {
   return *reinterpret_cast<Durations *>(&durations);
 }
 
 inline const Durations &
-ref(const pkmn_gen1_chance_durations &durations) noexcept {
+ref(const pkmn_gen1_chance_durations &durations)  {
   return *reinterpret_cast<const Durations *>(&durations);
 }
 

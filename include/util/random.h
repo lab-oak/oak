@@ -16,25 +16,25 @@ public:
   prng(std::mt19937::result_type seed)
       : seed(seed), engine(std::mt19937{seed}) {}
 
-  std::mt19937::result_type get_seed() const noexcept { return seed; }
+  std::mt19937::result_type get_seed() const  { return seed; }
 
-  std::mt19937::result_type random_seed() noexcept {
+  std::mt19937::result_type random_seed()  {
     return uniform_64_(engine);
   }
 
   // Uniform random in (0, 1)
-  double uniform() noexcept { return uniform_(engine); }
+  double uniform()  { return uniform_(engine); }
 
   // Random integer in [0, n)
-  int random_int(int n) noexcept {
+  int random_int(int n)  {
     assert(n != 0);
     return uniform_64_(engine) % n;
   }
 
-  uint64_t uniform_64() noexcept { return uniform_64_(engine); }
+  uint64_t uniform_64()  { return uniform_64_(engine); }
 
   template <typename Container>
-  int sample_pdf(const Container &input) noexcept {
+  int sample_pdf(const Container &input)  {
     double p = uniform();
     for (int i = 0; i < input.size(); ++i) {
       p -= static_cast<double>(input[i]);
@@ -47,7 +47,7 @@ public:
 
   template <template <typename...> typename Vector, typename T>
     requires(T::get_d())
-  int sample_pdf(const Vector<T> &input) noexcept {
+  int sample_pdf(const Vector<T> &input)  {
     double p = uniform();
     for (int i = 0; i < input.size(); ++i) {
       p -= input[i].get_d();
@@ -69,19 +69,19 @@ public:
 class fast_prng {
   uint8_t *state_ptr;
 
-  static inline uint32_t rotl32(uint32_t x, int k) noexcept {
+  static inline uint32_t rotl32(uint32_t x, int k)  {
     return (x << k) | (x >> (32 - k));
   }
 
   // Access the two 32-bit words stored in state_ptr
-  inline uint32_t &s0() noexcept {
+  inline uint32_t &s0()  {
     return *reinterpret_cast<uint32_t *>(state_ptr);
   }
-  inline uint32_t &s1() noexcept {
+  inline uint32_t &s1()  {
     return *reinterpret_cast<uint32_t *>(state_ptr + 4);
   }
 
-  uint32_t next32() noexcept {
+  uint32_t next32()  {
     uint32_t result = rotl32(s0() + s1(), 9) + s0();
 
     s1() ^= s0();
@@ -91,7 +91,7 @@ class fast_prng {
     return result;
   }
 
-  uint64_t next64() noexcept {
+  uint64_t next64()  {
     return (static_cast<uint64_t>(next32()) << 32) | next32();
   }
 
@@ -106,24 +106,24 @@ public:
     std::memcpy(buffer, seeds, 8);
   }
 
-  uint64_t uniform_64() noexcept { return next64(); }
+  uint64_t uniform_64()  { return next64(); }
 
-  double uniform() noexcept {
+  double uniform()  {
     // Like std::uniform_real_distribution, top 53 bits of next64() in [0, 1)
     return (next64() >> 11) * (1.0 / (1ull << 53));
   }
 
-  int random_int(int n) noexcept { return static_cast<int>(next32() % n); }
+  int random_int(int n)  { return static_cast<int>(next32() % n); }
 
-  uint64_t random_seed() noexcept { return next64(); }
+  uint64_t random_seed()  { return next64(); }
 
-  void discard(size_t n) noexcept {
+  void discard(size_t n)  {
     for (size_t i = 0; i < n; ++i)
       next32();
   }
 
   template <typename Container>
-  int sample_pdf(const Container &input) noexcept {
+  int sample_pdf(const Container &input)  {
     double p = uniform();
     for (int i = 0; i < static_cast<int>(input.size()); ++i) {
       p -= static_cast<double>(input[i]);

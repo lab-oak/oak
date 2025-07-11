@@ -24,21 +24,21 @@ template <std::size_t max_size> struct ArrayBasedVector {
       std::fill(this->begin(), this->end(), T{});
     }
 
-    template <typename Vec> constexpr Vector(const Vec &other) noexcept {
+    template <typename Vec> constexpr Vector(const Vec &other)  {
       assert(other.size() <= max_size);
       _size = other.size();
       std::copy(other.begin(), other.end(), _storage.begin());
     }
 
     template <typename Vec>
-    constexpr Vector &operator=(const Vec &other) noexcept {
+    constexpr Vector &operator=(const Vec &other)  {
       assert(other.size() <= max_size);
       _size = other.size();
       std::copy(other.begin(), other.end(), _storage.begin());
       return *this;
     }
 
-    template <typename Vec> bool operator==(const Vec &other) const noexcept {
+    template <typename Vec> bool operator==(const Vec &other) const  {
       for (CapacityT i = 0; i < _size; ++i) {
         if ((*this)[i] != other[i]) {
           return false;
@@ -56,7 +56,7 @@ template <std::size_t max_size> struct ArrayBasedVector {
       _size = n;
     }
 
-    template <typename size_type> void reserve(size_type n) noexcept {
+    template <typename size_type> void reserve(size_type n)  {
       assert(n <= max_size);
       _size = n;
     }
@@ -75,16 +75,16 @@ template <std::size_t max_size> struct ArrayBasedVector {
 
     constexpr const T &operator[](auto n) const { return _storage[n]; }
 
-    CapacityT size() const noexcept { return _size; }
+    CapacityT size() const  { return _size; }
 
-    constexpr void clear() noexcept { _size = 0; }
+    constexpr void clear()  { _size = 0; }
 
-    constexpr auto begin() noexcept { return _storage.begin(); }
+    constexpr auto begin()  { return _storage.begin(); }
 
-    constexpr const auto begin() const noexcept { return _storage.begin(); }
+    constexpr const auto begin() const  { return _storage.begin(); }
 
-    constexpr auto end() noexcept { return _storage.begin() + _size; }
+    constexpr auto end()  { return _storage.begin() + _size; }
 
-    const auto end() const noexcept { return _storage.begin() + _size; }
+    const auto end() const  { return _storage.begin() + _size; }
   };
 };

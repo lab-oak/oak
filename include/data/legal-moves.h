@@ -2757,7 +2757,7 @@ consteval auto get_move_pool_sizes() {
 
 constexpr auto MOVE_POOL_SIZES = get_move_pool_sizes();
 
-constexpr auto move_pool_size(const auto species) noexcept {
+constexpr auto move_pool_size(const auto species)  {
   return MOVE_POOL_SIZES[static_cast<uint8_t>(species)];
 }
 
@@ -2779,7 +2779,7 @@ consteval auto get_move_pools_flat() {
 
 constexpr auto MOVE_POOLS_FLAT = get_move_pools_flat();
 
-constexpr const auto &move_pool(const auto species) noexcept {
+constexpr const auto &move_pool(const auto species)  {
   return MOVE_POOLS_FLAT[static_cast<uint8_t>(species)];
 }
 
