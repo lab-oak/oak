@@ -68,7 +68,7 @@ struct CompressedFrames {
       }
       for (auto i = 0; i < n; ++i) {
         p2_empirical[i] =
-            compress_probs<float, policy_type>(search_output.p1_empirical[i]);
+            compress_probs<float, policy_type>(search_output.p2_empirical[i]);
         p2_nash[i] =
             compress_probs<float, policy_type>(search_output.p2_nash[i]);
       }
