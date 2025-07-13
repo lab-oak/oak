@@ -302,6 +302,8 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--debug-print=")) {
       RuntimeOptions::debug_print =
           (arg.substr(14) == "1" || arg.substr(14) == "true");
+    } else if (arg.starts_with("--print-interval=")) {
+      RuntimeOptions::print_interval_sec = std::stoll(arg.substr(17));
     } else {
       throw std::runtime_error("Invalid arg: " + arg);
     }
@@ -320,6 +322,8 @@ std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
 std::atomic<size_t> frame_counter{};
 std::atomic<size_t> traj_counter{};
+std::atomic<size_t> update_counter{};
+std::atomic<size_t> update_with_node_counter{};
 NN::BuildNet build_network{}; // is not battle specific unlike the net
 TeamPool team_pool{};
 }; // namespace RuntimeData
@@ -532,11 +536,16 @@ std::pair<int, int> sample(prng &device, auto &output) {
 // either reset the node or swap it with its child
 void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
   auto update_node = [&](auto &unique_node) {
+    if (!unique_node || !unique_node->is_init()) {
+      return;
+    }
     if (RuntimeOptions::Search::keep_node) {
       auto child = unique_node->get(i1, i2, obs);
+      RuntimeData::update_counter.fetch_add(1);
       if (child == unique_node->_map.end()) {
         unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
       } else {
+        RuntimeData::update_with_node_counter.fetch_add(1);
         auto unique_child =
             std::make_unique<std::decay_t<decltype(*unique_node)>>(
                 std::move((*child).second));
@@ -760,9 +769,17 @@ void print_thread_fn() {
     std::cout << (frames_more - frames_done) /
                      (float)RuntimeOptions::print_interval_sec
               << " battle frames/sec." << std::endl;
-    std::cout << (traj_more - traj_done) /
-                     (float)RuntimeOptions::print_interval_sec
-              << " build traj./sec." << std::endl;
+    if (RuntimeOptions::TeamGen::modify_team_prob > 0) {
+      std::cout << (traj_more - traj_done) /
+                       (float)RuntimeOptions::print_interval_sec
+                << " build traj./sec." << std::endl;
+    }
+    if (RuntimeOptions::Search::keep_node) {
+      double keep_node_ratio =
+          (double)RuntimeData::update_with_node_counter.load() /
+          (double)RuntimeData::update_counter.load();
+      std::cout << "keep node ratio: " << keep_node_ratio << std::endl;
+    }
 
     frames_done = frames_more;
     traj_done = traj_more;
@@ -799,6 +816,7 @@ void create_working_dir() {
 void prepare() {
   if (RuntimeOptions::TeamGen::build_network_path == "") {
     print("no build network path provided.");
+    std::cout << "Build Network: No path provided." << std::endl;
     const auto new_path =
         std::filesystem::path{RuntimeData::start_datetime} / "build-network";
     std::ofstream stream{new_path, std::ios::binary};
@@ -808,8 +826,8 @@ void prepare() {
                          std::ios::binary};
     const bool read_success =
         RuntimeData::build_network.read_parameters(stream);
-    print("build net read success: " +
-          std::string(read_success ? "true" : "false"));
+    std::cout << "Build Network read success: "
+              << std::string(read_success ? "true" : "false") << std::endl;
   }
 }
 

@@ -169,6 +169,15 @@ struct MCTS {
       } catch (std::exception &e) {
         std::cerr << e.what() << std::endl;
         success = false;
+        std::cout << "value matrix" << std::endl;
+        for (auto i = 0; i < output.m; ++i) {
+          for (auto j = 0; j < output.n; ++j) {
+            auto n = output.visit_matrix[i][j];
+            n += (n == 0);
+            std::cout << output.value_matrix[i][j] / n << ' ';
+          }
+          std::cout << std::endl;
+        }
       }
 
       for (int i = 0; i < c1.size(); ++i) {
