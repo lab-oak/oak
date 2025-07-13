@@ -94,6 +94,7 @@ struct TeamPool {
 
 namespace RuntimeOptions {
 
+uint64_t seed = 123456123;
 size_t threads = 0;
 size_t max_frames = 1 << 30; // actually terminates the program
 
@@ -303,6 +304,8 @@ bool parse_options(int argc, char **argv) {
           (arg.substr(14) == "1" || arg.substr(14) == "true");
     } else if (arg.starts_with("--print-interval=")) {
       RuntimeOptions::print_interval_sec = std::stoll(arg.substr(17));
+    } else if (arg.starts_with("--seed=")) {
+      RuntimeOptions::seed = std::stoul(arg.substr(7));
     } else {
       throw std::runtime_error("Invalid arg: " + arg);
     }
@@ -682,7 +685,7 @@ void generate(uint64_t seed) {
         print(container_string(output.p1_nash));
         print(Strings::side_choice_string(battle_data.battle.bytes, p1_choice));
         print("P2 choices/empiricial/nash:");
-        print(container_string(p1_labels));
+        print(container_string(p2_labels));
         print(container_string(output.p2_empirical));
         print(container_string(output.p2_nash));
         print(Strings::side_choice_string(battle_data.battle.bytes + 184,
@@ -857,8 +860,7 @@ int main(int argc, char **argv) {
 
   prepare();
 
-  uint64_t seed = 123456789;
-  prng device{seed};
+  prng device{RuntimeOptions::seed};
 
   std::vector<std::thread> thread_pool;
   for (int t = 0; t < RuntimeOptions::threads; ++t) {
