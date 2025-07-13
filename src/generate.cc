@@ -10,7 +10,6 @@
 #include <train/build-trajectory.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
-
 #include <util/random.h>
 
 #include <atomic>
@@ -443,7 +442,7 @@ std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
 
 // run search, use output to update battle data and nodes and training frame
 auto search(prng &device, const BattleData &battle_data,
-            SearchData &search_data, Train::CompressedFrames<> game_buffer) {
+            SearchData &search_data) {
   using namespace RuntimeOptions::Search;
 
   auto run_search_model = [&](auto &unique_node, auto &model) {
@@ -653,7 +652,7 @@ void generate(uint64_t seed) {
 
         // search and sample actions
         const auto output =
-            search(device, battle_data, search_data, training_frames);
+            search(device, battle_data, search_data);
         const auto [p1_index, p2_index] = sample(device, output);
 
         const auto [p1_choices, p2_choices] =
