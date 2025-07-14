@@ -255,9 +255,8 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
           vol.set_attacks(4 - (attacking + device.random_int(2)));
         }
       } else {
-        const auto index = device.random_int(40);
-        vol.set_attacks(multi[attacking - 1][index]);
-        assert(false); // Is this possible?
+        // in my testing this only happens when something is ko'd while binding
+        assert(side.pokemon(side.order(0) - 1).hp() == 0);
       }
     }
     if (const auto binding = duration.binding()) {
