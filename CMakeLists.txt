@@ -37,6 +37,11 @@ add_dependencies(debug-log build_client_release)
 target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(debug-log PRIVATE libpkmn_client)
 
+add_executable(dur src/dur.cc)
+add_dependencies(dur build_chance_release)
+target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(dur PRIVATE libpkmn_chance lrslib128)
+
 add_executable(chall src/chall.cc)
 add_dependencies(chall build_chance_release)
 target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

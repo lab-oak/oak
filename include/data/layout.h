@@ -19,7 +19,7 @@ constexpr auto sides = 0;
 constexpr auto turn = 368;
 constexpr auto last_damage = 370;
 constexpr auto last_moves = 372;
-constexpr auto rng = 374;
+constexpr auto rng = 376;
 } // namespace Battle
 
 namespace Side {

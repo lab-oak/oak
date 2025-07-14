@@ -232,11 +232,23 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
 
     auto &vol = side.active().volatiles();
 
-    if (const auto binding = duration.binding()) {
-      const auto index = device.random_int(40);
-      vol.set_attacks(multi[binding - 1][index]);
-    } else if (const auto attacking = duration.attacking()) {
+    if (const auto confusion = duration.confusion()) {
+      const uint8_t max = 6 - (confusion + (confusion == 1));
+      vol.set_confusion_left(
+          static_cast<uint8_t>(device.random_int(max) + 1 + (confusion == 1)));
+    }
+    if (const auto disable = duration.disable()) {
+      const uint8_t max = 9 - disable;
+      vol.set_disable_left(static_cast<uint8_t>(device.random_int(max) + 1));
+    }
+    if (const auto attacking = duration.attacking()) {
       if (vol.bide()) {
+        if (attacking == 3) {
+          vol.set_attacks(1);
+        } else {
+          vol.set_attacks(4 - (attacking + device.random_int(2)));
+        }
+      } else if (vol.thrashing()) {
         if (attacking == 3) {
           vol.set_attacks(1);
         } else {
@@ -244,17 +256,13 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
         }
       } else {
         const auto index = device.random_int(40);
-        vol.set_attacks(multi[attacking - 1][index]);
+        vol.set_attacks(multi[binding - 1][index]);
+        assert(false); // Is this possible?
       }
     }
-    if (const auto confusion = duration.confusion()) {
-      const uint8_t max = 6 - (confusion + (confusion == 1));
-      vol.set_confusion_left(
-          static_cast<uint8_t>(device.random_int(max) + 1 + (confusion == 1)));
-    }
-    if (const auto disable = duration.disable()) {
-      const uint8_t max = 8 - disable;
-      vol.set_disable_left(static_cast<uint8_t>(device.random_int(max) + 1));
+    if (const auto binding = duration.binding()) {
+      const auto index = device.random_int(40);
+      vol.set_attacks(multi[binding - 1][index]);
     }
 
     for (auto p = 0; p < 6; ++p) {

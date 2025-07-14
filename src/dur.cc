@@ -28,9 +28,10 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
     const auto &vol = battle.side(s).active().volatiles();
     const auto &duration = View::ref(durations).duration(s);
 
-    if (vol.confusion()) {
-      const auto set = static_cast<int>(vol.confusion_left());
-      const auto seen = static_cast<int>(duration.confusion());
+    if (vol.disable_move() != 0) {
+      // This is all you have to change besides setting the first move in main
+      const auto set = static_cast<int>(vol.disable_left());
+      const auto seen = static_cast<int>(duration.disable());
       std::pair<int, int> key{seen, set};
       map[key] += 1;
 
@@ -53,9 +54,14 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
 
 int main(int argc, char **argv) {
 
+  if (argc < 2) {
+    std::cerr << "Input: num-trials" << std::endl;
+    return 1;
+  }
+
   for (auto &team : teams) {
     for (auto &set : team) {
-      set.moves[0] = Data::Move::ConfuseRay;
+      set.moves[0] = Data::Move::Disable;
     }
   }
 
