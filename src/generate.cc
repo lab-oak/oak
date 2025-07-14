@@ -654,8 +654,7 @@ void generate(uint64_t seed) {
                                              battle_data.durations, {}));
 
         // search and sample actions
-        const auto output =
-            search(device, battle_data, search_data);
+        const auto output = search(device, battle_data, search_data);
         const auto [p1_index, p2_index] = sample(device, output);
 
         const auto [p1_choices, p2_choices] =
@@ -782,6 +781,9 @@ void print_thread_fn() {
           (double)RuntimeData::update_counter.load();
       std::cout << "keep node ratio: " << keep_node_ratio << std::endl;
     }
+    const auto progress =
+        (double)frames_more / RuntimeOptions::max_frames * 100;
+    std::cout << "progress: " << progress << "%" << std::endl;
 
     frames_done = frames_more;
     traj_done = traj_more;
@@ -818,10 +820,12 @@ void create_working_dir() {
 void prepare() {
   if (RuntimeOptions::TeamGen::build_network_path == "") {
     print("no build network path provided.");
-    std::cout << "Build Network: No path provided." << std::endl;
+    std::cout << "Build Network: No path provided, saving to work dir." << std::endl;
     const auto new_path =
         std::filesystem::path{RuntimeData::start_datetime} / "build-network";
     std::ofstream stream{new_path, std::ios::binary};
+    prng device{RuntimeOptions::seed};
+    RuntimeData::build_network.initialize(device);
     RuntimeData::build_network.write_parameters(stream);
   } else {
     std::ifstream stream{RuntimeOptions::TeamGen::build_network_path,

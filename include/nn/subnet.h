@@ -10,6 +10,11 @@ struct EmbeddingNet {
   Affine<in_dim, hidden_dim, clamp_0> fc0;
   Affine<hidden_dim, out_dim, clamp_1> fc1;
 
+  void initialize(auto &device) {
+    fc0.initialize(device);
+    fc1.initialize(device);
+  }
+
   bool read_parameters(std::istream &stream) {
     return fc0.read_parameters(stream) && fc1.read_parameters(stream);
   }
@@ -30,14 +35,22 @@ struct MainNet {
   static constexpr int hidden_dim = 32;
   static constexpr int policy_out_dim = 151 + 165;
 
-  Affine<in_dim, hidden_dim> fc_0;
+  Affine<in_dim, hidden_dim> fc0;
   Affine<hidden_dim, hidden_dim> value_fc1;
   Affine<hidden_dim, 1, false> value_fc2;
   Affine<hidden_dim, hidden_dim> policy_fc1;
   Affine<hidden_dim, policy_out_dim, false> policy_fc2;
 
+  void initialize(auto &device) {
+    fc0.initialize(device);
+    value_fc1.initialize(device);
+    value_fc2.initialize(device);
+    policy_fc1.initialize(device);
+    policy_fc2.initialize(device);
+  }
+
   bool read_parameters(std::istream &stream) {
-    return fc_0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
+    return fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
            value_fc2.read_parameters(stream);
   }
 
@@ -46,7 +59,7 @@ struct MainNet {
     static thread_local float value_b1[hidden_dim];
     static thread_local float value_b2[1];
     static thread_local float policy_b1[hidden_dim];
-    fc_0.propagate(input_data, b0);
+    fc0.propagate(input_data, b0);
     value_fc1.propagate(b0, value_b1);
     value_fc2.propagate(value_b1, value_b2);
     policy_fc1.propagate(b0, policy_b1);
