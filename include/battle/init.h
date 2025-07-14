@@ -256,7 +256,7 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
         }
       } else {
         const auto index = device.random_int(40);
-        vol.set_attacks(multi[binding - 1][index]);
+        vol.set_attacks(multi[attacking - 1][index]);
         assert(false); // Is this possible?
       }
     }
