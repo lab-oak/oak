@@ -740,7 +740,7 @@ void generate(uint64_t seed) {
     if (p1_team_index == -1) {
       p1_build_traj.score =
           static_cast<uint16_t>(2 * Init::score(battle_data.result));
-      p1_build_traj.eval = training_frames.updates.front().eval;
+      p1_build_traj.eval = training_frames.updates.front().empirical_value;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
@@ -748,7 +748,7 @@ void generate(uint64_t seed) {
       p2_build_traj.score =
           static_cast<uint16_t>(2 * (1 - Init::score(battle_data.result)));
       p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
-                           training_frames.updates.front().eval;
+                           training_frames.updates.front().empirical_value;
       build_buffer.push_back(p2_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }

@@ -37,11 +37,6 @@ add_dependencies(debug-log build_client_release)
 target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(debug-log PRIVATE libpkmn_client)
 
-add_executable(dur src/dur.cc)
-add_dependencies(dur build_chance_release)
-target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(dur PRIVATE libpkmn_chance lrslib128)
-
 add_executable(chall src/chall.cc)
 add_dependencies(chall build_chance_release)
 target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -51,6 +46,11 @@ add_executable(generate src/generate.cc)
 add_dependencies(generate build_chance_release)
 target_include_directories(generate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(generate PRIVATE libpkmn_chance lrslib128 eigen)
+
+add_library(train SHARED src/train.cc)
+add_dependencies(train build_chance_release) #TODO this could be client for logs
+target_include_directories(train PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(train PRIVATE libpkmn_chance)
 
 add_executable(decompress src/decompress.cc)
 add_dependencies(decompress build_chance_release)

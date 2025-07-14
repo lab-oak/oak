@@ -28,7 +28,7 @@ constexpr out_type uncompress_probs(in_type x) {
   }
 }
 
-template <typename policy_type = uint16_t, typename eval_type = uint16_t>
+template <typename policy_type = uint16_t, typename value_type = uint16_t>
 struct CompressedFrames {
 
   struct Update {
@@ -36,8 +36,8 @@ struct CompressedFrames {
     uint8_t m, n;
     pkmn_choice c1, c2;
     // training
-    eval_type eval;
-    eval_type eval_nash;
+    value_type empirical_value;
+    value_type nash_value;
     std::vector<policy_type> p1_empirical;
     std::vector<policy_type> p1_nash;
     std::vector<policy_type> p2_empirical;
@@ -45,17 +45,18 @@ struct CompressedFrames {
 
     static constexpr size_t n_bytes_static(auto m, auto n) {
       // The leading byte is the combination m/n
-      return 1 + 2 * sizeof(pkmn_result) + sizeof(eval_type) +
-             sizeof(eval_type) + 2 * (m + n) * sizeof(policy_type);
+      return 1 + 2 * sizeof(pkmn_result) + sizeof(value_type) +
+             sizeof(value_type) + 2 * (m + n) * sizeof(policy_type);
     }
 
     Update() = default;
     Update(const auto &search_output, pkmn_choice c1, pkmn_choice c2)
         : m{static_cast<uint8_t>(search_output.m)},
           n{static_cast<uint8_t>(search_output.n)}, c1{c1}, c2{c2},
-          eval{compress_probs<float, eval_type>(search_output.empirical_value)},
-          eval_nash{
-              compress_probs<float, eval_type>(search_output.nash_value)} {
+          empirical_value{
+              compress_probs<float, value_type>(search_output.empirical_value)},
+          nash_value{
+              compress_probs<float, value_type>(search_output.nash_value)} {
       p1_empirical.resize(m);
       p1_nash.resize(m);
       p2_empirical.resize(n);
@@ -82,12 +83,13 @@ struct CompressedFrames {
       buffer[index + 1] = c1;
       buffer[index + 2] = c2;
       index += 3;
-      std::memcpy(buffer + index, reinterpret_cast<const char *>(&eval),
-                  sizeof(eval_type));
-      index += sizeof(eval_type);
-      std::memcpy(buffer + index, reinterpret_cast<const char *>(&eval_nash),
-                  sizeof(eval_type));
-      index += sizeof(eval_type);
+      std::memcpy(buffer + index,
+                  reinterpret_cast<const char *>(&empirical_value),
+                  sizeof(value_type));
+      index += sizeof(value_type);
+      std::memcpy(buffer + index, reinterpret_cast<const char *>(&nash_value),
+                  sizeof(value_type));
+      index += sizeof(value_type);
       std::memcpy(buffer + index,
                   reinterpret_cast<const char *>(p1_empirical.data()),
                   m * sizeof(policy_type));
@@ -114,10 +116,10 @@ struct CompressedFrames {
       c1 = static_cast<pkmn_choice>(buffer[1]);
       c2 = static_cast<pkmn_choice>(buffer[2]);
       auto index = 3;
-      eval = *reinterpret_cast<const eval_type *>(buffer + index);
-      index += sizeof(eval_type);
-      eval_nash = *reinterpret_cast<const eval_type *>(buffer + index);
-      index += sizeof(eval_type);
+      empirical_value = *reinterpret_cast<const value_type *>(buffer + index);
+      index += sizeof(value_type);
+      nash_value = *reinterpret_cast<const value_type *>(buffer + index);
+      index += sizeof(value_type);
       p1_empirical.resize(m);
       p1_nash.resize(m);
       p2_empirical.resize(n);
@@ -141,7 +143,8 @@ struct CompressedFrames {
   CompressedFrames(const pkmn_gen1_battle &battle) : battle{battle} {}
 
   auto n_bytes() const {
-    auto n = 2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
+    auto n =
+        2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
     for (const auto &update : updates) {
       n += update.n_bytes();
     }
@@ -170,8 +173,7 @@ struct CompressedFrames {
     const auto buffer_length = buffer_16[0];
     const auto n_updates = buffer_16[1];
     std::memcpy(battle.bytes, buffer + 4, sizeof(pkmn_gen1_battle));
-    auto index =
-        2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle);
+    auto index = 2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle);
     result = buffer[index];
     ++index;
     while (index < buffer_length) {

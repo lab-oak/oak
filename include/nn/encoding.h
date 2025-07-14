@@ -1,5 +1,6 @@
 #pragma once
 
+#include <battle/init.h>
 #include <battle/view.h>
 #include <data/legal-moves.h>
 #include <data/status.h>
