@@ -43,7 +43,6 @@ std::string container_string(const auto &v) {
       ss << std::to_string(x) << ' ';
     }
   }
-  ss << '\n';
   return ss.str();
 }
 
@@ -108,6 +107,8 @@ namespace Search {
 
 // iterations/time per search
 size_t count = 1 << 10;
+// 0 means normal count. First turn eval is also used for team gen
+size_t t1_count = 0;
 char count_mode = 'i'; // (n)/(i)terations, (t)ime
 
 // search algo, model type/path
@@ -188,6 +189,9 @@ std::string generate_help_text() {
      << "  Seconds between status prints.\n\n";
   ss << "--count=" << RuntimeOptions::Search::count << '\n'
      << "  Number of iterations/ms to search per battle update.\n\n";
+  ss << "--t1-count=" << RuntimeOptions::Search::t1_count << '\n'
+     << "  Turn 1 search provides value targets for team gen. A value of 0 "
+        "means use the normal count.\n\n";
   ss << "--count-mode=" << RuntimeOptions::Search::count_mode << '\n'
      << "  i : iteration count\n"
      << "  t : milliseconds\n\n";
@@ -248,89 +252,87 @@ bool parse_options(int argc, char **argv) {
     return true;
   }
 
+  using namespace RuntimeOptions;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg.starts_with("--help")) {
       std::cout << generate_help_text() << std::endl;
       return true;
     } else if (arg.starts_with("--threads=")) {
-      RuntimeOptions::threads = std::stoul(arg.substr(10));
+      threads = std::stoul(arg.substr(10));
     } else if (arg.starts_with("--seed=")) {
-      RuntimeOptions::seed = std::stoul(arg.substr(7));
+      seed = std::stoul(arg.substr(7));
     } else if (arg.starts_with("--max-frames=")) {
-      RuntimeOptions::max_frames = std::stoul(arg.substr(13));
-    } else if (arg.starts_with("--count=")) {
-      RuntimeOptions::Search::count = std::stoul(arg.substr(8));
-    } else if (arg.starts_with("--count-mode=")) {
-      RuntimeOptions::Search::count_mode = arg[13];
-    } else if (arg.starts_with("--bandit-mode=")) {
-      RuntimeOptions::Search::bandit_mode = arg[14];
-    } else if (arg.starts_with("--battle-network-path=")) {
-      RuntimeOptions::Search::battle_network_path = arg.substr(23);
-    } else if (arg.starts_with("--policy-mode=")) {
-      RuntimeOptions::Search::policy_mode = arg[14];
-    } else if (arg.starts_with("--policy-temp=")) {
-      RuntimeOptions::Search::policy_temp = std::stod(arg.substr(14));
-    } else if (arg.starts_with("--policy-min-prob=")) {
-      RuntimeOptions::Search::policy_min_prob = std::stod(arg.substr(18));
-    } else if (arg.starts_with("--mix-nash-weight=")) {
-      RuntimeOptions::Search::mix_nash_weight = std::stod(arg.substr(18));
-    } else if (arg.starts_with("--keep-node=")) {
-      RuntimeOptions::Search::keep_node =
-          (arg.substr(12) == "1" || arg.substr(12) == "true");
-    } else if (arg.starts_with("--build-network-path=")) {
-      RuntimeOptions::TeamGen::build_network_path = arg.substr(21);
-    } else if (arg.starts_with("--modify-team-prob=")) {
-      RuntimeOptions::TeamGen::modify_team_prob = std::stod(arg.substr(19));
-    } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      RuntimeOptions::TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
-    } else if (arg.starts_with("--move-delete-prob=")) {
-      RuntimeOptions::TeamGen::move_delete_prob = std::stod(arg.substr(19));
+      max_frames = std::stoul(arg.substr(13));
     } else if (arg.starts_with("--buffer-size=")) {
-      RuntimeOptions::buffer_size_mb = std::stoul(arg.substr(14));
+      buffer_size_mb = std::stoul(arg.substr(14));
     } else if (arg.starts_with("--debug-print=")) {
-      RuntimeOptions::debug_print =
-          (arg.substr(14) == "1" || arg.substr(14) == "true");
+      debug_print = (arg.substr(14)[0] == '1' || arg.substr(14) == "true");
     } else if (arg.starts_with("--print-interval=")) {
-      RuntimeOptions::print_interval_sec = std::stoll(arg.substr(17));
+      print_interval_sec = std::stoll(arg.substr(17));
+    } else if (arg.starts_with("--count=")) {
+      Search::count = std::stoul(arg.substr(8));
+    } else if (arg.starts_with("--t1-count=")) {
+      Search::t1_count = std::stoul(arg.substr(11));
+    } else if (arg.starts_with("--count-mode=")) {
+      Search::count_mode = arg[13];
+    } else if (arg.starts_with("--bandit-mode=")) {
+      Search::bandit_mode = arg[14];
+    } else if (arg.starts_with("--battle-network-path=")) {
+      Search::battle_network_path = arg.substr(23);
+    } else if (arg.starts_with("--policy-mode=")) {
+      Search::policy_mode = arg[14];
+    } else if (arg.starts_with("--policy-temp=")) {
+      Search::policy_temp = std::stod(arg.substr(14));
+    } else if (arg.starts_with("--policy-min-prob=")) {
+      Search::policy_min_prob = std::stod(arg.substr(18));
+    } else if (arg.starts_with("--mix-nash-weight=")) {
+      Search::mix_nash_weight = std::stod(arg.substr(18));
+    } else if (arg.starts_with("--keep-node=")) {
+      Search::keep_node = (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
+    } else if (arg.starts_with("--build-network-path=")) {
+      TeamGen::build_network_path = arg.substr(21);
+    } else if (arg.starts_with("--modify-team-prob=")) {
+      TeamGen::modify_team_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--pokemon-delete-prob=")) {
+      TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
+    } else if (arg.starts_with("--move-delete-prob=")) {
+      TeamGen::move_delete_prob = std::stod(arg.substr(19));
     } else {
       throw std::runtime_error("Invalid arg: " + arg);
     }
   }
 
-  return RuntimeOptions::threads == 0;
+  if (Search::t1_count == 0) {
+    Search::t1_count = Search::count;
+  }
+
+  return threads == 0;
 }
 
 std::string runtime_arg_string() {
+  using namespace RuntimeOptions;
   std::ostringstream out;
-  out << "--threads=" << RuntimeOptions::threads << '\n';
-  out << "--seed=" << RuntimeOptions::seed << '\n';
-  out << "--max-frames=" << RuntimeOptions::max_frames << '\n';
-  out << "--count=" << RuntimeOptions::Search::count << '\n';
-  out << "--count-mode=" << RuntimeOptions::Search::count_mode << '\n';
-  out << "--bandit-mode=" << RuntimeOptions::Search::bandit_mode << '\n';
-  out << "--battle-network-path=" << RuntimeOptions::Search::battle_network_path
-      << '\n';
-  out << "--policy-mode=" << RuntimeOptions::Search::policy_mode << '\n';
-  out << "--policy-temp=" << RuntimeOptions::Search::policy_temp << '\n';
-  out << "--policy-min-prob=" << RuntimeOptions::Search::policy_min_prob
-      << '\n';
-  out << "--mix-nash-weight=" << RuntimeOptions::Search::mix_nash_weight
-      << '\n';
-  out << "--keep-node="
-      << (RuntimeOptions::Search::keep_node ? "true" : "false") << '\n';
-  out << "--build-network-path=" << RuntimeOptions::TeamGen::build_network_path
-      << '\n';
-  out << "--modify-team-prob=" << RuntimeOptions::TeamGen::modify_team_prob
-      << '\n';
-  out << "--pokemon-delete-prob="
-      << RuntimeOptions::TeamGen::pokemon_delete_prob << '\n';
-  out << "--move-delete-prob=" << RuntimeOptions::TeamGen::move_delete_prob
-      << '\n';
-  out << "--buffer-size=" << RuntimeOptions::buffer_size_mb << '\n';
-  out << "--debug-print=" << (RuntimeOptions::debug_print ? "true" : "false")
-      << '\n';
-  out << "--print-interval=" << RuntimeOptions::print_interval_sec << '\n';
+  out << "--threads=" << threads << '\n';
+  out << "--seed=" << seed << '\n';
+  out << "--max-frames=" << max_frames << '\n';
+  out << "--buffer-size=" << buffer_size_mb << '\n';
+  out << "--debug-print=" << (debug_print ? "true" : "false") << '\n';
+  out << "--print-interval=" << print_interval_sec << '\n';
+  out << "--count=" << Search::count << '\n';
+  out << "--t1-count=" << Search::t1_count << '\n';
+  out << "--count-mode=" << Search::count_mode << '\n';
+  out << "--bandit-mode=" << Search::bandit_mode << '\n';
+  out << "--battle-network-path=" << Search::battle_network_path << '\n';
+  out << "--policy-mode=" << Search::policy_mode << '\n';
+  out << "--policy-temp=" << Search::policy_temp << '\n';
+  out << "--policy-min-prob=" << Search::policy_min_prob << '\n';
+  out << "--mix-nash-weight=" << Search::mix_nash_weight << '\n';
+  out << "--keep-node=" << (Search::keep_node ? "true" : "false") << '\n';
+  out << "--build-network-path=" << TeamGen::build_network_path << '\n';
+  out << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n';
+  out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
+  out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
   return out.str();
 }
 
@@ -464,7 +466,7 @@ std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
 }
 
 // run search, use output to update battle data and nodes and training frame
-auto search(prng &device, const BattleData &battle_data,
+auto search(size_t c, prng &device, const BattleData &battle_data,
             SearchData &search_data) {
   using namespace RuntimeOptions::Search;
 
@@ -472,9 +474,9 @@ auto search(prng &device, const BattleData &battle_data,
     auto &node = *unique_node;
     MCTS search;
     if (count_mode == 'i' || count_mode == 'n') {
-      return search.run(count, node, battle_data, model);
+      return search.run(c, node, battle_data, model);
     } else if (count_mode == 't') {
-      std::chrono::milliseconds ms{count};
+      std::chrono::milliseconds ms{c};
       return search.run(ms, node, battle_data, model);
     }
     throw std::runtime_error("Invalid count mode char.");
@@ -673,7 +675,10 @@ void generate(uint64_t seed) {
                                              battle_data.durations, {}));
 
         // search and sample actions
-        const auto output = search(device, battle_data, search_data);
+        const auto output =
+            search(updates == 0 ? RuntimeOptions::Search::t1_count
+                                : RuntimeOptions::Search::count,
+                   device, battle_data, search_data);
         const auto [p1_index, p2_index] = sample(device, output);
 
         const auto [p1_choices, p2_choices] =
@@ -837,21 +842,35 @@ void create_working_dir() {
 }
 
 void prepare() {
+  // create working dir
+  const std::filesystem::path working_dir = RuntimeData::start_datetime;
+  std::error_code ec;
+  const bool created = std::filesystem::create_directory(working_dir, ec);
+  if (ec) {
+    std::cerr << "Error creating directory: " << ec.message() << '\n';
+  } else if (created) {
+    std::cout << "Created directory " << RuntimeData::start_datetime
+              << std::endl;
+  } else {
+    throw std::runtime_error("Could not create datetime dir.");
+  }
+
+  // save args
   {
-    const auto args_path =
-        std::filesystem::path{RuntimeData::start_datetime} / "args";
+    const auto args_path = working_dir / "args";
     std::ofstream args_file(args_path);
     if (!args_file) {
       throw std::runtime_error("Failed to open args.txt for writing.");
     }
     args_file << runtime_arg_string();
   }
+
+  // build network save/load
   if (RuntimeOptions::TeamGen::build_network_path == "") {
     print("no build network path provided.");
     std::cout << "Build Network: No path provided, saving to work dir."
               << std::endl;
-    const auto new_path =
-        std::filesystem::path{RuntimeData::start_datetime} / "build-network";
+    const auto new_path = working_dir / "build-network";
     std::ofstream stream{new_path, std::ios::binary};
     prng device{RuntimeOptions::seed};
     RuntimeData::build_network.initialize(device);
@@ -888,8 +907,6 @@ int main(int argc, char **argv) {
   if (const bool exit_early = parse_options(argc, argv)) {
     return 1;
   }
-
-  create_working_dir();
 
   prepare();
 
