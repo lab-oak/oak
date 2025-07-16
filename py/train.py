@@ -24,14 +24,14 @@ lib.read_battle_offsets.argtypes = [
 lib.read_battle_offsets.restype = ctypes.c_int64
 
 # Create a buffer
-count = 1024
-buf = array.array('H', [0] * count)  # 'H' = uint16
+
 
 # Convert array to ctypes pointer
-buf_ptr = ctypes.cast(ctypes.pointer(ctypes.c_uint16.from_buffer(buf)), ctypes.POINTER(ctypes.c_uint16))
 
 # # Call the function
 # path = b"./0.battle"
+# count = 1024
+# buf = array.array('H', [0] * count)  # 'H' = uint16
 # n = lib.read_battle_offsets(path, buf_ptr, count)
 
 # # Print result
@@ -42,12 +42,17 @@ buf_ptr = ctypes.cast(ctypes.pointer(ctypes.c_uint16.from_buffer(buf)), ctypes.P
 
 
 def main():
-    if len(sys.argv) < 1:
+    if len(sys.argv) < 2:
         print("Input: buffer-path; Program will parse all battles in buffer, using the normal encoding")
         exit()
     
-    buffer_path = sys.argv[0]
-    print(buffer_path)
+    buffer_path = sys.argv[1]
+
+    count = 1024
+    buf = array.array('H', [0] * count)  # 'H' = uint16
+    buf_ptr = ctypes.cast(ctypes.pointer(ctypes.c_uint16.from_buffer(buf)), ctypes.POINTER(ctypes.c_uint16))
+    n = lib.read_battle_offsets(bytes(buffer_path, 'utf-8'), buf_ptr, count)
+
 
 if __name__ == "__main__":
     main()
