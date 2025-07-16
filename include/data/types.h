@@ -6,7 +6,7 @@
 
 namespace Data {
 
-enum class Types : std::underlying_type_t<std::byte> {
+enum class Type : std::underlying_type_t<std::byte> {
   Normal,
   Fighting,
   Flying,
@@ -65,7 +65,7 @@ constexpr static std::array<std::array<Effectiveness, 15>, 15> TYPE_CHART{
      {E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N, E::N,
       E::N, E::N, E::S}}};
 
-consteval auto get_effectiveness(Types attacking, Types defending) noexcept {
+consteval auto get_effectiveness(Type attacking, Type defending) noexcept {
   return TYPE_CHART[static_cast<uint8_t>(attacking)]
                    [static_cast<uint8_t>(defending)];
 }
@@ -78,6 +78,6 @@ constexpr bool is_physical(const auto type) noexcept {
   return static_cast<uint8_t>(type) < 8;
 }
 
-static_assert(sizeof(Types) == 1);
+static_assert(sizeof(Type) == 1);
 
 } // namespace Data

@@ -94,6 +94,11 @@ constexpr std::array<std::array<char, MAX_SPECIES_LEN + 1>, 152>
          "Zapdos",     "Moltres",    "Dratini",    "Dragonair",  "Dragonite",
          "Mewtwo",     "Mew"}};
 
+constexpr std::array<std::array<char, 9>, 15> TYPE_CHAR_ARRAY = {
+    "Normal", "Fighting", "Flying",  "Poison", "Ground",
+    "Rock",   "Bug",      "Ghost",   "Fire",   "Water",
+    "Grass",  "Electric", "Psychic", "Ice",    "Dragon"};
+
 }; // namespace Data
 
 const char *species_char_array(const auto species) noexcept {
@@ -111,4 +116,10 @@ std::string species_string(const auto species) noexcept {
 
 std::string move_string(const auto move) noexcept {
   return std::string{Data::MOVE_CHAR_ARRAY[static_cast<uint8_t>(move)].data()};
+}
+
+std::string types_string(const auto types) noexcept {
+  return std::string{Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) % 16]} +
+         '/' +
+         std::string{Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) / 16]};
 }

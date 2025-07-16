@@ -276,7 +276,7 @@ enum class Effect : std::underlying_type_t<std::byte> {
 struct MoveData {
   Effect effect;
   uint8_t bp;
-  Types type;
+  Type type;
   uint8_t accuracy;
   Target target;
 };
@@ -288,7 +288,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         40,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -296,7 +296,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::HighCritical,
         50,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -304,7 +304,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         15,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -312,7 +312,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         18,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -320,7 +320,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -328,7 +328,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::PayDay,
         40,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -336,7 +336,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::BurnChance1,
         75,
-        Types::Fire,
+        Type::Fire,
         percent(100),
         Target::Other,
     },
@@ -344,7 +344,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FreezeChance,
         75,
-        Types::Ice,
+        Type::Ice,
         percent(100),
         Target::Other,
     },
@@ -352,7 +352,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance1,
         75,
-        Types::Electric,
+        Type::Electric,
         percent(100),
         Target::Other,
     },
@@ -360,7 +360,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         40,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -368,7 +368,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         55,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -376,7 +376,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::OHKO,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(30),
         Target::Other,
     },
@@ -384,7 +384,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -392,7 +392,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AttackUp2,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -400,7 +400,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         50,
-        Types::Normal,
+        Type::Normal,
         percent(95),
         Target::Other,
     },
@@ -408,7 +408,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         40,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Any,
     },
@@ -416,7 +416,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         35,
-        Types::Flying,
+        Type::Flying,
         percent(100),
         Target::Any,
     },
@@ -424,7 +424,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SwitchAndTeleport,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -432,7 +432,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         70,
-        Types::Flying,
+        Type::Flying,
         percent(95),
         Target::Any,
     },
@@ -440,7 +440,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Binding,
         15,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -448,7 +448,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -456,7 +456,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         35,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::Other,
     },
@@ -464,7 +464,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance2,
         65,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -472,7 +472,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DoubleHit,
         30,
-        Types::Fighting,
+        Type::Fighting,
         percent(100),
         Target::Other,
     },
@@ -480,7 +480,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         120,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -488,7 +488,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::JumpKick,
         70,
-        Types::Fighting,
+        Type::Fighting,
         percent(95),
         Target::Other,
     },
@@ -496,7 +496,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance2,
         60,
-        Types::Fighting,
+        Type::Fighting,
         percent(85),
         Target::Other,
     },
@@ -504,7 +504,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AccuracyDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -512,7 +512,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance2,
         70,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -520,7 +520,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         65,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -528,7 +528,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         15,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -536,7 +536,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::OHKO,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(30),
         Target::Other,
     },
@@ -544,7 +544,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         35,
-        Types::Normal,
+        Type::Normal,
         percent(95),
         Target::Other,
     },
@@ -552,7 +552,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance2,
         85,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -560,7 +560,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Binding,
         15,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -568,7 +568,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Recoil,
         90,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -576,7 +576,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Thrashing,
         90,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::RandomFoe,
     },
@@ -584,7 +584,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Recoil,
         100,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -592,7 +592,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Foes,
     },
@@ -600,7 +600,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::PoisonChance1,
         15,
-        Types::Poison,
+        Type::Poison,
         percent(100),
         Target::Other,
     },
@@ -608,7 +608,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Twineedle,
         25,
-        Types::Bug,
+        Type::Bug,
         percent(100),
         Target::Other,
     },
@@ -616,7 +616,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         14,
-        Types::Bug,
+        Type::Bug,
         percent(85),
         Target::Other,
     },
@@ -624,7 +624,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Foes,
     },
@@ -632,7 +632,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance1,
         60,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -640,7 +640,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AttackDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Foes,
     },
@@ -648,7 +648,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SwitchAndTeleport,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -656,7 +656,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Sleep,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(55),
         Target::Other,
     },
@@ -664,7 +664,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Confusion,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(55),
         Target::Other,
     },
@@ -672,7 +672,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDamage,
         1,
-        Types::Normal,
+        Type::Normal,
         percent(90),
         Target::Other,
     },
@@ -680,7 +680,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Disable,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(55),
         Target::Other,
     },
@@ -688,7 +688,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseDownChance,
         40,
-        Types::Poison,
+        Type::Poison,
         percent(100),
         Target::Other,
     },
@@ -696,7 +696,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::BurnChance1,
         40,
-        Types::Fire,
+        Type::Fire,
         percent(100),
         Target::Other,
     },
@@ -704,7 +704,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::BurnChance1,
         95,
-        Types::Fire,
+        Type::Fire,
         percent(100),
         Target::Other,
     },
@@ -712,7 +712,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Mist,
         0,
-        Types::Ice,
+        Type::Ice,
         percent(100),
         Target::Self,
     },
@@ -720,7 +720,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         40,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Other,
     },
@@ -728,7 +728,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         120,
-        Types::Water,
+        Type::Water,
         percent(80),
         Target::Other,
     },
@@ -736,7 +736,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         95,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Foes,
     },
@@ -744,7 +744,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FreezeChance,
         95,
-        Types::Ice,
+        Type::Ice,
         percent(100),
         Target::Other,
     },
@@ -752,7 +752,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FreezeChance,
         120,
-        Types::Ice,
+        Type::Ice,
         percent(90),
         Target::Other,
     },
@@ -760,7 +760,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ConfusionChance,
         65,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Other,
     },
@@ -768,7 +768,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpeedDownChance,
         65,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Other,
     },
@@ -776,7 +776,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AttackDownChance,
         65,
-        Types::Ice,
+        Type::Ice,
         percent(100),
         Target::Other,
     },
@@ -784,7 +784,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::HyperBeam,
         150,
-        Types::Normal,
+        Type::Normal,
         percent(90),
         Target::Other,
     },
@@ -792,7 +792,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         35,
-        Types::Flying,
+        Type::Flying,
         percent(100),
         Target::Any,
     },
@@ -800,7 +800,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Flying,
+        Type::Flying,
         percent(100),
         Target::Any,
     },
@@ -808,7 +808,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Recoil,
         80,
-        Types::Fighting,
+        Type::Fighting,
         percent(80),
         Target::Other,
     },
@@ -816,7 +816,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance2,
         50,
-        Types::Fighting,
+        Type::Fighting,
         percent(90),
         Target::Other,
     },
@@ -824,7 +824,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         1,
-        Types::Fighting,
+        Type::Fighting,
         percent(100),
         Target::Depends,
     },
@@ -832,7 +832,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDamage,
         1,
-        Types::Fighting,
+        Type::Fighting,
         percent(100),
         Target::Other,
     },
@@ -840,7 +840,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -848,7 +848,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DrainHP,
         20,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::Other,
     },
@@ -856,7 +856,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DrainHP,
         40,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::Other,
     },
@@ -864,7 +864,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::LeechSeed,
         0,
-        Types::Grass,
+        Type::Grass,
         percent(90),
         Target::Other,
     },
@@ -872,7 +872,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -880,7 +880,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::HighCritical,
         55,
-        Types::Grass,
+        Type::Grass,
         percent(95),
         Target::Other,
     },
@@ -888,7 +888,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         120,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::Other,
     },
@@ -896,7 +896,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Poison,
         0,
-        Types::Poison,
+        Type::Poison,
         percent(75),
         Target::Other,
     },
@@ -904,7 +904,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Paralyze,
         0,
-        Types::Grass,
+        Type::Grass,
         percent(75),
         Target::Other,
     },
@@ -912,7 +912,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Sleep,
         0,
-        Types::Grass,
+        Type::Grass,
         percent(75),
         Target::Other,
     },
@@ -920,7 +920,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Thrashing,
         70,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::RandomFoe,
     },
@@ -928,7 +928,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpeedDown1,
         0,
-        Types::Bug,
+        Type::Bug,
         percent(95),
         Target::Foes,
     },
@@ -936,7 +936,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDamage,
         1,
-        Types::Dragon,
+        Type::Dragon,
         percent(100),
         Target::Other,
     },
@@ -944,7 +944,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Binding,
         15,
-        Types::Fire,
+        Type::Fire,
         percent(70),
         Target::Other,
     },
@@ -952,7 +952,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance1,
         40,
-        Types::Electric,
+        Type::Electric,
         percent(100),
         Target::Other,
     },
@@ -960,7 +960,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance1,
         95,
-        Types::Electric,
+        Type::Electric,
         percent(100),
         Target::Other,
     },
@@ -968,7 +968,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Paralyze,
         0,
-        Types::Electric,
+        Type::Electric,
         percent(100),
         Target::Other,
     },
@@ -976,7 +976,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance1,
         120,
-        Types::Electric,
+        Type::Electric,
         percent(70),
         Target::Other,
     },
@@ -984,7 +984,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         50,
-        Types::Rock,
+        Type::Rock,
         percent(65),
         Target::Other,
     },
@@ -992,7 +992,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         100,
-        Types::Ground,
+        Type::Ground,
         percent(100),
         Target::AllOthers,
     },
@@ -1000,7 +1000,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::OHKO,
         0,
-        Types::Ground,
+        Type::Ground,
         percent(30),
         Target::Other,
     },
@@ -1008,7 +1008,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         100,
-        Types::Ground,
+        Type::Ground,
         percent(100),
         Target::Other,
     },
@@ -1016,7 +1016,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Poison,
         0,
-        Types::Poison,
+        Type::Poison,
         percent(85),
         Target::Other,
     },
@@ -1024,7 +1024,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ConfusionChance,
         50,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Other,
     },
@@ -1032,7 +1032,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDownChance,
         90,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Other,
     },
@@ -1040,7 +1040,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Sleep,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(60),
         Target::Other,
     },
@@ -1048,7 +1048,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AttackUp1,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1056,7 +1056,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpeedUp2,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1064,7 +1064,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         40,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1072,7 +1072,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Rage,
         20,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1080,7 +1080,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SwitchAndTeleport,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1088,7 +1088,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDamage,
         1,
-        Types::Ghost,
+        Type::Ghost,
         percent(100),
         Target::Other,
     },
@@ -1096,7 +1096,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Mimic,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1104,7 +1104,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseDown2,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -1112,7 +1112,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::EvasionUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1120,7 +1120,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Heal,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1128,7 +1128,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1136,7 +1136,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::EvasionUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1144,7 +1144,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AccuracyDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1152,7 +1152,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Confusion,
         0,
-        Types::Ghost,
+        Type::Ghost,
         percent(100),
         Target::Other,
     },
@@ -1160,7 +1160,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseUp1,
         0,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Self,
     },
@@ -1168,7 +1168,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1176,7 +1176,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseUp2,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1184,7 +1184,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::LightScreen,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1192,7 +1192,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Haze,
         0,
-        Types::Ice,
+        Type::Ice,
         percent(100),
         Target::Self,
     },
@@ -1200,7 +1200,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Reflect,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1208,7 +1208,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FocusEnergy,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1216,7 +1216,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Bide,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1224,7 +1224,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Metronome,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1232,7 +1232,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MirrorMove,
         0,
-        Types::Flying,
+        Type::Flying,
         percent(100),
         Target::Self,
     },
@@ -1240,7 +1240,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Explode,
         130,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1248,7 +1248,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         100,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -1256,7 +1256,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::ParalyzeChance2,
         20,
-        Types::Ghost,
+        Type::Ghost,
         percent(100),
         Target::Other,
     },
@@ -1264,7 +1264,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::PoisonChance2,
         20,
-        Types::Poison,
+        Type::Poison,
         percent(70),
         Target::Other,
     },
@@ -1272,7 +1272,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::PoisonChance2,
         65,
-        Types::Poison,
+        Type::Poison,
         percent(100),
         Target::Other,
     },
@@ -1280,7 +1280,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance1,
         65,
-        Types::Ground,
+        Type::Ground,
         percent(85),
         Target::Other,
     },
@@ -1288,7 +1288,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::BurnChance2,
         120,
-        Types::Fire,
+        Type::Fire,
         percent(85),
         Target::Other,
     },
@@ -1296,7 +1296,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Other,
     },
@@ -1304,7 +1304,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Binding,
         35,
-        Types::Water,
+        Type::Water,
         percent(75),
         Target::Other,
     },
@@ -1312,7 +1312,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Swift,
         60,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Foes,
     },
@@ -1320,7 +1320,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         100,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1328,7 +1328,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         20,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1336,7 +1336,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpeedDownChance,
         10,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1344,7 +1344,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialUp2,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1352,7 +1352,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AccuracyDown1,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(80),
         Target::Other,
     },
@@ -1360,7 +1360,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Heal,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1368,7 +1368,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::JumpKick,
         85,
-        Types::Fighting,
+        Type::Fighting,
         percent(90),
         Target::Other,
     },
@@ -1376,7 +1376,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Paralyze,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -1384,7 +1384,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DreamEater,
         100,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Other,
     },
@@ -1392,7 +1392,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Poison,
         0,
-        Types::Poison,
+        Type::Poison,
         percent(55),
         Target::Other,
     },
@@ -1400,7 +1400,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         15,
-        Types::Normal,
+        Type::Normal,
         percent(85),
         Target::Other,
     },
@@ -1408,7 +1408,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DrainHP,
         20,
-        Types::Bug,
+        Type::Bug,
         percent(100),
         Target::Other,
     },
@@ -1416,7 +1416,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Sleep,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(75),
         Target::Other,
     },
@@ -1424,7 +1424,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Charge,
         140,
-        Types::Flying,
+        Type::Flying,
         percent(90),
         Target::Any,
     },
@@ -1432,7 +1432,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Transform,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1440,7 +1440,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpeedDownChance,
         20,
-        Types::Water,
+        Type::Water,
         percent(100),
         Target::Other,
     },
@@ -1448,7 +1448,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         70,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1456,7 +1456,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Sleep,
         0,
-        Types::Grass,
+        Type::Grass,
         percent(100),
         Target::Other,
     },
@@ -1464,7 +1464,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AccuracyDown1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(70),
         Target::Other,
     },
@@ -1472,7 +1472,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SpecialDamage,
         1,
-        Types::Psychic,
+        Type::Psychic,
         percent(80),
         Target::Other,
     },
@@ -1480,7 +1480,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Splash,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1488,7 +1488,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DefenseUp2,
         0,
-        Types::Poison,
+        Type::Poison,
         percent(100),
         Target::Self,
     },
@@ -1496,7 +1496,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::HighCritical,
         90,
-        Types::Water,
+        Type::Water,
         percent(85),
         Target::Other,
     },
@@ -1504,7 +1504,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Explode,
         170,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1512,7 +1512,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::MultiHit,
         18,
-        Types::Normal,
+        Type::Normal,
         percent(80),
         Target::Other,
     },
@@ -1520,7 +1520,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::DoubleHit,
         50,
-        Types::Ground,
+        Type::Ground,
         percent(90),
         Target::Other,
     },
@@ -1528,7 +1528,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Heal,
         0,
-        Types::Psychic,
+        Type::Psychic,
         percent(100),
         Target::Self,
     },
@@ -1536,7 +1536,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         75,
-        Types::Rock,
+        Type::Rock,
         percent(90),
         Target::Other,
     },
@@ -1544,7 +1544,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::FlinchChance1,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(90),
         Target::Other,
     },
@@ -1552,7 +1552,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::AttackUp1,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1560,7 +1560,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Conversion,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1568,7 +1568,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::None,
         80,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1576,7 +1576,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::SuperFang,
         1,
-        Types::Normal,
+        Type::Normal,
         percent(90),
         Target::Other,
     },
@@ -1584,7 +1584,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::HighCritical,
         70,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Other,
     },
@@ -1592,7 +1592,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Substitute,
         0,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::Self,
     },
@@ -1600,7 +1600,7 @@ static constexpr std::array<MoveData, 165> MOVE_DATA{
     MoveData{
         Effect::Recoil,
         50,
-        Types::Normal,
+        Type::Normal,
         percent(100),
         Target::RandomFoe,
     }};

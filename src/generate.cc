@@ -289,7 +289,8 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--mix-nash-weight=")) {
       Search::mix_nash_weight = std::stod(arg.substr(18));
     } else if (arg.starts_with("--keep-node=")) {
-      Search::keep_node = (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
+      Search::keep_node =
+          (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
     } else if (arg.starts_with("--build-network-path=")) {
       TeamGen::build_network_path = arg.substr(21);
     } else if (arg.starts_with("--modify-team-prob=")) {
