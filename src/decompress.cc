@@ -1,5 +1,7 @@
+#include <battle/debug-log.h>
 #include <battle/init.h>
 #include <battle/sample-teams.h>
+#include <battle/strings.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
 
@@ -35,10 +37,27 @@ int main(int argc, char **argv) {
   std::vector<size_t> turns{};
   size_t read_index = 0;
   while (read_index < static_cast<size_t>(file_size)) {
-    Train::CompressedFrames<uint16_t, uint16_t> battle_frame{};
-    battle_frame.read(buffer.data() + read_index);
-    read_index += battle_frame.n_bytes();
-    turns.push_back(battle_frame.updates.size());
+    Train::CompressedFrames<> battle_frames{};
+    battle_frames.read(buffer.data() + read_index);
+    auto battle = battle_frames.battle;
+    pkmn_gen1_battle_options options{};
+    DebugLog<64> debug_log{};
+    debug_log.set_header(battle);
+    for (const auto &update : battle_frames.updates) {
+      std::cout << Strings::battle_data_to_string(
+                       battle,
+                       *pkmn_gen1_battle_options_chance_durations(&options), {})
+                << '\n';
+      std::cout << Strings::side_choice_string(battle.bytes, update.c1) << ' '
+                << Strings::side_choice_string(battle.bytes + 184, update.c2)
+                << std::endl;
+
+      // auto result = Init::update(battle, update.c1, update.c2, options);
+      debug_log.update(battle, update.c1, update.c2, options);
+    }
+    debug_log.save_data_to_path(std::to_string(turns.size()) + ".log");
+    read_index += battle_frames.n_bytes();
+    turns.push_back(battle_frames.updates.size());
   }
 
   std::cout << "turn lengths:" << std::endl;

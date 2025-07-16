@@ -232,6 +232,10 @@ struct Battle {
   const Side &side(size_t side) const noexcept {
     return *reinterpret_cast<const Side *>(bytes + side * Sizes::Side);
   }
+
+  uint16_t turn() const noexcept {
+    return reinterpret_cast<const uint16_t *>(bytes + 368)[0];
+  }
 };
 
 inline Battle &ref(pkmn_gen1_battle &battle) noexcept {

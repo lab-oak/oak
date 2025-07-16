@@ -131,6 +131,7 @@ struct CompressedFrames {
       std::memcpy(p2_empirical.data(), buffer + index, n * sizeof(policy_type));
       index += n * sizeof(policy_type);
       std::memcpy(p2_nash.data(), buffer + index, n * sizeof(policy_type));
+      assert(index + n * sizeof(policy_type) == n_bytes());
       return true;
     }
   };
