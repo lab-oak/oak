@@ -4,3 +4,4 @@
 *.build
 */build-network
 */args
+*.log

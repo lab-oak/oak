@@ -2,7 +2,7 @@
 #include <battle/strings.h>
 #include <battle/view.h>
 #include <data/options.h>
-#include <nn/encoding.h>
+#include <nn/encode.h>
 #include <nn/net.h>
 #include <pi/exp3.h>
 #include <pi/mcts.h>

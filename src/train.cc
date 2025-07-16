@@ -1,5 +1,5 @@
 #include <battle/debug-log.h>
-#include <nn/encoding.h>
+#include <nn/encode.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
 
@@ -24,6 +24,8 @@ extern "C" int read_battle_offsets(const char *path, uint16_t *out,
     return -1;
   }
 
+  std::cout << path << std::endl;
+
   size_t count = 0;
 
   auto *buf = new char[100000];
@@ -37,7 +39,7 @@ extern "C" int read_battle_offsets(const char *path, uint16_t *out,
     }
 
     *buf = {};
-    file.seekg(-2, std::ios::cur);
+    file.seekg(0, std::ios::beg);
     file.read(buf, offset);
     std::cout << "offset: " << offset << std::endl;
     std::cout << "buf[0 :2] " << (int)buf[0] + 256 * (int)buf[1] << std::endl;

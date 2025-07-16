@@ -1,7 +1,7 @@
 #pragma once
 
 #include <battle/view.h>
-#include <nn/encoding.h>
+#include <nn/encode.h>
 #include <nn/subnet.h>
 
 namespace NN {
