@@ -10,6 +10,81 @@
 
 namespace Encode {
 
+namespace Stats {
+
+void write(const View::Stats &stats, float *t) {
+  constexpr float max_stat_value = 999.0;
+  // we use this same function for active but the stats come from ActivePokemon
+  t[0] = stats.hp() / max_stat_value;
+  t[1] = stats.atk() / max_stat_value;
+  t[2] = stats.def() / max_stat_value;
+  t[3] = stats.spe() / max_stat_value;
+  t[4] = stats.spc() / max_stat_value;
+}
+
+} // namespace Stats
+
+namespace Pokemon {
+
+constexpr auto in_dim = 212;
+
+constexpr auto n_status = 15;
+
+constexpr auto get_status_index(auto status, uint8_t sleeps) {
+  if (!static_cast<bool>(status)) {
+    return 0;
+  }
+  // brn, par, psn(vol encodes tox), frz
+  if (!Data::is_sleep(status)) {
+    return std::countr_zero(static_cast<uint8_t>(status)) - 3;
+  } else {
+    if (!Data::self(status)) {
+      return 4 + sleeps;
+    } else {
+      const auto s = static_cast<uint8_t>(status) & 7;
+      return 12 + (s - 1);
+    }
+  }
+}
+
+static_assert(get_status_index(Data::Status::Poison, 0) == 0);
+static_assert(get_status_index(Data::Status::Burn, 0) == 1);
+static_assert(get_status_index(Data::Status::Freeze, 0) == 2);
+static_assert(get_status_index(Data::Status::Paralysis, 0) == 3);
+static_assert(get_status_index(Data::Status::Toxic, 0) == 0);
+static_assert(get_status_index(Data::Status::Sleep7, 0) == 4);
+static_assert(get_status_index(Data::Status::Sleep7, 1) == 5);
+static_assert(get_status_index(Data::Status::Sleep6, 2) == 6);
+static_assert(get_status_index(Data::Status::Sleep5, 3) == 7);
+static_assert(get_status_index(Data::Status::Sleep4, 4) == 8);
+static_assert(get_status_index(Data::Status::Sleep3, 5) == 9);
+static_assert(get_status_index(Data::Status::Sleep2, 6) == 10);
+static_assert(get_status_index(Data::Status::Sleep1, 7) == 11);
+static_assert(get_status_index(Data::Status::Rest1, 2) == 12);
+static_assert(get_status_index(Data::Status::Rest2, 1) == 13);
+static_assert(get_status_index(Data::Status::Rest3, 0) == 14);
+
+template <bool write_stats = true>
+void write(const View::Pokemon &pokemon, auto sleep, float *t) {
+  // Struggle and None do not have dimensions
+  constexpr auto n_moves = static_cast<uint8_t>(Data::Move::Struggle) - 1;
+  if constexpr (write_stats) {
+    Stats::write(pokemon.stats(), t);
+  }
+  // one hot starting at index 5 for (id - 1) since None is not encoded
+  for (const auto [id, pp] : pokemon.moves()) {
+    if (id != Data::Move::Struggle && id != Data::Move::None) {
+      t[(5 - 1) + static_cast<uint8_t>(id)] = static_cast<bool>(pp);
+    }
+  }
+  if (static_cast<bool>(pokemon.status())) {
+    t[5 + n_moves + get_status_index(pokemon.status(), sleep)] = 1;
+  }
+  t[5 + n_moves + n_status + (pokemon.types() & 16)] = 1;
+  t[5 + n_moves + n_status + (pokemon.types() >> 4)] = 1;
+}
+} // namespace Pokemon
+
 namespace Active {
 
 constexpr auto in_dim = 198;
@@ -43,61 +118,8 @@ void write(const View::Volatiles &vol, const View::Duration &dur, float *t) {
 }
 
 void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
-           const View::Duration &dur) {}
+           const View::Duration &dur, float *t) {}
 } // namespace Active
-
-namespace Pokemon {
-
-constexpr auto in_dim = 212;
-
-constexpr auto n_status = 14;
-
-constexpr auto get_status_index(uint8_t status, uint8_t sleeps) {
-  if (!status) {
-    return 0;
-  }
-  auto index = 0;
-  if (!Data::is_sleep(status)) {
-    index = std::countr_zero(status) - 4;
-    assert((index >= 0) && (index < 4));
-  } else {
-    if (!Data::self(status)) {
-      index = 4 + sleeps;
-      assert((index >= 4) && (index < 12));
-    } else {
-      const auto s = status & 7;
-      index = 12 + (s - 1);
-      assert((index >= 12) && (index < 14));
-    }
-  }
-  return index + 1;
-}
-
-template <bool write_stats = true>
-void write(const View::Pokemon &pokemon, auto sleep, float *t) {
-  constexpr auto n_moves =
-      static_cast<uint8_t>(Data::Move::Struggle) - 1; // no None dim
-  constexpr float max_stat_value = 999.0;
-  // we use this same function for active but the stats come from ActivePokemon
-  if constexpr (write_stats) {
-    t[0] = pokemon.stats().hp() / max_stat_value;
-    t[1] = pokemon.stats().atk() / max_stat_value;
-    t[2] = pokemon.stats().def() / max_stat_value;
-    t[3] = pokemon.stats().spe() / max_stat_value;
-    t[4] = pokemon.stats().spc() / max_stat_value;
-  }
-  // one hot starting at index 5 for (id - 1) since None is not encoded
-  for (const auto [id, pp] : pokemon.moves()) {
-    t[4 + static_cast<uint8_t>(id)] =
-        static_cast<bool>(id) && static_cast<bool>(pp);
-  }
-  if (static_cast<bool>(pokemon.status())) {
-    t[5 + n_moves + get_status_index(pokemon.status(), sleep)] = 1;
-  }
-  t[5 + n_moves + n_status + (pokemon.types() & 16)] = 1;
-  t[5 + n_moves + n_status + (pokemon.types() >> 4)] = 1;
-}
-} // namespace Pokemon
 
 namespace Team {
 
