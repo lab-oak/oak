@@ -154,6 +154,11 @@ struct ActivePokemon {
     return *reinterpret_cast<const Stats *>(bytes + 0);
   }
 
+  auto species() const noexcept {
+    return static_cast<Data::Species>(bytes[10]);
+  }
+  auto types() const noexcept { return bytes[11]; }
+
   uint8_t boost_atk() const noexcept { return bytes[12] & 0b00001111; }
   uint8_t boost_def() const noexcept { return (bytes[12] & 0b11110000) >> 4; }
   uint8_t boost_spe() const noexcept { return bytes[13] & 0b00001111; }
@@ -185,6 +190,13 @@ struct ActivePokemon {
   }
   const Volatiles &volatiles() const noexcept {
     return *reinterpret_cast<const Volatiles *>(bytes + 16);
+  }
+
+  std::array<MoveSlot, 4> &moves() noexcept {
+    return *reinterpret_cast<std::array<MoveSlot, 4> *>(bytes + 24);
+  }
+  const std::array<MoveSlot, 4> &moves() const noexcept {
+    return *reinterpret_cast<const std::array<MoveSlot, 4> *>(bytes + 24);
   }
 };
 

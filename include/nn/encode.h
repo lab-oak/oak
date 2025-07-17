@@ -2,7 +2,7 @@
 
 #include <battle/init.h>
 #include <battle/view.h>
-#include <data/legal-moves.h>
+#include <data/move-pools.h>
 #include <data/status.h>
 
 #include <array>
@@ -11,29 +11,29 @@
 namespace Encode {
 
 namespace Stats {
-
+constexpr float max_stat_value = 999;
+constexpr float max_hp_value = 706;
 void write(const View::Stats &stats, float *t) {
-  constexpr float max_stat_value = 999.0;
-  // we use this same function for active but the stats come from ActivePokemon
-  t[0] = stats.hp() / max_stat_value;
+  t[0] = stats.hp() / max_hp_value;
   t[1] = stats.atk() / max_stat_value;
   t[2] = stats.def() / max_stat_value;
   t[3] = stats.spe() / max_stat_value;
   t[4] = stats.spc() / max_stat_value;
 }
-
 } // namespace Stats
 
-namespace Pokemon {
-
-constexpr auto in_dim = 212;
-
-constexpr auto n_status = 15;
-
-constexpr auto get_status_index(auto status, uint8_t sleeps) {
-  if (!static_cast<bool>(status)) {
-    return 0;
+namespace MoveSlots {
+void write(const std::array<View::MoveSlot, 4> &move_slots, float *t) {
+  for (const auto [id, pp] : move_slots) {
+    if (id != Data::Move::Struggle && id != Data::Move::None) {
+      t[static_cast<uint8_t>(id) - 1] = static_cast<bool>(pp);
+    }
   }
+}
+} // namespace MoveSlots
+
+namespace Status {
+constexpr auto get_status_index(auto status, uint8_t sleeps) {
   // brn, par, psn(vol encodes tox), frz
   if (!Data::is_sleep(status)) {
     return std::countr_zero(static_cast<uint8_t>(status)) - 3;
@@ -64,36 +64,104 @@ static_assert(get_status_index(Data::Status::Rest1, 2) == 12);
 static_assert(get_status_index(Data::Status::Rest2, 1) == 13);
 static_assert(get_status_index(Data::Status::Rest3, 0) == 14);
 
-template <bool write_stats = true>
-void write(const View::Pokemon &pokemon, auto sleep, float *t) {
-  // Struggle and None do not have dimensions
-  constexpr auto n_moves = static_cast<uint8_t>(Data::Move::Struggle) - 1;
-  if constexpr (write_stats) {
-    Stats::write(pokemon.stats(), t);
+void write(const auto status, const auto sleep, float *t) {
+  if (static_cast<bool>(status)) {
+    t[get_status_index(status, sleep)] = 1;
   }
-  // one hot starting at index 5 for (id - 1) since None is not encoded
-  for (const auto [id, pp] : pokemon.moves()) {
-    if (id != Data::Move::Struggle && id != Data::Move::None) {
-      t[(5 - 1) + static_cast<uint8_t>(id)] = static_cast<bool>(pp);
+}
+} // namespace Status
+
+namespace Types {
+void write(const auto types, float *t) {
+  t[types % 16] = 1;
+  t[types / 16] = 1;
+}
+} // namespace Types
+
+namespace Pokemon {
+
+constexpr auto n_status = 15;
+constexpr auto n_moves = static_cast<uint8_t>(Data::Move::Struggle) - 1;
+
+constexpr auto in_dim = 5 + n_status + n_moves + 15;
+
+void write(const View::Pokemon &pokemon, auto sleep, float *t) {
+  Stats::write(pokemon.stats(), t);
+  MoveSlots::write(pokemon.moves(), t + 5);
+  Status::write(pokemon.status(), sleep, t + 5 + n_moves);
+  Types::write(pokemon.types(), t + 5 + n_moves + n_status);
+}
+
+consteval auto get_dim_names() {
+  using Name =
+      std::remove_const<decltype(Data::MOVE_CHAR_ARRAY)::value_type>::type;
+  std::array<Name, in_dim> result{};
+  result[0] = {'h', 'p'};
+  result[1] = {'a', 't', 'k'};
+  result[2] = {'d', 'e', 'f'};
+  result[3] = {'s', 'p', 'e'};
+  result[4] = {'s', 'p', 'c'};
+  auto index = 5;
+  result[index + 0] = {'p', 's', 'n'};
+  result[index + 1] = {'b', 'r', 'n'};
+  result[index + 2] = {'f', 'r', 'z'};
+  result[index + 3] = {'p', 'a', 'r'};
+  result[index + 4] = {'s', 'l', 'e', 'p', 't', '0'};
+  result[index + 5] = {'s', 'l', 'e', 'p', 't', '1'};
+  result[index + 6] = {'s', 'l', 'e', 'p', 't', '2'};
+  result[index + 7] = {'s', 'l', 'e', 'p', 't', '3'};
+  result[index + 8] = {'s', 'l', 'e', 'p', 't', '4'};
+  result[index + 9] = {'s', 'l', 'e', 'p', 't', '5'};
+  result[index + 10] = {'s', 'l', 'e', 'p', 't', '6'};
+  result[index + 11] = {'s', 'l', 'e', 'p', 't', '7'};
+  result[index + 12] = {'r', 'e', 's', 't', 'e', 'd', '2'};
+  result[index + 13] = {'r', 'e', 's', 't', 'e', 'd', '1'};
+  result[index + 14] = {'r', 'e', 's', 't', 'e', 'd', '0'};
+  index += n_status;
+  for (auto i = 0; i < n_moves; ++i) {
+    result[index + i] = Data::MOVE_CHAR_ARRAY[i + 1];
+  }
+  index += n_moves;
+  for (auto i = 0; i < 15; ++i) {
+    for (auto j = 0; j < 9; ++j) {
+      result[index + i][j] = Data::TYPE_CHAR_ARRAY[i][j];
     }
   }
-  if (static_cast<bool>(pokemon.status())) {
-    t[5 + n_moves + get_status_index(pokemon.status(), sleep)] = 1;
-  }
-  t[5 + n_moves + n_status + (pokemon.types() & 16)] = 1;
-  t[5 + n_moves + n_status + (pokemon.types() >> 4)] = 1;
+  return result;
 }
+
+constexpr auto dim_names = get_dim_names();
+
 } // namespace Pokemon
+
+namespace Duration {
+constexpr auto n_confusion = 0;
+constexpr auto n_disable = 0;
+constexpr auto n_attacking = 0;
+constexpr auto n_binding = 0;
+
+void write(View::Duration &duration, float *t) {
+  if (const auto confusion = duration.confusion()) {
+    t[confusion - 1] = 1;
+    assert(true);
+  }
+  if (const auto disable = duration.disable()) {
+    t[n_confusion + disable - 1] = 1;
+  }
+}
+} // namespace Duration
 
 namespace Active {
 
-constexpr auto in_dim = 198;
+constexpr auto n_volatiles = 26;
+constexpr auto in_dim = Pokemon::in_dim + n_volatiles;
 
-void write(const View::Volatiles &vol, const View::Duration &dur, float *t) {
+void write(const View::Volatiles &vol, float *t) {
 
   constexpr float chansey_sub = 706 / 4 + 1;
 
   // See data layout in extern/engine/src/lib/gen1/readme.md
+  // hidden data is replaced with normalized durations
   t[0] = vol.bide();
   t[1] = vol.thrashing();
   t[2] = vol.multi_hit();
@@ -112,13 +180,25 @@ void write(const View::Volatiles &vol, const View::Duration &dur, float *t) {
   t[15] = vol.light_screen();
   t[16] = vol.reflect();
   t[17] = vol.transform();
-  t[18] = vol.state() / 65535.0; // u16 bide damage? TODO
+  // confusion_left
+  // attacks (thrashing/binding) left
+  t[18] = vol.state() / (float)std::numeric_limits<uint16_t>::max();
   t[19] = vol.substitute_hp() / chansey_sub;
-  t[21] = vol.toxic_counter() / 16.0;
+  // skip transform id
+  // disable left
+  // disable move slot; just zero out the move encoding
+  t[20] = vol.toxic_counter() / 16.0;
 }
 
 void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
-           const View::Duration &dur, float *t) {}
+           const View::Duration &dur, float *t) {
+  Stats::write(active.stats(), t);
+  Types::write(active.types(), t + 5);
+  write(active.volatiles(), t + 7);
+  MoveSlots::write(active.moves(), t + 7 + n_volatiles);
+
+  Pokemon::write(pokemon, dur.sleep(0), t);
+}
 } // namespace Active
 
 namespace Team {

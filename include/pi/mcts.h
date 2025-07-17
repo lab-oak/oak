@@ -15,7 +15,8 @@
 
 #include "../extern/lrsnash/src/lib.h"
 
-static_assert(Options::chance && Options::calc && !Options::log);
+static_assert(LibpkmnOptions::chance && LibpkmnOptions::calc &&
+              !LibpkmnOptions::log);
 
 struct BattleData {
   pkmn_gen1_battle battle;
