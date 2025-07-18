@@ -93,8 +93,8 @@ constexpr auto n_dim =
 void write(const View::Pokemon &pokemon, auto sleep, float *t) {
   t = Stats::write(pokemon.stats(), t);
   t = MoveSlots::write(pokemon.moves(), t);
-  t = Status::write(pokemon.status(), sleep, t + 5 + n_moves);
-  t = Types::write(pokemon.types(), t + 5 + n_moves + n_status);
+  t = Status::write(pokemon.status(), sleep, t);
+  t = Types::write(pokemon.types(), t);
 }
 
 consteval auto get_dim_names() {
@@ -122,11 +122,11 @@ consteval auto get_dim_names() {
   result[index + 12] = {'r', 'e', 's', 't', 'e', 'd', '2'};
   result[index + 13] = {'r', 'e', 's', 't', 'e', 'd', '1'};
   result[index + 14] = {'r', 'e', 's', 't', 'e', 'd', '0'};
-  index += n_status;
-  for (auto i = 0; i < n_moves; ++i) {
+  index += Status::n_dim;
+  for (auto i = 0; i < MoveSlots::n_dim; ++i) {
     result[index + i] = Data::MOVE_CHAR_ARRAY[i + 1];
   }
-  index += n_moves;
+  index += MoveSlots::n_dim;
   for (auto i = 0; i < 15; ++i) {
     for (auto j = 0; j < 9; ++j) {
       result[index + i][j] = Data::TYPE_CHAR_ARRAY[i][j];
@@ -142,8 +142,8 @@ constexpr auto dim_names = get_dim_names();
 namespace Boosts {
 constexpr auto n_dim = 13 * 2;
 float* write(const View::ActivePokemon &active, float *t) {
-  t[acitve.boost_acc() + 6] = 1.0;
-  t[13 + acitve.boost_eva() + 6] = 1.0;
+  t[active.boost_acc() + 6] = 1.0;
+  t[13 + active.boost_eva() + 6] = 1.0;
   return t + n_dim;
 }
 } // namespace Boosts
@@ -193,7 +193,7 @@ constexpr auto n_attacking = 3; // bide = thrashing
 constexpr auto n_binding = 4;
 constexpr auto n_dim = n_confusion + n_disable + n_attacking + n_binding;
 
-float *write(View::Duration &duration, float *t) {
+float *write(const View::Duration &duration, float *t) {
   if (const auto confusion = duration.confusion()) {
     assert(confusion <= n_confusion);
     t[confusion - 1] = 1;
@@ -234,7 +234,7 @@ void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
   // disable
   if (const auto slot = active.volatiles().disable_move()) {
     assert(slot != 0);
-    t[active.moves()[slot].id] = 0; // TODO
+    t[static_cast<uint8_t>(active.moves()[slot].id)] = 0; // TODO
   }
   Duration::write(duration, t);
   Pokemon::write(pokemon, duration.sleep(0), t);
@@ -257,8 +257,8 @@ consteval auto get_species_move_list_size() {
 
 constexpr auto species_move_list_size = get_species_move_list_size();
 
-constexpr auto n_dim = species_move_list_size;
-constexpr auto out_dim = n_dim;
+constexpr auto in_dim = species_move_list_size;
+constexpr auto out_dim = in_dim;
 
 consteval auto get_species_move_data() {
   std::array<std::array<uint16_t, 166>, 152> table{};

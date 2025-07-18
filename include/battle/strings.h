@@ -204,7 +204,7 @@ std::string battle_to_string(const pkmn_gen1_battle &battle) {
       }
       const auto st = pokemon.status();
       if (st != Data::Status::None) {
-        ss << status(st) << ' ';
+        ss << status_string(st) << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
         ss << move_string(pokemon.moves()[m].id) << ' ';
@@ -262,7 +262,7 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
       }
       const auto st = pokemon.status();
       if (st != Data::Status::None) {
-        ss << status(st) << ' ';
+        ss << status_string(st) << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
         const auto moveslot = pokemon.moves()[m];

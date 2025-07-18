@@ -18,10 +18,10 @@ struct Network {
   static_assert((1 + active_out_dim) + 5 * (1 + pokemon_out_dim) ==
                 side_out_dim);
 
-  using PokemonSubnet = EmbeddingNet<Encode::Pokemon::in_dim,
+  using PokemonSubnet = EmbeddingNet<Encode::Pokemon::n_dim,
                                      pokemon_hidden_dim, pokemon_out_dim>;
   using ActiveSubnet =
-      EmbeddingNet<Encode::Active::in_dim, active_hidden_dim, active_out_dim>;
+      EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
 
   prng device{};
   PokemonSubnet p;
@@ -35,8 +35,8 @@ struct Network {
 
   float inference(const pkmn_gen1_battle &battle,
                   const pkmn_gen1_chance_durations &durations) {
-    static thread_local float pokemon_input[2][5][Encode::Pokemon::in_dim];
-    static thread_local float active_input[2][1][Encode::Active::in_dim];
+    static thread_local float pokemon_input[2][5][Encode::Pokemon::n_dim];
+    static thread_local float active_input[2][1][Encode::Active::n_dim];
     static thread_local float pokemon_output[2][5][pokemon_out_dim];
     static thread_local float active_output[2][1][active_out_dim];
     static thread_local float main_input[256][2];

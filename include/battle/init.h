@@ -216,6 +216,10 @@ constexpr void init_duration(const auto &side, View::Duration &duration) {
   }
 }
 
+static_assert(compute_stat(100, false) == 298);
+static_assert(compute_stat(250, true) == 703);
+static_assert(compute_stat(5, false) == 108);
+
 } // end anonymous namespace
 
 namespace Init {
@@ -279,8 +283,8 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
 
     for (auto p = 0; p < 6; ++p) {
       if (const auto sleep = duration.sleep(0)) {
-        const auto slot = side.order(p) - 1;
-        auto &pokemon = side.pokemon(slot);
+        const auto id = side.order(p) - 1;
+        auto &pokemon = side.pokemon(id);
         auto &status = reinterpret_cast<uint8_t &>(pokemon.status());
 
         if (!Data::is_sleep(status) || Data::self(status)) {
@@ -339,8 +343,8 @@ constexpr auto battle(const auto &p1, const auto &p2,
   pkmn_gen1_battle battle{};
   pkmn_gen1_battle_options options{};
   auto *durations_ptr = pkmn_gen1_battle_options_chance_durations(&options);
-  init_side(p1, battle.bytes, durations_ptr->bytes);
-  init_side(p2, battle.bytes + Sizes::Side, durations_ptr->bytes + 4);
+  init_side(p1, battle.bytes);
+  init_side(p2, battle.bytes + Sizes::Side);
   auto *ptr_64 =
       std::bit_cast<uint64_t *>(battle.bytes + Offsets::Battle::turn);
   ptr_64[0] = 0; // turn, last used, etc
@@ -350,29 +354,28 @@ constexpr auto battle(const auto &p1, const auto &p2,
   return battle;
 }
 
+constexpr pkmn_gen1_chance_durations durations() { return {}; }
+
 constexpr auto durations(const auto &p1, const auto &p2) {
   pkmn_gen1_chance_durations durations{};
   auto &dur = View::ref(durations);
   init_duration(p1, dur.duration(0));
   init_duration(p2, dur.duration(1));
-
   return durations;
 }
 
 constexpr pkmn_gen1_battle_options options() { return {}; }
 
-constexpr pkmn_gen1_chance_durations durations() { return {}; }
-
 [[nodiscard]] pkmn_result update(pkmn_gen1_battle &battle, const auto c1,
                                  const auto c2,
                                  pkmn_gen1_battle_options &options) {
   const auto get_choice = [](const auto c, const uint8_t *side) -> pkmn_choice {
-    using Choice = decltype(c);
+    using Choice = std::remove_cv<decltype(c)>::type;
     if constexpr (std::is_same_v<Choice, Species>) {
       for (uint8_t i = 1; i < 6; ++i) {
-        const auto slot = side[Offsets::Side::order + i] - 1;
+        const auto id = side[Offsets::Side::order + i] - 1;
         if (static_cast<uint8_t>(c) ==
-            side[24 * slot + Offsets::Pokemon::species]) {
+            side[24 * id + Offsets::Pokemon::species]) {
           return ((i + 1) << 2) | 2;
         }
       }
@@ -380,7 +383,7 @@ constexpr pkmn_gen1_chance_durations durations() { return {}; }
     } else if constexpr (std::is_same_v<Choice, Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
-            side[Offsets::ActivePokemon::moves + 2 * i]) {
+            side[Offsets::Side::active + Offsets::ActivePokemon::moves + 2 * i]) {
           return ((i + 1) << 2) | 1;
         }
       }
@@ -388,8 +391,7 @@ constexpr pkmn_gen1_chance_durations durations() { return {}; }
     } else if constexpr (std::is_integral_v<Choice>) {
       return c;
     } else {
-
-      // static_assert(false);
+      assert(false);
     }
   };
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
@@ -458,7 +460,3 @@ auto score2(const pkmn_result result) {
 }
 
 } // namespace Init
-
-static_assert(compute_stat(100, false) == 298);
-static_assert(compute_stat(250, true) == 703);
-static_assert(compute_stat(5, false) == 108);
