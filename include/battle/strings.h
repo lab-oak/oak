@@ -120,58 +120,117 @@ std::string pokemon_to_string(const uint8_t *const data) {
 }
 
 std::string volatiles_to_string(const View::Volatiles &vol) {
-  std::stringstream sstream{};
-  if (vol.thrashing()) {
-    sstream << "(thrashing: " << vol.attacks() << ")";
-  }
-  if (vol.binding()) {
-    sstream << "(binding: " << vol.attacks() << ")";
-  }
-  if (vol.confusion()) {
-    sstream << "(confused: " << vol.confusion_left() << ")";
-  }
-  return sstream.str();
+  std::stringstream ss{};
+  if (vol.bide())
+    ss << "(bide)";
+  if (vol.thrashing())
+    ss << "(thrashing)";
+  if (vol.multi_hit())
+    ss << "(multi-hit)";
+  if (vol.flinch())
+    ss << "(flinch)";
+  if (vol.charging())
+    ss << "(charging)";
+  if (vol.binding())
+    ss << "(binding)";
+  if (vol.invulnerable())
+    ss << "(invulnerable)";
+  if (vol.confusion())
+    ss << "(confused)";
+  if (vol.mist())
+    ss << "(mist)";
+  if (vol.focus_energy())
+    ss << "(focus-energy)";
+  if (vol.substitute())
+    ss << "(substitute)";
+  if (vol.recharging())
+    ss << "(recharging)";
+  if (vol.rage())
+    ss << "(rage)";
+  if (vol.leech_seed())
+    ss << "(leech-seed)";
+  if (vol.toxic())
+    ss << "(toxic)";
+  if (vol.light_screen())
+    ss << "(light-screen)";
+  if (vol.reflect())
+    ss << "(reflect)";
+  if (vol.transform())
+    ss << "(transform)";
+  if (vol.confusion_left())
+    ss << "(confusion_left: " << (int)vol.confusion_left() << ")";
+  if (vol.attacks())
+    ss << "(attacks: " << (int)vol.attacks() << ")";
+  if (vol.state())
+    ss << "(state: " << (int)vol.state() << ")";
+  if (vol.substitute_hp())
+    ss << "(sub_hp: " << (int)vol.substitute_hp() << ")";
+  if (vol.transform_species())
+    ss << "(transform: " << species_string(vol.transform_species()) << ")";
+  if (vol.disable_left())
+    ss << "(disable_left: " << (int)vol.disable_left() << ")";
+  if (vol.disable_move())
+    ss << "(disable_move: " << (int)vol.disable_move() << ")";
+  if (vol.toxic_counter())
+    ss << "(toxic_counter: " << (int)vol.toxic_counter() << ")";
+  return ss.str();
 }
 
-std::string battle_data_to_string(const pkmn_gen1_battle &battle,
-                                  const pkmn_gen1_chance_durations &durations,
-                                  pkmn_result) {
+std::string battle_to_string(const pkmn_gen1_battle &battle) {
   std::stringstream ss{};
-
   const auto &b = View::ref(battle);
-  ss << "Turn " << b.turn() << '\n';
   for (auto s = 0; s < 2; ++s) {
     const auto &side = b.side(s);
-    const auto &duration = View::ref(durations).duration(s);
-    const auto &vol = side.active().volatiles();
 
     for (auto i = 0; i < 6; ++i) {
       const auto slot = side.order()[i];
       if (slot == 0) {
         continue;
       }
-
-      if (i > 0) {
-        ss << "  ";
-      }
-
       auto &pokemon = side.pokemon(slot - 1);
 
-      ss << species_char_array(pokemon.species()) << ": ";
-      const auto hp = pokemon.hp();
-      const bool ko = (hp == 0);
-      if (!ko) {
-        ss << pokemon.percent() << "% ";
-      } else {
-        ss << "KO " << '\n';
-        continue;
-      }
-      ss << status_string(pokemon.status()) << ' ';
-      for (auto m = 0; m < 4; ++m) {
-        const auto moveslot = pokemon.moves()[m];
-        ss << move_char_array(moveslot.id) << ":" << (int)moveslot.pp << ' ';
+      if (i == 0) {
+        // pass for now
       }
 
+      ss << species_string(pokemon.species()) << ": ";
+      const auto hp = pokemon.hp();
+      if (hp != 0) {
+        ss << pokemon.percent() << "% (" << pokemon.hp() << '/'
+           << pokemon.stats().hp() << ") ";
+      } else {
+        ss << "KO " << std::endl;
+        continue;
+      }
+      const auto st = pokemon.status();
+      if (st != Data::Status::None) {
+        ss << status(st) << ' ';
+      }
+      for (auto m = 0; m < 4; ++m) {
+        ss << move_string(pokemon.moves()[m].id) << ' ';
+      }
+      ss << std::endl;
+    }
+    ss << std::endl;
+  }
+  return ss.str();
+}
+
+std::string battle_data_to_string(const pkmn_gen1_battle &battle,
+                                  const pkmn_gen1_chance_durations &durations,
+                                  pkmn_result) {
+  std::stringstream ss{};
+  const auto &b = View::ref(battle);
+  for (auto s = 0; s < 2; ++s) {
+    const auto &side = b.side(s);
+    const auto &duration = View::ref(durations).duration(s);
+    const auto &vol = side.active().volatiles();
+
+    for (auto i = 0; i < 6; ++i) {
+      const auto id = side.order(i);
+      if (id == 0) {
+        continue;
+      }
       if (i == 0) {
         if (duration.confusion()) {
           ss << "conf: " << static_cast<int>(duration.confusion());
@@ -185,20 +244,33 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
         if (duration.binding()) {
           ss << " binding: " << static_cast<int>(duration.binding());
         }
-        if (duration.confusion() || duration.disable() ||
-            duration.attacking() || duration.binding()) {
-          ss << '\n';
-        }
-        const auto vol_string = volatiles_to_string(vol);
-        if (vol_string.size() > 0) {
-          ss << volatiles_to_string(vol) << '\n';
-        }
+        ss << std::endl;
+        ss << volatiles_to_string(vol) << std::endl;
+      } else {
+        ss << "  ";
       }
+      const auto &pokemon = side.pokemon(id - 1);
 
-      // end of set
-      ss << '\n';
+      ss << species_char_array(pokemon.species()) << ": ";
+      const auto hp = pokemon.hp();
+      if (hp != 0) {
+        ss << pokemon.percent() << "% (" << pokemon.hp() << '/'
+           << pokemon.stats().hp() << ") ";
+      } else {
+        ss << "KO " << std::endl;
+        continue;
+      }
+      const auto st = pokemon.status();
+      if (st != Data::Status::None) {
+        ss << status(st) << ' ';
+      }
+      for (auto m = 0; m < 4; ++m) {
+        const auto moveslot = pokemon.moves()[m];
+        ss << move_char_array(moveslot.id) << ":" << (int)moveslot.pp << ' ';
+      }
+      ss << std::endl;
     }
-    // ss << '\n';
+    ss << std::endl;
   }
   return ss.str();
 }

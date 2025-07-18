@@ -8,6 +8,7 @@
 #include <data/status.h>
 
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -66,8 +67,8 @@ struct Pokemon {
     return *reinterpret_cast<const std::array<MoveSlot, 4> *>(bytes + 10);
   }
 
-  MoveSlot &moves(size_t i) noexcept { return moves()[i]; }
-  const MoveSlot &moves(size_t i) const noexcept { return moves()[i]; }
+  MoveSlot &moves(auto i) noexcept { return moves()[i]; }
+  const MoveSlot &moves(auto i) const noexcept { return moves()[i]; }
 
   uint16_t &hp() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 18); }
   const uint16_t &hp() const noexcept {
@@ -203,16 +204,18 @@ struct ActivePokemon {
 struct Side {
   uint8_t bytes[Sizes::Side];
 
-  Pokemon &pokemon(size_t slot) noexcept {
-    return *reinterpret_cast<Pokemon *>(bytes + slot * Sizes::Pokemon);
+  Pokemon &pokemon(auto i) noexcept {
+    return *reinterpret_cast<Pokemon *>(bytes + i * Sizes::Pokemon);
   }
-  const Pokemon &pokemon(size_t slot) const noexcept {
-    return *reinterpret_cast<const Pokemon *>(bytes + slot * Sizes::Pokemon);
+
+  const Pokemon &pokemon(auto i) const noexcept {
+    return *reinterpret_cast<const Pokemon *>(bytes + i * Sizes::Pokemon);
   }
 
   ActivePokemon &active() noexcept {
     return *reinterpret_cast<ActivePokemon *>(bytes + Offsets::Side::active);
   }
+
   const ActivePokemon &active() const noexcept {
     return *reinterpret_cast<const ActivePokemon *>(bytes +
                                                     Offsets::Side::active);
@@ -222,26 +225,44 @@ struct Side {
     return *reinterpret_cast<std::array<uint8_t, 6> *>(bytes +
                                                        Offsets::Side::order);
   }
+
   const std::array<uint8_t, 6> &order() const noexcept {
     return *reinterpret_cast<const std::array<uint8_t, 6> *>(
         bytes + Offsets::Side::order);
   }
 
-  uint8_t &order(size_t i) noexcept {
+  uint8_t &order(auto i) noexcept { return (bytes + Offsets::Side::order)[i]; }
+
+  const uint8_t &order(auto i) const noexcept {
     return (bytes + Offsets::Side::order)[i];
   }
-  const uint8_t &order(size_t i) const noexcept {
-    return (bytes + Offsets::Side::order)[i];
+
+  Pokemon &get(auto slot) noexcept {
+    assert(slot > 0 && slot <= 6);
+    const auto id = order(slot - 1);
+    assert(id > 0 && id <= 6);
+    return pokemon(id - 1);
   }
+
+  const Pokemon &get(auto slot) const noexcept {
+    assert(slot > 0 && slot <= 6);
+    const auto id = order(slot - 1);
+    assert(id > 0 && id <= 6);
+    return pokemon(id - 1);
+  }
+
+  Pokemon &stored() noexcept { return get(1); }
+
+  const Pokemon &stored() const noexcept { return get(1); }
 };
 
 struct Battle {
   uint8_t bytes[PKMN_GEN1_BATTLE_SIZE];
 
-  Side &side(size_t side) noexcept {
+  Side &side(auto side) noexcept {
     return *reinterpret_cast<Side *>(bytes + side * Sizes::Side);
   }
-  const Side &side(size_t side) const noexcept {
+  const Side &side(auto side) const noexcept {
     return *reinterpret_cast<const Side *>(bytes + side * Sizes::Side);
   }
 
@@ -261,11 +282,11 @@ inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
 struct Duration {
   uint32_t data = 0;
 
-  uint8_t sleep(size_t slot) const noexcept {
+  uint8_t sleep(auto slot) const noexcept {
     return (data >> (3 * slot)) & 0b111;
   }
 
-  void set_sleep(size_t slot, uint8_t sleeps) noexcept {
+  void set_sleep(auto slot, uint8_t sleeps) noexcept {
     const uint32_t mask = 0b111 << (3 * slot);
     data = (data & ~mask) | ((sleeps & 0b111) << (3 * slot));
   }
@@ -282,9 +303,9 @@ struct Duration {
 struct Durations {
   Duration d[2];
 
-  Duration &duration(size_t i) noexcept { return d[i]; }
+  Duration &duration(auto i) noexcept { return d[i]; }
 
-  const Duration &duration(size_t i) const noexcept { return d[i]; }
+  const Duration &duration(auto i) const noexcept { return d[i]; }
 };
 
 inline Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
