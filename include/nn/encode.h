@@ -13,22 +13,26 @@ namespace Encode {
 namespace Stats {
 constexpr float max_stat_value = 999;
 constexpr float max_hp_value = 706;
-void write(const View::Stats &stats, float *t) {
+constexpr auto n_dim = 5;
+float *write(const View::Stats &stats, float *t) {
   t[0] = stats.hp() / max_hp_value;
   t[1] = stats.atk() / max_stat_value;
   t[2] = stats.def() / max_stat_value;
   t[3] = stats.spe() / max_stat_value;
   t[4] = stats.spc() / max_stat_value;
+  return t + n_dim;
 }
 } // namespace Stats
 
 namespace MoveSlots {
-void write(const std::array<View::MoveSlot, 4> &move_slots, float *t) {
+constexpr auto n_dim = static_cast<uint8_t>(Data::Move::Struggle) - 1;
+float *write(const std::array<View::MoveSlot, 4> &move_slots, float *t) {
   for (const auto [id, pp] : move_slots) {
     if (id != Data::Move::Struggle && id != Data::Move::None) {
       t[static_cast<uint8_t>(id) - 1] = static_cast<bool>(pp);
     }
   }
+  return t + n_dim;
 }
 } // namespace MoveSlots
 
@@ -64,38 +68,39 @@ static_assert(get_status_index(Data::Status::Rest1, 2) == 12);
 static_assert(get_status_index(Data::Status::Rest2, 1) == 13);
 static_assert(get_status_index(Data::Status::Rest3, 0) == 14);
 
-void write(const auto status, const auto sleep, float *t) {
+constexpr auto n_dim = 15; // TODO is sleep with 7 slept possibel????
+float *write(const auto status, const auto sleep, float *t) {
   if (static_cast<bool>(status)) {
     t[get_status_index(status, sleep)] = 1;
   }
+  return t + n_dim;
 }
 } // namespace Status
 
 namespace Types {
-void write(const auto types, float *t) {
+constexpr auto n_dim = 15;
+float *write(const auto types, float *t) {
   t[types % 16] = 1;
   t[types / 16] = 1;
+  return t + n_dim;
 }
 } // namespace Types
 
 namespace Pokemon {
-
-constexpr auto n_status = 15;
-constexpr auto n_moves = static_cast<uint8_t>(Data::Move::Struggle) - 1;
-
-constexpr auto in_dim = 5 + n_status + n_moves + 15;
+constexpr auto n_dim =
+    Stats::n_dim + MoveSlots::n_dim + Status::n_dim + Types::n_dim;
 
 void write(const View::Pokemon &pokemon, auto sleep, float *t) {
-  Stats::write(pokemon.stats(), t);
-  MoveSlots::write(pokemon.moves(), t + 5);
-  Status::write(pokemon.status(), sleep, t + 5 + n_moves);
-  Types::write(pokemon.types(), t + 5 + n_moves + n_status);
+  t = Stats::write(pokemon.stats(), t);
+  t = MoveSlots::write(pokemon.moves(), t);
+  t = Status::write(pokemon.status(), sleep, t + 5 + n_moves);
+  t = Types::write(pokemon.types(), t + 5 + n_moves + n_status);
 }
 
 consteval auto get_dim_names() {
   using Name =
       std::remove_const<decltype(Data::MOVE_CHAR_ARRAY)::value_type>::type;
-  std::array<Name, in_dim> result{};
+  std::array<Name, n_dim> result{};
   result[0] = {'h', 'p'};
   result[1] = {'a', 't', 'k'};
   result[2] = {'d', 'e', 'f'};
@@ -134,29 +139,18 @@ constexpr auto dim_names = get_dim_names();
 
 } // namespace Pokemon
 
-namespace Duration {
-constexpr auto n_confusion = 0;
-constexpr auto n_disable = 0;
-constexpr auto n_attacking = 0;
-constexpr auto n_binding = 0;
-
-void write(View::Duration &duration, float *t) {
-  if (const auto confusion = duration.confusion()) {
-    t[confusion - 1] = 1;
-    assert(true);
-  }
-  if (const auto disable = duration.disable()) {
-    t[n_confusion + disable - 1] = 1;
-  }
+namespace Boosts {
+constexpr auto n_dim = 13 * 2;
+float* write(const View::ActivePokemon &active, float *t) {
+  t[acitve.boost_acc() + 6] = 1.0;
+  t[13 + acitve.boost_eva() + 6] = 1.0;
+  return t + n_dim;
 }
-} // namespace Duration
+} // namespace Boosts
 
-namespace Active {
-
-constexpr auto n_volatiles = 26;
-constexpr auto in_dim = Pokemon::in_dim + n_volatiles;
-
-void write(const View::Volatiles &vol, float *t) {
+namespace Volatiles {
+constexpr auto n_dim = 20;
+float* write(const View::Volatiles &vol, float *t) {
 
   constexpr float chansey_sub = 706 / 4 + 1;
 
@@ -184,20 +178,66 @@ void write(const View::Volatiles &vol, float *t) {
   // attacks (thrashing/binding) left
   t[18] = vol.state() / (float)std::numeric_limits<uint16_t>::max();
   t[19] = vol.substitute_hp() / chansey_sub;
-  // skip transform id
+  // transform id
   // disable left
   // disable move slot; just zero out the move encoding
   t[20] = vol.toxic_counter() / 16.0;
+  return t + n_dim;
 }
+} // namespace Volatiles
+
+namespace Duration {
+constexpr auto n_confusion = 5;
+constexpr auto n_disable = 8;
+constexpr auto n_attacking = 3; // bide = thrashing
+constexpr auto n_binding = 4;
+constexpr auto n_dim = n_confusion + n_disable + n_attacking + n_binding;
+
+float *write(View::Duration &duration, float *t) {
+  if (const auto confusion = duration.confusion()) {
+    assert(confusion <= n_confusion);
+    t[confusion - 1] = 1;
+  }
+  t += n_confusion;
+  if (const auto disable = duration.disable()) {
+    assert(disable <= n_disable);
+    t[disable - 1] = 1;
+  }
+  t += n_disable;
+  if (const auto attacking = duration.attacking()) {
+    assert(attacking <= n_attacking);
+    t[attacking - 1] = 1;
+  }
+  t += n_attacking;
+  if (const auto binding = duration.binding()) {
+    assert(binding <= n_binding);
+    t[binding - 1] = 1;
+  }
+  t += n_binding;
+  return t;
+}
+} // namespace Duration
+
+namespace Active {
+
+constexpr auto n_dim = Stats::n_dim + Types::n_dim + Boosts::n_dim +
+                        Volatiles::n_dim + MoveSlots::n_dim +
+                        Duration::n_dim + Pokemon::n_dim;
 
 void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
-           const View::Duration &dur, float *t) {
-  Stats::write(active.stats(), t);
-  Types::write(active.types(), t + 5);
-  write(active.volatiles(), t + 7);
-  MoveSlots::write(active.moves(), t + 7 + n_volatiles);
-
-  Pokemon::write(pokemon, dur.sleep(0), t);
+           const View::Duration &duration, float *t) {
+  t = Stats::write(active.stats(), t);
+  t = Types::write(active.types(), t);
+  t = Boosts::write(active, t);
+  t = Volatiles::write(active.volatiles(), t);
+  t = MoveSlots::write(active.moves(), t);
+  // disable
+  if (const auto slot = active.volatiles().disable_move()) {
+    assert(slot != 0);
+    t[active.moves()[slot].id] = 0; // TODO
+  }
+  Duration::write(duration, t);
+  Pokemon::write(pokemon, duration.sleep(0), t);
 }
 } // namespace Active
 
@@ -217,8 +257,8 @@ consteval auto get_species_move_list_size() {
 
 constexpr auto species_move_list_size = get_species_move_list_size();
 
-constexpr auto in_dim = species_move_list_size;
-constexpr auto out_dim = in_dim;
+constexpr auto n_dim = species_move_list_size;
+constexpr auto out_dim = n_dim;
 
 consteval auto get_species_move_data() {
   std::array<std::array<uint16_t, 166>, 152> table{};

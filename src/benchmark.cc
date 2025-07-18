@@ -29,7 +29,8 @@ int benchmark(int argc, char **argv) {
 
   const uint64_t seed = 1111111;
   // MonteCarlo::Model model{prng{seed}};
-  const auto [battle, durations] = Init::battle_data(p1, p2, seed);
+  const auto battle = Init::battle(p1, p2, seed);
+  const auto duration = Init::durations(p1, p2);
   BattleData battle_data{battle, durations};
 
   FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};

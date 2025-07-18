@@ -59,7 +59,7 @@ constexpr std::array<uint16_t, 5> compute_stats(const auto &pokemon) {
 }
 
 constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
-                            uint8_t *const duration_bytes, auto i = 0) {
+                            auto i = 0) {
   const auto species = pokemon.species;
   if (species == Species::None) {
     return;
@@ -95,13 +95,6 @@ constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
   }
   if constexpr (requires { pokemon.status; }) {
     bytes[20] = static_cast<uint8_t>(pokemon.status);
-
-    if constexpr (requires { pokemon.sleeps; }) {
-      if (Data::is_sleep(pokemon.status) && !Data::self(pokemon.status)) {
-        auto &d = *reinterpret_cast<View::Duration *>(duration_bytes);
-        d.set_sleep(i, pokemon.sleeps);
-      }
-    }
   } else {
     bytes[20] = 0;
   }
@@ -163,8 +156,7 @@ constexpr void init_active(const auto &active, uint8_t *const bytes) {
   }
 }
 
-constexpr void init_party(const auto &party, uint8_t *const bytes,
-                          uint8_t *const duration_bytes) {
+constexpr void init_party(const auto &party, uint8_t *const bytes) {
   const uint8_t n = party.size();
   assert(n > 0 && n <= 6);
   std::memset(bytes, 0, 24 * 6);
@@ -175,11 +167,10 @@ constexpr void init_party(const auto &party, uint8_t *const bytes,
   for (uint8_t i = 0; i < n; ++i) {
     const auto &set = party[i];
     assert(set.moves.size() <= 4);
-    init_pokemon(set, bytes + i * Sizes::Pokemon, duration_bytes, i);
+    init_pokemon(set, bytes + i * Sizes::Pokemon, i);
     if (i == 0) {
       init_active(set, bytes);
     }
-
     if (set.species != Data::Species::None) {
       if constexpr (requires { set.hp; }) {
         if (set.hp == 0) {
@@ -192,17 +183,39 @@ constexpr void init_party(const auto &party, uint8_t *const bytes,
   }
 }
 
-constexpr void init_side(const auto &side, uint8_t *const bytes,
-                         uint8_t *const duration_bytes) {
+constexpr void init_party(const auto &party, View::Duration &duration) {
+  const auto n = party.size();
+  assert(n > 0 && n <= 6);
+  auto n_alive = 0;
+  for (auto i = 0; i < n; ++i) {
+    const auto &pokemon = party[i];
+    if constexpr (requires { pokemon.sleeps; }) {
+      if (Data::is_sleep(pokemon.status) && !Data::self(pokemon.status)) {
+        duration.set_sleep(i, pokemon.sleeps);
+      }
+    }
+  }
+}
+
+constexpr void init_side(const auto &side, uint8_t *const bytes) {
   if constexpr (requires { side.pokemon; }) {
-    init_party(side.pokemon, bytes, duration_bytes);
+    init_party(side.pokemon, bytes);
     if constexpr (requires { side.active; }) {
       init_active(side.active, bytes + Offsets::Side::active);
     }
   } else {
-    init_party(side, bytes, duration_bytes);
+    init_party(side, bytes);
   }
 }
+
+constexpr void init_duration(const auto &side, View::Duration &duration) {
+  if constexpr (requires { side.pokemon; }) {
+    init_party(side.pokemon, duration);
+  } else {
+    init_party(side, duration);
+  }
+}
+
 } // end anonymous namespace
 
 namespace Init {
@@ -321,8 +334,8 @@ struct Config {
 };
 
 // get durations from config, applly durations using ad hoc device
-constexpr auto battle_data(const auto &p1, const auto &p2,
-                           uint64_t seed = 0x123445) {
+constexpr auto battle(const auto &p1, const auto &p2,
+                      uint64_t seed = 0x123445) {
   pkmn_gen1_battle battle{};
   pkmn_gen1_battle_options options{};
   auto *durations_ptr = pkmn_gen1_battle_options_chance_durations(&options);
@@ -334,11 +347,21 @@ constexpr auto battle_data(const auto &p1, const auto &p2,
   ptr_64[1] = seed;
   prng device{seed};
   Init::apply_durations(device, battle, *durations_ptr);
-  return std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>{
-      battle, *durations_ptr};
+  return battle;
+}
+
+constexpr auto durations(const auto &p1, const auto &p2) {
+  pkmn_gen1_chance_durations durations{};
+  auto &dur = View::ref(durations);
+  init_duration(p1, dur.duration(0));
+  init_duration(p2, dur.duration(1));
+
+  return durations;
 }
 
 constexpr pkmn_gen1_battle_options options() { return {}; }
+
+constexpr pkmn_gen1_chance_durations durations() { return {}; }
 
 [[nodiscard]] pkmn_result update(pkmn_gen1_battle &battle, const auto c1,
                                  const auto c2,

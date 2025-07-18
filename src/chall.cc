@@ -24,8 +24,7 @@ void handle_suspend(int signal) {
   run_search = false;
 }
 
-std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>
-parse_input(const std::string &line) {
+BattleData parse_input(const std::string &line) {
   const auto side_strings = split(line, '|');
   if (side_strings.size() != 2) {
     throw std::runtime_error("Battle input string must have \'|\' ");
@@ -43,7 +42,10 @@ parse_input(const std::string &line) {
   }
   prng device{std::random_device{}()};
 
-  return Init::battle_data(sides[0], sides[1], device.uniform_64());
+  const auto battle = Init::battle(sides[0], sides[1], device.uniform_64());
+  const auto durations = Init::durations(sides[0], sides[1]);
+
+  return {battle, durations};
 }
 
 int main(int argc, char **argv) {
@@ -59,8 +61,7 @@ int main(int argc, char **argv) {
     std::cout << "Enter battle string: " << std::endl;
     std::getline(std::cin, line);
     try {
-      const auto [battle, durations] = parse_input(line);
-      battle_data = {battle, durations, {}};
+      battle_data = parse_input(line);
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
       continue;

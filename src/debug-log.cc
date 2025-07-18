@@ -33,7 +33,7 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
     return 1;
   }
 
-  auto [battle, _] = Init::battle_data(teams[p1], teams[p2], seed);
+  auto battle = Init::battle(teams[p1], teams[p2], seed);
   pkmn_gen1_battle_options options{};
   std::array<pkmn_choice, 9> choices{};
 

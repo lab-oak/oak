@@ -15,9 +15,6 @@
 
 #include "../extern/lrsnash/src/lib.h"
 
-static_assert(pkmn_options.showdown && !pkmn_options.log &&
-              pkmn_options.chance && pkmn_options.calc);
-
 struct BattleData {
   pkmn_gen1_battle battle;
   pkmn_gen1_chance_durations durations;

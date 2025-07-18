@@ -647,8 +647,9 @@ void generate(uint64_t seed) {
     auto [p1_team, p1_team_index, p1_build_traj] = get_team(device);
     auto [p2_team, p2_team_index, p2_build_traj] = get_team(device);
 
-    const auto bd = Init::battle_data(p1_team, p2_team, device.uniform_64());
-    BattleData battle_data{bd.first, bd.second, {}};
+    const auto battle = Init::battle(p1_team, p2_team, device.uniform_64());
+    const auto durations = Init::durations(p1_team, p2_team);
+    BattleData battle_data{battle, durations};
     pkmn_gen1_battle_options battle_options{};
     battle_data.result = Init::update(battle_data.battle, 0, 0, battle_options);
 

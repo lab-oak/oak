@@ -35,10 +35,6 @@ template <typename BanditData, typename Obs> struct Node {
     return _map.find({p1_index, p2_index, obs});
   }
 
-  // Node *operator[](auto p1_index, auto p2_index, auto obs) {
-  //   return _map[{p1_index, p2_index, obs}].get();
-  // }
-
   std::unique_ptr<Node> release_child(auto p1_index, auto p2_index, auto obs) {
     return std::move(_map[{p1_index, p2_index, obs}]);
   }
@@ -55,14 +51,6 @@ struct Table {
   const auto &stats(index_type idx) const noexcept { return stats_table[idx]; }
   auto &stats(index_type idx) noexcept { return stats_table[idx]; }
 
-  // index_type get(index_type index, uint8_t i, uint8_t j,
-  //                const Obs &obs) noexcept {
-  //   index_type &child_index = index_map[Key{index, i, j, obs}];
-  //   if (child_index == 0) {
-  //     child_index = ++index;
-  //   }
-  //   return child_index;
-  // }
   index_type get(uint64_t key) noexcept {
     index_type &child_index = index_map[key];
     if (child_index == 0) {
