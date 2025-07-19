@@ -145,7 +145,21 @@ struct Volatiles {
   uint8_t toxic_counter() const { return (bits >> 59) & 0b11111; }
 };
 
-uint8_t encode_i4(int8_t x) { return static_cast<uint8_t>(x) & 0x0F; }
+constexpr uint8_t encode_i4(int8_t x) { return static_cast<uint8_t>(x) & 0x0F; }
+constexpr int8_t decode_i4(uint8_t x) {
+  x &= 0x0F;
+  return static_cast<int8_t>((x ^ 0x08) - 0x08);
+}
+
+consteval bool i4_conversion_is_valid() {
+  bool valid = true;
+  for (int8_t b = -6; b <= 6; ++b) {
+    valid &= decode_i4(encode_i4(b)) == b;
+  }
+  return valid;
+}
+
+static_assert(i4_conversion_is_valid());
 
 struct ActivePokemon {
   uint8_t bytes[32];
@@ -160,12 +174,24 @@ struct ActivePokemon {
   }
   auto types() const noexcept { return bytes[11]; }
 
-  uint8_t boost_atk() const noexcept { return bytes[12] & 0b00001111; }
-  uint8_t boost_def() const noexcept { return (bytes[12] & 0b11110000) >> 4; }
-  uint8_t boost_spe() const noexcept { return bytes[13] & 0b00001111; }
-  uint8_t boost_spc() const noexcept { return (bytes[13] & 0b11110000) >> 4; }
-  uint8_t boost_acc() const noexcept { return bytes[14] & 0b00001111; }
-  uint8_t boost_eva() const noexcept { return (bytes[14] & 0b11110000) >> 4; }
+  int8_t boost_atk() const noexcept {
+    return decode_i4(bytes[12] & 0b00001111);
+  }
+  int8_t boost_def() const noexcept {
+    return decode_i4((bytes[12] & 0b11110000) >> 4);
+  }
+  int8_t boost_spe() const noexcept {
+    return decode_i4(bytes[13] & 0b00001111);
+  }
+  int8_t boost_spc() const noexcept {
+    return decode_i4((bytes[13] & 0b11110000) >> 4);
+  }
+  int8_t boost_acc() const noexcept {
+    return decode_i4(bytes[14] & 0b00001111);
+  }
+  int8_t boost_eva() const noexcept {
+    return decode_i4((bytes[14] & 0b11110000) >> 4);
+  }
 
   void set_boost_atk(int8_t value) noexcept {
     bytes[12] = (bytes[12] & 0b11110000) | (encode_i4(value));

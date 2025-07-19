@@ -23,7 +23,7 @@ float *write(const View::Stats &stats, float *t) {
   return t + n_dim;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"HP", "ATK", "DEF", "SPE", "SPC"}};
 }
@@ -40,7 +40,7 @@ float *write(const std::array<View::MoveSlot, 4> &move_slots, float *t) {
   return t + n_dim;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
     result[i] = Data::MOVE_CHAR_ARRAY[i + 1];
@@ -92,7 +92,7 @@ float *write(const auto status, const auto sleep, float *t) {
   return t + n_dim;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   return std::array<std::array<char, 5>, n_dim>{
       {"BRN", "PAR", "PSN", "FRZ", "SLP1", "SLP2", "SLP3", "SLP4", "SLP5",
        "SLP6", "SLP7", "RST1", "RST2", "RST3"}};
@@ -119,7 +119,7 @@ void write(const View::Pokemon &pokemon, auto sleep, float *t) {
   t = Types::write(pokemon.types(), t);
 }
 
-consteval auto get_dim_names() {
+consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   const auto copy = [](const auto &src, auto &dest) {
     for (auto i = 0; i < src.size(); ++i) {
@@ -128,15 +128,15 @@ consteval auto get_dim_names() {
   };
   auto index = 0;
   for (auto i = 0; i < Stats::n_dim; ++i) {
-    copy(Stats::dim_names()[i], result[index + i]);
+    copy(Stats::dim_labels()[i], result[index + i]);
   }
   index += Stats::n_dim;
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
-    copy(MoveSlots::dim_names()[i], result[index + i]);
+    copy(MoveSlots::dim_labels()[i], result[index + i]);
   }
   index += MoveSlots::n_dim;
   for (auto i = 0; i < Status::n_dim; ++i) {
-    copy(Status::dim_names()[i], result[index + i]);
+    copy(Status::dim_labels()[i], result[index + i]);
   }
   index += Status::n_dim;
   for (auto i = 0; i < Types::n_dim; ++i) {
@@ -145,7 +145,7 @@ consteval auto get_dim_names() {
   return result;
 }
 
-constexpr auto dim_names = get_dim_names();
+constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Pokemon
 
@@ -169,7 +169,7 @@ float *write(const View::ActivePokemon &active, float *t) {
   return t + n_dim;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"atk", "def", "spe", "spc", "acc", "eva"}};
 }
@@ -212,7 +212,7 @@ float *write(const View::Volatiles &vol, float *t) {
   return t + n_dim;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
       {"bide",         "thrash",     "multi_hit", "flinch",     "charging",
        "binding",      "invulner",   "confusion", "mist",       "focus_energy",
@@ -255,7 +255,7 @@ float *write(const View::Duration &duration, float *t) {
   return t;
 }
 
-consteval auto dim_names() {
+consteval auto dim_labels() {
   std::array<std::array<char, 10>, n_dim> result;
 
   auto index = 0;
@@ -307,7 +307,7 @@ void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
   Pokemon::write(pokemon, duration.sleep(0), t);
 }
 
-consteval auto get_dim_names() {
+consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
 
   const auto copy = [](const auto &src, auto &dest) {
@@ -318,7 +318,7 @@ consteval auto get_dim_names() {
 
   auto index = 0;
   for (auto i = 0; i < Stats::n_dim; ++i) {
-    copy(Stats::dim_names()[i], result[index + i]);
+    copy(Stats::dim_labels()[i], result[index + i]);
   }
   index += Stats::n_dim;
 
@@ -328,32 +328,32 @@ consteval auto get_dim_names() {
   index += Types::n_dim;
 
   for (auto i = 0; i < Boosts::n_dim; ++i) {
-    copy(Boosts::dim_names()[i], result[index + i]);
+    copy(Boosts::dim_labels()[i], result[index + i]);
   }
   index += Boosts::n_dim;
 
   for (auto i = 0; i < Volatiles::n_dim; ++i) {
-    copy(Volatiles::dim_names()[i], result[index + i]);
+    copy(Volatiles::dim_labels()[i], result[index + i]);
   }
   index += Volatiles::n_dim;
 
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
-    copy(MoveSlots::dim_names()[i], result[index + i]);
+    copy(MoveSlots::dim_labels()[i], result[index + i]);
   }
   index += MoveSlots::n_dim;
 
   for (auto i = 0; i < Duration::n_dim; ++i) {
-    copy(Duration::dim_names()[i], result[index + i]);
+    copy(Duration::dim_labels()[i], result[index + i]);
   }
   index += Duration::n_dim;
 
   for (auto i = 0; i < Pokemon::n_dim; ++i) {
-    copy(Pokemon::dim_names[i], result[index + i]);
+    copy(Pokemon::dim_labels[i], result[index + i]);
   }
   return result;
 }
 
-constexpr auto dim_names = get_dim_names();
+constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Active
 
