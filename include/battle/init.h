@@ -383,7 +383,8 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
     } else if constexpr (std::is_same_v<Choice, Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
-            side[Offsets::Side::active + Offsets::ActivePokemon::moves + 2 * i]) {
+            side[Offsets::Side::active + Offsets::ActivePokemon::moves +
+                 2 * i]) {
           return ((i + 1) << 2) | 1;
         }
       }

@@ -18,8 +18,8 @@ struct Network {
   static_assert((1 + active_out_dim) + 5 * (1 + pokemon_out_dim) ==
                 side_out_dim);
 
-  using PokemonSubnet = EmbeddingNet<Encode::Pokemon::n_dim,
-                                     pokemon_hidden_dim, pokemon_out_dim>;
+  using PokemonSubnet =
+      EmbeddingNet<Encode::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
   using ActiveSubnet =
       EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
 
