@@ -187,13 +187,17 @@ std::string battle_to_string(const pkmn_gen1_battle &battle) {
       if (slot == 0) {
         continue;
       }
-      auto &pokemon = side.pokemon(slot - 1);
 
+      auto &pokemon = side.pokemon(slot - 1);
       if (i == 0) {
         // pass for now
       }
 
-      ss << species_string(pokemon.species()) << ": ";
+      ss << species_char_array(pokemon.species());
+      if (pokemon.level() != 100) {
+        ss << " L" << (int)pokemon.level();
+      }
+      ss << ": ";
       const auto hp = pokemon.hp();
       if (hp != 0) {
         ss << pokemon.percent() << "% (" << pokemon.hp() << '/'
@@ -207,7 +211,7 @@ std::string battle_to_string(const pkmn_gen1_battle &battle) {
         ss << status_string(st) << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
-        ss << move_string(pokemon.moves()[m].id) << ' ';
+        ss << move_char_array(pokemon.moves()[m].id) << ' ';
       }
       ss << std::endl;
     }
@@ -231,6 +235,8 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
       if (id == 0) {
         continue;
       }
+
+      const auto &pokemon = side.pokemon(id - 1);
       if (i == 0) {
         if (duration.confusion()) {
           ss << "conf: " << static_cast<int>(duration.confusion());
@@ -249,9 +255,12 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
       } else {
         ss << "  ";
       }
-      const auto &pokemon = side.pokemon(id - 1);
 
-      ss << species_char_array(pokemon.species()) << ": ";
+      ss << species_char_array(pokemon.species());
+      if (pokemon.level() != 100) {
+        ss << " L" << (int)pokemon.level();
+      }
+      ss << ": ";
       const auto hp = pokemon.hp();
       if (hp != 0) {
         ss << pokemon.percent() << "% (" << pokemon.hp() << '/'

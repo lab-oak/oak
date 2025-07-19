@@ -98,6 +98,10 @@ Init::Set parse_set(const auto &words) {
       } else if (lower.starts_with("spc")) {
         pokemon.boosts.spc = std::stoi(lower.substr(3));
       }
+
+      if (lower.starts_with("lvl")) {
+        pokemon.level = std::stoll(lower.substr(3));
+      }
     }
   }
   return pokemon;

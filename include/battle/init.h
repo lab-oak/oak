@@ -28,32 +28,19 @@ using Data::Move;
 using Data::Species;
 using Data::Status;
 
-constexpr uint16_t compute_stat(uint8_t base, bool hp = false) {
+constexpr uint16_t compute_stat(uint8_t base, bool hp = false,
+                                uint8_t level = 100) {
   const uint16_t evs = 255;
   const uint32_t core = (2 * (base + 15)) + 63;
-  return hp ? core + 110 : core + 5;
+  const uint32_t factor = hp ? level + 10 : 5;
+  return core * level / 100 + factor;
 }
 
 constexpr std::array<uint16_t, 5> compute_stats(const auto &pokemon) {
   std::array<uint16_t, 5> stats;
   const auto base = get_species_data(pokemon.species).base_stats;
-  const auto ev = [&pokemon]() {
-    if constexpr (requires { pokemon.ev; }) {
-      return pokemon.ev;
-    } else {
-      return std::array<uint8_t, 5>{63, 63, 63, 63, 63};
-    }
-  }();
-  const auto dv = [&pokemon]() {
-    if constexpr (requires { pokemon.dv; }) {
-      return pokemon.dv;
-    } else {
-      return std::array<uint8_t, 5>{15, 15, 15, 15, 15};
-    }
-  }();
   for (int s = 0; s < 5; ++s) {
-    const uint32_t core = 2 * (base[s] + dv[s]) + ev[s];
-    stats[s] = (s == 0) ? core + 110 : core + 5;
+    stats[s] = compute_stat(base[s], s == 0, pokemon.level);
   }
   return stats;
 }
@@ -64,7 +51,11 @@ constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
   if (species == Species::None) {
     return;
   }
-
+  if constexpr (requires { pokemon.level; }) {
+    bytes[23] = pokemon.level;
+  } else {
+    bytes[23] = 100;
+  }
   const auto stats = compute_stats(pokemon);
   auto *u16_ptr = std::bit_cast<uint16_t *>(bytes);
   for (int s = 0; s < 5; ++s) {
@@ -102,11 +93,6 @@ constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
   const auto types = get_types(species);
   bytes[22] =
       (static_cast<uint8_t>(types[1]) << 4) | static_cast<uint8_t>(types[0]);
-  if constexpr (requires { pokemon.level; }) {
-    bytes[23] = pokemon.level;
-  } else {
-    bytes[23] = 100;
-  }
 }
 
 constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
@@ -316,6 +302,7 @@ struct Set {
   uint8_t status = 0;
   uint8_t sleeps = 0;
   Boosts boosts{};
+  uint8_t level = 100;
   constexpr bool operator==(const Set &) const = default;
 };
 

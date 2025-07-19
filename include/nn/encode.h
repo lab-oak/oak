@@ -245,7 +245,7 @@ float *write(const View::Duration &duration, float *t) {
     t[attacking - 1] = 1;
   }
   t += n_attacking;
-  
+
   if (const auto binding = duration.binding()) {
     assert(binding <= n_binding);
     t[binding - 1] = 1;
