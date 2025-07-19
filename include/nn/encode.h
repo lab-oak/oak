@@ -25,7 +25,7 @@ float *write(const View::Stats &stats, float *t) {
 
 consteval auto dim_names() {
   return std::array<std::array<char, 4>, n_dim>{
-      {"HP", "ATK", "DEF", "SPE", "SPE"}};
+      {"HP", "ATK", "DEF", "SPE", "SPC"}};
 }
 } // namespace Stats
 
@@ -267,7 +267,7 @@ consteval auto dim_names() {
 
   for (auto i = 0; i < n_disable; ++i) {
     result[index + i] = {"disable"};
-    result[index + i][9] = static_cast<char>('1' + i);
+    result[index + i][7] = static_cast<char>('1' + i);
   }
   index += n_disable;
 
@@ -279,7 +279,7 @@ consteval auto dim_names() {
 
   for (auto i = 0; i < n_binding; ++i) {
     result[index + i] = {"binding"};
-    result[index + i][9] = static_cast<char>('1' + i);
+    result[index + i][7] = static_cast<char>('1' + i);
   }
   return result;
 }
