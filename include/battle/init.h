@@ -19,6 +19,24 @@
 #include <utility>
 #include <vector>
 
+namespace Data {
+constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
+    std::array<uint8_t, 2>{25, 100}, // -6
+    {28, 100},                       // -5
+    {33, 100},                       // -4
+    {40, 100},                       // -3
+    {50, 100},                       // -2
+    {66, 100},                       // -1
+    {1, 1},                          //  0
+    {15, 10},                        // +1
+    {2, 1},                          // +2
+    {25, 10},                        // +3
+    {3, 1},                          // +4
+    {35, 10},                        // +5
+    {4, 1}                           // +6
+};
+};
+
 namespace {
 using namespace Layout;
 
@@ -95,24 +113,8 @@ constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
       (static_cast<uint8_t>(types[1]) << 4) | static_cast<uint8_t>(types[0]);
 }
 
-constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
-    std::array<uint8_t, 2>{25, 100}, // -6
-    {28, 100},                       // -5
-    {33, 100},                       // -4
-    {40, 100},                       // -3
-    {50, 100},                       // -2
-    {66, 100},                       // -1
-    {1, 1},                          //  0
-    {15, 10},                        // +1
-    {2, 1},                          // +2
-    {25, 10},                        // +3
-    {3, 1},                          // +4
-    {35, 10},                        // +5
-    {4, 1}                           // +6
-};
-
 constexpr uint16_t boost(uint16_t stat, int b) {
-  const auto &pair = boosts[b + 6];
+  const auto &pair = Data::boosts[b + 6];
   return std::min(999, stat * pair[0] / pair[1]);
 }
 

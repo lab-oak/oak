@@ -150,27 +150,28 @@ constexpr auto dim_names = get_dim_names();
 } // namespace Pokemon
 
 namespace Boosts {
-constexpr auto n_dim = 13 * 2;
+
+constexpr auto n_dim = 6;
+constexpr float scale = 1 / 4.0;
+constexpr float scale_acceva = 1 / 3.0;
 float *write(const View::ActivePokemon &active, float *t) {
-  t[active.boost_acc() + 6] = 1.0;
-  t[13 + active.boost_eva() + 6] = 1.0;
+  const auto get_multiplier = [](auto index) -> float {
+    const auto x = Data::boosts[index + 6];
+    return (float)x[0] / x[1];
+  };
+
+  t[0] = get_multiplier(active.boost_atk()) * scale;
+  t[1] = get_multiplier(active.boost_def()) * scale;
+  t[2] = get_multiplier(active.boost_spe()) * scale;
+  t[3] = get_multiplier(active.boost_spc()) * scale;
+  t[4] = get_multiplier(active.boost_acc()) * scale_acceva;
+  t[5] = get_multiplier(active.boost_eva()) * scale_acceva;
   return t + n_dim;
 }
 
 consteval auto dim_names() {
-  std::array<std::array<char, 4>, n_dim> result;
-  auto index = 0;
-
-  for (auto i = 0; i < 13; ++i) {
-    result[index + i] = {"ACC"};
-    result[index + i][3] = static_cast<char>('1' + i);
-  }
-  index += 13;
-  for (auto i = 0; i < 13; ++i) {
-    result[index + i] = {"EVA"};
-    result[index + i][3] = static_cast<char>('1' + i);
-  }
-  return result;
+  return std::array<std::array<char, 4>, n_dim>{
+      {"atk", "def", "spe", "spc", "acc", "eva"}};
 }
 } // namespace Boosts
 
@@ -302,7 +303,7 @@ void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
     assert(slot != 0);
     t[static_cast<uint8_t>(active.moves()[slot].id)] = 0; // TODO
   }
-  Duration::write(duration, t);
+  t = Duration::write(duration, t);
   Pokemon::write(pokemon, duration.sleep(0), t);
 }
 
