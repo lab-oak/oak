@@ -214,7 +214,7 @@ float *write(const View::Volatiles &vol, float *t) {
 
 consteval auto dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
-      {"bide",         "thrash",     "multi_hit", "flinch",     "charging",
+      {"bide",         "thrashing",     "multi_hit", "flinch",     "charging",
        "binding",      "invulner",   "confusion", "mist",       "focus_energy",
        "substitute",   "recharging", "rage",      "leech_seed", "toxic",
        "light_screen", "reflect",    "transform", "state",      "sub_hp"}};

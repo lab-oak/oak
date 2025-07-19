@@ -6,7 +6,7 @@ This project has two layers. The first is a header-only library that defines
 
 * *sound*, high performance MCTS for perfect information battles
 
-* both full-precision and fast, quantized neural network implementations for CPU
+* both full-precision and fast, quantized (TODO) neural network implementations for CPU
 
 * a lossless battle encoding for neural network inputs
 
@@ -18,7 +18,7 @@ The second layer is a collection of programs that form a serious platorm for tra
 
 * a static library to quicly convert compressed training data into a python accessible buffer
 
-* a tool to compare battle networks with each other and pure MCTS
+* (TODO) a tool to compare battle networks with each other and pure MCTS
 
 * a tool for engine analysis of user defined positions
 
@@ -34,7 +34,7 @@ Must have cmake and zig installed. The bash below clones the repo, builds the li
 git clone --recurse-submodules https://github.com/lab-oak/oak
 cd oak && git submodule update --recursive
 chmod +x dev/libpkmn && ./dev/libpkmn
-mkdir build && cd build && cmake .. && make && cd ..
+mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
 ```
 
 The `pkmn-debug` utility is built via
