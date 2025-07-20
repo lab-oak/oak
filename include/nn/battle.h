@@ -1,9 +1,9 @@
 
 #include <battle/init.h>
 #include <battle/view.h>
-#include <data/move-pools.h>
-#include <data/status.h>
-#include <data/strings.h>
+#include <libpkmn/move-pools.h>
+#include <libpkmn/data/status.h>
+#include <libpkmn/strings.h>
 
 #include <array>
 #include <cassert>

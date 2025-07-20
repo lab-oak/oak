@@ -7,8 +7,8 @@
 #include <sstream>
 #include <string>
 
-#include <data/moves.h>
-#include <data/species.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 
 namespace Data {
 

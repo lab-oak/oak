@@ -1,7 +1,7 @@
 #pragma once
 
 #include <battle/strings.h>
-#include <data/layout.h>
+#include <libpkmn/layout.h>
 #include <pi/mcts.h>
 
 #include <iomanip>

@@ -1,12 +1,12 @@
 #pragma once
 
 #include <battle/view.h>
-#include <data/boosts.h>
-#include <data/layout.h>
-#include <data/moves.h>
-#include <data/species.h>
-#include <data/status.h>
-#include <data/types.h>
+#include <libpkmn/data/boosts.h>
+#include <libpkmn/layout.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
+#include <libpkmn/data/status.h>
+#include <libpkmn/data/types.h>
 
 #include <assert.h>
 #include <cstring>

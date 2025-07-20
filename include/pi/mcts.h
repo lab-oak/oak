@@ -4,8 +4,8 @@
 
 #include <battle/durations.h>
 #include <battle/strings.h>
-#include <data/layout.h>
-#include <data/options.h>
+#include <libpkmn/layout.h>
+#include <libpkmn/options.h>
 #include <pi/tree.h>
 #include <util/random.h>
 
