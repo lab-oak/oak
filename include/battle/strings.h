@@ -227,7 +227,7 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {
     const auto &side = b.sides[s];
-    const auto &duration = View::ref(durations).duration(s);
+    const auto &duration = View::ref(durations).get(s);
     const auto &vol = side.active.volatiles;
 
     for (auto i = 0; i < 6; ++i) {

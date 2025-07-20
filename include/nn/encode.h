@@ -4,6 +4,7 @@
 #include <battle/view.h>
 #include <data/move-pools.h>
 #include <data/status.h>
+#include <data/strings.h>
 
 #include <array>
 #include <cassert>

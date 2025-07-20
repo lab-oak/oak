@@ -1,41 +1,18 @@
 #pragma once
 
 #include <battle/view.h>
+#include <data/boosts.h>
 #include <data/layout.h>
 #include <data/moves.h>
 #include <data/species.h>
 #include <data/status.h>
-#include <data/strings.h>
 #include <data/types.h>
-#include <util/random.h>
 
 #include <assert.h>
-#include <bit>
-#include <cstddef>
 #include <cstring>
-#include <sstream>
 #include <stdexcept>
 #include <type_traits>
-#include <utility>
 #include <vector>
-
-namespace Data {
-constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
-    std::array<uint8_t, 2>{25, 100}, // -6
-    {28, 100},                       // -5
-    {33, 100},                       // -4
-    {40, 100},                       // -3
-    {50, 100},                       // -2
-    {66, 100},                       // -1
-    {1, 1},                          //  0
-    {15, 10},                        // +1
-    {2, 1},                          // +2
-    {25, 10},                        // +3
-    {3, 1},                          // +4
-    {35, 10},                        // +5
-    {4, 1}                           // +6
-};
-};
 
 namespace {
 using namespace Layout;
@@ -212,122 +189,35 @@ static_assert(compute_stat(5, false) == 108);
 
 namespace Init {
 
-void apply_durations(auto &device, pkmn_gen1_battle &b,
-                     const pkmn_gen1_chance_durations &d) {
-
-  static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                              2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-                              2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
-                              2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}};
-
-  auto &battle = View::ref(b);
-  const auto &durations = View::ref(d);
-  for (auto s = 0; s < 2; ++s) {
-    auto &side = battle.sides[s];
-    const auto &duration = durations.duration(s);
-
-    auto &vol = side.active.volatiles;
-
-    if (const auto confusion = duration.confusion()) {
-      const uint8_t max = 6 - (confusion + (confusion == 1));
-      vol.set_confusion_left(
-          static_cast<uint8_t>(device.random_int(max) + 1 + (confusion == 1)));
-    }
-    if (const auto disable = duration.disable()) {
-      const uint8_t max = 9 - disable;
-      vol.set_disable_left(static_cast<uint8_t>(device.random_int(max) + 1));
-    }
-    if (const auto attacking = duration.attacking()) {
-      if (vol.bide()) {
-        if (attacking == 3) {
-          vol.set_attacks(1);
-        } else {
-          vol.set_attacks(4 - (attacking + device.random_int(2)));
-        }
-      } else if (vol.thrashing()) {
-        if (attacking == 3) {
-          vol.set_attacks(1);
-        } else {
-          vol.set_attacks(4 - (attacking + device.random_int(2)));
-        }
-      } else {
-        // in my testing this only happens when something is ko'd while binding
-        assert(side.stored().hp == 0);
-      }
-    }
-    if (const auto binding = duration.binding()) {
-      const auto index = device.random_int(40);
-      vol.set_attacks(multi[binding - 1][index]);
-    }
-
-    for (auto p = 0; p < 6; ++p) {
-      if (const auto sleep = duration.sleep(0)) {
-        // TODO only works when party full
-        const auto id = side.order[p] - 1;
-        auto &pokemon = side.pokemon[id];
-        auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
-
-        if (!Data::is_sleep(status) || Data::self(status)) {
-          continue;
-        }
-
-        const uint8_t max = 8 - sleep;
-        status &= 0b11111000; // keep rest bit, clear sleep remaining
-        status |= static_cast<uint8_t>(device.random_int(max) + 1);
-      }
-    }
-  }
-}
-
 struct Boosts {
   int atk;
   int def;
   int spe;
   int spc;
-
   bool operator==(const Boosts &) const noexcept = default;
 };
 
 struct Set {
   Species species;
   std::array<Move, 4> moves;
-  std::array<uint8_t, 4> pp{0xFF, 0xFF, 0xFF, 0xFF};
+
+  std::array<uint8_t, 4> pp{0, 0, 0, 0};
   float hp = 1;
   uint8_t status = 0;
   uint8_t sleeps = 0;
-  Boosts boosts{};
+  Boosts boosts = {};
   uint8_t level = 100;
-  constexpr bool operator==(const Set &) const = default;
+  constexpr bool operator==(const Set &) const noexcept = default;
 };
 
 using Team = std::array<Set, 6>;
 
-std::string team_string(const auto &team) {
-  std::stringstream ss{};
-  for (const auto &set : team) {
-    ss << species_string(set.species) << ": ";
-    for (const auto moveid : set.moves) {
-      ss << move_string(moveid) << ' ';
-    }
-    ss << '\n';
-  }
-  return ss.str();
-}
-
 struct Config {
   std::array<Set, 6> pokemon;
+
+  // TODO more
 };
 
-// get durations from config, applly durations using ad hoc device
 constexpr auto battle(const auto &p1, const auto &p2,
                       uint64_t seed = 0x123445) {
   pkmn_gen1_battle battle{};
@@ -339,8 +229,9 @@ constexpr auto battle(const auto &p1, const auto &p2,
       std::bit_cast<uint64_t *>(battle.bytes + Offsets::Battle::turn);
   ptr_64[0] = 0; // turn, last used, etc
   ptr_64[1] = seed;
-  prng device{seed};
-  Init::apply_durations(device, battle, *durations_ptr);
+  // TODO make sure we are adding this afterwards now that we've commented it
+  // out prng device{seed}; Init::apply_durations(device, battle,
+  // *durations_ptr);
   return battle;
 }
 
@@ -349,8 +240,8 @@ constexpr pkmn_gen1_chance_durations durations() { return {}; }
 constexpr auto durations(const auto &p1, const auto &p2) {
   pkmn_gen1_chance_durations durations{};
   auto &dur = View::ref(durations);
-  init_duration(p1, dur.duration(0));
-  init_duration(p2, dur.duration(1));
+  init_duration(p1, dur.get(0));
+  init_duration(p2, dur.get(1));
   return durations;
 }
 

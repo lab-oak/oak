@@ -456,11 +456,23 @@ std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   const bool changed = (team != SampleTeams::teams[index]);
   Train::BuildTrajectory build_traj{};
   if (changed) {
+    const auto team_string = [](const auto &team) {
+      std::stringstream ss{};
+      for (const auto &set : team) {
+        ss << species_string(set.species) << ": ";
+        for (const auto moveid : set.moves) {
+          ss << move_string(moveid) << ' ';
+        }
+        ss << '\n';
+      }
+      return ss.str();
+    };
+
     print("Team " + std::to_string(index) + " modified:");
-    print(Init::team_string(team));
+    print(team_string(team));
     build_traj =
         rollout_build_network(team, RuntimeData::build_network, device);
-    print(Init::team_string(team));
+    print(team_string(team));
   }
 
   return {team, changed ? -1 : index, build_traj};
@@ -565,7 +577,7 @@ void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
       return;
     }
     if (RuntimeOptions::Search::keep_node) {
-      auto child = unique_node->get(i1, i2, obs);
+      auto child = unique_node->find(i1, i2, obs);
       RuntimeData::update_counter.fetch_add(1);
       if (child == unique_node->_map.end()) {
         unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();

@@ -9,14 +9,9 @@
 
 #include <array>
 #include <cassert>
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <type_traits>
+#include <cstddef>
 
 namespace View {
-
-using namespace Layout;
 
 #pragma pack(push, 1)
 
@@ -42,7 +37,9 @@ struct alignas(1) Pokemon {
   uint8_t types;
   uint8_t level;
 
-  float percent() const noexcept { return 100 * static_cast<float>(hp) / stats.hp; }
+  int percent() const noexcept {
+    return 100 * static_cast<float>(hp) / stats.hp;
+  }
 };
 
 struct alignas(1) Volatiles {
@@ -186,14 +183,6 @@ struct alignas(1) Battle {
   uint64_t rng;
 };
 
-inline Battle &ref(pkmn_gen1_battle &battle) noexcept {
-  return *reinterpret_cast<Battle *>(&battle);
-}
-
-inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
-  return *reinterpret_cast<const Battle *>(&battle);
-}
-
 struct alignas(1) Duration {
   uint32_t data;
 
@@ -211,13 +200,23 @@ struct alignas(1) Duration {
 };
 
 struct alignas(1) Durations {
-  Duration d[2];
+  std::array<Duration, 2> durations;
 
-  Duration &duration(auto i) noexcept { return d[i]; }
-  const Duration &duration(auto i) const noexcept { return d[i]; }
+  inline constexpr auto &get(auto i) noexcept { return durations[i]; }
+  inline constexpr const auto &get(auto i) const noexcept {
+    return durations[i];
+  }
 };
 
 #pragma pack(pop)
+
+inline Battle &ref(pkmn_gen1_battle &battle) noexcept {
+  return *reinterpret_cast<Battle *>(&battle);
+}
+
+inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
+  return *reinterpret_cast<const Battle *>(&battle);
+}
 
 inline Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<Durations *>(&durations);
@@ -228,14 +227,15 @@ ref(const pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<const Durations *>(&durations);
 }
 
-static_assert(sizeof(Battle) == Layout::Sizes::Battle);
-static_assert(sizeof(Side) == Layout::Sizes::Side);
-static_assert(sizeof(Pokemon) == Layout::Sizes::Pokemon);
-static_assert(sizeof(Volatiles) == 8);
 static_assert(sizeof(Stats) == 10);
 static_assert(sizeof(MoveSlot) == 2);
 static_assert(sizeof(Boosts) == 4);
+static_assert(sizeof(Volatiles) == 8);
+
+static_assert(sizeof(Pokemon) == Layout::Sizes::Pokemon);
 static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
+static_assert(sizeof(Side) == Layout::Sizes::Side);
+static_assert(sizeof(Battle) == Layout::Sizes::Battle);
 static_assert(sizeof(Durations) == Layout::Sizes::Durations);
 
 } // namespace View
