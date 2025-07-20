@@ -3,7 +3,7 @@
 #include <pkmn.h>
 
 #include <battle/rng.h>
-#include <battle/view.h>
+#include <libpkmn/data.h>
 
 #include <array>
 #include <cstddef>

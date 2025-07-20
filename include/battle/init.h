@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/view.h>
+#include <libpkmn/data.h>
 #include <libpkmn/data/boosts.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>

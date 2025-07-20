@@ -1,7 +1,7 @@
 #pragma once
 
 #include <battle/init.h>
-#include <battle/view.h>
+#include <libpkmn/data.h>
 #include <libpkmn/move-pools.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/strings.h>
