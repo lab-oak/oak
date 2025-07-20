@@ -1,7 +1,7 @@
 #pragma once
 
-#include <battle/strings.h>
 #include <libpkmn/layout.h>
+#include <libpkmn/strings.h>
 #include <search/mcts.h>
 
 #include <iomanip>
@@ -27,9 +27,9 @@ std::vector<std::string> split(const std::string &input, char delim) {
   return result;
 }
 
-Init::Set parse_set(const auto &words) {
+PKMN::Set parse_set(const auto &words) {
 
-  Init::Set pokemon{};
+  PKMN::Set pokemon{};
 
   pokemon.species = Strings::string_to_species(words[0]);
 

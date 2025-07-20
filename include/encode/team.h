@@ -1,8 +1,8 @@
 #pragma once
 
-#include <battle/init.h>
-#include <libpkmn/data.h>
+#include <battle/pkmn.h>
 #include <data/move-pools.h>
+#include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/data/strings.h>
 
@@ -60,7 +60,7 @@ inline constexpr auto species_move_list(const auto index) {
   return SPECIES_MOVE_LIST[index];
 }
 
-void write(const Init::Team &team, float *const t) {
+void write(const PKMN::Team &team, float *const t) {
   for (const auto &set : team) {
     if (static_cast<bool>(set.species)) {
       t[species_move_table(set.species, 0)] = 1;
@@ -73,7 +73,7 @@ void write(const Init::Team &team, float *const t) {
   }
 }
 
-[[nodiscard]] bool write_policy_mask(const Init::Team &team, float *const t) {
+[[nodiscard]] bool write_policy_mask(const PKMN::Team &team, float *const t) {
   bool needs_species = false;
   bool complete = true;
   for (const auto &set : team) {
@@ -121,7 +121,7 @@ void write(const Init::Team &team, float *const t) {
   return complete;
 }
 
-void apply_index_to_team(Init::Team &team, auto s, auto m) {
+void apply_index_to_team(PKMN::Team &team, auto s, auto m) {
   if (!m) {
     for (auto &set : team) {
       if (set.species == Data::Species::None) {

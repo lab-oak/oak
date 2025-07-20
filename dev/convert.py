@@ -131,16 +131,16 @@ def main():
 
 #include <array>
 
-#include <data/moves.h>
-#include <data/species.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 
-#include <battle/init.h>
+#include <battle/pkmn.h>
 
 namespace SampleTeams {
 using Data::Moves;
 using Data::Species;
 using enum Moves;
-using Set = Init::Set;
+using Set = PKMN::Set;
 """
     print(header)
 

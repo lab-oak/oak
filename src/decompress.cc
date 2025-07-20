@@ -1,8 +1,8 @@
 #include <battle/debug-log.h>
-#include <battle/init.h>
-#include <battle/strings.h>
+#include <battle/pkmn.h>
 #include <data/sample-teams.h>
 #include <encode/battle.h>
+#include <libpkmn/strings.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
 
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
                 << Strings::side_choice_string(battle.bytes + 184, update.c2)
                 << std::endl;
 
-      // auto result = Init::update(battle, update.c1, update.c2, options);
+      // auto result = PKMN::update(battle, update.c1, update.c2, options);
       debug_log.update(battle, update.c1, update.c2, options);
     }
     debug_log.save_data_to_path(std::to_string(turns.size()) + ".log");

@@ -2,8 +2,8 @@
 
 #include <pkmn.h>
 
-#include <libpkmn/rng.h>
 #include <libpkmn/data.h>
+#include <libpkmn/rng.h>
 
 #include <array>
 #include <cstddef>

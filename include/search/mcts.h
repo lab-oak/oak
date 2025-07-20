@@ -2,10 +2,10 @@
 
 #include <pkmn.h>
 
-#include <search/durations.h>
-#include <battle/strings.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/options.h>
+#include <libpkmn/strings.h>
+#include <search/durations.h>
 #include <search/tree.h>
 #include <util/random.h>
 
@@ -86,7 +86,7 @@ struct MCTS {
     const auto prepare_and_run_iteration = [this, &input, &model,
                                             &node]() -> float {
       auto copy = input;
-      std::bit_cast<uint64_t *>(copy.battle.bytes + Offsets::Battle::rng)[0] =
+      std::bit_cast<uint64_t *>(copy.battle.bytes + Layout::Offsets::Battle::rng)[0] =
           model.device.uniform_64();
       chance_options.durations = copy.durations;
       apply_durations(copy.battle, copy.durations);
@@ -242,7 +242,7 @@ struct MCTS {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       } else {
         // last two bytes of battle rng
-        const auto *rand = battle.bytes + Offsets::Battle::rng + 6;
+        const auto *rand = battle.bytes + Layout::Offsets::Battle::rng + 6;
         auto *over = this->calc_options.overrides.bytes;
         if constexpr (Options::rolls_same) {
           over[0] = roll_byte<Options::root_rolls>(rand[0]);
