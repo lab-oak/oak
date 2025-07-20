@@ -4,7 +4,7 @@
 #include <libpkmn/data.h>
 #include <data/move-pools.h>
 #include <libpkmn/data/status.h>
-#include <libpkmn/strings.h>
+#include <libpkmn/data/strings.h>
 
 #include <array>
 #include <cassert>
