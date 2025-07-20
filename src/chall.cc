@@ -1,6 +1,6 @@
 #include <battle/init.h>
-#include <data/sample-teams.h>
 #include <battle/strings.h>
+#include <data/sample-teams.h>
 #include <libpkmn/strings.h>
 #include <search/exp3.h>
 #include <search/mcts.h>

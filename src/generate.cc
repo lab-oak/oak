@@ -1,8 +1,8 @@
-#include <data/sample-teams.h>
 #include <battle/strings.h>
+#include <data/sample-teams.h>
+#include <encode/team.h>
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
-#include <nn/team.h>
 #include <nn/net.h>
 #include <search/exp3.h>
 #include <search/mcts.h>

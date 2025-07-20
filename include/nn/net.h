@@ -1,7 +1,7 @@
 #pragma once
 
+#include <encode/battle.h>
 #include <libpkmn/data.h>
-#include <nn/battle.h>
 #include <nn/subnet.h>
 #include <util/random.h>
 

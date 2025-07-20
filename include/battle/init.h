@@ -2,11 +2,11 @@
 
 #include <libpkmn/data.h>
 #include <libpkmn/data/boosts.h>
-#include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/data/types.h>
+#include <libpkmn/layout.h>
 
 #include <assert.h>
 #include <cstring>

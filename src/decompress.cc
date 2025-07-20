@@ -1,8 +1,8 @@
 #include <battle/debug-log.h>
 #include <battle/init.h>
-#include <data/sample-teams.h>
 #include <battle/strings.h>
-#include <nn/battle.h>
+#include <data/sample-teams.h>
+#include <encode/battle.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
 
