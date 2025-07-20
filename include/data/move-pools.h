@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libpkmn/legal-moves.h>
+#include <data/legal-moves.h>
 #include <libpkmn/options.h>
 
 namespace Data {

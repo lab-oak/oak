@@ -1,4 +1,4 @@
-#include <battle/sample-teams.h>
+#include <data/sample-teams.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>

@@ -2,7 +2,7 @@
 
 #include <pkmn.h>
 
-#include <battle/rng.h>
+#include <libpkmn/rng.h>
 #include <libpkmn/data.h>
 
 #include <array>

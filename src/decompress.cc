@@ -1,6 +1,6 @@
 #include <battle/debug-log.h>
 #include <battle/init.h>
-#include <battle/sample-teams.h>
+#include <data/sample-teams.h>
 #include <battle/strings.h>
 #include <nn/battle.h>
 #include <train/compressed-frame.h>

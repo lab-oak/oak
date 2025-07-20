@@ -1,7 +1,7 @@
 
 #include <battle/init.h>
 #include <libpkmn/data.h>
-#include <libpkmn/move-pools.h>
+#include <data/move-pools.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/strings.h>
 
