@@ -180,38 +180,38 @@ std::string battle_to_string(const pkmn_gen1_battle &battle) {
   std::stringstream ss{};
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {
-    const auto &side = b.side(s);
+    const auto &side = b.sides[s];
 
     for (auto i = 0; i < 6; ++i) {
-      const auto slot = side.order()[i];
+      const auto slot = side.order[i];
       if (slot == 0) {
         continue;
       }
 
-      auto &pokemon = side.pokemon(slot - 1);
+      auto &pokemon = side.pokemon[slot - 1];
       if (i == 0) {
         // pass for now
       }
 
-      ss << species_char_array(pokemon.species());
-      if (pokemon.level() != 100) {
-        ss << " L" << (int)pokemon.level();
+      ss << species_char_array(pokemon.species);
+      if (pokemon.level != 100) {
+        ss << " L" << (int)pokemon.level;
       }
       ss << ": ";
-      const auto hp = pokemon.hp();
+      const auto hp = pokemon.hp;
       if (hp != 0) {
-        ss << pokemon.percent() << "% (" << pokemon.hp() << '/'
-           << pokemon.stats().hp() << ") ";
+        ss << pokemon.percent() << "% (" << pokemon.hp << '/'
+           << pokemon.stats.hp << ") ";
       } else {
         ss << "KO " << std::endl;
         continue;
       }
-      const auto st = pokemon.status();
+      const auto st = pokemon.status;
       if (st != Data::Status::None) {
         ss << status_string(st) << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
-        ss << move_char_array(pokemon.moves()[m].id) << ' ';
+        ss << move_char_array(pokemon.moves[m].id) << ' ';
       }
       ss << std::endl;
     }
@@ -226,17 +226,17 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   std::stringstream ss{};
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {
-    const auto &side = b.side(s);
+    const auto &side = b.sides[s];
     const auto &duration = View::ref(durations).duration(s);
-    const auto &vol = side.active().volatiles();
+    const auto &vol = side.active.volatiles;
 
     for (auto i = 0; i < 6; ++i) {
-      const auto id = side.order(i);
+      const auto id = side.order[i];
       if (id == 0) {
         continue;
       }
 
-      const auto &pokemon = side.pokemon(id - 1);
+      const auto &pokemon = side.pokemon[id - 1];
       if (i == 0) {
         if (duration.confusion()) {
           ss << "conf: " << static_cast<int>(duration.confusion());
@@ -256,25 +256,25 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
         ss << "  ";
       }
 
-      ss << species_char_array(pokemon.species());
-      if (pokemon.level() != 100) {
-        ss << " L" << (int)pokemon.level();
+      ss << species_char_array(pokemon.species);
+      if (pokemon.level != 100) {
+        ss << " L" << (int)pokemon.level;
       }
       ss << ": ";
-      const auto hp = pokemon.hp();
+      const auto hp = pokemon.hp;
       if (hp != 0) {
-        ss << pokemon.percent() << "% (" << pokemon.hp() << '/'
-           << pokemon.stats().hp() << ") ";
+        ss << pokemon.percent() << "% (" << pokemon.hp << '/'
+           << pokemon.stats.hp << ") ";
       } else {
         ss << "KO " << std::endl;
         continue;
       }
-      const auto st = pokemon.status();
+      const auto st = pokemon.status;
       if (st != Data::Status::None) {
         ss << status_string(st) << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
-        const auto moveslot = pokemon.moves()[m];
+        const auto moveslot = pokemon.moves[m];
         ss << move_char_array(moveslot.id) << ":" << (int)moveslot.pp << ' ';
       }
       ss << std::endl;

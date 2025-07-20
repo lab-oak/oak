@@ -127,20 +127,20 @@ constexpr void init_active(const auto &active, uint8_t *const bytes) {
   }
   auto *stats = reinterpret_cast<uint16_t *>(bytes + Offsets::Side::active);
   if constexpr (requires { active.boosts.atk; }) {
-    stats[1] = boost(pokemon.stats().atk(), active.boosts.atk);
-    active_pokemon.set_boost_atk(active.boosts.atk);
+    stats[1] = boost(pokemon.stats.atk, active.boosts.atk);
+    active_pokemon.boosts.set_atk(active.boosts.atk);
   }
   if constexpr (requires { active.boosts.def; }) {
-    stats[2] = boost(pokemon.stats().def(), active.boosts.def);
-    active_pokemon.set_boost_def(active.boosts.def);
+    stats[2] = boost(pokemon.stats.def, active.boosts.def);
+    active_pokemon.boosts.set_def(active.boosts.def);
   }
   if constexpr (requires { active.boosts.spe; }) {
-    stats[3] = boost(pokemon.stats().spe(), active.boosts.spe);
-    active_pokemon.set_boost_spe(active.boosts.spe);
+    stats[3] = boost(pokemon.stats.spe, active.boosts.spe);
+    active_pokemon.boosts.set_spe(active.boosts.spe);
   }
   if constexpr (requires { active.boosts.spc; }) {
-    stats[4] = boost(pokemon.stats().spc(), active.boosts.spc);
-    active_pokemon.set_boost_spc(active.boosts.spc);
+    stats[4] = boost(pokemon.stats.spc, active.boosts.spc);
+    active_pokemon.boosts.set_spc(active.boosts.spc);
   }
 }
 
@@ -232,10 +232,10 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
   auto &battle = View::ref(b);
   const auto &durations = View::ref(d);
   for (auto s = 0; s < 2; ++s) {
-    auto &side = battle.side(s);
+    auto &side = battle.sides[s];
     const auto &duration = durations.duration(s);
 
-    auto &vol = side.active().volatiles();
+    auto &vol = side.active.volatiles;
 
     if (const auto confusion = duration.confusion()) {
       const uint8_t max = 6 - (confusion + (confusion == 1));
@@ -261,7 +261,7 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
         }
       } else {
         // in my testing this only happens when something is ko'd while binding
-        assert(side.pokemon(side.order(0) - 1).hp() == 0);
+        assert(side.stored().hp == 0);
       }
     }
     if (const auto binding = duration.binding()) {
@@ -271,9 +271,10 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
 
     for (auto p = 0; p < 6; ++p) {
       if (const auto sleep = duration.sleep(0)) {
-        const auto id = side.order(p) - 1;
-        auto &pokemon = side.pokemon(id);
-        auto &status = reinterpret_cast<uint8_t &>(pokemon.status());
+        // TODO only works when party full
+        const auto id = side.order[p] - 1;
+        auto &pokemon = side.pokemon[id];
+        auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
 
         if (!Data::is_sleep(status) || Data::self(status)) {
           continue;

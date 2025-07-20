@@ -45,10 +45,10 @@ struct Network {
 
     for (auto s = 0; s < 2; ++s) {
       const auto &dur = View::ref(durations).duration(s);
-      const auto &side = b.side(s);
+      const auto &side = b.sides[s];
 
       auto k = 0;
-      const auto &active = side.pokemon(side.order(0) - 1);
+      const auto &active = side.stored();
       for (k = 1; k < 6; ++k) {
       }
     }

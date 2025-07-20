@@ -15,11 +15,11 @@ constexpr float max_stat_value = 999;
 constexpr float max_hp_value = 706;
 constexpr auto n_dim = 5;
 float *write(const View::Stats &stats, float *t) {
-  t[0] = stats.hp() / max_hp_value;
-  t[1] = stats.atk() / max_stat_value;
-  t[2] = stats.def() / max_stat_value;
-  t[3] = stats.spe() / max_stat_value;
-  t[4] = stats.spc() / max_stat_value;
+  t[0] = stats.hp / max_hp_value;
+  t[1] = stats.atk / max_stat_value;
+  t[2] = stats.def / max_stat_value;
+  t[3] = stats.spe / max_stat_value;
+  t[4] = stats.spc / max_stat_value;
   return t + n_dim;
 }
 
@@ -113,10 +113,10 @@ constexpr auto n_dim =
     Stats::n_dim + MoveSlots::n_dim + Status::n_dim + Types::n_dim;
 
 void write(const View::Pokemon &pokemon, auto sleep, float *t) {
-  t = Stats::write(pokemon.stats(), t);
-  t = MoveSlots::write(pokemon.moves(), t);
-  t = Status::write(pokemon.status(), sleep, t);
-  t = Types::write(pokemon.types(), t);
+  t = Stats::write(pokemon.stats, t);
+  t = MoveSlots::write(pokemon.moves, t);
+  t = Status::write(pokemon.status, sleep, t);
+  t = Types::write(pokemon.types, t);
 }
 
 consteval auto get_dim_labels() {
@@ -160,12 +160,12 @@ float *write(const View::ActivePokemon &active, float *t) {
     return (float)x[0] / x[1];
   };
 
-  t[0] = get_multiplier(active.boost_atk()) * scale;
-  t[1] = get_multiplier(active.boost_def()) * scale;
-  t[2] = get_multiplier(active.boost_spe()) * scale;
-  t[3] = get_multiplier(active.boost_spc()) * scale;
-  t[4] = get_multiplier(active.boost_acc()) * scale_acceva;
-  t[5] = get_multiplier(active.boost_eva()) * scale_acceva;
+  t[0] = get_multiplier(active.boosts.atk()) * scale;
+  t[1] = get_multiplier(active.boosts.def()) * scale;
+  t[2] = get_multiplier(active.boosts.spe()) * scale;
+  t[3] = get_multiplier(active.boosts.spc()) * scale;
+  t[4] = get_multiplier(active.boosts.acc()) * scale_acceva;
+  t[5] = get_multiplier(active.boosts.eva()) * scale_acceva;
   return t + n_dim;
 }
 
@@ -214,7 +214,7 @@ float *write(const View::Volatiles &vol, float *t) {
 
 consteval auto dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
-      {"bide",         "thrashing",     "multi_hit", "flinch",     "charging",
+      {"bide",         "thrashing",  "multi_hit", "flinch",     "charging",
        "binding",      "invulner",   "confusion", "mist",       "focus_energy",
        "substitute",   "recharging", "rage",      "leech_seed", "toxic",
        "light_screen", "reflect",    "transform", "state",      "sub_hp"}};
@@ -293,15 +293,15 @@ constexpr auto n_dim = Stats::n_dim + Types::n_dim + Boosts::n_dim +
 
 void write(const View::Pokemon &pokemon, const View::ActivePokemon &active,
            const View::Duration &duration, float *t) {
-  t = Stats::write(active.stats(), t);
-  t = Types::write(active.types(), t);
+  t = Stats::write(active.stats, t);
+  t = Types::write(active.types, t);
   t = Boosts::write(active, t);
-  t = Volatiles::write(active.volatiles(), t);
-  t = MoveSlots::write(active.moves(), t);
+  t = Volatiles::write(active.volatiles, t);
+  t = MoveSlots::write(active.moves, t);
   // disable
-  if (const auto slot = active.volatiles().disable_move()) {
+  if (const auto slot = active.volatiles.disable_move()) {
     assert(slot != 0);
-    t[static_cast<uint8_t>(active.moves()[slot].id)] = 0; // TODO
+    t[static_cast<uint8_t>(active.moves[slot].id)] = 0; // TODO
   }
   t = Duration::write(duration, t);
   Pokemon::write(pokemon, duration.sleep(0), t);

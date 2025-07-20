@@ -18,91 +18,34 @@ namespace View {
 
 using namespace Layout;
 
-struct Stats {
-  uint8_t bytes[10];
+#pragma pack(push, 1)
 
-  uint16_t &hp() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 0); }
-  const uint16_t &hp() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 0);
-  }
-
-  uint16_t &atk() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 2); }
-  const uint16_t &atk() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 2);
-  }
-
-  uint16_t &def() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 4); }
-  const uint16_t &def() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 4);
-  }
-
-  uint16_t &spe() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 6); }
-  const uint16_t &spe() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 6);
-  }
-
-  uint16_t &spc() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 8); }
-  const uint16_t &spc() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 8);
-  }
+struct alignas(1) Stats {
+  uint16_t hp;
+  uint16_t atk;
+  uint16_t def;
+  uint16_t spe;
+  uint16_t spc;
 };
 
-struct MoveSlot {
+struct alignas(1) MoveSlot {
   Data::Move id;
   uint8_t pp;
 };
 
-struct Pokemon {
-  uint8_t bytes[24];
+struct alignas(1) Pokemon {
+  Stats stats;
+  std::array<MoveSlot, 4> moves;
+  uint16_t hp;
+  Data::Status status;
+  Data::Species species;
+  uint8_t types;
+  uint8_t level;
 
-  Stats &stats() noexcept { return *reinterpret_cast<Stats *>(bytes + 0); }
-  const Stats &stats() const noexcept {
-    return *reinterpret_cast<const Stats *>(bytes + 0);
-  }
-
-  std::array<MoveSlot, 4> &moves() noexcept {
-    return *reinterpret_cast<std::array<MoveSlot, 4> *>(bytes + 10);
-  }
-  const std::array<MoveSlot, 4> &moves() const noexcept {
-    return *reinterpret_cast<const std::array<MoveSlot, 4> *>(bytes + 10);
-  }
-
-  MoveSlot &moves(auto i) noexcept { return moves()[i]; }
-  const MoveSlot &moves(auto i) const noexcept { return moves()[i]; }
-
-  uint16_t &hp() noexcept { return *reinterpret_cast<uint16_t *>(bytes + 18); }
-  const uint16_t &hp() const noexcept {
-    return *reinterpret_cast<const uint16_t *>(bytes + 18);
-  }
-
-  float percent() const noexcept {
-    // Return ceil of current hp divided by max hp times 100
-    return std::ceil(100.0f * hp() / stats().hp());
-  }
-
-  Data::Status &status() noexcept {
-    return *reinterpret_cast<Data::Status *>(bytes + 20);
-  }
-  const Data::Status &status() const noexcept {
-    return *reinterpret_cast<const Data::Status *>(bytes + 20);
-  }
-
-  Data::Species &species() noexcept {
-    return *reinterpret_cast<Data::Species *>(bytes + 21);
-  }
-  const Data::Species &species() const noexcept {
-    return *reinterpret_cast<const Data::Species *>(bytes + 21);
-  }
-
-  uint8_t &types() noexcept { return bytes[22]; }
-  const uint8_t &types() const noexcept { return bytes[22]; }
-
-  uint8_t &level() noexcept { return bytes[23]; }
-  const uint8_t &level() const noexcept { return bytes[23]; }
+  float percent() const noexcept { return 100 * static_cast<float>(hp) / stats.hp; }
 };
 
-// Align Volatiles for uint64_t access
-struct Volatiles {
+struct alignas(1) Volatiles {
   uint64_t bits;
 
   bool bide() const { return bits & (1ULL << 0); }
@@ -161,140 +104,86 @@ consteval bool i4_conversion_is_valid() {
 
 static_assert(i4_conversion_is_valid());
 
-struct ActivePokemon {
-  uint8_t bytes[32];
+struct alignas(1) Boosts {
+  uint8_t bytes[4];
 
-  Stats &stats() noexcept { return *reinterpret_cast<Stats *>(bytes + 0); }
-  const Stats &stats() const noexcept {
-    return *reinterpret_cast<const Stats *>(bytes + 0);
+  int8_t atk() const noexcept { return decode_i4(bytes[0] & 0b00001111); }
+  int8_t def() const noexcept {
+    return decode_i4((bytes[0] & 0b11110000) >> 4);
   }
-
-  auto species() const noexcept {
-    return static_cast<Data::Species>(bytes[10]);
+  int8_t spe() const noexcept { return decode_i4(bytes[1] & 0b00001111); }
+  int8_t spc() const noexcept {
+    return decode_i4((bytes[1] & 0b11110000) >> 4);
   }
-  auto types() const noexcept { return bytes[11]; }
-
-  int8_t boost_atk() const noexcept {
-    return decode_i4(bytes[12] & 0b00001111);
-  }
-  int8_t boost_def() const noexcept {
-    return decode_i4((bytes[12] & 0b11110000) >> 4);
-  }
-  int8_t boost_spe() const noexcept {
-    return decode_i4(bytes[13] & 0b00001111);
-  }
-  int8_t boost_spc() const noexcept {
-    return decode_i4((bytes[13] & 0b11110000) >> 4);
-  }
-  int8_t boost_acc() const noexcept {
-    return decode_i4(bytes[14] & 0b00001111);
-  }
-  int8_t boost_eva() const noexcept {
-    return decode_i4((bytes[14] & 0b11110000) >> 4);
+  int8_t acc() const noexcept { return decode_i4(bytes[2] & 0b00001111); }
+  int8_t eva() const noexcept {
+    return decode_i4((bytes[2] & 0b11110000) >> 4);
   }
 
-  void set_boost_atk(int8_t value) noexcept {
-    bytes[12] = (bytes[12] & 0b11110000) | (encode_i4(value));
+  void set_atk(int8_t value) noexcept {
+    bytes[0] = (bytes[0] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_def(int8_t value) noexcept {
-    bytes[12] = (bytes[12] & 0b00001111) | (encode_i4(value) << 4);
+  void set_def(int8_t value) noexcept {
+    bytes[0] = (bytes[0] & 0b00001111) | (encode_i4(value) << 4);
   }
-  void set_boost_spe(int8_t value) noexcept {
-    bytes[13] = (bytes[13] & 0b11110000) | (encode_i4(value));
+  void set_spe(int8_t value) noexcept {
+    bytes[1] = (bytes[1] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_spc(int8_t value) noexcept {
-    bytes[13] = (bytes[13] & 0b00001111) | (encode_i4(value) << 4);
+  void set_spc(int8_t value) noexcept {
+    bytes[1] = (bytes[1] & 0b00001111) | (encode_i4(value) << 4);
   }
-  void set_boost_acc(int8_t value) noexcept {
-    bytes[14] = (bytes[14] & 0b11110000) | (encode_i4(value));
+  void set_acc(int8_t value) noexcept {
+    bytes[2] = (bytes[2] & 0b11110000) | (encode_i4(value));
   }
-  void set_boost_eva(int8_t value) noexcept {
-    bytes[14] = (bytes[14] & 0b00001111) | (encode_i4(value) << 4);
-  }
-
-  Volatiles &volatiles() noexcept {
-    return *reinterpret_cast<Volatiles *>(bytes + 16);
-  }
-  const Volatiles &volatiles() const noexcept {
-    return *reinterpret_cast<const Volatiles *>(bytes + 16);
-  }
-
-  std::array<MoveSlot, 4> &moves() noexcept {
-    return *reinterpret_cast<std::array<MoveSlot, 4> *>(bytes + 24);
-  }
-  const std::array<MoveSlot, 4> &moves() const noexcept {
-    return *reinterpret_cast<const std::array<MoveSlot, 4> *>(bytes + 24);
+  void set_eva(int8_t value) noexcept {
+    bytes[2] = (bytes[2] & 0b00001111) | (encode_i4(value) << 4);
   }
 };
 
-struct Side {
-  uint8_t bytes[Sizes::Side];
+struct alignas(1) ActivePokemon {
+  Stats stats;
+  Data::Species species;
+  uint8_t types;
+  Boosts boosts;
+  Volatiles volatiles;
+  std::array<MoveSlot, 4> moves;
+};
 
-  Pokemon &pokemon(auto i) noexcept {
-    return *reinterpret_cast<Pokemon *>(bytes + i * Sizes::Pokemon);
-  }
-
-  const Pokemon &pokemon(auto i) const noexcept {
-    return *reinterpret_cast<const Pokemon *>(bytes + i * Sizes::Pokemon);
-  }
-
-  ActivePokemon &active() noexcept {
-    return *reinterpret_cast<ActivePokemon *>(bytes + Offsets::Side::active);
-  }
-
-  const ActivePokemon &active() const noexcept {
-    return *reinterpret_cast<const ActivePokemon *>(bytes +
-                                                    Offsets::Side::active);
-  }
-
-  std::array<uint8_t, 6> &order() noexcept {
-    return *reinterpret_cast<std::array<uint8_t, 6> *>(bytes +
-                                                       Offsets::Side::order);
-  }
-
-  const std::array<uint8_t, 6> &order() const noexcept {
-    return *reinterpret_cast<const std::array<uint8_t, 6> *>(
-        bytes + Offsets::Side::order);
-  }
-
-  uint8_t &order(auto i) noexcept { return (bytes + Offsets::Side::order)[i]; }
-
-  const uint8_t &order(auto i) const noexcept {
-    return (bytes + Offsets::Side::order)[i];
-  }
+struct alignas(1) Side {
+  std::array<Pokemon, 6> pokemon;
+  ActivePokemon active;
+  std::array<uint8_t, 6> order;
+  Data::Move last_selected_move;
+  Data::Move last_used_move;
 
   Pokemon &get(auto slot) noexcept {
     assert(slot > 0 && slot <= 6);
-    const auto id = order(slot - 1);
+    const auto id = order[slot - 1];
     assert(id > 0 && id <= 6);
-    return pokemon(id - 1);
+    return pokemon[id - 1];
   }
-
   const Pokemon &get(auto slot) const noexcept {
     assert(slot > 0 && slot <= 6);
-    const auto id = order(slot - 1);
+    const auto id = order[slot - 1];
     assert(id > 0 && id <= 6);
-    return pokemon(id - 1);
+    return pokemon[id - 1];
   }
 
   Pokemon &stored() noexcept { return get(1); }
-
   const Pokemon &stored() const noexcept { return get(1); }
 };
 
-struct Battle {
-  uint8_t bytes[PKMN_GEN1_BATTLE_SIZE];
+struct alignas(1) MoveDetails {
+  uint8_t index;
+  uint8_t counterable;
+};
 
-  Side &side(auto side) noexcept {
-    return *reinterpret_cast<Side *>(bytes + side * Sizes::Side);
-  }
-  const Side &side(auto side) const noexcept {
-    return *reinterpret_cast<const Side *>(bytes + side * Sizes::Side);
-  }
-
-  uint16_t turn() const noexcept {
-    return reinterpret_cast<const uint16_t *>(bytes + 368)[0];
-  }
+struct alignas(1) Battle {
+  std::array<Side, 2> sides;
+  uint16_t turn;
+  uint16_t last_damage;
+  std::array<MoveDetails, 2> last_moves;
+  uint64_t rng;
 };
 
 inline Battle &ref(pkmn_gen1_battle &battle) noexcept {
@@ -305,34 +194,30 @@ inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<const Battle *>(&battle);
 }
 
-struct Duration {
-  uint32_t data = 0;
+struct alignas(1) Duration {
+  uint32_t data;
 
   uint8_t sleep(auto slot) const noexcept {
     return (data >> (3 * slot)) & 0b111;
   }
-
   void set_sleep(auto slot, uint8_t sleeps) noexcept {
     const uint32_t mask = 0b111 << (3 * slot);
     data = (data & ~mask) | ((sleeps & 0b111) << (3 * slot));
   }
-
   uint8_t confusion() const noexcept { return (data >> 18) & 0b111; }
-
   uint8_t disable() const noexcept { return (data >> 21) & 0b1111; }
-
   uint8_t attacking() const noexcept { return (data >> 25) & 0b111; }
-
   uint8_t binding() const noexcept { return (data >> 28) & 0b111; }
 };
 
-struct Durations {
+struct alignas(1) Durations {
   Duration d[2];
 
   Duration &duration(auto i) noexcept { return d[i]; }
-
   const Duration &duration(auto i) const noexcept { return d[i]; }
 };
+
+#pragma pack(pop)
 
 inline Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<Durations *>(&durations);
@@ -342,5 +227,15 @@ inline const Durations &
 ref(const pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<const Durations *>(&durations);
 }
+
+static_assert(sizeof(Battle) == Layout::Sizes::Battle);
+static_assert(sizeof(Side) == Layout::Sizes::Side);
+static_assert(sizeof(Pokemon) == Layout::Sizes::Pokemon);
+static_assert(sizeof(Volatiles) == 8);
+static_assert(sizeof(Stats) == 10);
+static_assert(sizeof(MoveSlot) == 2);
+static_assert(sizeof(Boosts) == 4);
+static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
+static_assert(sizeof(Durations) == Layout::Sizes::Durations);
 
 } // namespace View
