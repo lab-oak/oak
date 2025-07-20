@@ -228,39 +228,19 @@ public:
   }
 
   std::string visit_string() const {
-    std::stringstream sstream{};
+    std::stringstream ss{};
     if constexpr (enable_visits) {
-      sstream << "V1: ";
+      ss << "V1: ";
       for (auto i = 0; i < _rows; ++i) {
-        sstream << std::to_string(this->p1_visits[i]) << " ";
+        ss << std::to_string(this->p1_visits[i]) << " ";
       }
-      sstream << "V2: ";
+      ss << "V2: ";
       for (auto i = 0; i < _cols; ++i) {
-        sstream << std::to_string(this->p2_visits[i]) << " ";
+        ss << std::to_string(this->p2_visits[i]) << " ";
       }
-      sstream.flush();
+      ss.flush();
     }
-    return sstream.str();
-  }
-
-  std::pair<std::vector<float>, std::vector<float>>
-  policies(float iterations) const {
-
-    std::vector<float> p1{};
-    std::vector<float> p2{};
-
-    p1.resize(_rows);
-    p2.resize(_cols);
-
-    if constexpr (enable_visits) {
-      for (auto i = 0; i < _rows; ++i) {
-        p1[i] = this->p1_visits[i].value() / (iterations - 1);
-      }
-      for (auto i = 0; i < _cols; ++i) {
-        p2[i] = this->p2_visits[i].value() / (iterations - 1);
-      }
-    }
-    return {p1, p2};
+    return ss.str();
   }
 };
 #pragma pack(pop)

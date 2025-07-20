@@ -140,25 +140,6 @@ public:
     sstream.flush();
     return sstream.str();
   }
-
-  std::pair<std::vector<float>, std::vector<float>>
-  policies(float iterations) const {
-
-    std::vector<float> p1{};
-    std::vector<float> p2{};
-
-    p1.resize(_rows);
-    p2.resize(_cols);
-
-    for (auto i = 0; i < _rows; ++i) {
-      p1[i] = this->p1_visits[i] / (iterations - 1);
-    }
-    for (auto i = 0; i < _cols; ++i) {
-      p2[i] = this->p2_visits[i] / (iterations - 1);
-    }
-
-    return {p1, p2};
-  }
 };
 #pragma pack(pop)
 

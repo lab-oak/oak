@@ -11,6 +11,7 @@ enum class Status : std::underlying_type_t<std::byte> {
   Freeze = 0b00100000,
   Paralysis = 0b01000000,
   Toxic = 0b10001000,
+  // number refers to set value
   Sleep1 = 0b00000001,
   Sleep2 = 0b00000010,
   Sleep3 = 0b00000011,
@@ -20,7 +21,6 @@ enum class Status : std::underlying_type_t<std::byte> {
   Sleep7 = 0b00000111,
   Rest1 = 0b10000001,
   Rest2 = 0b10000010,
-  // Seemingly only possible mid update
   Rest3 = 0b10000011,
 };
 
