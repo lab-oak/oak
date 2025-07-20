@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/debug-log.h>
+#include <util/debug-log.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/data/strings.h>
 #include <util/random.h>

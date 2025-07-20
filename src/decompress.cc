@@ -1,4 +1,4 @@
-#include <battle/debug-log.h>
+#include <util/debug-log.h>
 #include <libpkmn/pkmn.h>
 #include <data/sample-teams.h>
 #include <encode/battle.h>

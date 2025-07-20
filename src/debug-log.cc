@@ -1,6 +1,6 @@
 #include <util/random.h>
 
-#include <battle/debug-log.h>
+#include <util/debug-log.h>
 #include <data/sample-teams.h>
 
 #include <iostream>
