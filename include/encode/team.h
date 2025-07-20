@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/pkmn.h>
+#include <libpkmn/pkmn.h>
 #include <data/move-pools.h>
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>

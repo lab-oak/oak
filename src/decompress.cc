@@ -1,5 +1,5 @@
 #include <battle/debug-log.h>
-#include <battle/pkmn.h>
+#include <libpkmn/pkmn.h>
 #include <data/sample-teams.h>
 #include <encode/battle.h>
 #include <libpkmn/strings.h>

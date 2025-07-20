@@ -86,7 +86,8 @@ struct MCTS {
     const auto prepare_and_run_iteration = [this, &input, &model,
                                             &node]() -> float {
       auto copy = input;
-      std::bit_cast<uint64_t *>(copy.battle.bytes + Layout::Offsets::Battle::rng)[0] =
+      std::bit_cast<uint64_t *>(copy.battle.bytes +
+                                Layout::Offsets::Battle::rng)[0] =
           model.device.uniform_64();
       chance_options.durations = copy.durations;
       apply_durations(copy.battle, copy.durations);

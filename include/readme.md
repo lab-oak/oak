@@ -43,7 +43,7 @@ The two headers below make up the rest of the C++ `libpkmn` interface.
 
 To the extent that is possible in C++ (there is no `i4` type for example), we duplicate the definition of the data structures in `lib/gen1/data.zig`.
 
-Defines the `auto& View::ref(auto &)` function template that returns a reference to a wrapper for `libpkmn`'s functional types. This cheifly includes `View::Battle` which provides identically named accessors for all of the zig members.
+Defines the `auto& View::ref(auto &)` function template that returns a reference to a wrapper for `libpkmn`'s functional types. This cheifly includes `PKMN::Battle` which provides identically named accessors for all of the zig members.
 
 * init.h
 

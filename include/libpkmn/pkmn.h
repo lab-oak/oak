@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/init.h>
+#include <libpkmn/init.h>
 
 namespace PKMNDetail {
 
@@ -82,8 +82,8 @@ void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
     } else if constexpr (std::is_same_v<Choice, Data::Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
-            side[Layout::Offsets::Side::active + Layout::Offsets::ActivePokemon::moves +
-                 2 * i]) {
+            side[Layout::Offsets::Side::active +
+                 Layout::Offsets::ActivePokemon::moves + 2 * i]) {
           return ((i + 1) << 2) | 1;
         }
       }
@@ -95,9 +95,9 @@ void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
     }
   };
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
-  return pkmn_gen1_battle_update(&battle, get_choice(c1, battle.bytes),
-                                 get_choice(c2, battle.bytes + Layout::Sizes::Side),
-                                 &options);
+  return pkmn_gen1_battle_update(
+      &battle, get_choice(c1, battle.bytes),
+      get_choice(c2, battle.bytes + Layout::Sizes::Side), &options);
 }
 
 auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)

@@ -119,7 +119,7 @@ std::string pokemon_to_string(const uint8_t *const data) {
   return sstream.str();
 }
 
-std::string volatiles_to_string(const View::Volatiles &vol) {
+std::string volatiles_to_string(const PKMN::Volatiles &vol) {
   std::stringstream ss{};
   if (vol.bide())
     ss << "(bide)";
