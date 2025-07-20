@@ -1,5 +1,5 @@
 #include <battle/debug-log.h>
-#include <nn/encode.h>
+#include <nn/battle.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
 

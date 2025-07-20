@@ -1,7 +1,7 @@
 #pragma once
 
 #include <battle/view.h>
-#include <nn/encode.h>
+#include <nn/battle.h>
 #include <nn/subnet.h>
 #include <util/random.h>
 
