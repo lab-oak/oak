@@ -2,7 +2,7 @@
 
 #include <battle/strings.h>
 #include <libpkmn/layout.h>
-#include <pi/mcts.h>
+#include <search/mcts.h>
 
 #include <iomanip>
 #include <string>

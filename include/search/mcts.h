@@ -2,11 +2,11 @@
 
 #include <pkmn.h>
 
-#include <battle/durations.h>
+#include <search/durations.h>
 #include <battle/strings.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/options.h>
-#include <pi/tree.h>
+#include <search/tree.h>
 #include <util/random.h>
 
 #include <chrono>
