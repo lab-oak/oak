@@ -1,7 +1,7 @@
 #pragma once
 
-#include <libpkmn/init.h>
-#include <libpkmn/view.h>
+#include <libpkmn/pkmn.h>
+#include <libpkmn/data.h>
 #include <data/move-pools.h>
 #include <libpkmn/data/status.h>
 

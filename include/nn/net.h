@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libpkmn/view.h>
+#include <libpkmn/data.h>
 #include <nn/encode.h>
 #include <nn/subnet.h>
 

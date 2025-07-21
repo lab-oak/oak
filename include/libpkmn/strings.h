@@ -12,7 +12,7 @@
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/strings.h>
 
-#include <libpkmn/view.h>
+#include <libpkmn/data.h>
 
 constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
                                                int slot = 1) {

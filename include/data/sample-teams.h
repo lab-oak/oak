@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <libpkmn/init.h>
+#include <libpkmn/pkmn.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 

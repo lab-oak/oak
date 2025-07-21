@@ -35,11 +35,11 @@ Byte offsets and sizes.
 
 The two headers below make up the rest of the C++ `libpkmn` interface.
 
-* view.h
+* data.h
 
 Defines the `auto& View::ref(auto &)` function template that returns a reference to a wrapper for `libpkmn`'s functional types. This cheifly includes `View::Battle` which provides identically named accessors for all of the zig members.
 
-* init.h
+* pkmn.h
 
 Helper fuctions to initialize Battles and Durations structs (like properly setting sleep turns and other durations.) The function aspect of `libpkmn` is wrapped here e.g. `update()`.
 

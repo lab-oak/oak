@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libpkmn/view.h>
+#include <libpkmn/data.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>

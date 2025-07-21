@@ -1,4 +1,4 @@
-#include <libpkmn/init.h>
+#include <libpkmn/pkmn.h>
 #include <data/sample-teams.h>
 #include <libpkmn/strings.h>
 #include <libpkmn/data/strings.h>

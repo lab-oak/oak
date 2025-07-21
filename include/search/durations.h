@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libpkmn/view.h>
+#include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 
 void apply_durations(pkmn_gen1_battle &b,
