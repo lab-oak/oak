@@ -2,7 +2,7 @@
 #include <libpkmn/strings.h>
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
-#include <nn/encode.h>
+#include <encode/team.h>
 #include <nn/net.h>
 #include <search/exp3.h>
 #include <search/mcts.h>

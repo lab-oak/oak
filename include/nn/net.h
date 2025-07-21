@@ -1,7 +1,7 @@
 #pragma once
 
 #include <libpkmn/data.h>
-#include <nn/encode.h>
+#include <encode/battle.h>
 #include <nn/subnet.h>
 
 namespace NN {
