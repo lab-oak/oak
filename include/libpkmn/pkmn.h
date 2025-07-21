@@ -1,12 +1,12 @@
 #pragma once
 
 #include <libpkmn/data.h>
-#include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/data/strings.h>
 #include <libpkmn/data/types.h>
+#include <libpkmn/layout.h>
 #include <util/random.h>
 
 #include <assert.h>
@@ -372,4 +372,4 @@ auto score2(const pkmn_result result) {
   }
 }
 
-} // namespace Init
+} // namespace PKMN

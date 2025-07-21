@@ -1,7 +1,7 @@
 #include <util/random.h>
 
-#include <util/debug-log.h>
 #include <data/sample-teams.h>
+#include <util/debug-log.h>
 
 #include <iostream>
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <libpkmn/strings.h>
 #include <libpkmn/layout.h>
+#include <libpkmn/strings.h>
 #include <search/mcts.h>
 
 #include <iomanip>

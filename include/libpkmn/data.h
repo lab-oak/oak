@@ -2,10 +2,10 @@
 
 #include <pkmn.h>
 
-#include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
+#include <libpkmn/layout.h>
 
 #include <array>
 #include <cassert>
@@ -42,7 +42,9 @@ struct alignas(1) Pokemon {
   uint8_t types;
   uint8_t level;
 
-  float percent() const noexcept { return 100 * static_cast<float>(hp) / stats.hp; }
+  float percent() const noexcept {
+    return 100 * static_cast<float>(hp) / stats.hp;
+  }
 };
 
 struct alignas(1) Volatiles {

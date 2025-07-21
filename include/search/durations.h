@@ -3,8 +3,7 @@
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 
-void apply_durations(pkmn_gen1_battle &b,
-                     const pkmn_gen1_chance_durations &d) {
+void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
 
   static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
       std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,

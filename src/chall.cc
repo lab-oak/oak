@@ -1,7 +1,7 @@
-#include <libpkmn/pkmn.h>
 #include <data/sample-teams.h>
-#include <libpkmn/strings.h>
 #include <libpkmn/data/strings.h>
+#include <libpkmn/pkmn.h>
+#include <libpkmn/strings.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <util/random.h>

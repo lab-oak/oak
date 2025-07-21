@@ -1,8 +1,8 @@
 #pragma once
 
-#include <util/debug-log.h>
-#include <libpkmn/pkmn.h>
 #include <libpkmn/data/strings.h>
+#include <libpkmn/pkmn.h>
+#include <util/debug-log.h>
 #include <util/random.h>
 #include <util/strings.h>
 

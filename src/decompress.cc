@@ -1,8 +1,8 @@
-#include <util/debug-log.h>
-#include <libpkmn/pkmn.h>
 #include <data/sample-teams.h>
+#include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
 #include <train/compressed-frame.h>
+#include <util/debug-log.h>
 #include <util/random.h>
 
 #include <fstream>

@@ -1,8 +1,8 @@
-#include <util/debug-log.h>
 #include <encode/battle.h>
 #include <encode/team.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
+#include <util/debug-log.h>
 
 #include <cstdint>
 #include <fstream>

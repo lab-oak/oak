@@ -1,9 +1,9 @@
 #pragma once
 
-#include <libpkmn/pkmn.h>
-#include <libpkmn/data.h>
 #include <data/move-pools.h>
+#include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
+#include <libpkmn/pkmn.h>
 
 #include <array>
 #include <cassert>

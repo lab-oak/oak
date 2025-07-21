@@ -1,9 +1,9 @@
 
 #pragma once
 
-#include <libpkmn/pkmn.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
+#include <libpkmn/pkmn.h>
 
 namespace SampleTeams {
 using enum Data::Move;

@@ -2,11 +2,11 @@
 
 #include <pkmn.h>
 
-#include <libpkmn/strings.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/options.h>
-#include <search/tree.h>
+#include <libpkmn/strings.h>
 #include <search/durations.h>
+#include <search/tree.h>
 #include <util/random.h>
 
 #include <chrono>
