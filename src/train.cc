@@ -1,4 +1,4 @@
-#include <battle/debug-log.h>
+#include <util/debug-log.h>
 #include <nn/encode.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>

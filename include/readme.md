@@ -31,7 +31,7 @@ The former array is unweildy so here we define a more natural interface e.g. `mo
 
 Byte offsets and sizes.
 
-## battle/
+## util/
 
 The two headers below make up the rest of the C++ `libpkmn` interface.
 
@@ -84,7 +84,7 @@ TODO lots to talk about
 
 # train/
 
-The structures defined here is the input and target information needed to train a value/policy model. It does not take any architecture or encoding into consideration, so a frame is the raw battle/durations struct together with the value/policy targets.
+The structures defined here is the input and target information needed to train a value/policy model. It does not take any architecture or encoding into consideration, so a frame is the raw util/durations struct together with the value/policy targets.
 
 Therefore the `generate` program can be used to train any network not just the one provided.
 
