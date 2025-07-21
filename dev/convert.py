@@ -134,7 +134,7 @@ def main():
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 
-#include <battle/init.h>
+#include <libpkmn/init.h>
 
 namespace SampleTeams {
 using Data::Moves;

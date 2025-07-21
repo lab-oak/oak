@@ -1,7 +1,7 @@
 #include <battle/debug-log.h>
-#include <battle/init.h>
+#include <libpkmn/init.h>
 #include <data/sample-teams.h>
-#include <battle/strings.h>
+#include <libpkmn/strings.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
 

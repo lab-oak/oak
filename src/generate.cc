@@ -1,6 +1,6 @@
 #include <data/sample-teams.h>
-#include <battle/strings.h>
-#include <battle/view.h>
+#include <libpkmn/strings.h>
+#include <libpkmn/view.h>
 #include <libpkmn/options.h>
 #include <nn/encode.h>
 #include <nn/net.h>

@@ -2,7 +2,7 @@
 
 #include <pkmn.h>
 
-#include <battle/strings.h>
+#include <libpkmn/strings.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/options.h>
 #include <search/tree.h>

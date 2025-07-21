@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/view.h>
+#include <libpkmn/view.h>
 #include <nn/encode.h>
 #include <nn/subnet.h>
 

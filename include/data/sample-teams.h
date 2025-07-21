@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <battle/init.h>
+#include <libpkmn/init.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 

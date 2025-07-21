@@ -1,6 +1,6 @@
 #pragma once
 
-#include <battle/strings.h>
+#include <libpkmn/strings.h>
 #include <libpkmn/layout.h>
 #include <search/mcts.h>
 
