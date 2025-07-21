@@ -212,76 +212,6 @@ static_assert(compute_stat(5, false) == 108);
 
 namespace Init {
 
-void apply_durations(auto &device, pkmn_gen1_battle &b,
-                     const pkmn_gen1_chance_durations &d) {
-
-  static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                              2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2,
-                              2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
-                              2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-      std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}};
-
-  auto &battle = View::ref(b);
-  const auto &durations = View::ref(d);
-  for (auto s = 0; s < 2; ++s) {
-    auto &side = battle.sides[s];
-    const auto &duration = durations.duration(s);
-
-    auto &vol = side.active.volatiles;
-
-    if (const auto confusion = duration.confusion()) {
-      const uint8_t max = 6 - (confusion + (confusion == 1));
-      vol.set_confusion_left(
-          static_cast<uint8_t>(device.random_int(max) + 1 + (confusion == 1)));
-    }
-    if (const auto disable = duration.disable()) {
-      const uint8_t max = 9 - disable;
-      vol.set_disable_left(static_cast<uint8_t>(device.random_int(max) + 1));
-    }
-    if (const auto attacking = duration.attacking()) {
-      if (vol.bide()) {
-        if (attacking == 3) {
-          vol.set_attacks(1);
-        } else {
-          vol.set_attacks(4 - (attacking + device.random_int(2)));
-        }
-      } else if (vol.thrashing()) {
-        if (attacking == 3) {
-          vol.set_attacks(1);
-        } else {
-          vol.set_attacks(4 - (attacking + device.random_int(2)));
-        }
-      } else {
-        // in my testing this only happens when something is ko'd while binding
-        assert(side.stored().hp == 0);
-      }
-    }
-    if (const auto binding = duration.binding()) {
-      const auto index = device.random_int(40);
-      vol.set_attacks(multi[binding - 1][index]);
-    }
-
-    if (const auto sleep = duration.sleep(0)) {
-      auto &pokemon = side.stored();
-      auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
-
-      if (Data::is_sleep(status) && Data::self(status)) {
-        const uint8_t max = 8 - sleep;
-        status &= 0b11111000; // keep rest bit, clear sleep remaining
-        status |= static_cast<uint8_t>(device.random_int(max) + 1);
-      }
-    }
-  }
-}
-
 struct Boosts {
   int atk;
   int def;
@@ -333,8 +263,6 @@ constexpr auto battle(const auto &p1, const auto &p2,
       std::bit_cast<uint64_t *>(battle.bytes + Offsets::Battle::turn);
   ptr_64[0] = 0; // turn, last used, etc
   ptr_64[1] = seed;
-  prng device{seed};
-  Init::apply_durations(device, battle, *durations_ptr);
   return battle;
 }
 

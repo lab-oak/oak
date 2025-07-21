@@ -2,11 +2,11 @@
 
 #include <pkmn.h>
 
-#include <battle/init.h>
 #include <battle/strings.h>
 #include <data/layout.h>
 #include <data/options.h>
 #include <pi/tree.h>
+#include <pi/durations.h>
 #include <util/random.h>
 
 #include <chrono>
@@ -90,7 +90,7 @@ struct MCTS {
                                 Layout::Offsets::Battle::rng)[0] =
           model.device.uniform_64();
       chance_options.durations = copy.durations;
-      Init::apply_durations(model.device, copy.battle, copy.durations);
+      apply_durations(copy.battle, copy.durations);
       pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
       return run_iteration<Options>(&node, copy, model).first;
     };
