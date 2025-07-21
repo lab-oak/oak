@@ -1,5 +1,5 @@
 #include <battle/init.h>
-#include <battle/sample-teams.h>
+#include <data/sample-teams.h>
 #include <battle/strings.h>
 #include <libpkmn/strings.h>
 #include <search/exp3.h>

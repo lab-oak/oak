@@ -2,7 +2,7 @@
 
 #include <battle/init.h>
 #include <battle/view.h>
-#include <libpkmn/data/move-pools.h>
+#include <data/move-pools.h>
 #include <libpkmn/data/status.h>
 
 #include <array>
