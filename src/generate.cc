@@ -4,9 +4,9 @@
 #include <data/options.h>
 #include <nn/encode.h>
 #include <nn/net.h>
-#include <pi/exp3.h>
-#include <pi/mcts.h>
-#include <pi/ucb.h>
+#include <search/exp3.h>
+#include <search/mcts.h>
+#include <search/ucb.h>
 #include <train/build-trajectory.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>

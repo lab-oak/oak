@@ -51,7 +51,7 @@ Helper fuctions to initialize Battles and Durations structs (like properly setti
 
 Smogon sample teams for RBY OU. Two grandfathered benchmark teams are here, too.
 
-## pi/
+## search/
 
 Perfect info search essentially means open teamsheats. In fact all data is visible to the player/search besides the information described below.
 

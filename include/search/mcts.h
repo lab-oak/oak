@@ -5,8 +5,8 @@
 #include <battle/strings.h>
 #include <data/layout.h>
 #include <data/options.h>
-#include <pi/tree.h>
-#include <pi/durations.h>
+#include <search/tree.h>
+#include <search/durations.h>
 #include <util/random.h>
 
 #include <chrono>

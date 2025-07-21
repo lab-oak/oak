@@ -1,8 +1,8 @@
 #include <battle/sample-teams.h>
-#include <pi/exp3.h>
-#include <pi/mcts.h>
-#include <pi/tree.h>
-#include <pi/ucb.h>
+#include <search/exp3.h>
+#include <search/mcts.h>
+#include <search/tree.h>
+#include <search/ucb.h>
 #include <util/random.h>
 
 #include <chrono>
