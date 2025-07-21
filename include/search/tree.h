@@ -1,12 +1,7 @@
 #pragma once
 
-#include <pkmn.h>
-
-#include <assert.h>
-
-#include <array>
 #include <map>
-#include <memory>
+#include <utility>
 
 namespace Tree {
 
@@ -31,35 +26,9 @@ template <typename BanditData, typename Obs> struct Node {
     return &node;
   }
 
-  auto get(auto p1_index, auto p2_index, auto obs) {
+  auto find(auto p1_index, auto p2_index, auto obs) {
     return _map.find({p1_index, p2_index, obs});
   }
-
-  std::unique_ptr<Node> release_child(auto p1_index, auto p2_index, auto obs) {
-    return std::move(_map[{p1_index, p2_index, obs}]);
-  }
-};
-
-template <typename BanditData, typename Obs, size_t size,
-          typename index_type = uint32_t>
-struct Table {
-  std::array<BanditData, size> stats_table;
-  using Key = std::tuple<index_type, uint8_t, uint8_t, Obs>;
-  std::map<uint64_t, index_type> index_map;
-  index_type index;
-
-  const auto &stats(index_type idx) const noexcept { return stats_table[idx]; }
-  auto &stats(index_type idx) noexcept { return stats_table[idx]; }
-
-  index_type get(uint64_t key) noexcept {
-    index_type &child_index = index_map[key];
-    if (child_index == 0) {
-      child_index = ++index;
-    }
-    return child_index;
-  }
-
-  void reset() noexcept { index = 0; }
 };
 
 }; // namespace Tree

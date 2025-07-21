@@ -565,7 +565,7 @@ void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
       return;
     }
     if (RuntimeOptions::Search::keep_node) {
-      auto child = unique_node->get(i1, i2, obs);
+      auto child = unique_node->find(i1, i2, obs);
       RuntimeData::update_counter.fetch_add(1);
       if (child == unique_node->_map.end()) {
         unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
