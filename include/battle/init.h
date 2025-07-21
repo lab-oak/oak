@@ -5,7 +5,7 @@
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
-#include <libpkmn/strings.h>
+#include <libpkmn/data/strings.h>
 #include <libpkmn/data/types.h>
 #include <util/random.h>
 

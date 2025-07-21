@@ -10,7 +10,7 @@
 
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
-#include <libpkmn/strings.h>
+#include <libpkmn/data/strings.h>
 
 #include <battle/view.h>
 
