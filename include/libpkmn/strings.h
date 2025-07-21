@@ -8,11 +8,10 @@
 #include <string>
 #include <vector>
 
+#include <libpkmn/data.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/strings.h>
-
-#include <libpkmn/data.h>
 
 constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
                                                int slot = 1) {
@@ -119,7 +118,7 @@ std::string pokemon_to_string(const uint8_t *const data) {
   return sstream.str();
 }
 
-std::string volatiles_to_string(const View::Volatiles &vol) {
+std::string volatiles_to_string(const PKMN::Volatiles &vol) {
   std::stringstream ss{};
   if (vol.bide())
     ss << "(bide)";
@@ -227,7 +226,7 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {
     const auto &side = b.sides[s];
-    const auto &duration = View::ref(durations).duration(s);
+    const auto &duration = View::ref(durations).get(s);
     const auto &vol = side.active.volatiles;
 
     for (auto i = 0; i < 6; ++i) {

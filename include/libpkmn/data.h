@@ -14,7 +14,7 @@
 #include <cstring>
 #include <type_traits>
 
-namespace View {
+namespace PKMN {
 
 using namespace Layout;
 
@@ -188,14 +188,6 @@ struct alignas(1) Battle {
   uint64_t rng;
 };
 
-inline Battle &ref(pkmn_gen1_battle &battle) noexcept {
-  return *reinterpret_cast<Battle *>(&battle);
-}
-
-inline const Battle &ref(const pkmn_gen1_battle &battle) noexcept {
-  return *reinterpret_cast<const Battle *>(&battle);
-}
-
 struct alignas(1) Duration {
   uint32_t data;
 
@@ -215,20 +207,11 @@ struct alignas(1) Duration {
 struct alignas(1) Durations {
   Duration d[2];
 
-  Duration &duration(auto i) noexcept { return d[i]; }
-  const Duration &duration(auto i) const noexcept { return d[i]; }
+  Duration &get(auto i) noexcept { return d[i]; }
+  const Duration &get(auto i) const noexcept { return d[i]; }
 };
 
 #pragma pack(pop)
-
-inline Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
-  return *reinterpret_cast<Durations *>(&durations);
-}
-
-inline const Durations &
-ref(const pkmn_gen1_chance_durations &durations) noexcept {
-  return *reinterpret_cast<const Durations *>(&durations);
-}
 
 static_assert(sizeof(Battle) == Layout::Sizes::Battle);
 static_assert(sizeof(Side) == Layout::Sizes::Side);
@@ -239,5 +222,26 @@ static_assert(sizeof(MoveSlot) == 2);
 static_assert(sizeof(Boosts) == 4);
 static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
 static_assert(sizeof(Durations) == Layout::Sizes::Durations);
+
+} // namespace PKMN
+
+namespace View {
+
+inline PKMN::Battle &ref(pkmn_gen1_battle &battle) noexcept {
+  return *reinterpret_cast<PKMN::Battle *>(&battle);
+}
+
+inline const PKMN::Battle &ref(const pkmn_gen1_battle &battle) noexcept {
+  return *reinterpret_cast<const PKMN::Battle *>(&battle);
+}
+
+inline PKMN::Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
+  return *reinterpret_cast<PKMN::Durations *>(&durations);
+}
+
+inline const PKMN::Durations &
+ref(const pkmn_gen1_chance_durations &durations) noexcept {
+  return *reinterpret_cast<const PKMN::Durations *>(&durations);
+}
 
 } // namespace View

@@ -23,7 +23,7 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
   const auto &durations = View::ref(d);
   for (auto s = 0; s < 2; ++s) {
     auto &side = battle.sides[s];
-    const auto &duration = durations.duration(s);
+    const auto &duration = durations.get(s);
 
     auto &vol = side.active.volatiles;
 

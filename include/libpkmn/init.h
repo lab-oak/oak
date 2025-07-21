@@ -102,9 +102,9 @@ constexpr uint16_t boost(uint16_t stat, int b) {
 }
 
 constexpr void init_active(const auto &active, uint8_t *const bytes) {
-  auto &pokemon = *reinterpret_cast<View::Pokemon *>(bytes);
+  auto &pokemon = *reinterpret_cast<PKMN::Pokemon *>(bytes);
   auto &active_pokemon =
-      *reinterpret_cast<View::ActivePokemon *>(bytes + Offsets::Side::active);
+      *reinterpret_cast<PKMN::ActivePokemon *>(bytes + Offsets::Side::active);
 
   if constexpr (requires { active.volatiles; }) {
   }
@@ -154,7 +154,7 @@ constexpr void init_party(const auto &party, uint8_t *const bytes) {
   }
 }
 
-constexpr void init_party(const auto &party, View::Duration &duration) {
+constexpr void init_party(const auto &party, PKMN::Duration &duration) {
   const auto n = party.size();
   assert(n > 0 && n <= 6);
   auto n_alive = 0;
@@ -179,7 +179,7 @@ constexpr void init_side(const auto &side, uint8_t *const bytes) {
   }
 }
 
-constexpr void init_duration(const auto &side, View::Duration &duration) {
+constexpr void init_duration(const auto &side, PKMN::Duration &duration) {
   if constexpr (requires { side.pokemon; }) {
     init_party(side.pokemon, duration);
   } else {
@@ -192,3 +192,14 @@ static_assert(compute_stat(250, true) == 703);
 static_assert(compute_stat(5, false) == 108);
 
 } // end anonymous namespace
+
+namespace Init {
+struct Boosts {
+  int atk;
+  int def;
+  int spe;
+  int spc;
+
+  bool operator==(const Boosts &) const noexcept = default;
+};
+}

@@ -37,7 +37,7 @@ The two headers below make up the rest of the C++ `libpkmn` interface.
 
 * data.h
 
-Defines the `auto& View::ref(auto &)` function template that returns a reference to a wrapper for `libpkmn`'s functional types. This cheifly includes `View::Battle` which provides identically named accessors for all of the zig members.
+Defines the `auto& View::ref(auto &)` function template that returns a reference to a wrapper for `libpkmn`'s functional types. This cheifly includes `PKMN::Battle` which provides identically named accessors for all of the zig members.
 
 * pkmn.h
 

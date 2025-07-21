@@ -44,7 +44,7 @@ struct Network {
     const auto &b = View::ref(battle);
 
     for (auto s = 0; s < 2; ++s) {
-      const auto &dur = View::ref(durations).duration(s);
+      const auto &dur = View::ref(durations).get(s);
       const auto &side = b.sides[s];
 
       auto k = 0;

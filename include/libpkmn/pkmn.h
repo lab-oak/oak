@@ -22,15 +22,6 @@
 
 namespace PKMN {
 
-struct Boosts {
-  int atk;
-  int def;
-  int spe;
-  int spc;
-
-  bool operator==(const Boosts &) const noexcept = default;
-};
-
 struct Set {
   Species species;
   std::array<Move, 4> moves;
@@ -38,7 +29,7 @@ struct Set {
   float hp = 1;
   uint8_t status = 0;
   uint8_t sleeps = 0;
-  Boosts boosts{};
+  Init::Boosts boosts{};
   uint8_t level = 100;
   constexpr bool operator==(const Set &) const = default;
 };
@@ -81,8 +72,8 @@ constexpr pkmn_gen1_chance_durations durations() { return {}; }
 constexpr auto durations(const auto &p1, const auto &p2) {
   pkmn_gen1_chance_durations durations{};
   auto &dur = View::ref(durations);
-  init_duration(p1, dur.duration(0));
-  init_duration(p2, dur.duration(1));
+  init_duration(p1, dur.get(0));
+  init_duration(p2, dur.get(1));
   return durations;
 }
 
