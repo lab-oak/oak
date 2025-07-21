@@ -1,0 +1,21 @@
+44893 ms.
+44609 ms.
+44344 ms.
+44983 ms.
+44818 ms.
+
+ Performance counter stats for './build/benchmark' (5 runs):
+
+         45,031.67 msec task-clock                       #    0.996 CPUs utilized               ( +-  0.27% )
+             1,735      context-switches                 #   38.528 /sec                        ( +-  9.12% )
+               163      cpu-migrations                   #    3.620 /sec                        ( +-  4.21% )
+            49,330      page-faults                      #    1.095 K/sec                       ( +-  0.00% )
+    93,133,083,536      cycles                           #    2.068 GHz                         ( +-  0.27% )
+    18,648,651,924      stalled-cycles-frontend          #   20.02% frontend cycles idle        ( +-  0.38% )
+   180,850,677,280      instructions                     #    1.94  insn per cycle            
+                                                  #    0.10  stalled cycles per insn     ( +-  0.02% )
+    28,953,679,767      branches                         #  642.963 M/sec                       ( +-  0.03% )
+       588,352,960      branch-misses                    #    2.03% of all branches             ( +-  0.25% )
+
+            45.230 +- 0.113 seconds time elapsed  ( +-  0.25% )
+
