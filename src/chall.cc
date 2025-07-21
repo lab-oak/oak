@@ -29,21 +29,21 @@ BattleData parse_input(const std::string &line) {
   if (side_strings.size() != 2) {
     throw std::runtime_error("Battle input string must have \'|\' ");
   }
-  std::vector<std::vector<Init::Set>> sides{};
+  std::vector<std::vector<PKMN::Set>> sides{};
   for (const auto &side_string : side_strings) {
-    std::vector<Init::Set> sets{};
+    std::vector<PKMN::Set> sets{};
     auto set_strings = split(side_string, ';');
     for (const auto &set_string : set_strings) {
       auto words = split(set_string, ' ');
-      Init::Set set = parse_set(words);
+      PKMN::Set set = parse_set(words);
       sets.push_back(set);
     }
     sides.push_back(sets);
   }
   prng device{std::random_device{}()};
 
-  const auto battle = Init::battle(sides[0], sides[1], device.uniform_64());
-  const auto durations = Init::durations(sides[0], sides[1]);
+  const auto battle = PKMN::battle(sides[0], sides[1], device.uniform_64());
+  const auto durations = PKMN::durations(sides[0], sides[1]);
 
   return {battle, durations};
 }
@@ -69,14 +69,14 @@ int main(int argc, char **argv) {
     break;
   }
 
-  battle_data.result = Init::update(battle_data.battle, 0, 0, options);
+  battle_data.result = PKMN::update(battle_data.battle, 0, 0, options);
 
   while (!pkmn_result_type(battle_data.result)) {
     std::cout << "\nBattle:" << std::endl;
     std::cout << Strings::battle_data_to_string(battle_data.battle,
                                                 battle_data.durations, {});
     const auto [p1_choices, p2_choices] =
-        Init::choices(battle_data.battle, battle_data.result);
+        PKMN::choices(battle_data.battle, battle_data.result);
     std::vector<std::string> p1_labels{};
     std::vector<std::string> p2_labels{};
     for (auto i = 0; i < p1_choices.size(); ++i) {
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
 
     std::cout << p1_labels[a] << ' ' << p2_labels[b] << std::endl;
 
-    battle_data.result = Init::update(battle_data.battle, c1, c2, options);
+    battle_data.result = PKMN::update(battle_data.battle, c1, c2, options);
     battle_data.durations =
         *pkmn_gen1_battle_options_chance_durations(&options);
   }

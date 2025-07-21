@@ -29,8 +29,8 @@ int benchmark(int argc, char **argv) {
 
   const uint64_t seed = 1111111;
   // MonteCarlo::Model model{prng{seed}};
-  const auto battle = Init::battle(p1, p2, seed);
-  const auto durations = Init::durations(p1, p2);
+  const auto battle = PKMN::battle(p1, p2, seed);
+  const auto durations = PKMN::durations(p1, p2);
   BattleData battle_data{battle, durations};
 
   FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
@@ -41,7 +41,7 @@ int benchmark(int argc, char **argv) {
   }
   exp = std::max(0, std::min(20, exp));
   size_t iterations = 1 << exp;
-  battle_data.result = Init::update(battle_data.battle, 0, 0, search.options);
+  battle_data.result = PKMN::update(battle_data.battle, 0, 0, search.options);
   Exp3Node node{};
 
   const auto output = search.run(iterations, node, battle_data, model);

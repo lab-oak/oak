@@ -210,7 +210,7 @@ static_assert(compute_stat(5, false) == 108);
 
 } // end anonymous namespace
 
-namespace Init {
+namespace PKMN {
 
 struct Boosts {
   int atk;
@@ -291,7 +291,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
           return ((i + 1) << 2) | 2;
         }
       }
-      throw std::runtime_error{"Init::update - invalid switch"};
+      throw std::runtime_error{"PKMN::update - invalid switch"};
     } else if constexpr (std::is_same_v<Choice, Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
@@ -300,7 +300,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
           return ((i + 1) << 2) | 1;
         }
       }
-      throw std::runtime_error{"Init::update - invalid move"};
+      throw std::runtime_error{"PKMN::update - invalid move"};
     } else if constexpr (std::is_integral_v<Choice>) {
       return c;
     } else {

@@ -367,7 +367,7 @@ struct SearchData {
 };
 
 Train::BuildTrajectory
-rollout_build_network(Init::Team &team, NN::BuildNet &build_net, auto &device) {
+rollout_build_network(PKMN::Team &team, NN::BuildNet &build_net, auto &device) {
   using namespace Encode::Team;
   Train::BuildTrajectory traj{};
 
@@ -429,7 +429,7 @@ rollout_build_network(Init::Team &team, NN::BuildNet &build_net, auto &device) {
 
 // produces a (modified) team from the pool and the index of unmodified team or
 // -1 if modified.
-std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
+std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(SampleTeams::teams.size());
@@ -457,10 +457,10 @@ std::tuple<Init::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   Train::BuildTrajectory build_traj{};
   if (changed) {
     print("Team " + std::to_string(index) + " modified:");
-    print(Init::team_string(team));
+    print(PKMN::team_string(team));
     build_traj =
         rollout_build_network(team, RuntimeData::build_network, device);
-    print(Init::team_string(team));
+    print(PKMN::team_string(team));
   }
 
   return {team, changed ? -1 : index, build_traj};
@@ -647,11 +647,11 @@ void generate(uint64_t seed) {
     auto [p1_team, p1_team_index, p1_build_traj] = get_team(device);
     auto [p2_team, p2_team_index, p2_build_traj] = get_team(device);
 
-    const auto battle = Init::battle(p1_team, p2_team, device.uniform_64());
-    const auto durations = Init::durations(p1_team, p2_team);
+    const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    const auto durations = PKMN::durations(p1_team, p2_team);
     BattleData battle_data{battle, durations};
     pkmn_gen1_battle_options battle_options{};
-    battle_data.result = Init::update(battle_data.battle, 0, 0, battle_options);
+    battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
 
     SearchData search_data{NN::Network{}, std::make_unique<Exp3Node>(),
                            std::make_unique<UCBNode>()};
@@ -684,7 +684,7 @@ void generate(uint64_t seed) {
         const auto [p1_index, p2_index] = sample(device, output);
 
         const auto [p1_choices, p2_choices] =
-            Init::choices(battle_data.battle, battle_data.result);
+            PKMN::choices(battle_data.battle, battle_data.result);
         const auto p1_choice = p1_choices[p1_index];
         const auto p2_choice = p2_choices[p2_index];
 
@@ -720,7 +720,7 @@ void generate(uint64_t seed) {
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
 
         // update battle, durations, result (state info)
-        battle_data.result = Init::update(battle_data.battle, p1_choice,
+        battle_data.result = PKMN::update(battle_data.battle, p1_choice,
                                           p2_choice, battle_options);
         battle_data.durations =
             *pkmn_gen1_battle_options_chance_durations(&battle_options);
@@ -742,18 +742,18 @@ void generate(uint64_t seed) {
     // build
     if ((p1_team_index >= 0) && (p2_team_index >= 0)) {
       RuntimeData::team_pool.update(p1_team_index, p2_team_index,
-                                    Init::score(battle_data.result));
+                                    PKMN::score(battle_data.result));
     }
     if (p1_team_index == -1) {
       p1_build_traj.score =
-          static_cast<uint16_t>(2 * Init::score(battle_data.result));
+          static_cast<uint16_t>(2 * PKMN::score(battle_data.result));
       p1_build_traj.eval = training_frames.updates.front().empirical_value;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
     if (p2_team_index == -1) {
       p2_build_traj.score =
-          static_cast<uint16_t>(2 * (1 - Init::score(battle_data.result)));
+          static_cast<uint16_t>(2 * (1 - PKMN::score(battle_data.result)));
       p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
                            training_frames.updates.front().empirical_value;
       build_buffer.push_back(p2_build_traj);

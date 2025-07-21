@@ -1,21 +1,21 @@
-43980 ms.
-43457 ms.
-43795 ms.
-45233 ms.
-44497 ms.
+44314 ms.
+42547 ms.
+42316 ms.
+42529 ms.
+43017 ms.
 
  Performance counter stats for './build/benchmark' (5 runs):
 
-         44,583.42 msec task-clock                       #    0.998 CPUs utilized               ( +-  0.69% )
-             1,158      context-switches                 #   25.974 /sec                        ( +- 11.88% )
-               110      cpu-migrations                   #    2.467 /sec                        ( +- 12.42% )
-            49,335      page-faults                      #    1.107 K/sec                       ( +-  0.00% )
-    92,182,393,418      cycles                           #    2.068 GHz                         ( +-  0.69% )
-    18,574,475,319      stalled-cycles-frontend          #   20.15% frontend cycles idle        ( +-  0.88% )
-   182,391,102,623      instructions                     #    1.98  insn per cycle            
+         43,372.88 msec task-clock                       #    0.999 CPUs utilized               ( +-  0.81% )
+               581      context-switches                 #   13.395 /sec                        ( +- 32.76% )
+                47      cpu-migrations                   #    1.084 /sec                        ( +- 27.09% )
+            49,334      page-faults                      #    1.137 K/sec                     
+    89,753,450,278      cycles                           #    2.069 GHz                         ( +-  0.79% )
+    17,983,629,719      stalled-cycles-frontend          #   20.04% frontend cycles idle        ( +-  0.87% )
+   182,347,521,004      instructions                     #    2.03  insn per cycle            
                                                   #    0.10  stalled cycles per insn     ( +-  0.01% )
-    29,195,691,030      branches                         #  654.855 M/sec                       ( +-  0.02% )
-       589,241,660      branch-misses                    #    2.02% of all branches             ( +-  0.25% )
+    29,184,877,837      branches                         #  672.883 M/sec                       ( +-  0.01% )
+       584,734,016      branch-misses                    #    2.00% of all branches             ( +-  0.20% )
 
-            44.659 +- 0.317 seconds time elapsed  ( +-  0.71% )
+            43.405 +- 0.362 seconds time elapsed  ( +-  0.84% )
 

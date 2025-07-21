@@ -140,7 +140,7 @@ namespace SampleTeams {
 using Data::Moves;
 using Data::Species;
 using enum Moves;
-using Set = Init::Set;
+using Set = PKMN::Set;
 """
     print(header)
 
