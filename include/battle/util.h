@@ -2,7 +2,7 @@
 
 #include <battle/debug-log.h>
 #include <battle/init.h>
-#include <data/strings.h>
+#include <libpkmn/data/strings.h>
 #include <util/random.h>
 #include <util/strings.h>
 

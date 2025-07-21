@@ -2,8 +2,8 @@
 #pragma once
 
 #include <battle/init.h>
-#include <data/moves.h>
-#include <data/species.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 
 namespace SampleTeams {
 using enum Data::Move;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <data/legal-moves.h>
-#include <data/options.h>
+#include <libpkmn/data/legal-moves.h>
+#include <libpkmn/data/options.h>
 
 namespace Data {
 consteval auto get_move_pools() {

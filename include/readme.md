@@ -1,4 +1,4 @@
-## data/
+## libpkmn/data/
 
 * species.h
 * moves.h

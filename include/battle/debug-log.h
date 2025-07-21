@@ -9,7 +9,7 @@
 
 #include <pkmn.h>
 
-#include <data/layout.h>
+#include <libpkmn/data/layout.h>
 
 template <size_t log_size = 64> struct DebugLog {
   static constexpr auto header_size = 8 + PKMN_GEN1_BATTLE_SIZE;

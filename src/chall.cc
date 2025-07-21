@@ -1,7 +1,7 @@
 #include <battle/init.h>
 #include <battle/sample-teams.h>
 #include <battle/strings.h>
-#include <data/strings.h>
+#include <libpkmn/data/strings.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <util/random.h>

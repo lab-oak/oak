@@ -1,7 +1,7 @@
 #pragma once
 
 #include <battle/view.h>
-#include <data/status.h>
+#include <libpkmn/data/status.h>
 
 void apply_durations(pkmn_gen1_battle &b,
                      const pkmn_gen1_chance_durations &d) {

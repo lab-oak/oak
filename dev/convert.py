@@ -131,8 +131,8 @@ def main():
 
 #include <array>
 
-#include <data/moves.h>
-#include <data/species.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 
 #include <battle/init.h>
 

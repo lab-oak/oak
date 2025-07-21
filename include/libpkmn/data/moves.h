@@ -1,6 +1,6 @@
 #pragma once
 
-#include <data/types.h>
+#include <libpkmn/data/types.h>
 
 #include <array>
 #include <cstdint>

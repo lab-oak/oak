@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include <data/moves.h>
-#include <data/species.h>
-#include <data/strings.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
+#include <libpkmn/data/strings.h>
 
 #include <battle/view.h>
 

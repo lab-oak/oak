@@ -2,10 +2,10 @@
 
 #include <pkmn.h>
 
-#include <data/layout.h>
-#include <data/moves.h>
-#include <data/species.h>
-#include <data/status.h>
+#include <libpkmn/data/layout.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
+#include <libpkmn/data/status.h>
 
 #include <array>
 #include <cassert>
