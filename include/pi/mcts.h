@@ -30,16 +30,14 @@ struct Model {
 struct MCTS {
 
   template <bool _root_matrix = true, size_t _root_rolls = 3,
-            size_t _other_rolls = 1, size_t _min_mon = 1>
+            size_t _other_rolls = 1, bool _debug_print = false>
   struct Options {
     static constexpr bool root_matrix = _root_matrix;
     static constexpr size_t root_rolls = _root_rolls;
     static constexpr size_t other_rolls = _other_rolls;
-    static constexpr bool debug_print = false;
-    static constexpr size_t min_mon = _min_mon;
-
-    static constexpr size_t rolls_same = (root_rolls == other_rolls);
-    static constexpr bool can_defer_to_rollout = (min_mon > 1);
+    static constexpr bool debug_print = _debug_print;
+    // secondary
+    static constexpr bool rolls_same = (root_rolls == other_rolls);
     static constexpr bool clamping = (root_rolls != 39) || (other_rolls != 39);
   };
 
@@ -53,8 +51,8 @@ struct MCTS {
   std::array<std::array<float, 9>, 9> value_matrix;
 
   struct Output {
-    size_t m;
-    size_t n;
+    uint m;
+    uint n;
     size_t iterations;
     double total_value;
     double empirical_value;
@@ -74,16 +72,6 @@ struct MCTS {
   auto run(const auto dur, auto &node, const auto &input, auto &model,
            Output output = {}) {
 
-    const auto iter = [this, &input, &model, &node]() -> float {
-      auto copy = input;
-      std::bit_cast<uint64_t *>(copy.battle.bytes + Offsets::Battle::rng)[0] =
-          model.device.uniform_64();
-      chance_options.durations = copy.durations;
-      Init::apply_durations(model.device, copy.battle, copy.durations);
-      pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
-      return run_iteration<Options>(&node, copy, model).first;
-    };
-
     *this = {};
     if (!node.is_init()) {
       auto m = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P1,
@@ -95,6 +83,19 @@ struct MCTS {
       node.init(m, n);
     }
 
+    const auto prepare_and_run_iteration = [this, &input, &model,
+                                            &node]() -> float {
+      auto copy = input;
+      std::bit_cast<uint64_t *>(copy.battle.bytes +
+                                Layout::Offsets::Battle::rng)[0] =
+          model.device.uniform_64();
+      chance_options.durations = copy.durations;
+      Init::apply_durations(model.device, copy.battle, copy.durations);
+      pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
+      return run_iteration<Options>(&node, copy, model).first;
+    };
+
+    // time duration
     if constexpr (requires {
                     std::chrono::duration_cast<std::chrono::milliseconds>(dur);
                   }) {
@@ -103,26 +104,28 @@ struct MCTS {
           std::chrono::duration_cast<std::chrono::milliseconds>(dur);
       std::chrono::milliseconds elapsed{};
       while (elapsed < duration) {
-        output.total_value += iter();
+        output.total_value += prepare_and_run_iteration();
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
       }
       output.duration +=
           std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+      // flag duration
     } else if constexpr (requires { *dur; }) {
       const auto start = std::chrono::high_resolution_clock::now();
       while (*dur) {
         ++output.iterations;
-        output.total_value += iter();
+        output.total_value += prepare_and_run_iteration();
       }
       const auto end = std::chrono::high_resolution_clock::now();
       output.duration +=
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+      // iteration count
     } else {
       const auto start = std::chrono::high_resolution_clock::now();
       for (auto i = 0; i < dur; ++i) {
-        output.total_value += iter();
+        output.total_value += prepare_and_run_iteration();
       }
       output.iterations += dur;
       const auto end = std::chrono::high_resolution_clock::now();
@@ -130,20 +133,23 @@ struct MCTS {
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     }
 
+    // process output
+
     output.empirical_value = output.total_value / output.iterations;
-    const auto [c1, c2] = Init::choices(input.battle, input.result);
-    output.m = c1.size();
-    output.n = c2.size();
-    std::copy(c1.begin(), c1.end(), output.p1_choices.begin());
-    std::copy(c2.begin(), c2.end(), output.p2_choices.begin());
+    output.m = pkmn_gen1_battle_choices(
+        &input.battle, PKMN_PLAYER_P1, pkmn_result_p1(input.result),
+        output.p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+    output.n = pkmn_gen1_battle_choices(
+        &input.battle, PKMN_PLAYER_P2, pkmn_result_p2(input.result),
+        output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
 
     if constexpr (Options::root_matrix) {
       // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
       constexpr int discretize_factor = 80;
       std::array<int, 9 * 9> solve_matrix;
 
-      for (int i = 0; i < c1.size(); ++i) {
-        for (int j = 0; j < c2.size(); ++j) {
+      for (int i = 0; i < output.m; ++i) {
+        for (int j = 0; j < output.n; ++j) {
           output.visit_matrix[i][j] += visit_matrix[i][j];
           output.value_matrix[i][j] += value_matrix[i][j];
           auto n = output.visit_matrix[i][j];
@@ -178,11 +184,11 @@ struct MCTS {
         }
       }
 
-      for (int i = 0; i < c1.size(); ++i) {
+      for (int i = 0; i < output.m; ++i) {
         output.p1_empirical[i] /= (float)output.iterations;
         output.p1_nash[i] = nash1[i];
       }
-      for (int j = 0; j < c2.size(); ++j) {
+      for (int j = 0; j < output.n; ++j) {
         output.p2_empirical[j] /= (float)output.iterations;
         output.p2_nash[j] = nash2[j];
       }
@@ -197,15 +203,16 @@ struct MCTS {
     return output;
   }
 
-  template <size_t rolls>
+  template <size_t n_rolls>
   static constexpr uint8_t roll_byte(const uint8_t seed) {
-    if constexpr (rolls == 1) {
-      // mid
-      return 236;
+    constexpr uint8_t lowest_roll{236};
+    constexpr uint8_t middle_roll{236};
+    if constexpr (n_rolls == 1) {
+      return middle_roll;
     } else {
-      static_assert((rolls == 2) || (rolls == 3) || (rolls == 20));
-      constexpr int step = 38 / (rolls - 1);
-      return 217 + step * (seed % rolls);
+      static_assert((n_rolls == 2) || (n_rolls == 3) || (n_rolls == 20));
+      constexpr uint8_t step = 38 / (n_rolls - 1);
+      return lowest_roll + step * (seed % n_rolls);
     }
   }
 
@@ -236,7 +243,7 @@ struct MCTS {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       } else {
         // last two bytes of battle rng
-        const auto *rand = battle.bytes + Offsets::Battle::rng + 6;
+        const auto *rand = battle.bytes + Layout::Offsets::Battle::rng + 6;
         auto *over = this->calc_options.overrides.bytes;
         if constexpr (Options::rolls_same) {
           over[0] = roll_byte<Options::root_rolls>(rand[0]);
@@ -382,50 +389,6 @@ struct MCTS {
     default: {
       assert(false);
       return {.5, .5};
-    }
-    };
-  }
-
-  void init_stats(auto &stats, pkmn_gen1_battle &battle, pkmn_result result) {
-
-    const auto m = pkmn_gen1_battle_choices(
-        &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
-        PKMN_GEN1_MAX_CHOICES);
-    const auto n = pkmn_gen1_battle_choices(
-        &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
-        PKMN_GEN1_MAX_CHOICES);
-    stats.init(m, n);
-  }
-
-  float rollout(auto &stats, auto &prng, pkmn_gen1_battle &battle,
-                pkmn_result result) {
-    while (!pkmn_result_type(result)) {
-      auto seed = prng.uniform_64();
-      const auto m = pkmn_gen1_battle_choices(
-          &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
-          PKMN_GEN1_MAX_CHOICES);
-      const auto c1 = choices[seed % m];
-      const auto n = pkmn_gen1_battle_choices(
-          &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
-          PKMN_GEN1_MAX_CHOICES);
-      seed >>= 32;
-      const auto c2 = choices[seed % n];
-      pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
-      result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
-    }
-    switch (pkmn_result_type(result)) {
-    case PKMN_RESULT_WIN: {
-      return 1.0;
-    }
-    case PKMN_RESULT_LOSE: {
-      return 0.0;
-    }
-    case PKMN_RESULT_TIE: {
-      return 0.5;
-    }
-    default: {
-      assert(false);
-      return 0.5;
     }
     };
   }

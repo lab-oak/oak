@@ -1,21 +1,20 @@
-44066 ms.
-43548 ms.
-45144 ms.
-45879 ms.
-45737 ms.
+44466 ms.
+44334 ms.
+44255 ms.
+43602 ms.
+44099 ms.
 
  Performance counter stats for './build/benchmark' (5 runs):
 
-         45,262.49 msec task-clock                       #    0.999 CPUs utilized               ( +-  1.01% )
-               875      context-switches                 #   19.332 /sec                        ( +- 30.37% )
-                56      cpu-migrations                   #    1.237 /sec                        ( +- 34.12% )
-            49,330      page-faults                      #    1.090 K/sec                       ( +-  0.00% )
-    93,625,491,031      cycles                           #    2.069 GHz                         ( +-  0.98% )
-    21,910,122,118      stalled-cycles-frontend          #   23.40% frontend cycles idle        ( +-  1.05% )
-   180,787,226,500      instructions                     #    1.93  insn per cycle            
-                                                  #    0.12  stalled cycles per insn     ( +-  0.02% )
-    28,941,248,519      branches                         #  639.409 M/sec                       ( +-  0.03% )
-       581,504,095      branch-misses                    #    2.01% of all branches             ( +-  0.40% )
+         44,588.66 msec task-clock                       #    0.999 CPUs utilized               ( +-  0.34% )
+               866      context-switches                 #   19.422 /sec                        ( +- 16.91% )
+                82      cpu-migrations                   #    1.839 /sec                        ( +-  8.02% )
+            49,335      page-faults                      #    1.106 K/sec                       ( +-  0.00% )
+    92,204,915,094      cycles                           #    2.068 GHz                         ( +-  0.34% )
+    18,624,761,043      stalled-cycles-frontend          #   20.20% frontend cycles idle        ( +-  0.58% )
+   182,395,437,966      instructions                     #    1.98  insn per cycle            
+                                                  #    0.10  stalled cycles per insn     ( +-  0.01% )
+    29,191,758,834      branches                         #  654.690 M/sec                       ( +-  0.01% )
+       590,016,735      branch-misses                    #    2.02% of all branches             ( +-  0.17% )
 
-            45.315 +- 0.467 seconds time elapsed  ( +-  1.03% )
-
+            44.648 +- 0.158 seconds time elapsed  ( +-  0.35% )
