@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-namespace {
+namespace Init {
 using namespace Layout;
 
 using Data::get_species_data;
@@ -191,9 +191,6 @@ static_assert(compute_stat(100, false) == 298);
 static_assert(compute_stat(250, true) == 703);
 static_assert(compute_stat(5, false) == 108);
 
-} // end anonymous namespace
-
-namespace Init {
 struct Boosts {
   int atk;
   int def;
@@ -202,4 +199,4 @@ struct Boosts {
 
   bool operator==(const Boosts &) const noexcept = default;
 };
-}
+} // namespace Init

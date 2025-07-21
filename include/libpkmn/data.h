@@ -205,10 +205,10 @@ struct alignas(1) Duration {
 };
 
 struct alignas(1) Durations {
-  Duration d[2];
+  Duration durations[2];
 
-  Duration &get(auto i) noexcept { return d[i]; }
-  const Duration &get(auto i) const noexcept { return d[i]; }
+  Duration &get(auto i) noexcept { return durations[i]; }
+  const Duration &get(auto i) const noexcept { return durations[i]; }
 };
 
 #pragma pack(pop)

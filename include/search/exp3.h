@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <util/int.h>
+
 #include <algorithm>
 #include <array>
 #include <assert.h>
@@ -11,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include <immintrin.h>
+// #include <immintrin.h>
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
@@ -112,46 +114,6 @@ void softmax(auto &forecast, const auto &gains, float eta) {
     forecast[i] /= sum;
   }
 }
-
-#pragma pack(push, 1)
-struct uint24_t {
-  std::array<uint8_t, 3> _data;
-
-  constexpr uint24_t() = default;
-
-  constexpr uint24_t(uint32_t value) noexcept {
-    _data[0] = value & 0xFF;
-    _data[1] = (value >> 8) & 0xFF;
-    _data[2] = (value >> 16) & 0xFF;
-  }
-
-  constexpr operator uint32_t() const noexcept {
-    return (static_cast<uint32_t>(_data[0]) |
-            (static_cast<uint32_t>(_data[1]) << 8) |
-            (static_cast<uint32_t>(_data[2]) << 16));
-  }
-
-  constexpr auto value() const noexcept { return static_cast<uint32_t>(*this); }
-
-  constexpr uint24_t &operator++() noexcept {
-    uint32_t value = static_cast<uint32_t>(*this) + 1;
-    *this = uint24_t(value);
-    return *this;
-  }
-};
-#pragma pack(pop)
-
-struct uint24_t_test {
-  static_assert(sizeof(uint24_t) == 3);
-
-  static consteval uint24_t overflow() {
-    uint24_t x{};
-    for (size_t i = 0; i < (1 << 24); ++i) {
-      ++x;
-    }
-    return x;
-  }
-};
 
 template <bool enabled> struct JointBanditDataBase;
 
@@ -255,7 +217,6 @@ public:
       outcome.p2_mu = forecast[outcome.p2_index];
     }
 
-    // TODO
     outcome.p1_index =
         std::min(outcome.p1_index, static_cast<uint8_t>(_rows - 1));
     outcome.p2_index =
@@ -279,26 +240,6 @@ public:
       sstream.flush();
     }
     return sstream.str();
-  }
-
-  std::pair<std::vector<float>, std::vector<float>>
-  policies(float iterations) const {
-
-    std::vector<float> p1{};
-    std::vector<float> p2{};
-
-    p1.resize(_rows);
-    p2.resize(_cols);
-
-    if constexpr (enable_visits) {
-      for (auto i = 0; i < _rows; ++i) {
-        p1[i] = this->p1_visits[i].value() / (iterations - 1);
-      }
-      for (auto i = 0; i < _cols; ++i) {
-        p2[i] = this->p2_visits[i].value() / (iterations - 1);
-      }
-    }
-    return {p1, p2};
   }
 };
 #pragma pack(pop)

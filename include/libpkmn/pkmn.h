@@ -23,8 +23,8 @@
 namespace PKMN {
 
 struct Set {
-  Species species;
-  std::array<Move, 4> moves;
+  Data::Species species;
+  std::array<Data::Move, 4> moves;
   std::array<uint8_t, 4> pp{0xFF, 0xFF, 0xFF, 0xFF};
   float hp = 1;
   uint8_t status = 0;
@@ -58,8 +58,8 @@ constexpr auto battle(const auto &p1, const auto &p2,
   pkmn_gen1_battle battle{};
   pkmn_gen1_battle_options options{};
   auto *durations_ptr = pkmn_gen1_battle_options_chance_durations(&options);
-  init_side(p1, battle.bytes);
-  init_side(p2, battle.bytes + Sizes::Side);
+  Init::init_side(p1, battle.bytes);
+  Init::init_side(p2, battle.bytes + Sizes::Side);
   auto *ptr_64 =
       std::bit_cast<uint64_t *>(battle.bytes + Offsets::Battle::turn);
   ptr_64[0] = 0; // turn, last used, etc
@@ -72,8 +72,8 @@ constexpr pkmn_gen1_chance_durations durations() { return {}; }
 constexpr auto durations(const auto &p1, const auto &p2) {
   pkmn_gen1_chance_durations durations{};
   auto &dur = View::ref(durations);
-  init_duration(p1, dur.get(0));
-  init_duration(p2, dur.get(1));
+  Init::init_duration(p1, dur.get(0));
+  Init::init_duration(p2, dur.get(1));
   return durations;
 }
 
@@ -84,7 +84,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
                                  pkmn_gen1_battle_options &options) {
   const auto get_choice = [](const auto c, const uint8_t *side) -> pkmn_choice {
     using Choice = std::remove_cv<decltype(c)>::type;
-    if constexpr (std::is_same_v<Choice, Species>) {
+    if constexpr (std::is_same_v<Choice, Data::Species>) {
       for (uint8_t i = 1; i < 6; ++i) {
         const auto id = side[Offsets::Side::order + i] - 1;
         if (static_cast<uint8_t>(c) ==
@@ -93,7 +93,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
         }
       }
       throw std::runtime_error{"PKMN::update - invalid switch"};
-    } else if constexpr (std::is_same_v<Choice, Move>) {
+    } else if constexpr (std::is_same_v<Choice, Data::Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
             side[Offsets::Side::active + Offsets::ActivePokemon::moves +
