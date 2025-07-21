@@ -269,17 +269,11 @@ void apply_durations(auto &device, pkmn_gen1_battle &b,
       vol.set_attacks(multi[binding - 1][index]);
     }
 
-    for (auto p = 0; p < 6; ++p) {
-      if (const auto sleep = duration.sleep(0)) {
-        // TODO only works when party full
-        const auto id = side.order[p] - 1;
-        auto &pokemon = side.pokemon[id];
-        auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
+    if (const auto sleep = duration.sleep(0)) {
+      auto &pokemon = side.stored();
+      auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
 
-        if (!Data::is_sleep(status) || Data::self(status)) {
-          continue;
-        }
-
+      if (Data::is_sleep(status) && Data::self(status)) {
         const uint8_t max = 8 - sleep;
         status &= 0b11111000; // keep rest bit, clear sleep remaining
         status |= static_cast<uint8_t>(device.random_int(max) + 1);
