@@ -3,8 +3,8 @@
 #include <pkmn.h>
 
 #include <battle/strings.h>
-#include <libpkmn/data/layout.h>
-#include <libpkmn/data/options.h>
+#include <libpkmn/layout.h>
+#include <libpkmn/options.h>
 #include <search/tree.h>
 #include <search/durations.h>
 #include <util/random.h>

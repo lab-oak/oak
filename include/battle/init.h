@@ -1,11 +1,11 @@
 #pragma once
 
 #include <battle/view.h>
-#include <libpkmn/data/layout.h>
+#include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
-#include <libpkmn/data/strings.h>
+#include <libpkmn/strings.h>
 #include <libpkmn/data/types.h>
 #include <util/random.h>
 

@@ -1,7 +1,7 @@
 #include <battle/sample-teams.h>
 #include <battle/strings.h>
 #include <battle/view.h>
-#include <libpkmn/data/options.h>
+#include <libpkmn/options.h>
 #include <nn/encode.h>
 #include <nn/net.h>
 #include <search/exp3.h>

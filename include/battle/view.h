@@ -2,7 +2,7 @@
 
 #include <pkmn.h>
 
-#include <libpkmn/data/layout.h>
+#include <libpkmn/layout.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
