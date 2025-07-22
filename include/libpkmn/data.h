@@ -16,8 +16,6 @@
 
 namespace PKMN {
 
-using namespace Layout;
-
 #pragma pack(push, 1)
 
 struct alignas(1) Stats {

@@ -21,13 +21,6 @@
 #include <vector>
 
 namespace Init {
-using namespace Layout;
-
-using Data::get_species_data;
-using Data::get_types;
-using Data::Move;
-using Data::Species;
-using Data::Status;
 
 constexpr uint16_t compute_stat(uint8_t base, bool hp = false,
                                 uint8_t level = 100) {
@@ -39,7 +32,7 @@ constexpr uint16_t compute_stat(uint8_t base, bool hp = false,
 
 constexpr std::array<uint16_t, 5> compute_stats(const auto &pokemon) {
   std::array<uint16_t, 5> stats;
-  const auto base = get_species_data(pokemon.species).base_stats;
+  const auto base = Data::get_species_data(pokemon.species).base_stats;
   for (int s = 0; s < 5; ++s) {
     stats[s] = compute_stat(base[s], s == 0, pokemon.level);
   }
@@ -49,7 +42,7 @@ constexpr std::array<uint16_t, 5> compute_stats(const auto &pokemon) {
 constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
                             auto i = 0) {
   const auto species = pokemon.species;
-  if (species == Species::None) {
+  if (species == Data::Species::None) {
     return;
   }
   if constexpr (requires { pokemon.level; }) {
@@ -104,11 +97,11 @@ constexpr uint16_t boost(uint16_t stat, int b) {
 constexpr void init_active(const auto &active, uint8_t *const bytes) {
   auto &pokemon = *reinterpret_cast<PKMN::Pokemon *>(bytes);
   auto &active_pokemon =
-      *reinterpret_cast<PKMN::ActivePokemon *>(bytes + Offsets::Side::active);
+      *reinterpret_cast<PKMN::ActivePokemon *>(bytes + Layout::Offsets::Side::active);
 
   if constexpr (requires { active.volatiles; }) {
   }
-  auto *stats = reinterpret_cast<uint16_t *>(bytes + Offsets::Side::active);
+  auto *stats = reinterpret_cast<uint16_t *>(bytes + Layout::Offsets::Side::active);
   if constexpr (requires { active.boosts.atk; }) {
     stats[1] = boost(pokemon.stats.atk, active.boosts.atk);
     active_pokemon.boosts.set_atk(active.boosts.atk);
@@ -131,14 +124,14 @@ constexpr void init_party(const auto &party, uint8_t *const bytes) {
   const uint8_t n = party.size();
   assert(n > 0 && n <= 6);
   std::memset(bytes, 0, 24 * 6);
-  std::memset(bytes + Offsets::Side::order, 0, 6);
+  std::memset(bytes + Layout::Offsets::Side::order, 0, 6);
 
   uint8_t n_alive = 0;
 
   for (uint8_t i = 0; i < n; ++i) {
     const auto &set = party[i];
     assert(set.moves.size() <= 4);
-    init_pokemon(set, bytes + i * Sizes::Pokemon, i);
+    init_pokemon(set, bytes + i * Layout::Sizes::Pokemon, i);
     if (i == 0) {
       init_active(set, bytes);
     }
@@ -148,7 +141,7 @@ constexpr void init_party(const auto &party, uint8_t *const bytes) {
           continue;
         }
       }
-      bytes[Offsets::Side::order + n_alive] = i + 1;
+      bytes[Layout::Offsets::Side::order + n_alive] = i + 1;
       ++n_alive;
     }
   }
@@ -172,7 +165,7 @@ constexpr void init_side(const auto &side, uint8_t *const bytes) {
   if constexpr (requires { side.pokemon; }) {
     init_party(side.pokemon, bytes);
     if constexpr (requires { side.active; }) {
-      init_active(side.active, bytes + Offsets::Side::active);
+      init_active(side.active, bytes + Layout::Offsets::Side::active);
     }
   } else {
     init_party(side, bytes);

@@ -1,23 +1,15 @@
 #pragma once
 
-#include <libpkmn/data.h>
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/data/strings.h>
-#include <libpkmn/data/types.h>
 #include <libpkmn/init.h>
-#include <libpkmn/layout.h>
-#include <util/random.h>
 
 #include <assert.h>
-#include <bit>
-#include <cstddef>
-#include <cstring>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 namespace PKMN {
@@ -56,12 +48,10 @@ struct Config {
 constexpr auto battle(const auto &p1, const auto &p2,
                       uint64_t seed = 0x123445) {
   pkmn_gen1_battle battle{};
-  pkmn_gen1_battle_options options{};
-  auto *durations_ptr = pkmn_gen1_battle_options_chance_durations(&options);
   Init::init_side(p1, battle.bytes);
-  Init::init_side(p2, battle.bytes + Sizes::Side);
+  Init::init_side(p2, battle.bytes + Layout::Sizes::Side);
   auto *ptr_64 =
-      std::bit_cast<uint64_t *>(battle.bytes + Offsets::Battle::turn);
+      std::bit_cast<uint64_t *>(battle.bytes + Layout::Offsets::Battle::turn);
   ptr_64[0] = 0; // turn, last used, etc
   ptr_64[1] = seed;
   return battle;
@@ -86,9 +76,9 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
     using Choice = std::remove_cv<decltype(c)>::type;
     if constexpr (std::is_same_v<Choice, Data::Species>) {
       for (uint8_t i = 1; i < 6; ++i) {
-        const auto id = side[Offsets::Side::order + i] - 1;
+        const auto id = side[Layout::Offsets::Side::order + i] - 1;
         if (static_cast<uint8_t>(c) ==
-            side[24 * id + Offsets::Pokemon::species]) {
+            side[24 * id + Layout::Offsets::Pokemon::species]) {
           return ((i + 1) << 2) | 2;
         }
       }
@@ -96,7 +86,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
     } else if constexpr (std::is_same_v<Choice, Data::Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
-            side[Offsets::Side::active + Offsets::ActivePokemon::moves +
+            side[Layout::Offsets::Side::active + Layout::Offsets::ActivePokemon::moves +
                  2 * i]) {
           return ((i + 1) << 2) | 1;
         }
@@ -110,7 +100,7 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
   };
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
   return pkmn_gen1_battle_update(&battle, get_choice(c1, battle.bytes),
-                                 get_choice(c2, battle.bytes + Sizes::Side),
+                                 get_choice(c2, battle.bytes + Layout::Sizes::Side),
                                  &options);
 }
 
