@@ -96,12 +96,13 @@ constexpr uint16_t boost(uint16_t stat, int b) {
 
 constexpr void init_active(const auto &active, uint8_t *const bytes) {
   auto &pokemon = *reinterpret_cast<PKMN::Pokemon *>(bytes);
-  auto &active_pokemon =
-      *reinterpret_cast<PKMN::ActivePokemon *>(bytes + Layout::Offsets::Side::active);
+  auto &active_pokemon = *reinterpret_cast<PKMN::ActivePokemon *>(
+      bytes + Layout::Offsets::Side::active);
 
   if constexpr (requires { active.volatiles; }) {
   }
-  auto *stats = reinterpret_cast<uint16_t *>(bytes + Layout::Offsets::Side::active);
+  auto *stats =
+      reinterpret_cast<uint16_t *>(bytes + Layout::Offsets::Side::active);
   if constexpr (requires { active.boosts.atk; }) {
     stats[1] = boost(pokemon.stats.atk, active.boosts.atk);
     active_pokemon.boosts.set_atk(active.boosts.atk);

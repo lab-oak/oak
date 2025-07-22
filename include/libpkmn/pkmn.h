@@ -6,45 +6,36 @@
 #include <libpkmn/data/strings.h>
 #include <libpkmn/init.h>
 
-#include <assert.h>
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-#include <vector>
+namespace PKMNDetail {
+
+template <typename T> auto get(T *t) { return t; }
+
+template <typename T>
+  requires(!std::is_pointer_v<T>)
+auto get(const T &t) {
+  return &t;
+}
+} // namespace PKMNDetail
 
 namespace PKMN {
 
 struct Set {
+  static constexpr std::array<uint8_t, 4> max_pp{255, 255, 255, 255};
+
   Data::Species species;
   std::array<Data::Move, 4> moves;
-  std::array<uint8_t, 4> pp{0xFF, 0xFF, 0xFF, 0xFF};
-  float hp = 1;
+
+  std::array<uint8_t, 4> pp{max_pp};
+  float hp = 100 / 100;
   uint8_t status = 0;
   uint8_t sleeps = 0;
-  Init::Boosts boosts{};
+  Init::Boosts boosts = {};
   uint8_t level = 100;
-  constexpr bool operator==(const Set &) const = default;
+  constexpr bool operator==(const Set &) const noexcept = default;
 };
 
 using Team = std::array<Set, 6>;
 
-std::string team_string(const auto &team) {
-  std::stringstream ss{};
-  for (const auto &set : team) {
-    ss << species_string(set.species) << ": ";
-    for (const auto moveid : set.moves) {
-      ss << move_string(moveid) << ' ';
-    }
-    ss << '\n';
-  }
-  return ss.str();
-}
-
-struct Config {
-  std::array<Set, 6> pokemon;
-};
-
-// get durations from config, applly durations using ad hoc device
 constexpr auto battle(const auto &p1, const auto &p2,
                       uint64_t seed = 0x123445) {
   pkmn_gen1_battle battle{};
@@ -69,6 +60,17 @@ constexpr auto durations(const auto &p1, const auto &p2) {
 
 constexpr pkmn_gen1_battle_options options() { return {}; }
 
+void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
+         const auto &calc) {
+  using PKMNDetail::get;
+  return pkmn_gen1_battle_options_set(&options, get(log), get(chance),
+                                      get(calc));
+}
+
+void set(pkmn_gen1_battle_options &options) {
+  return pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
+}
+
 [[nodiscard]] pkmn_result update(pkmn_gen1_battle &battle, const auto c1,
                                  const auto c2,
                                  pkmn_gen1_battle_options &options) {
@@ -86,8 +88,8 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
     } else if constexpr (std::is_same_v<Choice, Data::Move>) {
       for (uint8_t i = 0; i < 4; ++i) {
         if (static_cast<uint8_t>(c) ==
-            side[Layout::Offsets::Side::active + Layout::Offsets::ActivePokemon::moves +
-                 2 * i]) {
+            side[Layout::Offsets::Side::active +
+                 Layout::Offsets::ActivePokemon::moves + 2 * i]) {
           return ((i + 1) << 2) | 1;
         }
       }
@@ -99,9 +101,9 @@ constexpr pkmn_gen1_battle_options options() { return {}; }
     }
   };
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
-  return pkmn_gen1_battle_update(&battle, get_choice(c1, battle.bytes),
-                                 get_choice(c2, battle.bytes + Layout::Sizes::Side),
-                                 &options);
+  return pkmn_gen1_battle_update(
+      &battle, get_choice(c1, battle.bytes),
+      get_choice(c2, battle.bytes + Layout::Sizes::Side), &options);
 }
 
 auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
@@ -138,27 +140,6 @@ auto score(const pkmn_result result) {
   default: {
     assert(false);
     return 0.5;
-  }
-  }
-}
-
-auto score2(const pkmn_result result) {
-  switch (pkmn_result_type(result)) {
-  case PKMN_RESULT_NONE: {
-    return 1;
-  }
-  case PKMN_RESULT_WIN: {
-    return 2;
-  }
-  case PKMN_RESULT_LOSE: {
-    return 0;
-  }
-  case PKMN_RESULT_TIE: {
-    return 1;
-  }
-  default: {
-    assert(false);
-    return 1;
   }
   }
 }

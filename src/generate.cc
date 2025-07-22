@@ -456,11 +456,22 @@ std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(prng &device) {
   const bool changed = (team != SampleTeams::teams[index]);
   Train::BuildTrajectory build_traj{};
   if (changed) {
+    const auto team_string = [](const auto &team) {
+      std::stringstream ss{};
+      for (const auto &set : team) {
+        ss << species_string(set.species) << ": ";
+        for (const auto moveid : set.moves) {
+          ss << move_string(moveid) << ' ';
+        }
+        ss << '\n';
+      }
+      return ss.str();
+    };
     print("Team " + std::to_string(index) + " modified:");
-    print(PKMN::team_string(team));
+    print(team_string(team));
     build_traj =
         rollout_build_network(team, RuntimeData::build_network, device);
-    print(PKMN::team_string(team));
+    print(team_string(team));
   }
 
   return {team, changed ? -1 : index, build_traj};
