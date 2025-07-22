@@ -35,6 +35,14 @@ public:
   }
 
   bool read_parameters(std::istream &stream) {
+    uint32_t in;
+    uint32_t out;
+    if (!stream.read(reinterpret_cast<char *>(&in), sizeof(uint32_t))) {
+      return false;
+    }
+    if (!stream.read(reinterpret_cast<char *>(&out), sizeof(uint32_t))) {
+      return false;
+    }
     if (!stream.read(reinterpret_cast<char *>(biases.data()),
                      kOut * sizeof(float))) {
       return false;
@@ -43,10 +51,14 @@ public:
                      kOut * kIn * sizeof(float))) {
       return false;
     }
-    return true;
+    return (in == kIn) && (out == kOut);
   }
 
   bool write_parameters(std::ostream &stream) const {
+    uint32_t in = kIn;
+    uint32_t out = kOut;
+    stream.write(reinterpret_cast<const char *>(&in), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&out), sizeof(uint32_t));
     stream.write(reinterpret_cast<const char *>(biases.data()),
                  kOut * sizeof(float));
     stream.write(reinterpret_cast<const char *>(weights.data()),
@@ -63,5 +75,9 @@ public:
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }
     }
+  }
+
+  bool operator==(const Affine &other) const {
+    return (biases == other.biases) && (weights == other.weights);
   }
 };
