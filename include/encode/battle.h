@@ -1,4 +1,3 @@
-#pragma once
 
 #include <data/move-pools.h>
 #include <libpkmn/data.h>
@@ -94,7 +93,7 @@ float *write(const auto status, const auto sleep, float *t) {
 
 consteval auto dim_labels() {
   return std::array<std::array<char, 5>, n_dim>{
-      {"BRN", "PAR", "PSN", "FRZ", "SLP1", "SLP2", "SLP3", "SLP4", "SLP5",
+      {"PSN", "BRN", "FRZ", "PAR", "SLP1", "SLP2", "SLP3", "SLP4", "SLP5",
        "SLP6", "SLP7", "RST1", "RST2", "RST3"}};
 }
 } // namespace Status
