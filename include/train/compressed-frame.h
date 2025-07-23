@@ -210,7 +210,6 @@ struct CompressedFrames {
       std::memcpy(frame.durations.bytes, PKMN::durations(options).bytes,
                   Layout::Sizes::Durations);
       frame.result = result;
-
       for (int i = 0; i < update.m; ++i) {
         frame.p1_empirical[i] =
             uncompress_probs<policy_type, float>(update.p1_empirical[i]);
@@ -231,7 +230,6 @@ struct CompressedFrames {
       frame.nash_value = uncompress_probs<value_type, float>(update.nash_value);
       frame.score =
           uncompress_probs<value_type, float>(PKMN::score(this->result));
-
       result = PKMN::update(b, update.c1, update.c2, options);
     }
 
