@@ -175,7 +175,7 @@ consteval auto dim_labels() {
 } // namespace Boosts
 
 namespace Volatiles {
-constexpr auto n_dim = 20;
+constexpr auto n_dim = 19;
 float *write(const PKMN::Volatiles &vol, float *t) {
 
   constexpr float chansey_sub = 706 / 4 + 1;
@@ -184,39 +184,36 @@ float *write(const PKMN::Volatiles &vol, float *t) {
   // hidden data is replaced with normalized durations
   t[0] = vol.bide();
   t[1] = vol.thrashing();
-  t[2] = vol.multi_hit();
-  t[3] = vol.flinch();
-  t[4] = vol.charging();
-  t[5] = vol.binding();
-  t[6] = vol.invulnerable();
-  t[7] = vol.confusion();
-  t[8] = vol.mist();
-  t[9] = vol.focus_energy();
-  t[10] = vol.substitute();
-  t[11] = vol.recharging();
-  t[12] = vol.rage();
-  t[13] = vol.leech_seed();
-  t[14] = vol.toxic();
-  t[15] = vol.light_screen();
-  t[16] = vol.reflect();
-  t[17] = vol.transform();
+  t[2] = vol.charging();
+  t[3] = vol.binding();
+  t[4] = vol.invulnerable();
+  t[5] = vol.confusion();
+  t[6] = vol.mist();
+  t[7] = vol.focus_energy();
+  t[8] = vol.substitute();
+  t[9] = vol.recharging();
+  t[10] = vol.rage();
+  t[11] = vol.leech_seed();
+  t[12] = vol.toxic();
+  t[13] = vol.light_screen();
+  t[14] = vol.reflect();
+  t[15] = vol.transform();
   // confusion_left
   // attacks (thrashing/binding) left
-  t[18] = vol.state() / (float)std::numeric_limits<uint16_t>::max();
-  t[19] = vol.substitute_hp() / chansey_sub;
+  t[16] = vol.state() / (float)std::numeric_limits<uint16_t>::max();
+  t[17] = vol.substitute_hp() / chansey_sub;
   // transform id
   // disable left
   // disable move slot; just zero out the move encoding
-  t[20] = vol.toxic_counter() / 16.0;
+  t[18] = vol.toxic_counter() / 16.0;
   return t + n_dim;
 }
 
 consteval auto dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
-      {"bide",         "thrashing",  "multi_hit", "flinch",     "charging",
-       "binding",      "invulner",   "confusion", "mist",       "focus_energy",
-       "substitute",   "recharging", "rage",      "leech_seed", "toxic",
-       "light_screen", "reflect",    "transform", "state",      "sub_hp"}};
+      {"bide", "thrashing", "charging", "binding", "invulner", "confusion",
+       "mist", "focus_energy", "substitute", "recharging", "rage", "leech_seed",
+       "toxic", "light_screen", "reflect", "transform", "state", "sub_hp"}};
 }
 } // namespace Volatiles
 

@@ -60,6 +60,14 @@ constexpr auto durations(const auto &p1, const auto &p2) {
 
 constexpr pkmn_gen1_battle_options options() { return {}; }
 
+auto &durations(pkmn_gen1_battle_options &options) {
+  return *pkmn_gen1_battle_options_chance_durations(&options);
+}
+
+const auto &durations(const pkmn_gen1_battle_options &options) {
+  return *pkmn_gen1_battle_options_chance_durations(&options);
+}
+
 void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
          const auto &calc) {
   using PKMNDetail::get;

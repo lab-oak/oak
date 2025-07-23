@@ -1,5 +1,8 @@
 #pragma once
 
+#include <libpkmn/pkmn.h>
+#include <train/frame.h>
+
 #include <istream>
 
 namespace Train {
@@ -185,6 +188,54 @@ struct CompressedFrames {
     }
     assert(index == buffer_length);
     return true;
+  }
+
+  std::vector<Frame> uncompress() const {
+    pkmn_gen1_battle b = this->battle;
+    auto options = PKMN::options();
+    pkmn_result result{80};
+
+    std::vector<Frame> frames;
+    frames.reserve(updates.size());
+
+    for (const auto &update : updates) {
+      frames.emplace_back();
+      Frame &frame = frames.back();
+      frame.m = update.m;
+      frame.n = update.n;
+
+      const auto [p1_choices, p2_choices] = PKMN::choices(b, result);
+
+      std::memcpy(frame.battle.bytes, b.bytes, Layout::Sizes::Battle);
+      std::memcpy(frame.durations.bytes, PKMN::durations(options).bytes,
+                  Layout::Sizes::Durations);
+      frame.result = result;
+
+      for (int i = 0; i < update.m; ++i) {
+        frame.p1_empirical[i] =
+            uncompress_probs<policy_type, float>(update.p1_empirical[i]);
+        frame.p1_nash[i] =
+            uncompress_probs<policy_type, float>(update.p1_nash[i]);
+        frame.p1_choices[i] = p1_choices[i];
+      }
+      for (int i = 0; i < update.n; ++i) {
+        frame.p2_empirical[i] =
+            uncompress_probs<policy_type, float>(update.p2_empirical[i]);
+        frame.p2_nash[i] =
+            uncompress_probs<policy_type, float>(update.p2_nash[i]);
+        frame.p2_choices[i] = p2_choices[i];
+      }
+
+      frame.empirical_value =
+          uncompress_probs<value_type, float>(update.empirical_value);
+      frame.nash_value = uncompress_probs<value_type, float>(update.nash_value);
+      frame.score =
+          uncompress_probs<value_type, float>(PKMN::score(this->result));
+
+      result = PKMN::update(b, update.c1, update.c2, options);
+    }
+
+    return frames;
   }
 };
 

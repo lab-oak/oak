@@ -24,12 +24,11 @@ static_assert(pp_byte(std::bit_cast<uint64_t>(std::array<uint8_t, 8>{
 static_assert(pp_byte(std::bit_cast<uint64_t>(std::array<uint8_t, 8>{
                   0, 0, 0, 0, 0, 0, 0, 0})) == 0b00000000);
 
-
-uint8_t pokemon_key(const PKMN::Pokemon& pokemon, const uint8_t sleep) {
-    uint8_t byte = pp_byte(std::bit_cast<uint64_t>(pokemon.moves));
-    if (pokemon.status) {
-        byte |= (Encode::Status::get_status_index(pokemon.status, sleep) + 1) << 4;
-    }
-    return byte;
+uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
+  uint8_t byte = pp_byte(std::bit_cast<uint64_t>(pokemon.moves));
+  if (pokemon.status) {
+    byte |= (Encode::Status::get_status_index(pokemon.status, sleep) + 1) << 4;
+  }
+  return byte;
 }
-}
+} // namespace Encode
