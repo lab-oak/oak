@@ -2,6 +2,7 @@
 
 #include <encode/battle.h>
 #include <libpkmn/data.h>
+#include <nn/cache.h>
 #include <nn/subnet.h>
 
 namespace NN {
@@ -12,37 +13,54 @@ struct Network {
   static constexpr auto pokemon_out_dim = 39;
   static constexpr auto active_hidden_dim = 32;
   static constexpr auto active_out_dim = 55;
-  static constexpr auto side_out_dim = 256;
+  static constexpr auto side_out_dim =
+      (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
   static constexpr auto main_hidden_dim = 64;
   static constexpr auto policy_dim = 151 + 164; // no Struggle, None
   // leading dims "1 + " are hp percentage.
   static_assert((1 + active_out_dim) + 5 * (1 + pokemon_out_dim) ==
                 side_out_dim);
 
-  using PokemonSubnet =
+  using PokemonNet =
       EmbeddingNet<Encode::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
-  using ActiveSubnet =
+  using ActiveNet =
       EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
 
   mt19937 device;
-  PokemonSubnet p;
-  ActiveSubnet a;
-  MainNet<main_hidden_dim, policy_dim> m;
+  PokemonNet pokemon_net;
+  ActiveNet active_net;
+  MainNet<main_hidden_dim, policy_dim> main_net;
+  PokemonCache<pokemon_out_dim> pokemon_cache;
 
-  Network() : device{std::random_device{}()}, p{}, a{}, m{} {
-    p.initialize(device);
-    a.initialize(device);
-    m.initialize(device);
+  Network()
+      : device{std::random_device{}()}, pokemon_net{}, active_net{},
+        main_net{} {}
+
+  void initialize() {
+    pokemon_net.initialize(device);
+    active_net.initialize(device);
+    main_net.initialize(device);
+  }
+
+  void fill_cache(const pkmn_gen1_battle &battle) {
+    pokemon_cache.fill(pokemon_net, View::ref(battle));
+  }
+
+  bool operator==(const Network &other) {
+    return (pokemon_net == pokemon_net) && (active_net == active_net) &&
+           (main_net == main_net);
   }
 
   bool read_parameters(std::istream &stream) {
-    return p.read_parameters(stream) && a.read_parameters(stream) &&
-           m.read_parameters(stream);
+    return pokemon_net.read_parameters(stream) &&
+           active_net.read_parameters(stream) &&
+           main_net.read_parameters(stream);
   }
 
   bool write_parameters(std::ostream &stream) {
-    return p.write_parameters(stream) && a.write_parameters(stream) &&
-           m.write_parameters(stream);
+    return pokemon_net.write_parameters(stream) &&
+           active_net.write_parameters(stream) &&
+           main_net.write_parameters(stream);
   }
 
   static constexpr auto main_input_index(auto i) noexcept {
@@ -89,7 +107,7 @@ struct Network {
       } else {
         Encode::Active::write(stored, side.active, duration,
                               active_input[s][0]);
-        a.propagate(active_input[s][0], main_input[s] + 1);
+        active_net.propagate(active_input[s][0], main_input[s] + 1);
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
       }
 
@@ -102,23 +120,16 @@ struct Network {
         } else {
           const auto sleep = duration.sleep(slot - 1);
           Encode::Pokemon::write(pokemon, sleep, input);
-          p.propagate(input, output + 1);
+          pokemon_net.propagate(input, output + 1);
           output[0] = (float)pokemon.hp / pokemon.stats.hp;
         }
       }
     }
 
-    // print_main_input(main_input[0]);
-    // std::cout << std::endl;
-
     float *policy_output = nullptr;
-    float value = m.propagate(main_input[0], policy_output);
+    float value = main_net.propagate(main_input[0], policy_output);
 
     return value;
-  }
-
-  bool operator==(const Network &other) {
-    return (p == p) && (a == a) && (m == m);
   }
 };
 

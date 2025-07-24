@@ -2,11 +2,10 @@
 
 #include <array>
 #include <cassert>
-#include <random>
 #include <cstdint>
 #include <cstring>
+#include <random>
 #include <type_traits>
-
 
 class mt19937 {
 private:

@@ -1,5 +1,6 @@
 #include <encode/battle.h>
 #include <encode/encoded-frame.h>
+#include <encode/policy.h>
 #include <encode/team.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
@@ -9,6 +10,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <random>
 
 extern "C" const int pokemon_in_dim = Encode::Pokemon::n_dim;
 extern "C" const int active_in_dim = Encode::Active::n_dim;
@@ -60,13 +62,13 @@ extern "C" int read_battle_offsets(const char *path, uint16_t *out,
 }
 
 extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
-                                     uint8_t *m, uint8_t *n, uint8_t *battle,
-                                     uint8_t *durations, uint8_t *result,
-                                     uint8_t *p1_choices, uint8_t *p2_choices,
-                                     float *p1_empirical, float *p1_nash,
-                                     float *p2_empirical, float *p2_nash,
-                                     float *empirical_value, float *nash_value,
-                                     float *score) {
+                                     float write_prob, uint8_t *m, uint8_t *n,
+                                     uint8_t *battle, uint8_t *durations,
+                                     uint8_t *result, uint8_t *p1_choices,
+                                     uint8_t *p2_choices, float *p1_empirical,
+                                     float *p1_nash, float *p2_empirical,
+                                     float *p2_nash, float *empirical_value,
+                                     float *nash_value, float *score) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -97,6 +99,8 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     }
   }
 
+  std::mt19937 mt{std::random_device{}()};
+  std::uniform_real_distribution<float> dist{0, 1};
   int count = 0;
   while (true) {
     uint16_t offset;
@@ -114,16 +118,18 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     Train::CompressedFrames<> battle_frames{};
     battle_frames.read(buf);
 
-    if (count + battle_frames.updates.size() >= max_count) {
-      return count;
-    }
-
     const auto frames = battle_frames.uncompress();
 
     for (const auto frame : frames) {
+      const auto r = dist(mt);
+      if (r >= write_prob) {
+        continue;
+      }
       input.write(frame);
+      if (++count == max_count) {
+        return count;
+      }
     }
-    count += frames.size();
 
     if (file.peek() == EOF) {
       return count;
@@ -131,19 +137,14 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
   }
 }
 
-extern "C" int encode_buffer(const char *path, size_t max_count, uint8_t *m,
-                             uint8_t *n, uint16_t *p1_choice_indices,
+extern "C" int encode_buffer(const char *path, size_t max_count,
+                             float write_prob, uint8_t *m, uint8_t *n,
+                             uint16_t *p1_choice_indices,
                              uint16_t *p2_choice_indices, float *pokemon,
                              float *active, float *hp, float *p1_empirical,
                              float *p1_nash, float *p2_empirical,
                              float *p2_nash, float *empirical_value,
                              float *nash_value, float *score) {
-
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    std::cerr << "Failed to open file: " << path << std::endl;
-    return -1;
-  }
 
   Encode::EncodedFrameInput input{.m = m,
                                   .n = n,
@@ -168,6 +169,14 @@ extern "C" int encode_buffer(const char *path, size_t max_count, uint8_t *m,
     }
   }
 
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    std::cerr << "Failed to open file: " << path << std::endl;
+    return -1;
+  }
+
+  std::mt19937 mt{std::random_device{}()};
+  std::uniform_real_distribution<float> dist{0, 1};
   int count = 0;
   while (true) {
     uint16_t offset;
@@ -185,44 +194,50 @@ extern "C" int encode_buffer(const char *path, size_t max_count, uint8_t *m,
     Train::CompressedFrames<> battle_frames{};
     battle_frames.read(buf);
 
-    if (count + battle_frames.updates.size() >= max_count) {
-      return count;
-    }
-
     const auto frames = battle_frames.uncompress();
 
     for (const auto frame : frames) {
-      Encode::EncodedFrame encoded{};
-      encoded.m = frame.m;
-      encoded.n = frame.n;
+      const auto r = dist(mt);
+      if (r >= write_prob) {
+        continue;
+      }
 
-      // TODO action indices
+      Encode::EncodedFrame encoded{};
 
       const auto &battle = View::ref(frame.battle);
       const auto &durations = View::ref(frame.durations);
-
       for (auto s = 0; s < 2; ++s) {
         const auto &side = battle.sides[s];
         const auto &duration = durations.get(s);
         const auto &stored = side.stored();
-        encoded.hp[s][0] = stored.hp / stored.stats.hp;
+        encoded.hp[s][0] = (float)stored.hp / stored.stats.hp;
         Encode::Active::write(stored, side.active, duration,
                               encoded.active[s][0].data());
 
         for (auto slot = 2; slot <= 6; ++slot) {
           const auto &pokemon = side.get(slot);
           const auto sleep = duration.sleep(slot - 1);
-          encoded.hp[s][slot - 1] = pokemon.hp / pokemon.stats.hp;
+          encoded.hp[s][slot - 1] = (float)pokemon.hp / pokemon.stats.hp;
           Encode::Pokemon::write(pokemon, sleep,
                                  encoded.pokemon[s][slot - 2].data());
         }
       }
-
+      encoded.m = frame.m;
+      encoded.n = frame.n;
+      for (auto i = 0; i < frame.m; ++i) {
+        encoded.p1_choice_indices[i] =
+            Encode::Policy::get_index(battle.sides[0], frame.p1_choices[i]);
+      }
+      for (auto i = 0; i < frame.n; ++i) {
+        encoded.p2_choice_indices[i] =
+            Encode::Policy::get_index(battle.sides[1], frame.p2_choices[i]);
+      }
       encoded.target = frame.target;
-
       input.write(encoded);
+      if (++count == max_count) {
+        return count;
+      }
     }
-    count += frames.size();
 
     if (file.peek() == EOF) {
       return count;

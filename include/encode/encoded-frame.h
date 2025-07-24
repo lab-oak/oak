@@ -51,12 +51,12 @@ struct EncodedFrameInput {
                 sizeof(float) * 12);
     hp += 12;
 
-    std::fill_n(p1_choice_indices, 9, 0);
-    std::fill_n(p2_choice_indices, 9, 0);
     std::fill_n(p1_empirical, 9, 0.f);
     std::fill_n(p1_nash, 9, 0.f);
+    std::fill_n(p1_choice_indices, 9, 0);
     std::fill_n(p2_empirical, 9, 0.f);
     std::fill_n(p2_nash, 9, 0.f);
+    std::fill_n(p2_choice_indices, 9, 0);
 
     for (int i = 0; i < frame.m; ++i) {
       p1_empirical[i] = frame.target.p1_empirical[i];
@@ -66,15 +66,16 @@ struct EncodedFrameInput {
     for (int i = 0; i < frame.n; ++i) {
       p2_empirical[i] = frame.target.p2_empirical[i];
       p2_nash[i] = frame.target.p2_nash[i];
-      p1_choice_indices[i] = frame.p1_choice_indices[i];
+      p2_choice_indices[i] = frame.p2_choice_indices[i];
     }
 
-    p1_choice_indices += 9;
-    p2_choice_indices += 9;
     p1_empirical += 9;
     p1_nash += 9;
+    p1_choice_indices += 9;
+
     p2_empirical += 9;
     p2_nash += 9;
+    p2_choice_indices += 9;
 
     *empirical_value++ = frame.target.empirical_value;
     *nash_value++ = frame.target.nash_value;

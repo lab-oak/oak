@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 
-lib = ctypes.CDLL('./build/libtrain.so')
+lib = ctypes.CDLL("./build/libtrain.so")
 
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
 active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
@@ -19,6 +19,7 @@ lib.read_buffer_to_frames.restype = ctypes.c_int
 lib.read_buffer_to_frames.argtypes = [
     ctypes.c_char_p,
     ctypes.c_uint64,
+    ctypes.c_float,
     ctypes.POINTER(ctypes.c_uint8),  # m
     ctypes.POINTER(ctypes.c_uint8),  # n
     ctypes.POINTER(ctypes.c_uint8),  # battle
@@ -39,10 +40,11 @@ lib.read_buffer_to_frames.restype = ctypes.c_int
 lib.encode_buffer.argtypes = [
     ctypes.c_char_p,
     ctypes.c_uint64,
+    ctypes.c_float,
     ctypes.POINTER(ctypes.c_uint8),  # m
     ctypes.POINTER(ctypes.c_uint8),  # n
-    ctypes.POINTER(ctypes.c_uint16), # p1_choice_indices
-    ctypes.POINTER(ctypes.c_uint16), # p2_choice_indices
+    ctypes.POINTER(ctypes.c_uint16),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_uint16),  # p2_choice_indices
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
@@ -58,8 +60,10 @@ lib.encode_buffer.restype = ctypes.c_int
 
 # Python
 
+
 def ptr(array: np.ndarray, dtype):
     return ctypes.cast(array.ctypes.data, ctypes.POINTER(dtype))
+
 
 class FrameInput:
     def __init__(self, size: int):
@@ -76,31 +80,34 @@ class FrameInput:
         self.p2_choices = np.zeros((size, 9), dtype=np.uint8)
 
         self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash      = np.zeros((size, 9), dtype=np.float32)
+        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
         self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash      = np.zeros((size, 9), dtype=np.float32)
+        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
 
         self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value      = np.zeros((size, 1), dtype=np.float32)
+        self.nash_value = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
 
     def ptrs_for_index(self, i: int):
         return (
-            self.m[i].ctypes.data,
-            self.n[i].ctypes.data,
-            self.battle[i].ctypes.data,
-            self.durations[i].ctypes.data,
-            self.result[i].ctypes.data,
-            self.p1_choices[i].ctypes.data,
-            self.p2_choices[i].ctypes.data,
-            self.p1_empirical[i].ctypes.data,
-            self.p1_nash[i].ctypes.data,
-            self.p2_empirical[i].ctypes.data,
-            self.p2_nash[i].ctypes.data,
-            self.empirical_value[i].ctypes.data,
-            self.nash_value[i].ctypes.data,
-            self.score[i].ctypes.data,
+            ptr(self.m[i], ctypes.c_uint8),
+            ptr(self.n[i], ctypes.c_uint8),
+            ptr(self.battle[i], ctypes.c_uint8),
+            ptr(self.durations[i], ctypes.c_uint8),
+            ptr(self.result[i], ctypes.c_uint8),
+            ptr(self.p1_choices[i], ctypes.c_uint8),
+            ptr(self.p2_choices[i], ctypes.c_uint8),
+            ptr(self.p1_empirical[i], ctypes.c_float),
+            ptr(self.p1_nash[i], ctypes.c_float),
+            ptr(self.p2_empirical[i], ctypes.c_float),
+            ptr(self.p2_nash[i], ctypes.c_float),
+            ptr(self.empirical_value[i], ctypes.c_float),
+            ptr(self.nash_value[i], ctypes.c_float),
+            ptr(self.score[i], ctypes.c_float),
         )
+
+
+# 2 + 36 + 40 * (198) +
 
 
 class EncodedFrameInput:
@@ -118,12 +125,12 @@ class EncodedFrameInput:
         self.hp = np.zeros((size, 2, 6), dtype=np.float32)
 
         self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash      = np.zeros((size, 9), dtype=np.float32)
+        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
         self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash      = np.zeros((size, 9), dtype=np.float32)
+        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
 
         self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value      = np.zeros((size, 1), dtype=np.float32)
+        self.nash_value = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
 
     def ptrs_for_index(self, i: int):
@@ -146,7 +153,7 @@ class EncodedFrameInput:
 
 
 def read_battle_offsets(path, n):
-    path_bytes = path.encode('utf-8')
+    path_bytes = path.encode("utf-8")
     offsets = np.zeros(n, dtype=np.uint16)
 
     args = (
@@ -155,29 +162,40 @@ def read_battle_offsets(path, n):
         ctypes.c_uint64(n),
     )
     res = lib.read_battle_offsets(*args)
-
-def read_buffer_to_frames(path, max_frames, frame_input : FrameInput):
-
-    path_bytes = path.encode('utf-8')
-
-    count = min(max_frames, frame_input.size)
-
-    args = (ctypes.c_char_p(path_bytes), ctypes.c_uint64(count)) + tuple(
-        ctypes.cast(ptr, ctypes.POINTER(ctypes.c_uint8 if j < 7 else ctypes.c_float))
-        for j, ptr in enumerate(frame_input.ptrs_for_index(0))
-    )
-    res = lib.read_buffer_to_frames(*args)
-
     return res
 
-def encode_buffer(path, max_frames, encoded_frame_input):
 
-    path_bytes = path.encode('utf-8')
+def read_buffer_to_frames(
+    path: str,
+    max_frames: int,
+    frame_input: FrameInput,
+    start_index: int = 0,
+    write_prob: float = 1,
+):
+    path_bytes = path.encode("utf-8")
+    max_count = min(max_frames, frame_input.size)
+    args = (
+        ctypes.c_char_p(path_bytes),
+        ctypes.c_uint64(max_count),
+        ctypes.c_float(write_prob),
+    ) + frame_input.ptrs_for_index(start_index)
+    count = lib.read_buffer_to_frames(*args)
+    return count
 
-    count = min(max_frames, encoded_frame_input.size)
 
-    args = (ctypes.c_char_p(path_bytes), ctypes.c_uint64(count)) + encoded_frame_input.ptrs_for_index(0)
-        
-    res = lib.encode_buffer(*args)
-
-    return res
+def encode_buffer(
+    path: str,
+    max_frames: int,
+    encoded_frame_input: EncodedFrameInput,
+    start_index: int = 0,
+    write_prob: float = 1,
+):
+    path_bytes = path.encode("utf-8")
+    max_count = min(max_frames, encoded_frame_input.size)
+    args = (
+        ctypes.c_char_p(path_bytes),
+        ctypes.c_uint64(max_count),
+        ctypes.c_float(write_prob),
+    ) + encoded_frame_input.ptrs_for_index(start_index)
+    count = lib.encode_buffer(*args)
+    return count

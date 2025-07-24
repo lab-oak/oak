@@ -3,7 +3,7 @@
 #include <encode/battle.h>
 
 namespace Encode {
-consteval uint8_t pp_byte(uint64_t v) noexcept {
+constexpr uint8_t pp_byte(uint64_t v) noexcept {
   // Shift so byte1 -> low byte, byte3 -> bits 24..31, etc.
   uint64_t t = (v >> 8) & 0x00FF00FF00FF00FFull;
 
@@ -26,7 +26,7 @@ static_assert(pp_byte(std::bit_cast<uint64_t>(std::array<uint8_t, 8>{
 
 uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
   uint8_t byte = pp_byte(std::bit_cast<uint64_t>(pokemon.moves));
-  if (pokemon.status) {
+  if (static_cast<bool>(pokemon.status)) {
     byte |= (Encode::Status::get_status_index(pokemon.status, sleep) + 1) << 4;
   }
   return byte;
