@@ -429,7 +429,7 @@ rollout_build_network(PKMN::Team &team, NN::BuildNet &build_net, auto &device) {
 
 // produces a (modified) team from the pool and the index of unmodified team or
 // -1 if modified.
-std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(prng &device) {
+std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(mt19937 &device) {
   using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(SampleTeams::teams.size());
@@ -478,7 +478,7 @@ std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(prng &device) {
 }
 
 // run search, use output to update battle data and nodes and training frame
-auto search(size_t c, prng &device, const BattleData &battle_data,
+auto search(size_t c, mt19937 &device, const BattleData &battle_data,
             SearchData &search_data) {
   using namespace RuntimeOptions::Search;
 
@@ -511,7 +511,7 @@ auto search(size_t c, prng &device, const BattleData &battle_data,
   throw std::runtime_error("Invalid bandit mode char.");
 }
 
-std::pair<int, int> sample(prng &device, auto &output) {
+std::pair<int, int> sample(mt19937 &device, auto &output) {
   using namespace RuntimeOptions::Search;
   const double t = policy_temp;
 
@@ -599,7 +599,7 @@ void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
 // loop to generate teams, self-play battle with mcts/net, save training
 // data for battle and build net
 void generate(uint64_t seed) {
-  prng device{seed};
+  mt19937 device{seed};
   const size_t training_frames_target_size = RuntimeOptions::buffer_size_mb
                                              << 20;
   const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
@@ -885,7 +885,7 @@ void prepare() {
               << std::endl;
     const auto new_path = working_dir / "build-network";
     std::ofstream stream{new_path, std::ios::binary};
-    prng device{RuntimeOptions::seed};
+    mt19937 device{RuntimeOptions::seed};
     RuntimeData::build_network.initialize(device);
     RuntimeData::build_network.write_parameters(stream);
   } else {
@@ -923,7 +923,7 @@ int main(int argc, char **argv) {
 
   prepare();
 
-  prng device{RuntimeOptions::seed};
+  mt19937 device{RuntimeOptions::seed};
 
   std::vector<std::thread> thread_pool;
   for (int t = 0; t < RuntimeOptions::threads; ++t) {

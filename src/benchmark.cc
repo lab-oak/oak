@@ -28,7 +28,7 @@ int benchmark(int argc, char **argv) {
   auto p2 = SampleTeams::benchmark_teams[1];
 
   const uint64_t seed = 1111111;
-  // MonteCarlo::Model model{prng{seed}};
+  // MonteCarlo::Model model{mt19937{seed}};
   const auto battle = PKMN::battle(p1, p2, seed);
   const auto durations = PKMN::durations(p1, p2);
   BattleData battle_data{battle, durations};

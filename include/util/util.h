@@ -9,7 +9,7 @@
 namespace Util {
 
 template <typename F, bool debug_log = true>
-pkmn_result rollout_and_exec(prng &device, pkmn_gen1_battle &battle,
+pkmn_result rollout_and_exec(auto &device, pkmn_gen1_battle &battle,
                              pkmn_gen1_battle_options &options, F func) {
   auto result = PKMN::update(battle, 0, 0, options);
   std::array<pkmn_choice, 9> choices;

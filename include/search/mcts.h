@@ -23,7 +23,7 @@ struct BattleData {
 
 namespace MonteCarlo {
 struct Model {
-  prng device;
+  mt19937 device;
 };
 } // namespace MonteCarlo
 
@@ -345,11 +345,11 @@ struct MCTS {
     };
   }
 
-  std::pair<float, float> init_stats_and_rollout(auto &stats, auto &prng,
+  std::pair<float, float> init_stats_and_rollout(auto &stats, auto &device,
                                                  pkmn_gen1_battle &battle,
                                                  pkmn_result result) {
 
-    auto seed = prng.uniform_64();
+    auto seed = device.uniform_64();
     auto m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
                                       pkmn_result_p1(result), choices.data(),
                                       PKMN_GEN1_MAX_CHOICES);
@@ -363,7 +363,7 @@ struct MCTS {
     result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
     stats.init(m, n);
     while (!pkmn_result_type(result)) {
-      seed = prng.uniform_64();
+      seed = device.uniform_64();
       m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
                                    pkmn_result_p1(result), choices.data(),
                                    PKMN_GEN1_MAX_CHOICES);

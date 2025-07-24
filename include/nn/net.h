@@ -24,7 +24,7 @@ struct Network {
   using ActiveSubnet =
       EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
 
-  prng device;
+  mt19937 device;
   PokemonSubnet p;
   ActiveSubnet a;
   MainNet<main_hidden_dim, policy_dim> m;

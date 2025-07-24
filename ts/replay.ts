@@ -103,7 +103,7 @@ function convert(replay: client.Battle, finished: client.Battle): engine.Data<en
         sides: sides,
         turn: 0,
         lastDamage: 0,
-        prng: [1, 2, 3, 4, 5, 6],
+        mt19937: [1, 2, 3, 4, 5, 6],
     };
 }
 

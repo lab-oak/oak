@@ -40,7 +40,7 @@ BattleData parse_input(const std::string &line) {
     }
     sides.push_back(sets);
   }
-  prng device{std::random_device{}()};
+  mt19937 device{std::random_device{}()};
 
   const auto battle = PKMN::battle(sides[0], sides[1], device.uniform_64());
   const auto durations = PKMN::durations(sides[0], sides[1]);
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
   std::signal(SIGTSTP, handle_suspend);
 
-  prng device{std::random_device{}()};
+  mt19937 device{std::random_device{}()};
 
   pkmn_gen1_battle_options options{};
   BattleData battle_data;

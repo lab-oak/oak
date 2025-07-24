@@ -39,7 +39,7 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
 
   DebugLog<log_size> debug_log{};
   debug_log.set_header(battle);
-  prng device{seed};
+  mt19937 device{seed};
 
   auto turns = 0;
   pkmn_choice c1{0};

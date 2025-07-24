@@ -3,8 +3,12 @@
 #include <array>
 #include <cassert>
 #include <random>
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
 
-class prng {
+
+class mt19937 {
 private:
   std::mt19937::result_type seed;
   std::mt19937 engine;
@@ -12,8 +16,8 @@ private:
   std::uniform_int_distribution<uint64_t> uniform_64_;
 
 public:
-  prng() : seed(std::random_device{}()), engine(std::mt19937{seed}) {}
-  prng(std::mt19937::result_type seed)
+  mt19937() : seed(std::random_device{}()), engine(std::mt19937{seed}) {}
+  mt19937(std::mt19937::result_type seed)
       : seed(seed), engine(std::mt19937{seed}) {}
 
   std::mt19937::result_type get_seed() const noexcept { return seed; }
@@ -60,11 +64,6 @@ public:
 
   void discard(size_t n) { engine.discard(n); }
 };
-
-#include <cstdint>
-#include <cstring>
-#include <random>
-#include <type_traits>
 
 class fast_prng {
   uint8_t *state_ptr;
