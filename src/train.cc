@@ -12,9 +12,22 @@
 #include <iostream>
 #include <random>
 
+auto dim_labels_to_c(const auto &data) {
+  constexpr auto size = data.size();
+  std::array<const char *, size> ptrs{};
+  auto i = 0;
+  for (auto &x : data) { ptrs[i++] = x.data(); }
+  return ptrs;
+}
+const auto pokemon_dim_label_ptrs = 
+    dim_labels_to_c(Encode::Pokemon::dim_labels);
+const auto active_dim_label_ptrs = 
+    dim_labels_to_c(Encode::Active::dim_labels);
+
 extern "C" const int pokemon_in_dim = Encode::Pokemon::n_dim;
 extern "C" const int active_in_dim = Encode::Active::n_dim;
-
+extern "C" const char * const *pokemon_dim_labels = pokemon_dim_label_ptrs.data();
+extern "C" const char * const *active_dim_labels = active_dim_label_ptrs.data();
 extern "C" int read_battle_offsets(const char *path, uint16_t *out,
                                    size_t max_count) {
   std::ifstream file(path, std::ios::binary);

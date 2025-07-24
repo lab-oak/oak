@@ -9,6 +9,19 @@ lib = ctypes.CDLL("./build/libtrain.so")
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
 active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
 
+pokemon_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(
+    lib, "pokemon_dim_labels"
+)
+active_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "active_dim_labels")
+
+
+def char_pp_to_str_list(char_pp, count):
+    return [char_pp[i].decode("utf-8") for i in range(count)]
+
+
+pokemon_dim_labels = char_pp_to_str_list(pokemon_dim_labels_raw, pokemon_in_dim)
+active_dim_labels = char_pp_to_str_list(active_dim_labels_raw, active_in_dim)
+
 lib.read_battle_offsets.argtypes = [
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_uint16),

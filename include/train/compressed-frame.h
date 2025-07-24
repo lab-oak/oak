@@ -229,8 +229,7 @@ struct CompressedFrames {
           uncompress_probs<value_type, float>(update.empirical_value);
       frame.target.nash_value =
           uncompress_probs<value_type, float>(update.nash_value);
-      frame.target.score =
-          uncompress_probs<value_type, float>(PKMN::score(this->result));
+      frame.target.score = PKMN::score(this->result);
       result = PKMN::update(b, update.c1, update.c2, options);
     }
 
