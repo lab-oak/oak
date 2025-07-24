@@ -1,6 +1,7 @@
 #pragma once
 
 #include <encode/battle.h>
+#include <train/target.h>
 
 namespace Encode {
 
@@ -14,25 +15,19 @@ struct EncodedFrame {
   std::array<uint16_t, 9> p1_choice_indices;
   std::array<uint16_t, 9> p2_choice_indices;
 
-  std::array<float, 9> p1_empirical;
-  std::array<float, 9> p1_nash;
-  std::array<float, 9> p2_empirical;
-  std::array<float, 9> p2_nash;
-  float empirical_value;
-  float nash_value;
-  float score;
+  Train::Target target;
 };
 
 struct EncodedFrameInput {
   uint8_t *m;
   uint8_t *n;
 
-  float *pokemon; // expects size: 2 * 5 * Pokemon::n_dim
-  float *active;  // expects size: 2 * 1 * Active::n_dim
-  float *hp;      // expects size: 2 * 6
-
   uint16_t *p1_choice_indices;
   uint16_t *p2_choice_indices;
+
+  float *pokemon;
+  float *active;
+  float *hp;
 
   float *p1_empirical;
   float *p1_nash;
@@ -64,13 +59,13 @@ struct EncodedFrameInput {
     std::fill_n(p2_nash, 9, 0.f);
 
     for (int i = 0; i < frame.m; ++i) {
-      p1_empirical[i] = frame.p1_empirical[i];
-      p1_nash[i] = frame.p1_nash[i];
+      p1_empirical[i] = frame.target.p1_empirical[i];
+      p1_nash[i] = frame.target.p1_nash[i];
       p1_choice_indices[i] = frame.p1_choice_indices[i];
     }
     for (int i = 0; i < frame.n; ++i) {
-      p2_empirical[i] = frame.p2_empirical[i];
-      p2_nash[i] = frame.p2_nash[i];
+      p2_empirical[i] = frame.target.p2_empirical[i];
+      p2_nash[i] = frame.target.p2_nash[i];
       p1_choice_indices[i] = frame.p1_choice_indices[i];
     }
 
@@ -81,9 +76,9 @@ struct EncodedFrameInput {
     p2_empirical += 9;
     p2_nash += 9;
 
-    *empirical_value++ = frame.empirical_value;
-    *nash_value++ = frame.nash_value;
-    *score++ = frame.score;
+    *empirical_value++ = frame.target.empirical_value;
+    *nash_value++ = frame.target.nash_value;
+    *score++ = frame.target.score;
   }
 };
 

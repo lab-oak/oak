@@ -211,24 +211,25 @@ struct CompressedFrames {
                   Layout::Sizes::Durations);
       frame.result = result;
       for (int i = 0; i < update.m; ++i) {
-        frame.p1_empirical[i] =
+        frame.target.p1_empirical[i] =
             uncompress_probs<policy_type, float>(update.p1_empirical[i]);
-        frame.p1_nash[i] =
+        frame.target.p1_nash[i] =
             uncompress_probs<policy_type, float>(update.p1_nash[i]);
         frame.p1_choices[i] = p1_choices[i];
       }
       for (int i = 0; i < update.n; ++i) {
-        frame.p2_empirical[i] =
+        frame.target.p2_empirical[i] =
             uncompress_probs<policy_type, float>(update.p2_empirical[i]);
-        frame.p2_nash[i] =
+        frame.target.p2_nash[i] =
             uncompress_probs<policy_type, float>(update.p2_nash[i]);
         frame.p2_choices[i] = p2_choices[i];
       }
 
-      frame.empirical_value =
+      frame.target.empirical_value =
           uncompress_probs<value_type, float>(update.empirical_value);
-      frame.nash_value = uncompress_probs<value_type, float>(update.nash_value);
-      frame.score =
+      frame.target.nash_value =
+          uncompress_probs<value_type, float>(update.nash_value);
+      frame.target.score =
           uncompress_probs<value_type, float>(PKMN::score(this->result));
       result = PKMN::update(b, update.c1, update.c2, options);
     }

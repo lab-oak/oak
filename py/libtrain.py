@@ -36,7 +36,30 @@ lib.read_buffer_to_frames.argtypes = [
 ]
 lib.read_buffer_to_frames.restype = ctypes.c_int
 
+lib.encode_buffer.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_uint64,
+    ctypes.POINTER(ctypes.c_uint8),  # m
+    ctypes.POINTER(ctypes.c_uint8),  # n
+    ctypes.POINTER(ctypes.c_uint16), # p1_choice_indices
+    ctypes.POINTER(ctypes.c_uint16), # p2_choice_indices
+    ctypes.POINTER(ctypes.c_float),  # pokemon
+    ctypes.POINTER(ctypes.c_float),  # active
+    ctypes.POINTER(ctypes.c_float),  # hp
+    ctypes.POINTER(ctypes.c_float),  # p1_empirical
+    ctypes.POINTER(ctypes.c_float),  # p1_nash
+    ctypes.POINTER(ctypes.c_float),  # p2_empirical
+    ctypes.POINTER(ctypes.c_float),  # p2_nash
+    ctypes.POINTER(ctypes.c_float),  # empirical_value
+    ctypes.POINTER(ctypes.c_float),  # nash_value
+    ctypes.POINTER(ctypes.c_float),  # score
+]
+lib.encode_buffer.restype = ctypes.c_int
+
 # Python
+
+def ptr(array: np.ndarray, dtype):
+    return ctypes.cast(array.ctypes.data, ctypes.POINTER(dtype))
 
 class FrameInput:
     def __init__(self, size: int):
@@ -62,7 +85,6 @@ class FrameInput:
         self.score = np.zeros((size, 1), dtype=np.float32)
 
     def ptrs_for_index(self, i: int):
-        """Returns raw pointers for index `i`, suitable for passing to ctypes."""
         return (
             self.m[i].ctypes.data,
             self.n[i].ctypes.data,
@@ -82,19 +104,18 @@ class FrameInput:
 
 
 class EncodedFrameInput:
-    def __init__(self, n):
+    def __init__(self, size):
         self.size = size
 
         self.m = np.zeros((size, 1), dtype=np.uint8)
         self.n = np.zeros((size, 1), dtype=np.uint8)
 
-        self.pokemon_input = np.zeros((size, 2, 5, pokemon_in_dim), dtype=np.float32)
-        self.active_input = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
-        self.main_input = np.zeros((size, 2, 256), dtype=np.float32)
-
-        # target
         self.p1_choice_indices = np.zeros((size, 9), dtype=np.uint16)
         self.p2_choice_indices = np.zeros((size, 9), dtype=np.uint16)
+
+        self.pokemon = np.zeros((size, 2, 5, pokemon_in_dim), dtype=np.float32)
+        self.active = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
+        self.hp = np.zeros((size, 2, 6), dtype=np.float32)
 
         self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
         self.p1_nash      = np.zeros((size, 9), dtype=np.float32)
@@ -104,6 +125,25 @@ class EncodedFrameInput:
         self.empirical_value = np.zeros((size, 1), dtype=np.float32)
         self.nash_value      = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
+
+    def ptrs_for_index(self, i: int):
+        return (
+            ptr(self.m[i], ctypes.c_uint8),
+            ptr(self.n[i], ctypes.c_uint8),
+            ptr(self.p1_choice_indices[i], ctypes.c_uint16),
+            ptr(self.p2_choice_indices[i], ctypes.c_uint16),
+            ptr(self.pokemon[i], ctypes.c_float),
+            ptr(self.active[i], ctypes.c_float),
+            ptr(self.hp[i], ctypes.c_float),
+            ptr(self.p1_empirical[i], ctypes.c_float),
+            ptr(self.p1_nash[i], ctypes.c_float),
+            ptr(self.p2_empirical[i], ctypes.c_float),
+            ptr(self.p2_nash[i], ctypes.c_float),
+            ptr(self.empirical_value[i], ctypes.c_float),
+            ptr(self.nash_value[i], ctypes.c_float),
+            ptr(self.score[i], ctypes.c_float),
+        )
+
 
 def read_battle_offsets(path, n):
     path_bytes = path.encode('utf-8')
@@ -127,5 +167,17 @@ def read_buffer_to_frames(path, max_frames, frame_input : FrameInput):
         for j, ptr in enumerate(frame_input.ptrs_for_index(0))
     )
     res = lib.read_buffer_to_frames(*args)
+
+    return res
+
+def encode_buffer(path, max_frames, encoded_frame_input):
+
+    path_bytes = path.encode('utf-8')
+
+    count = min(max_frames, encoded_frame_input.size)
+
+    args = (ctypes.c_char_p(path_bytes), ctypes.c_uint64(count)) + encoded_frame_input.ptrs_for_index(0)
+        
+    res = lib.encode_buffer(*args)
 
     return res

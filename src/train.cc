@@ -1,4 +1,5 @@
 #include <encode/battle.h>
+#include <encode/encoded-frame.h>
 #include <encode/team.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
@@ -73,8 +74,6 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     return -1;
   }
 
-  int count = 0;
-
   Train::FrameInput input{.m = m,
                           .n = n,
                           .battle = battle,
@@ -91,13 +90,14 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
                           .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
-  for (auto *x : ptrs) {
-    if (x == 0) {
-      std::cerr << "bad ptr" << std::endl;
+  for (const auto *x : ptrs) {
+    if (!x) {
+      std::cerr << "read_buffer_to_stream: null pointer in input" << std::endl;
       return -1;
     }
   }
 
+  int count = 0;
   while (true) {
     uint16_t offset;
     file.read(reinterpret_cast<char *>(&offset), 2);
@@ -131,14 +131,13 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
   }
 }
 
-extern "C" int read_encoded_buffer_to_frames(const char *path, size_t max_count,
-                                     uint8_t *m, uint8_t *n, uint8_t *battle,
-                                     uint8_t *durations, uint8_t *result,
-                                     uint8_t *p1_choices, uint8_t *p2_choices,
-                                     float *p1_empirical, float *p1_nash,
-                                     float *p2_empirical, float *p2_nash,
-                                     float *empirical_value, float *nash_value,
-                                     float *score) {
+extern "C" int encode_buffer(const char *path, size_t max_count, uint8_t *m,
+                             uint8_t *n, uint16_t *p1_choice_indices,
+                             uint16_t *p2_choice_indices, float *pokemon,
+                             float *active, float *hp, float *p1_empirical,
+                             float *p1_nash, float *p2_empirical,
+                             float *p2_nash, float *empirical_value,
+                             float *nash_value, float *score) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -146,31 +145,30 @@ extern "C" int read_encoded_buffer_to_frames(const char *path, size_t max_count,
     return -1;
   }
 
-  int count = 0;
-
-  Train::FrameInput input{.m = m,
-                          .n = n,
-                          .battle = battle,
-                          .durations = durations,
-                          .result = result,
-                          .p1_choices = p1_choices,
-                          .p2_choices = p2_choices,
-                          .p1_empirical = p1_empirical,
-                          .p1_nash = p1_nash,
-                          .p2_empirical = p2_empirical,
-                          .p2_nash = p2_nash,
-                          .empirical_value = empirical_value,
-                          .nash_value = nash_value,
-                          .score = score};
+  Encode::EncodedFrameInput input{.m = m,
+                                  .n = n,
+                                  .p1_choice_indices = p1_choice_indices,
+                                  .p2_choice_indices = p2_choice_indices,
+                                  .pokemon = pokemon,
+                                  .active = active,
+                                  .hp = hp,
+                                  .p1_empirical = p1_empirical,
+                                  .p1_nash = p1_nash,
+                                  .p2_empirical = p2_empirical,
+                                  .p2_nash = p2_nash,
+                                  .empirical_value = empirical_value,
+                                  .nash_value = nash_value,
+                                  .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
-  for (auto *x : ptrs) {
-    if (x == 0) {
-      std::cerr << "bad ptr" << std::endl;
+  for (const auto *x : ptrs) {
+    if (!x) {
+      std::cerr << "encode_buffer: null pointer in input" << std::endl;
       return -1;
     }
   }
 
+  int count = 0;
   while (true) {
     uint16_t offset;
     file.read(reinterpret_cast<char *>(&offset), 2);
@@ -195,6 +193,11 @@ extern "C" int read_encoded_buffer_to_frames(const char *path, size_t max_count,
 
     for (const auto frame : frames) {
       Encode::EncodedFrame encoded{};
+      encoded.m = frame.m;
+      encoded.n = frame.n;
+
+      // TODO action indices
+
       const auto &battle = View::ref(frame.battle);
       const auto &durations = View::ref(frame.durations);
 
@@ -202,19 +205,22 @@ extern "C" int read_encoded_buffer_to_frames(const char *path, size_t max_count,
         const auto &side = battle.sides[s];
         const auto &duration = durations.get(s);
         const auto &stored = side.stored();
-
+        encoded.hp[s][0] = stored.hp / stored.stats.hp;
         Encode::Active::write(stored, side.active, duration,
                               encoded.active[s][0].data());
 
         for (auto slot = 2; slot <= 6; ++slot) {
           const auto &pokemon = side.get(slot);
-
           const auto sleep = duration.sleep(slot - 1);
+          encoded.hp[s][slot - 1] = pokemon.hp / pokemon.stats.hp;
           Encode::Pokemon::write(pokemon, sleep,
                                  encoded.pokemon[s][slot - 2].data());
         }
       }
-      
+
+      encoded.target = frame.target;
+
+      input.write(encoded);
     }
     count += frames.size();
 
