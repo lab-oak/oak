@@ -3,25 +3,12 @@
 #include <encode/battle.h>
 #include <libpkmn/data.h>
 #include <nn/cache.h>
+#include <nn/params.h>
 #include <nn/subnet.h>
 
 namespace NN {
 
 struct Network {
-
-  static constexpr auto pokemon_hidden_dim = 32;
-  static constexpr auto pokemon_out_dim = 39;
-  static constexpr auto active_hidden_dim = 32;
-  static constexpr auto active_out_dim = 55;
-  static constexpr auto side_out_dim =
-      (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
-  static constexpr auto hidden_dim = 128;
-  static constexpr auto value_hidden_dim = 64;
-  static constexpr auto policy_hidden_dim = 64;
-  static constexpr auto policy_out_dim =
-      151 +
-      (static_cast<uint8_t>(Data::Move::Struggle) - 1); // no Struggle, None
-
   using PokemonNet =
       EmbeddingNet<Encode::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
   using ActiveNet =

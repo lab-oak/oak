@@ -1,13 +1,8 @@
 import ctypes
-import array
-import sys
 
 import numpy as np
 
 lib = ctypes.CDLL("./build/libtrain.so")
-
-pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
-active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
 
 pokemon_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(
     lib, "pokemon_dim_labels"
@@ -19,8 +14,21 @@ def char_pp_to_str_list(char_pp, count):
     return [char_pp[i].decode("utf-8") for i in range(count)]
 
 
+pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
+active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
+
 pokemon_dim_labels = char_pp_to_str_list(pokemon_dim_labels_raw, pokemon_in_dim)
 active_dim_labels = char_pp_to_str_list(active_dim_labels_raw, active_in_dim)
+
+pokemon_hidden_dim = ctypes.c_int.in_dll(lib, "pokemon_hidden_dim").value
+pokemon_out_dim = ctypes.c_int.in_dll(lib, "pokemon_out_dim").value
+active_hidden_dim = ctypes.c_int.in_dll(lib, "active_hidden_dim").value
+active_out_dim = ctypes.c_int.in_dll(lib, "active_out_dim").value
+side_out_dim = ctypes.c_int.in_dll(lib, "side_out_dim").value
+hidden_dim = ctypes.c_int.in_dll(lib, "hidden_dim").value
+value_hidden_dim = ctypes.c_int.in_dll(lib, "value_hidden_dim").value
+policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
+policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
 lib.read_battle_offsets.argtypes = [
     ctypes.c_char_p,

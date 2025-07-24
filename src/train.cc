@@ -2,6 +2,7 @@
 #include <encode/encoded-frame.h>
 #include <encode/policy.h>
 #include <encode/team.h>
+#include <nn/params.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
 #include <util/debug-log.h>
@@ -21,69 +22,65 @@ auto dim_labels_to_c(const auto &data) {
   }
   return ptrs;
 }
-const auto pokemon_dim_label_ptrs =
-    dim_labels_to_c(Encode::Pokemon::dim_labels);
-const auto active_dim_label_ptrs = dim_labels_to_c(Encode::Active::dim_labels);
 
-extern "C" const int pokemon_in_dim = Encode::Pokemon::n_dim;
-extern "C" const int active_in_dim = Encode::Active::n_dim;
-extern "C" const char *const *pokemon_dim_labels =
-    pokemon_dim_label_ptrs.data();
-extern "C" const char *const *active_dim_labels = active_dim_label_ptrs.data();
-extern "C" int read_battle_offsets(const char *path, uint16_t *out,
-                                   size_t max_count) {
+const auto pokemon_dim_label_ptrs = dim_labels_to_c(Encode::Pokemon::dim_labels);
+const auto active_dim_label_ptrs  = dim_labels_to_c(Encode::Active::dim_labels);
+
+extern "C" const char *const *pokemon_dim_labels = pokemon_dim_label_ptrs.data();
+extern "C" const char *const *active_dim_labels  = active_dim_label_ptrs.data();
+
+extern "C" const int pokemon_in_dim      = Encode::Pokemon::n_dim;
+extern "C" const int active_in_dim       = Encode::Active::n_dim;
+
+extern "C" const int pokemon_hidden_dim  = NN::pokemon_hidden_dim;
+extern "C" const int pokemon_out_dim     = NN::pokemon_out_dim;
+extern "C" const int active_hidden_dim   = NN::active_hidden_dim;
+extern "C" const int active_out_dim      = NN::active_out_dim;
+extern "C" const int side_out_dim        = NN::side_out_dim;
+extern "C" const int hidden_dim          = NN::hidden_dim;
+extern "C" const int value_hidden_dim    = NN::value_hidden_dim;
+extern "C" const int policy_hidden_dim   = NN::policy_hidden_dim;
+extern "C" const int policy_out_dim      = NN::policy_out_dim;
+
+extern "C" int read_battle_offsets(const char *path, uint16_t *out, size_t max_games) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     std::cerr << "Failed to open file: " << path << std::endl;
     return -1;
   }
 
-  size_t count = 0;
-
-  auto *buf = new char[100000];
-
-  while (count < max_count) {
+  int n_games = 0;
+  std::vector<char> buffer{};
+  while (n_games < max_games) {
     uint16_t offset;
     file.read(reinterpret_cast<char *>(&offset), 2);
     if (file.gcount() < 2) {
       std::cerr << "bad offset read" << std::endl;
       return -1;
     }
-
-    *buf = {};
     file.seekg(-2, std::ios::cur);
+    buffer.resize(offset);
+    buffer.clear();
+    char *buf = buffer.data();
     file.read(buf, offset);
     Train::CompressedFrames<> battle_frames{};
     battle_frames.read(buf);
-
-    DebugLog<256> debug_log{};
-    auto battle = battle_frames.battle;
-    debug_log.set_header(battle);
-    pkmn_gen1_battle_options options{};
-    for (const auto &update : battle_frames.updates) {
-      debug_log.update(battle, update.c1, update.c2, options);
-    }
-
-    debug_log.save_data_to_path(std::to_string(count) + ".log");
-
-    out[count++] = offset;
-
+    out[n_games++] = offset;
     if (file.peek() == EOF) {
-      return count;
+      return n_games;
     }
   }
-
-  return static_cast<int>(count);
+  return n_games;
 }
 
-extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
-                                     float write_prob, uint8_t *m, uint8_t *n,
-                                     uint8_t *battle, uint8_t *durations,
-                                     uint8_t *result, uint8_t *p1_choices,
-                                     uint8_t *p2_choices, float *p1_empirical,
-                                     float *p1_nash, float *p2_empirical,
-                                     float *p2_nash, float *empirical_value,
-                                     float *nash_value, float *score) {
+extern "C" int read_buffer_to_frames(const char *path, size_t max_count, float write_prob,
+                                     uint8_t *m, uint8_t *n, uint8_t *battle,
+                                     uint8_t *durations, uint8_t *result,
+                                     uint8_t *p1_choices, uint8_t *p2_choices,
+                                     float *p1_empirical, float *p1_nash,
+                                     float *p2_empirical, float *p2_nash,
+                                     float *empirical_value, float *nash_value,
+                                     float *score) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -117,6 +114,7 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
   std::mt19937 mt{std::random_device{}()};
   std::uniform_real_distribution<float> dist{0, 1};
   int count = 0;
+  std::vector<char> buffer{};
   while (true) {
     uint16_t offset;
     file.read(reinterpret_cast<char *>(&offset), 2);
@@ -126,9 +124,9 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     }
     file.seekg(-2, std::ios::cur);
 
-    std::vector<char> buffer{};
     buffer.resize(offset);
-    auto buf = buffer.data();
+    buffer.clear();
+    char *buf = buffer.data();
     file.read(buf, offset);
     Train::CompressedFrames<> battle_frames{};
     battle_frames.read(buf);
@@ -152,14 +150,13 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
   }
 }
 
-extern "C" int encode_buffer(const char *path, size_t max_count,
-                             float write_prob, uint8_t *m, uint8_t *n,
-                             uint16_t *p1_choice_indices,
-                             uint16_t *p2_choice_indices, float *pokemon,
-                             float *active, float *hp, float *p1_empirical,
-                             float *p1_nash, float *p2_empirical,
-                             float *p2_nash, float *empirical_value,
-                             float *nash_value, float *score) {
+extern "C" int encode_buffer(const char *path, size_t max_count, float write_prob,
+                             uint8_t *m, uint8_t *n, uint16_t *p1_choice_indices,
+                             uint16_t *p2_choice_indices, float *pokemon, float *active,
+                             float *hp, float *p1_empirical, float *p1_nash,
+                             float *p2_empirical, float *p2_nash,
+                             float *empirical_value, float *nash_value,
+                             float *score) {
 
   Encode::EncodedFrameInput input{.m = m,
                                   .n = n,
@@ -193,6 +190,7 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
   std::mt19937 mt{std::random_device{}()};
   std::uniform_real_distribution<float> dist{0, 1};
   int count = 0;
+  std::vector<char> buffer{};
   while (true) {
     uint16_t offset;
     file.read(reinterpret_cast<char *>(&offset), 2);
@@ -202,9 +200,9 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
     }
     file.seekg(-2, std::ios::cur);
 
-    std::vector<char> buffer{};
     buffer.resize(offset);
-    auto buf = buffer.data();
+    buffer.clear();
+    char *buf = buffer.data();
     file.read(buf, offset);
     Train::CompressedFrames<> battle_frames{};
     battle_frames.read(buf);
