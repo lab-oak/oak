@@ -6,8 +6,8 @@ import numpy as np
 
 lib = ctypes.CDLL('./build/libtrain.so')
 
-pokemon_in_dim = 198
-active_in_dim = 212
+pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
+active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
 
 lib.read_battle_offsets.argtypes = [
     ctypes.c_char_p,
@@ -81,6 +81,29 @@ class FrameInput:
         )
 
 
+class EncodedFrameInput:
+    def __init__(self, n):
+        self.size = size
+
+        self.m = np.zeros((size, 1), dtype=np.uint8)
+        self.n = np.zeros((size, 1), dtype=np.uint8)
+
+        self.pokemon_input = np.zeros((size, 2, 5, pokemon_in_dim), dtype=np.float32)
+        self.active_input = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
+        self.main_input = np.zeros((size, 2, 256), dtype=np.float32)
+
+        # target
+        self.p1_choice_indices = np.zeros((size, 9), dtype=np.uint16)
+        self.p2_choice_indices = np.zeros((size, 9), dtype=np.uint16)
+
+        self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
+        self.p1_nash      = np.zeros((size, 9), dtype=np.float32)
+        self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
+        self.p2_nash      = np.zeros((size, 9), dtype=np.float32)
+
+        self.empirical_value = np.zeros((size, 1), dtype=np.float32)
+        self.nash_value      = np.zeros((size, 1), dtype=np.float32)
+        self.score = np.zeros((size, 1), dtype=np.float32)
 
 def read_battle_offsets(path, n):
     path_bytes = path.encode('utf-8')
@@ -99,7 +122,7 @@ def read_buffer_to_frames(path, max_frames, frame_input : FrameInput):
 
     count = min(max_frames, frame_input.size)
 
-    args = (ctypes.c_char_p(path_bytes), ctypes.c_uint64(max_frames)) + tuple(
+    args = (ctypes.c_char_p(path_bytes), ctypes.c_uint64(count)) + tuple(
         ctypes.cast(ptr, ctypes.POINTER(ctypes.c_uint8 if j < 7 else ctypes.c_float))
         for j, ptr in enumerate(frame_input.ptrs_for_index(0))
     )

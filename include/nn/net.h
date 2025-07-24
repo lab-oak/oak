@@ -113,7 +113,7 @@ struct Network {
 
     float *policy_output = nullptr;
     float value = m.propagate(main_input[0], policy_output);
-    // std::cout << value << std::endl;
+
     return value;
   }
 

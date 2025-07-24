@@ -1,11 +1,24 @@
+import sys
+
 import libtrain
 
-frames = libtrain.FrameInput(100000)
+def main ():
+    if (len(sys.argv) < 2):
+        print("input: buffer path")
+        return
+    size = 100000
+    frames = libtrain.FrameInput(size)
+    n = libtrain.read_buffer_to_frames(sys.argv[1], size, frames)
+    print(n)
+    print(libtrain.pokemon_in_dim)
+    print(libtrain.active_in_dim)
 
-n = libtrain.read_buffer_to_frames("0.battle", 100000, frames)
-# libtrain.read_battle_offsets("0.battle", 2000)
-print(n)
+    for i in range(40, 1000, 80):
+        print(frames.p1_empirical[i])
+        print(frames.p1_nash[i])
+        print(frames.p2_empirical[i])
+        print(frames.p2_nash[i])
+        print()
 
-for i in range(10):
-
-    print(frames.p1_empirical[i])
+if __name__ == "__main__":
+    main()

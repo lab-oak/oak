@@ -12,10 +12,11 @@
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/strings.h>
+#include <libpkmn/layout.h>
 
 constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
                                                int slot = 1) {
-  const auto index = side[175 + slot] - 1;
+  const auto index = side[(Layout::Offsets::Side::order - 1) + slot] - 1;
   return side + 24 * index;
 }
 

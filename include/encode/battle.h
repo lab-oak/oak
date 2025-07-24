@@ -1,3 +1,4 @@
+#pragma once
 
 #include <data/move-pools.h>
 #include <libpkmn/data.h>
