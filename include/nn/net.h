@@ -15,11 +15,12 @@ struct Network {
   static constexpr auto active_out_dim = 55;
   static constexpr auto side_out_dim =
       (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
-  static constexpr auto main_hidden_dim = 64;
-  static constexpr auto policy_dim = 151 + 164; // no Struggle, None
-  // leading dims "1 + " are hp percentage.
-  static_assert((1 + active_out_dim) + 5 * (1 + pokemon_out_dim) ==
-                side_out_dim);
+  static constexpr auto hidden_dim = 128;
+  static constexpr auto value_hidden_dim = 64;
+  static constexpr auto policy_hidden_dim = 64;
+  static constexpr auto policy_out_dim =
+      151 +
+      (static_cast<uint8_t>(Data::Move::Struggle) - 1); // no Struggle, None
 
   using PokemonNet =
       EmbeddingNet<Encode::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
@@ -29,7 +30,9 @@ struct Network {
   mt19937 device;
   PokemonNet pokemon_net;
   ActiveNet active_net;
-  MainNet<main_hidden_dim, policy_dim> main_net;
+  MainNet<2 * side_out_dim, hidden_dim, value_hidden_dim, policy_hidden_dim,
+          policy_out_dim>
+      main_net;
   PokemonCache<pokemon_out_dim> pokemon_cache;
 
   Network()
@@ -126,8 +129,7 @@ struct Network {
       }
     }
 
-    float *policy_output = nullptr;
-    float value = main_net.propagate(main_input[0], policy_output);
+    float value = main_net.propagate(main_input[0]);
 
     return value;
   }
