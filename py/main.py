@@ -39,7 +39,10 @@ def loss(input: libtrain.EncodedFrameInput, output: net.OutputBuffers):
 class Optimizer:
     def __init__(self, network: torch.nn.Module):
         self.opt = torch.optim.Adam(network.parameters())
-
+    def step(self):
+        self.opt.step()
+    def zero_grad(self):
+        self.opt.zero_grad()
 
 def find_battle_files(root_dir):
     battle_files = []
@@ -50,9 +53,25 @@ def find_battle_files(root_dir):
                 battle_files.append(full_path)
     return battle_files
 
+def loss(input: libtrain.EncodedFrameInput, output: net.OutputBuffers):
+    size = min(input.size, output.size)
+
+    w_nash = 0.45
+    w_empirical = 0.45
+    w_score = 0.1
+
+    target = (
+        w_nash * input.nash_value[:size]
+        + w_empirical * input.empirical_value[:size]
+        + w_score * input.score[:size]
+    )
+
+    return torch.nn.functional.mse_loss(output.value[:size], target)
+
 
 def main():
-    threads = 8
+    threads = 1
+    steps = 500
 
     parent = sys.argv[1]
     paths = find_battle_files(parent)
@@ -60,20 +79,35 @@ def main():
 
     size = int(sys.argv[2])
     encoded_frames = libtrain.EncodedFrameInput(size)
-    n_frames = libtrain.encode_buffers(
-        paths, threads, size, encoded_frames, start_index=0, write_prob=0.2
-    )
-    print(f"read {n_frames} encoded frames")
+    output_buffer = net.OutputBuffers(size)
 
     network = net.Network()
     with open("netparams", "rb") as f:
         network.read_parameters(f)
 
-    output_buffer = net.OutputBuffers(size)
-    inference(network, encoded_frames, output_buffer)
+    optimizer = Optimizer(network)
 
-    opt = Optimizer(network)
-    print(output_buffer.sides)
+    for step in range(steps):
+        # encoded_frames.clear()
+        # output_buffer.clear()
+        encoded_frames = libtrain.EncodedFrameInput(size)
+        output_buffer = net.OutputBuffers(size)
+
+        n_frames = libtrain.encode_buffers(
+            paths, threads, size, encoded_frames, start_index=0, write_prob=0.2
+        )
+
+        if n_frames == 0:
+            continue  # Skip empty batches
+
+        inference(network, encoded_frames, output_buffer)
+
+        optimizer.zero_grad()
+        loss_value = loss(encoded_frames, output_buffer)
+        loss_value.backward()
+        optimizer.step()
+
+        print(f"Step {step+1}/{steps}, Loss: {loss_value.item():.6f}")
 
 if __name__ == "__main__":
     main()

@@ -334,5 +334,5 @@ extern "C" size_t encode_buffer_multithread(
     thread_pool[i].join();
   }
 
-  return count.load();
+  return std::min(count.load(), max_count);
 }
