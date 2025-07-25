@@ -14,12 +14,6 @@ class Affine(nn.Module):
         self.layer = torch.nn.Linear(in_dim, out_dim)
         self.clamp = clamp
 
-    def forward(self, x):
-        x = F.linear(x, self.layer.weight, self.layer.bias)
-        if self.clamp:
-            return torch.clamp(x, 0.0, 1.0)
-        return x
-
     def read_parameters(self, f):
         dims = f.read(8)
         in_dim, out_dim = struct.unpack("<II", dims)
@@ -29,17 +23,29 @@ class Affine(nn.Module):
         ), f"Expected out_dim={self.out_dim}, got {out_dim}"
         self.layer.weight.data.copy_(
             torch.frombuffer(
-                f.read(self.layer.weight.numel() * 4), dtype=torch.float32
+                bytearray(f.read(self.layer.weight.numel() * 4)), dtype=torch.float32
             ).reshape(self.layer.weight.shape)
         )
         self.layer.bias.data.copy_(
-            torch.frombuffer(f.read(self.layer.bias.numel() * 4), dtype=torch.float32)
+            torch.frombuffer(
+                bytearray(f.read(self.layer.bias.numel() * 4)), dtype=torch.float32
+            )
         )
 
     def write_parameters(self, f):
         f.write(struct.pack("<II", self.in_dim, self.out_dim))
         f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
         f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
+
+    def clamp_parameters(self):
+        self.layer.weight.data.clamp_(0, 1)
+        self.layer.bias.data.clamp_(0, 1)
+
+    def forward(self, x):
+        x = self.layer(x)
+        if self.clamp:
+            return torch.clamp(x, 0.0, 1.0)
+        return x
 
 
 class EmbeddingNet(nn.Module):
@@ -48,9 +54,6 @@ class EmbeddingNet(nn.Module):
         self.fc0 = Affine(in_dim, hidden_dim, clamp=clamp0)
         self.fc1 = Affine(hidden_dim, out_dim, clamp=clamp1)
 
-    def forward(self, x):
-        return self.fc1(self.fc0(x))
-
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
         self.fc1.read_parameters(f)
@@ -58,6 +61,15 @@ class EmbeddingNet(nn.Module):
     def write_parameters(self, f):
         self.fc0.write_parameters(f)
         self.fc1.write_parameters(f)
+
+    def clamp_parameters(
+        self,
+    ):
+        self.fc0.clamp_parameters()
+        self.fc1.clamp_parameters()
+
+    def forward(self, x):
+        return self.fc1(self.fc0(x))
 
 
 class MainNet(nn.Module):
@@ -91,6 +103,17 @@ class MainNet(nn.Module):
         self.policy2_fc1.write_parameters(f)
         self.policy2_fc2.write_parameters(f)
 
+    def clamp_parameters(
+        self,
+    ):
+        self.fc0.clamp_parameters()
+        self.value_fc1.clamp_parameters()
+        self.value_fc2.clamp_parameters()
+        self.policy1_fc1.clamp_parameters()
+        self.policy1_fc2.clamp_parameters()
+        self.policy2_fc1.clamp_parameters()
+        self.policy2_fc2.clamp_parameters()
+
     def forward(self, x):
         b0 = self.fc0(x)
         value_b1 = self.value_fc1(b0)
@@ -101,8 +124,7 @@ class MainNet(nn.Module):
 
 class Network(torch.nn.Module):
 
-    hidden_dim = libtrain.hidden_dim
-    pokemon_hidden_dim = libtrain.value_hidden_dim
+    pokemon_hidden_dim = libtrain.pokemon_hidden_dim
     pokemon_out_dim = libtrain.pokemon_out_dim
     active_hidden_dim = libtrain.active_hidden_dim
     active_out_dim = libtrain.active_out_dim
@@ -139,6 +161,13 @@ class Network(torch.nn.Module):
         self.pokemon_net.write_parameters(f)
         self.active_net.write_parameters(f)
         self.main_net.write_parameters(f)
+
+    def clamp_parameters(
+        self,
+    ):
+        self.pokemon_net.clamp_parameters()
+        self.active_net.clamp_parameters()
+        self.main_net.clamp_parameters()
 
 
 class OutputBuffers:

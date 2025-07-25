@@ -308,7 +308,6 @@ extern "C" size_t encode_buffer_multithread(
         for (const auto frame : frames) {
           const auto cur = count.load();
           if (cur >= max_count) {
-            std::cout << "cur: " << cur << "; exiting" << std::endl;
             return;
           }
           const auto r = dist_real(mt);

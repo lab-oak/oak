@@ -49,7 +49,7 @@ def find_battle_files(root_dir):
 
 
 def main():
-    threads = 1
+    threads = 8
 
     parent = sys.argv[1]
     paths = find_battle_files(parent)
@@ -63,6 +63,9 @@ def main():
     print(f"read {n_frames} encoded frames")
 
     network = net.Network()
+    with open("netparams", "rb") as f:
+        network.read_parameters(f)
+
     output_buffer = net.OutputBuffers(size)
     inference(network, encoded_frames, output_buffer)
 
