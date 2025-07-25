@@ -11,12 +11,11 @@ class Affine(nn.Module):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.weight = nn.Parameter(torch.empty(out_dim, in_dim))
-        self.bias = nn.Parameter(torch.empty(out_dim))
+        self.layer = torch.nn.Linear(in_dim, out_dim)
         self.clamp = clamp
 
     def forward(self, x):
-        x = F.linear(x, self.weight, self.bias)
+        x = F.linear(x, self.layer.weight, self.layer.bias)
         if self.clamp:
             return torch.clamp(x, 0.0, 1.0)
         return x
@@ -28,19 +27,19 @@ class Affine(nn.Module):
         assert (
             out_dim == self.out_dim
         ), f"Expected out_dim={self.out_dim}, got {out_dim}"
-        self.weight.data.copy_(
+        self.layer.weight.data.copy_(
             torch.frombuffer(
-                f.read(self.weight.numel() * 4), dtype=torch.float32
-            ).reshape(self.weight.shape)
+                f.read(self.layer.weight.numel() * 4), dtype=torch.float32
+            ).reshape(self.layer.weight.shape)
         )
-        self.bias.data.copy_(
-            torch.frombuffer(f.read(self.bias.numel() * 4), dtype=torch.float32)
+        self.layer.bias.data.copy_(
+            torch.frombuffer(f.read(self.layer.bias.numel() * 4), dtype=torch.float32)
         )
 
     def write_parameters(self, f):
         f.write(struct.pack("<II", self.in_dim, self.out_dim))
-        f.write(self.weight.detach().cpu().numpy().astype("f4").tobytes())
-        f.write(self.bias.detach().cpu().numpy().astype("f4").tobytes())
+        f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
+        f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
 
 
 class EmbeddingNet(nn.Module):
@@ -74,13 +73,6 @@ class MainNet(nn.Module):
         self.policy2_fc1 = Affine(hidden_dim, policy_hidden_dim)
         self.policy2_fc2 = Affine(policy_hidden_dim, policy_out_dim, clamp=False)
 
-    def forward(self, x):
-        b0 = self.fc0(x)
-        value_b1 = self.value_fc1(b0)
-        value_b2 = self.value_fc2(value_b1)
-        value = torch.sigmoid(value_b2)
-        return value
-
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
         self.value_fc1.read_parameters(f)
@@ -99,6 +91,12 @@ class MainNet(nn.Module):
         self.policy2_fc1.write_parameters(f)
         self.policy2_fc2.write_parameters(f)
 
+    def forward(self, x):
+        b0 = self.fc0(x)
+        value_b1 = self.value_fc1(b0)
+        value_b2 = self.value_fc2(value_b1)
+        value = torch.sigmoid(value_b2)
+        return value
 
 class Network(torch.nn.Module):
 
@@ -124,10 +122,11 @@ class Network(torch.nn.Module):
             self.active_in_dim, self.active_hidden_dim, self.active_out_dim
         )
         self.main_net = MainNet(
-            self.hidden_dim,
+            2 * self.side_out_dim,
             self.hidden_dim,
             self.value_hidden_dim,
             self.policy_hidden_dim,
+            self.policy_out_dim
         )
 
     def read_parameters(self, f):
@@ -143,29 +142,8 @@ class Network(torch.nn.Module):
 
 class OutputBuffers:
     def __init__(self, size):
-        self.pokemon = np.array((size, 2, 5, Network.pokemon_out_dim), dtype=np.float32)
-        self.active = np.array((size, 2, 1, Network.active_out_dim), dtype=np.float32)
-        self.sides = np.array(
-            (size, 2, (1 + Network.active_out_dim) + 5 * (1 + Network.pokemon_out_dim)),
-            dtype=np.float32,
-        )
-        self.value = np.array((size, 1), dtype=np.float32)
-
-
-def inference(
-    self, network: Network, input: libtrain.EncodedFrameInput, output: OutputBuffers
-):
-    pokemon_output = network.pokemon_net.forward(input.pokemon)
-    active_output = network.active_net.forward(input.active)
-    for s in range(2):
-        self.sides[:, s, 1 : Network.active_out_dim + 1] = active_output[:, s, 0, :]
-        self.sides[:, s, 0] = input.hp[:, s, 0]
-    self.sides[:, 1, :] = active_output[:, 1, 0, :]
-    main_input = torch.cat(
-        (
-            active_output.view(-1, 2, 5 * Network.pokemon_out_dim),
-            pokemon_output.view(-1, 2, 5 * Network.pokemon_out_dim),
-        ),
-        dim=2,
-    ).view(-1, 1 + Network.active_out_dim + 5 * (1 + Network.pokemon_out_dim))
-    output.value = network.main_net.forward(main_input)
+        self.size = size
+        self.pokemon = torch.zeros((size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32)
+        self.active = torch.zeros((size, 2, 1, Network.active_out_dim), dtype=torch.float32)
+        self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
+        self.value = torch.zeros((size, 1), dtype=torch.float32)

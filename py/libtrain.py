@@ -1,5 +1,7 @@
 import ctypes
 
+import torch
+
 import numpy as np
 
 lib = ctypes.CDLL("./build/libtrain.so")
@@ -82,8 +84,8 @@ lib.encode_buffer.restype = ctypes.c_int
 # Python
 
 
-def ptr(array: np.ndarray, dtype):
-    return ctypes.cast(array.ctypes.data, ctypes.POINTER(dtype))
+def ptr(array: torch.Tensor, dtype):
+    return ctypes.cast(array.detach().numpy().ctypes.data, ctypes.POINTER(dtype))
 
 
 class FrameInput:
@@ -135,24 +137,24 @@ class EncodedFrameInput:
     def __init__(self, size):
         self.size = size
 
-        self.m = np.zeros((size, 1), dtype=np.uint8)
-        self.n = np.zeros((size, 1), dtype=np.uint8)
+        self.m = torch.zeros((size, 1), dtype=torch.uint8)
+        self.n = torch.zeros((size, 1), dtype=torch.uint8)
 
-        self.p1_choice_indices = np.zeros((size, 9), dtype=np.uint16)
-        self.p2_choice_indices = np.zeros((size, 9), dtype=np.uint16)
+        self.p1_choice_indices = torch.zeros((size, 9), dtype=torch.uint16)
+        self.p2_choice_indices = torch.zeros((size, 9), dtype=torch.uint16)
 
-        self.pokemon = np.zeros((size, 2, 5, pokemon_in_dim), dtype=np.float32)
-        self.active = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
-        self.hp = np.zeros((size, 2, 6), dtype=np.float32)
+        self.pokemon = torch.zeros((size, 2, 5, pokemon_in_dim), dtype=torch.float32)
+        self.active = torch.zeros((size, 2, 1, active_in_dim), dtype=torch.float32)
+        self.hp = torch.zeros((size, 2, 6, 1), dtype=torch.float32)
 
-        self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
-        self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
+        self.p1_empirical = torch.zeros((size, 9), dtype=torch.float32)
+        self.p1_nash = torch.zeros((size, 9), dtype=torch.float32)
+        self.p2_empirical = torch.zeros((size, 9), dtype=torch.float32)
+        self.p2_nash = torch.zeros((size, 9), dtype=torch.float32)
 
-        self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value = np.zeros((size, 1), dtype=np.float32)
-        self.score = np.zeros((size, 1), dtype=np.float32)
+        self.empirical_value = torch.zeros((size, 1), dtype=torch.float32)
+        self.nash_value = torch.zeros((size, 1), dtype=torch.float32)
+        self.score =torch.zeros((size, 1), dtype=torch.float32)
 
     def ptrs_for_index(self, i: int):
         return (

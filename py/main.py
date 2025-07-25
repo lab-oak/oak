@@ -1,38 +1,30 @@
+import torch
+
 import sys
 import inspect
 
 import libtrain
+import net
 
+class Optimizer:
 
-def print_members_at_index(obj, n):
-    for name, member in inspect.getmembers(obj):
-        try:
-            num = member[n].size
-            if num < 300:
-                print(f"{name} : {member[n]}")
-            else:
-                pass
-        except Exception:
-            pass
-    for val, label in zip(obj.pokemon[n, 0, 0], libtrain.pokemon_dim_labels):
-        print(val, label)
-
+    torch.nn.optimizer
 
 def main():
-    if len(sys.argv) < 2:
-        print("input: buffer path")
+    if len(sys.argv) < 3:
+        print("Input: battle-file-path, buffer-size")
         return
-    size = 100000
+    path = sys.argv[1]
+    size = int(sys.argv[2])
     encoded_frames = libtrain.EncodedFrameInput(size)
     n_frames = libtrain.encode_buffer(
-        sys.argv[1], size, encoded_frames, start_index=0, write_prob=0.05
+        path, size, encoded_frames, start_index=0, write_prob=0.05
     )
     print(f"read {n_frames} encoded frames")
 
-    for i in range(400, 1000, 80):
-        print(f"index: {i}")
-        print_members_at_index(encoded_frames, i)
-        print()
+    network = net.Network()
+    output_buffer = net.OutputBuffers(size)
+    net.inference(network, encoded_frames, output_buffer)
 
 
 if __name__ == "__main__":
