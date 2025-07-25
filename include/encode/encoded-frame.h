@@ -18,7 +18,8 @@ struct EncodedFrame {
   std::array<uint16_t, 9> p2_choice_indices;
 
   EncodedFrame() = default;
-  EncodedFrame(const Train::Frame &frame) {
+  EncodedFrame(const Train::Frame &frame)
+      : pokemon{}, active{}, hp{}, p1_choice_indices{}, p2_choice_indices{} {
 
     const auto &battle = View::ref(frame.battle);
     const auto &durations = View::ref(frame.durations);
@@ -70,20 +71,20 @@ struct EncodedFrameInput {
 
   EncodedFrameInput index(auto i) const {
     auto copy = *this;
-    copy.m += 1;
-    copy.n += 1;
-    copy.pokemon += 2 * 5 * Pokemon::n_dim;
-    copy.active += 2 * 1 * Active::n_dim;
-    copy.hp += 12;
-    copy.p1_empirical += 9;
-    copy.p1_nash += 9;
-    copy.p1_choice_indices += 9;
-    copy.p2_empirical += 9;
-    copy.p2_nash += 9;
-    copy.p2_choice_indices += 9;
-    copy.empirical_value += 1;
-    copy.nash_value += 1;
-    copy.score += 1;
+    copy.m += i;
+    copy.n += i;
+    copy.pokemon += i * 2 * 5 * Pokemon::n_dim;
+    copy.active += i * 2 * 1 * Active::n_dim;
+    copy.hp += i * 12;
+    copy.p1_empirical += i * 9;
+    copy.p1_nash += i * 9;
+    copy.p1_choice_indices += i * 9;
+    copy.p2_empirical += i * 9;
+    copy.p2_nash += i * 9;
+    copy.p2_choice_indices += i * 9;
+    copy.empirical_value += i;
+    copy.nash_value += i;
+    copy.score += i;
     return copy;
   }
 

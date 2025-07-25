@@ -306,18 +306,17 @@ extern "C" size_t encode_buffer_multithread(
 
         // sample, write to encoded_input
         for (const auto frame : frames) {
-          const auto cur = count.load();
-          if (cur >= max_count) {
-            return;
-          }
           const auto r = dist_real(mt);
           if (r >= write_prob) {
             continue;
           }
+          const auto cur = count.fetch_add(1);
+          if (cur >= max_count) {
+            return;
+          }
           auto input_correct = input.index(cur);
           Encode::EncodedFrame encoded{frame};
           input_correct.write(encoded, frame.target);
-          count.fetch_add(1);
         }
 
         if (file.peek() == EOF) {

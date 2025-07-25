@@ -15,16 +15,19 @@ def inference(
     network: net.Network, input: libtrain.EncodedFrameInput, output: net.OutputBuffers
 ):
     size = min(input.size, output.size)
-    pokemon_output = network.pokemon_net.forward(input.pokemon[:size])
-    active_output = network.active_net.forward(input.active[:size])
-    pokemon_flat = torch.cat((input.hp[:size, :, 1:], pokemon_output), dim=3).view(
-        -1, 2, 5 * (1 + network.pokemon_out_dim)
-    )
-    output.sides[:size, :, 0, 1 : network.active_out_dim + 1] = active_output[
-        :, :, 0, :
+    output.pokemon[:size] = network.pokemon_net.forward(input.pokemon[:size])
+    output.active[:size] = network.active_net.forward(input.active[:size])
+    # active hp
+    output.sides[:size, :, :, 0] = input.hp[:size, :, :1, 0]
+    # active word
+    output.sides[:size, :, :, 1 : network.active_out_dim + 1] = output.active[
+        :size, :, :, :
     ]
-    output.sides[:size, :, 0, 0] = input.hp[:size, :, 0, 0]
-    output.sides[:size, :, 0, 1 + network.active_out_dim :] = pokemon_flat[:size]
+    # pokemon hp/word
+    pokemon_flat = torch.cat(
+        (input.hp[:size, :, 1:], output.pokemon[:size]), dim=3
+    ).view(size, 2, 1, 5 * (1 + network.pokemon_out_dim))
+    output.sides[:size, :, :, 1 + network.active_out_dim :] = pokemon_flat[:size]
     battle = output.sides[:size].view(size, 2 * network.side_out_dim)
     output.value[:size] = network.main_net.forward(battle)
 
@@ -70,7 +73,7 @@ def main():
     inference(network, encoded_frames, output_buffer)
 
     opt = Optimizer(network)
-
+    print(output_buffer.sides)
 
 if __name__ == "__main__":
     main()
