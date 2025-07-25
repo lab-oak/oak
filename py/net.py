@@ -38,8 +38,7 @@ class Affine(nn.Module):
         f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
 
     def clamp_parameters(self):
-        self.layer.weight.data.clamp_(0, 1)
-        self.layer.bias.data.clamp_(0, 1)
+        self.layer.weight.data.clamp_(-2, 2)
 
     def forward(self, x):
         x = self.layer(x)
@@ -181,3 +180,9 @@ class OutputBuffers:
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
+
+    def clear(self):
+        self.pokemon.detach_().zero_()
+        self.active.detach_().zero_()
+        self.sides.detach_().zero_()
+        self.value.detach_().zero_()

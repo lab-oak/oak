@@ -39,10 +39,13 @@ def loss(input: libtrain.EncodedFrameInput, output: net.OutputBuffers):
 class Optimizer:
     def __init__(self, network: torch.nn.Module):
         self.opt = torch.optim.Adam(network.parameters())
+
     def step(self):
         self.opt.step()
+
     def zero_grad(self):
         self.opt.zero_grad()
+
 
 def find_battle_files(root_dir):
     battle_files = []
@@ -52,6 +55,7 @@ def find_battle_files(root_dir):
                 full_path = os.path.join(dirpath, filename)
                 battle_files.append(full_path)
     return battle_files
+
 
 def loss(input: libtrain.EncodedFrameInput, output: net.OutputBuffers):
     size = min(input.size, output.size)
@@ -88,17 +92,12 @@ def main():
     optimizer = Optimizer(network)
 
     for step in range(steps):
-        # encoded_frames.clear()
-        # output_buffer.clear()
-        encoded_frames = libtrain.EncodedFrameInput(size)
-        output_buffer = net.OutputBuffers(size)
+        encoded_frames.clear()
+        output_buffer.clear()
 
         n_frames = libtrain.encode_buffers(
             paths, threads, size, encoded_frames, start_index=0, write_prob=0.2
         )
-
-        if n_frames == 0:
-            continue  # Skip empty batches
 
         inference(network, encoded_frames, output_buffer)
 
@@ -108,6 +107,7 @@ def main():
         optimizer.step()
 
         print(f"Step {step+1}/{steps}, Loss: {loss_value.item():.6f}")
+
 
 if __name__ == "__main__":
     main()

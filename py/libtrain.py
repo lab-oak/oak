@@ -153,9 +153,6 @@ class FrameInput:
         )
 
 
-# 2 + 36 + 40 * (198) +
-
-
 class EncodedFrameInput:
     def __init__(self, size):
         self.size = size
@@ -178,6 +175,25 @@ class EncodedFrameInput:
         self.empirical_value = torch.zeros((size, 1), dtype=torch.float32)
         self.nash_value = torch.zeros((size, 1), dtype=torch.float32)
         self.score = torch.zeros((size, 1), dtype=torch.float32)
+
+    def clear(self):
+        self.m.detach_().zero_()
+        self.n.detach_().zero_()
+        self.p1_choice_indices.detach_().zero_()
+        self.p2_choice_indices.detach_().zero_()
+
+        self.pokemon.detach_().zero_()
+        self.active.detach_().zero_()
+        self.hp.detach_().zero_()
+
+        self.p1_empirical.detach_().zero_()
+        self.p1_nash.detach_().zero_()
+        self.p2_empirical.detach_().zero_()
+        self.p2_nash.detach_().zero_()
+
+        self.empirical_value.detach_().zero_()
+        self.nash_value.detach_().zero_()
+        self.score.detach_().zero_()
 
     def ptrs_for_index(self, i: int):
         return (
