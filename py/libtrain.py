@@ -81,6 +81,29 @@ lib.encode_buffer.argtypes = [
 ]
 lib.encode_buffer.restype = ctypes.c_int
 
+lib.encode_buffer_multithread.argtypes = [
+    ctypes.POINTER(ctypes.c_char_p),
+    ctypes.c_uint64,
+    ctypes.c_uint64,
+    ctypes.c_uint64,
+    ctypes.c_float,
+    ctypes.POINTER(ctypes.c_uint8),  # m
+    ctypes.POINTER(ctypes.c_uint8),  # n
+    ctypes.POINTER(ctypes.c_uint16),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_uint16),  # p2_choice_indices
+    ctypes.POINTER(ctypes.c_float),  # pokemon
+    ctypes.POINTER(ctypes.c_float),  # active
+    ctypes.POINTER(ctypes.c_float),  # hp
+    ctypes.POINTER(ctypes.c_float),  # p1_empirical
+    ctypes.POINTER(ctypes.c_float),  # p1_nash
+    ctypes.POINTER(ctypes.c_float),  # p2_empirical
+    ctypes.POINTER(ctypes.c_float),  # p2_nash
+    ctypes.POINTER(ctypes.c_float),  # empirical_value
+    ctypes.POINTER(ctypes.c_float),  # nash_value
+    ctypes.POINTER(ctypes.c_float),  # score
+]
+lib.encode_buffer_multithread.restype = ctypes.c_uint64
+
 # Python
 
 
@@ -154,7 +177,7 @@ class EncodedFrameInput:
 
         self.empirical_value = torch.zeros((size, 1), dtype=torch.float32)
         self.nash_value = torch.zeros((size, 1), dtype=torch.float32)
-        self.score =torch.zeros((size, 1), dtype=torch.float32)
+        self.score = torch.zeros((size, 1), dtype=torch.float32)
 
     def ptrs_for_index(self, i: int):
         return (
@@ -221,4 +244,26 @@ def encode_buffer(
         ctypes.c_float(write_prob),
     ) + encoded_frame_input.ptrs_for_index(start_index)
     count = lib.encode_buffer(*args)
+    return count
+
+
+def encode_buffers(
+    paths: list[str],
+    threads: int,
+    max_count: int,
+    encoded_frame_input: EncodedFrameInput,
+    start_index: int = 0,
+    write_prob: float = 1,
+):
+    encoded_paths = [path.encode("utf-8") for path in paths]
+    arr = (ctypes.c_char_p * len(encoded_paths))(*encoded_paths)
+    max_count = min(max_count, encoded_frame_input.size)
+    args = (
+        arr,
+        ctypes.c_uint64(len(encoded_paths)),
+        ctypes.c_uint64(threads),
+        ctypes.c_uint64(max_count),
+        ctypes.c_float(write_prob),
+    ) + encoded_frame_input.ptrs_for_index(start_index)
+    count = lib.encode_buffer_multithread(*args)
     return count

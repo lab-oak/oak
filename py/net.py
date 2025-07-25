@@ -98,6 +98,7 @@ class MainNet(nn.Module):
         value = torch.sigmoid(value_b2)
         return value
 
+
 class Network(torch.nn.Module):
 
     hidden_dim = libtrain.hidden_dim
@@ -126,7 +127,7 @@ class Network(torch.nn.Module):
             self.hidden_dim,
             self.value_hidden_dim,
             self.policy_hidden_dim,
-            self.policy_out_dim
+            self.policy_out_dim,
         )
 
     def read_parameters(self, f):
@@ -143,7 +144,11 @@ class Network(torch.nn.Module):
 class OutputBuffers:
     def __init__(self, size):
         self.size = size
-        self.pokemon = torch.zeros((size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32)
-        self.active = torch.zeros((size, 2, 1, Network.active_out_dim), dtype=torch.float32)
+        self.pokemon = torch.zeros(
+            (size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32
+        )
+        self.active = torch.zeros(
+            (size, 2, 1, Network.active_out_dim), dtype=torch.float32
+        )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)

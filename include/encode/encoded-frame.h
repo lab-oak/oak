@@ -1,6 +1,8 @@
 #pragma once
 
 #include <encode/battle.h>
+#include <encode/policy.h>
+#include <train/frame.h>
 #include <train/target.h>
 
 namespace Encode {
@@ -15,7 +17,36 @@ struct EncodedFrame {
   std::array<uint16_t, 9> p1_choice_indices;
   std::array<uint16_t, 9> p2_choice_indices;
 
-  Train::Target target;
+  EncodedFrame() = default;
+  EncodedFrame(const Train::Frame &frame) {
+
+    const auto &battle = View::ref(frame.battle);
+    const auto &durations = View::ref(frame.durations);
+    for (auto s = 0; s < 2; ++s) {
+      const auto &side = battle.sides[s];
+      const auto &duration = durations.get(s);
+      const auto &stored = side.stored();
+      hp[s][0] = (float)stored.hp / stored.stats.hp;
+      Encode::Active::write(stored, side.active, duration, active[s][0].data());
+
+      for (auto slot = 2; slot <= 6; ++slot) {
+        const auto &poke = side.get(slot);
+        const auto sleep = duration.sleep(slot - 1);
+        hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
+        Encode::Pokemon::write(poke, sleep, pokemon[s][slot - 2].data());
+      }
+    }
+    m = frame.m;
+    n = frame.n;
+    for (auto i = 0; i < frame.m; ++i) {
+      p1_choice_indices[i] =
+          Encode::Policy::get_index(battle.sides[0], frame.p1_choices[i]);
+    }
+    for (auto i = 0; i < frame.n; ++i) {
+      p2_choice_indices[i] =
+          Encode::Policy::get_index(battle.sides[1], frame.p2_choices[i]);
+    }
+  }
 };
 
 struct EncodedFrameInput {
@@ -37,7 +68,26 @@ struct EncodedFrameInput {
   float *nash_value;
   float *score;
 
-  void write(const EncodedFrame &frame) {
+  EncodedFrameInput index(auto i) const {
+    auto copy = *this;
+    copy.m += 1;
+    copy.n += 1;
+    copy.pokemon += 2 * 5 * Pokemon::n_dim;
+    copy.active += 2 * 1 * Active::n_dim;
+    copy.hp += 12;
+    copy.p1_empirical += 9;
+    copy.p1_nash += 9;
+    copy.p1_choice_indices += 9;
+    copy.p2_empirical += 9;
+    copy.p2_nash += 9;
+    copy.p2_choice_indices += 9;
+    copy.empirical_value += 1;
+    copy.nash_value += 1;
+    copy.score += 1;
+    return copy;
+  }
+
+  void write(const EncodedFrame &frame, const Train::Target &target) {
     *m++ = frame.m;
     *n++ = frame.n;
 
@@ -59,13 +109,13 @@ struct EncodedFrameInput {
     std::fill_n(p2_choice_indices, 9, 0);
 
     for (int i = 0; i < frame.m; ++i) {
-      p1_empirical[i] = frame.target.p1_empirical[i];
-      p1_nash[i] = frame.target.p1_nash[i];
+      p1_empirical[i] = target.p1_empirical[i];
+      p1_nash[i] = target.p1_nash[i];
       p1_choice_indices[i] = frame.p1_choice_indices[i];
     }
     for (int i = 0; i < frame.n; ++i) {
-      p2_empirical[i] = frame.target.p2_empirical[i];
-      p2_nash[i] = frame.target.p2_nash[i];
+      p2_empirical[i] = target.p2_empirical[i];
+      p2_nash[i] = target.p2_nash[i];
       p2_choice_indices[i] = frame.p2_choice_indices[i];
     }
 
@@ -77,9 +127,9 @@ struct EncodedFrameInput {
     p2_nash += 9;
     p2_choice_indices += 9;
 
-    *empirical_value++ = frame.target.empirical_value;
-    *nash_value++ = frame.target.nash_value;
-    *score++ = frame.target.score;
+    *empirical_value++ = target.empirical_value;
+    *nash_value++ = target.nash_value;
+    *score++ = target.score;
   }
 };
 
