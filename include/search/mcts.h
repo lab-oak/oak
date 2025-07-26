@@ -205,7 +205,7 @@ struct MCTS {
 
   template <size_t n_rolls>
   static constexpr uint8_t roll_byte(const uint8_t seed) {
-    constexpr uint8_t lowest_roll{236};
+    constexpr uint8_t lowest_roll{217};
     constexpr uint8_t middle_roll{236};
     if constexpr (n_rolls == 1) {
       return middle_roll;
@@ -323,7 +323,9 @@ struct MCTS {
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
               PKMN_GEN1_MAX_CHOICES);
           node->stats().init(m, n);
-          const float value = model.inference(input.battle, input.durations);
+          const float value = model.inference(
+              input.battle,
+              *pkmn_gen1_battle_options_chance_durations(&options));
           return {value, 1 - value};
         } else {
           return init_stats_and_rollout(node->stats(), device, battle, result);

@@ -20,7 +20,7 @@ struct Network {
   MainNet<2 * side_out_dim, hidden_dim, value_hidden_dim, policy_hidden_dim,
           policy_out_dim>
       main_net;
-  PokemonCache<pokemon_out_dim> pokemon_cache;
+  // PokemonCache<pokemon_out_dim> pokemon_cache;
 
   Network()
       : device{std::random_device{}()}, pokemon_net{}, active_net{},
@@ -32,9 +32,9 @@ struct Network {
     main_net.initialize(device);
   }
 
-  void fill_cache(const pkmn_gen1_battle &battle) {
-    pokemon_cache.fill(pokemon_net, View::ref(battle));
-  }
+  // void fill_cache(const pkmn_gen1_battle &battle) {
+  //   pokemon_cache.fill(pokemon_net, View::ref(battle));
+  // }
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&

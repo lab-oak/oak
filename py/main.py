@@ -86,8 +86,8 @@ def main():
     output_buffer = net.OutputBuffers(size)
 
     network = net.Network()
-    with open("netparams", "rb") as f:
-        network.read_parameters(f)
+    with open("netparams", "wb") as f:
+        network.write_parameters(f)
 
     optimizer = Optimizer(network)
 
@@ -108,6 +108,8 @@ def main():
 
         print(f"Step {step+1}/{steps}, Loss: {loss_value.item():.6f}")
 
+    with open("netparams2", "wb") as f:
+        network.write_parameters(f)
 
 if __name__ == "__main__":
     main()
