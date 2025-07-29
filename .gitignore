@@ -1,7 +1,8 @@
-/build
-/libpkmn
+build/
+libpkmn/
 *.battle
 *.build
 */build-network
 */args
 *.log
+nets/
