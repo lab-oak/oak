@@ -792,7 +792,7 @@ void generate(uint64_t seed) {
   }
 }
 
-    void print_thread_fn() {
+void print_thread_fn() {
   size_t frames_done = 0;
   size_t traj_done = 0;
   while (true) {

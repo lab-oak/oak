@@ -165,20 +165,31 @@ class AffineTransform {
 
     // Read network parameters
     bool read_parameters(std::istream& stream) {
+    uint32_t in;
+    uint32_t out;
+    if (!stream.read(reinterpret_cast<char *>(&in), sizeof(uint32_t))) {
+      return false;
+    }
+    if (!stream.read(reinterpret_cast<char *>(&out), sizeof(uint32_t))) {
+      return false;
+    }
         read_little_endian<BiasType>(stream, biases, OutputDimensions);
         for (IndexType i = 0; i < OutputDimensions * PaddedInputDimensions; ++i)
             weights[get_weight_index(i)] = read_little_endian<WeightType>(stream);
 
-        return !stream.fail();
+        return !stream.fail() && (in == InDims) && (out == OutDims)
+;
     }
 
     // Write network parameters
     bool write_parameters(std::ostream& stream) const {
+    uint32_t in = InDims;
+    uint32_t out = OutDims;
+    stream.write(reinterpret_cast<const char *>(&in), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&out), sizeof(uint32_t));
         write_little_endian<BiasType>(stream, biases, OutputDimensions);
-
         for (IndexType i = 0; i < OutputDimensions * PaddedInputDimensions; ++i)
             write_little_endian<WeightType>(stream, weights[get_weight_index(i)]);
-
         return !stream.fail();
     }
     // Forward propagation

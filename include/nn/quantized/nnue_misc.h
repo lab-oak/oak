@@ -32,30 +32,30 @@ class Position;
 namespace Eval::NNUE {
 
 struct EvalFile {
-    // Default net name, will use one of the EvalFileDefaultName* macros defined
-    // in evaluate.h
-    std::string defaultName;
-    // Selected net name, either via uci option or default
-    std::string current;
-    // Net description extracted from the net file
-    std::string netDescription;
+  // Default net name, will use one of the EvalFileDefaultName* macros defined
+  // in evaluate.h
+  std::string defaultName;
+  // Selected net name, either via uci option or default
+  std::string current;
+  // Net description extracted from the net file
+  std::string netDescription;
 };
 
-
 struct NnueEvalTrace {
-    static_assert(LayerStacks == PSQTBuckets);
+  static_assert(LayerStacks == PSQTBuckets);
 
-    Value       psqt[LayerStacks];
-    Value       positional[LayerStacks];
-    std::size_t correctBucket;
+  Value psqt[LayerStacks];
+  Value positional[LayerStacks];
+  std::size_t correctBucket;
 };
 
 struct Networks;
 struct AccumulatorCaches;
 
-std::string trace(Position& pos, const Networks& networks, AccumulatorCaches& caches);
+std::string trace(Position &pos, const Networks &networks,
+                  AccumulatorCaches &caches);
 
-}  // namespace Stockfish::Eval::NNUE
-}  // namespace Stockfish
+} // namespace Eval::NNUE
+} // namespace Stockfish
 
-#endif  // #ifndef NNUE_MISC_H_INCLUDED
+#endif // #ifndef NNUE_MISC_H_INCLUDED
