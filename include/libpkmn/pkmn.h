@@ -131,7 +131,7 @@ auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
   return {p1_choices, p2_choices};
 }
 
-auto score(const pkmn_result result) {
+constexpr float score(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
   case PKMN_RESULT_NONE: {
     return .5;
@@ -148,6 +148,27 @@ auto score(const pkmn_result result) {
   default: {
     assert(false);
     return 0.5;
+  }
+  }
+}
+
+constexpr uint8_t score2(const pkmn_result result) noexcept {
+  switch (pkmn_result_type(result)) {
+  case PKMN_RESULT_NONE: {
+    return 1;
+  }
+  case PKMN_RESULT_WIN: {
+    return 2;
+  }
+  case PKMN_RESULT_LOSE: {
+    return 0;
+  }
+  case PKMN_RESULT_TIE: {
+    return 1;
+  }
+  default: {
+    assert(false);
+    return 1;
   }
   }
 }
