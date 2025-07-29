@@ -3,7 +3,7 @@
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
 #include <libpkmn/strings.h>
-#include <nn/net.h>
+#include <nn/network.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/ucb.h>
@@ -792,7 +792,7 @@ void generate(uint64_t seed) {
   }
 }
 
-void print_thread_fn() {
+    void print_thread_fn() {
   size_t frames_done = 0;
   size_t traj_done = 0;
   while (true) {

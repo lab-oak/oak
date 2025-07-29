@@ -2,10 +2,11 @@
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
 #include <libpkmn/strings.h>
-#include <nn/net.h>
+#include <nn/network.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/ucb.h>
+#include <train/compressed-frames.h>
 #include <util/random.h>
 
 #include <atomic>
@@ -165,6 +166,8 @@ void thread_fn(uint64_t seed) {
     BattleData battle_data{battle, durations};
     pkmn_gen1_battle_options battle_options{};
     battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
+
+    Train::CompressedFrames<> training_frames{battle_data.battle};
 
     SearchData p1_search_data{RuntimeData::p1_network};
     SearchData p2_search_data{RuntimeData::p2_network};
