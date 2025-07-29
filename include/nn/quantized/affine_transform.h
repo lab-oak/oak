@@ -177,8 +177,7 @@ class AffineTransform {
         for (IndexType i = 0; i < OutputDimensions * PaddedInputDimensions; ++i)
             weights[get_weight_index(i)] = read_little_endian<WeightType>(stream);
 
-        return !stream.fail() && (in == InDims) && (out == OutDims)
-;
+        return !stream.fail() && (in == InDims) && (out == OutDims);
     }
 
     // Write network parameters
