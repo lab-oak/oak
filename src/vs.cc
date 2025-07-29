@@ -6,7 +6,7 @@
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/ucb.h>
-#include <train/compressed-frames.h>
+#include <train/compressed-frame.h>
 #include <util/random.h>
 
 #include <atomic>
