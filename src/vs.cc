@@ -178,22 +178,29 @@ void thread_fn(uint64_t seed) {
           sleep(1);
         }
 
-        std::cout << "update: " << updates << std::endl;
-
         p1_search_data.clear();
         p2_search_data.clear();
 
-        const auto p1_output =
-            search(p1_search_options.count, device, battle_data, p1_search_data,
-                   p1_search_options);
-        const auto p2_output =
-            search(p2_search_options.count, device, battle_data, p2_search_data,
-                   p2_search_options);
-
         const auto [p1_choices, p2_choices] =
             PKMN::choices(battle_data.battle, battle_data.result);
-        // const auto p1_index = device.random_int(p1_choices.size());
-        // const auto p2_index = device.random_int(p2_choices.size());
+
+        MCTS::Output p1_output, p2_output;
+
+        if (p1_choices.size() > 1) {
+          p1_output = search(p1_search_options.count, device, battle_data,
+                             p1_search_data, p1_search_options);
+        } else {
+          p1_output = search(10, device, battle_data, p1_search_data,
+                             p1_search_options);
+        }
+        if (p2_choices.size() > 1) {
+          p2_output = search(p2_search_options.count, device, battle_data,
+                             p2_search_data, p2_search_options);
+        } else {
+          p2_output = search(10, device, battle_data, p2_search_data,
+                             p2_search_options);
+        }
+
         const auto [p1_index, p2_index] = sample(device, p1_output, p2_output);
 
         const auto p1_choice = p1_choices[p1_index];
@@ -202,11 +209,10 @@ void thread_fn(uint64_t seed) {
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
                                           p2_choice, battle_options);
         battle_data.durations = PKMN::durations(battle_options);
-
         ++updates;
       }
 
-      const size_t score = 2 * PKMN::score(battle_data.result);
+      const size_t score = PKMN::score2(battle_data.result);
       RuntimeData::score.fetch_add(score);
       RuntimeData::n.fetch_add(1);
     } catch (const std::exception &e) {
@@ -257,7 +263,7 @@ int main(int argc, char **argv) {
   p1_search_options.battle_network_path = {argv[1]};
   p2_search_options.battle_network_path = {argv[2]};
 
-  if (!p1_search_options.battle_network_path.empty()) {
+  if (p1_search_options.battle_network_path != "mc") {
     std::ifstream file{p1_search_options.battle_network_path};
     if (!file) {
       std::cerr << "Cant open p1 network path" << std::endl;
@@ -268,9 +274,12 @@ int main(int argc, char **argv) {
       std::cerr << "Cant read p1 network data" << std::endl;
       return 1;
     }
+  } else {
+    p1_search_options.battle_network_path = "";
+    std::cout << "p1 uses montecarlo" << std::endl;
   }
 
-  if (!p2_search_options.battle_network_path.empty()) {
+  if (p2_search_options.battle_network_path != "mc") {
     std::ifstream file{p2_search_options.battle_network_path};
     if (!file) {
       std::cerr << "Cant open p2 network path" << std::endl;
@@ -281,6 +290,9 @@ int main(int argc, char **argv) {
       std::cerr << "Cant read p2 network data" << std::endl;
       return 1;
     }
+  } else {
+    p2_search_options.battle_network_path = "";
+    std::cout << "p2 uses montecarlo" << std::endl;
   }
 
   size_t threads = 1;
@@ -310,5 +322,5 @@ int main(int argc, char **argv) {
 
   std::cout << "score: "
             << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
-            << std::endl;
+            << " over " << RuntimeData::n.load() << " games." << std::endl;
 }
