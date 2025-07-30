@@ -8,6 +8,7 @@
 #include <search/ucb.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
+#include <util/search.h>
 
 #include <atomic>
 #include <cmath>
@@ -25,33 +26,26 @@ using Obs = std::array<uint8_t, 16>;
 using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
 using UCBNode = Tree::Node<UCB::JointBanditData<2.0f>, Obs>;
 
+using Exp3_03 = Exp3::JointBanditData<0.3f>;
+using Exp3_10 = Exp3::JointBanditData<0.1f>;
+using Exp3_20 = Exp3::JointBanditData<0.2f>;
+using UCB_05 = UCB::JointBanditData<0.5f>;
+using UCB_10 = UCB::JointBanditData<1.0f>;
+using UCB_20 = UCB::JointBanditData<2.0f>;
+
 namespace RuntimeData {
 bool terminated = false;
 bool suspended = false;
-
-NN::Network p1_network{};
-NN::Network p2_network{};
 
 std::atomic<size_t> score{};
 std::atomic<size_t> n{};
 
 } // namespace RuntimeData
 
-struct SearchData {
-  NN::Network battle_network{};
-  std::unique_ptr<Exp3Node> exp3_unique_node{std::make_unique<Exp3Node>()};
-  std::unique_ptr<UCBNode> ucb_unique_node{std::make_unique<UCBNode>()};
-
-  void clear() {
-    exp3_unique_node = std::make_unique<Exp3Node>();
-    ucb_unique_node = std::make_unique<UCBNode>();
-  }
-};
-
 struct SearchOptions {
-  std::string battle_network_path = "";
+  std::string battle_network_path = "mc";
   char count_mode = 'i';
-  char bandit_mode = 'e';
+  std::string bandit_name = "exp3-0.29";
   size_t count = {1 << 10};
 };
 
@@ -67,41 +61,6 @@ SearchOptions p2_search_options{};
 
 PolicyOptions p1_policy_options{};
 PolicyOptions p2_policy_options{};
-
-auto search(size_t c, mt19937 &device, const BattleData &battle_data,
-            SearchData &search_data, const auto &options) {
-  auto run_search_model = [&](auto &unique_node, auto &model,
-                              const auto &options) {
-    auto &node = *unique_node;
-
-    assert(unique_node.get());
-
-    MCTS search;
-    if (options.count_mode == 'i' || options.count_mode == 'n') {
-      return search.run(c, node, battle_data, model);
-    } else if (options.count_mode == 't') {
-      std::chrono::milliseconds ms{c};
-      return search.run(ms, node, battle_data, model);
-    }
-    throw std::runtime_error("Invalid count mode char.");
-  };
-
-  auto run_search_node = [&](auto &unique_node, const auto &options) {
-    if (options.battle_network_path.empty()) {
-      MonteCarlo::Model model{device};
-      return run_search_model(unique_node, model, options);
-    } else {
-      return run_search_model(unique_node, search_data.battle_network, options);
-    }
-  };
-
-  if (options.bandit_mode == 'e') {
-    return run_search_node(search_data.exp3_unique_node, options);
-  } else if (options.bandit_mode == 'u') {
-    return run_search_node(search_data.ucb_unique_node, options);
-  }
-  throw std::runtime_error("Invalid bandit mode char.");
-}
 
 std::pair<int, int> sample(mt19937 &device, auto &p1_output, auto &p2_output) {
 
@@ -169,9 +128,6 @@ void thread_fn(uint64_t seed) {
 
     Train::CompressedFrames<> training_frames{battle_data.battle};
 
-    SearchData p1_search_data{RuntimeData::p1_network};
-    SearchData p2_search_data{RuntimeData::p2_network};
-
     size_t updates = 0;
     try {
       // playout game
@@ -181,27 +137,37 @@ void thread_fn(uint64_t seed) {
           sleep(1);
         }
 
-        p1_search_data.clear();
-        p2_search_data.clear();
-
         const auto [p1_choices, p2_choices] =
             PKMN::choices(battle_data.battle, battle_data.result);
 
         MCTS::Output p1_output, p2_output;
 
         if (p1_choices.size() > 1) {
-          p1_output = search(p1_search_options.count, device, battle_data,
-                             p1_search_data, p1_search_options);
+          p1_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
+                                         UCB_10, UCB_20>(
+              battle_data, p1_search_options.count,
+              p1_search_options.count_mode, p1_search_options.bandit_name,
+              p1_search_options.battle_network_path);
         } else {
-          p1_output = search(10, device, battle_data, p1_search_data,
-                             p1_search_options);
+          p1_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
+                                         UCB_10, UCB_20>(
+              battle_data, 10, p1_search_options.count_mode,
+              p1_search_options.bandit_name,
+              p1_search_options.battle_network_path);
         }
+
         if (p2_choices.size() > 1) {
-          p2_output = search(p2_search_options.count, device, battle_data,
-                             p2_search_data, p2_search_options);
+          p2_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
+                                         UCB_10, UCB_20>(
+              battle_data, p2_search_options.count,
+              p2_search_options.count_mode, p2_search_options.bandit_name,
+              p2_search_options.battle_network_path);
         } else {
-          p2_output = search(10, device, battle_data, p2_search_data,
-                             p2_search_options);
+          p2_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
+                                         UCB_10, UCB_20>(
+              battle_data, 10, p2_search_options.count_mode,
+              p2_search_options.bandit_name,
+              p2_search_options.battle_network_path);
         }
 
         const auto [p1_index, p2_index] = sample(device, p1_output, p2_output);
@@ -256,61 +222,30 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
-  if (argc < 3) {
-    std::cerr << "Input: net-path-1 net-path-2" << std::endl;
+  if (argc < 9) {
+    std::cerr << "Side: count mode bandit-name net-path.\n Input (Side) p1, "
+                 "(Side) p2."
+              << std::endl;
     return 1;
   }
 
-  // read networks
+  p1_search_options.count = std::atoll(argv[1]);
+  p1_search_options.count_mode = argv[2][0];
+  p1_search_options.bandit_name = std::string{argv[3]};
+  p1_search_options.battle_network_path = std::string(argv[4]);
 
-  p1_search_options.battle_network_path = {argv[1]};
-  p2_search_options.battle_network_path = {argv[2]};
-
-  if (p1_search_options.battle_network_path != "mc") {
-    std::ifstream file{p1_search_options.battle_network_path};
-    if (!file) {
-      std::cerr << "Cant open p1 network path" << std::endl;
-      return 1;
-    }
-    const auto success = RuntimeData::p1_network.read_parameters(file);
-    if (!success) {
-      std::cerr << "Cant read p1 network data" << std::endl;
-      return 1;
-    }
-  } else {
-    p1_search_options.battle_network_path = "";
-    std::cout << "p1 uses montecarlo" << std::endl;
-  }
-
-  if (p2_search_options.battle_network_path != "mc") {
-    std::ifstream file{p2_search_options.battle_network_path};
-    if (!file) {
-      std::cerr << "Cant open p2 network path" << std::endl;
-      return 1;
-    }
-    const auto success = RuntimeData::p2_network.read_parameters(file);
-    if (!success) {
-      std::cerr << "Cant read p2 network data" << std::endl;
-      return 1;
-    }
-  } else {
-    p2_search_options.battle_network_path = "";
-    std::cout << "p2 uses montecarlo" << std::endl;
-  }
+  p2_search_options.count = std::atoll(argv[5]);
+  p2_search_options.count_mode = argv[6][0];
+  p2_search_options.bandit_name = std::string{argv[7]};
+  p2_search_options.battle_network_path = std::string(argv[8]);
 
   size_t threads = 1;
-  size_t count = (1 << 10);
   size_t seed = std::random_device{}();
-  if (argc >= 4) {
-    threads = std::atoll(argv[3]);
+  if (argc > 9) {
+    threads = std::atoll(argv[9]);
   }
-  if (argc >= 5) {
-    count = std::atoll(argv[4]);
-    p2_search_options.count = count;
-    p1_search_options.count = count;
-  }
-  if (argc >= 6) {
-    seed = std::atoll(argv[5]);
+  if (argc > 10) {
+    seed = std::atoll(argv[10]);
   }
 
   mt19937 device{seed};
