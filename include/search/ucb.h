@@ -46,8 +46,20 @@ uint32_t sqrt_scaled_fast(uint32_t x) {
 }
 
 #pragma pack(push, 1)
-class JointBanditData {
+template <float c_ucb> class JointBanditData {
+  static auto consteval get_name() {
+    constexpr auto trailing_precision = 3;
+    std::array<char, 4 + 3 + trailing_precision> name{"ucb-"};
+    auto gamma_char = to_char<c_ucb, trailing_precision>();
+    for (auto i = 0; i < 3 + trailing_precision; ++i) {
+      name[i + 4] = gamma_char[i];
+    }
+    return name;
+  }
+
 public:
+  static constexpr std::array<char, 10> name = get_name();
+
   std::array<float, 9> p1_score;
   std::array<float, 9> p2_score;
   std::array<uint24_t, 9> p1_visits;
@@ -96,7 +108,7 @@ public:
       float log_N = log(N);
       float max = 0;
       for (auto i = 0; i < _rows; ++i) {
-        float e = sqrt(log_N / p1_visits[i]);
+        float e = c_ucb * sqrt(log_N / p1_visits[i]);
         float a = e + q[i];
         if (a > max) {
           max = a;

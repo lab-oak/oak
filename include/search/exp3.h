@@ -11,97 +11,12 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <util/to_char.h>
 #include <vector>
-
-// #include <immintrin.h>
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
 namespace Exp3 {
-
-// inline __m256 exp_ps(__m256 x) {
-//   // Save original input for special handling
-//   __m256 original_x = x;
-
-//   // Clamp only upper bound (to avoid overflow)
-//   x = _mm256_min_ps(x, _mm256_set1_ps(88.3762626647949f));
-
-//   // Range reduction: x * log2(e)
-//   __m256 fx = _mm256_mul_ps(x, _mm256_set1_ps(1.44269504088896341f)); //
-//   log2(e) fx = _mm256_round_ps(fx, _MM_FROUND_TO_NEAREST_INT |
-//   _MM_FROUND_NO_EXC);
-
-//   // Compute exp(x) = 2^n * exp(r)
-//   __m256 tmp = _mm256_mul_ps(fx, _mm256_set1_ps(0.693359375f));
-//   __m256 r = _mm256_sub_ps(x, tmp);
-//   tmp = _mm256_mul_ps(fx, _mm256_set1_ps(-2.12194440e-4f));
-//   r = _mm256_sub_ps(r, tmp);
-
-//   // Polynomial approximation of exp(r)
-//   __m256 r2 = _mm256_mul_ps(r, r);
-//   __m256 r3 = _mm256_mul_ps(r2, r);
-//   __m256 r4 = _mm256_mul_ps(r3, r);
-//   __m256 r5 = _mm256_mul_ps(r4, r);
-
-//   __m256 y = _mm256_fmadd_ps(_mm256_set1_ps(1.9875691500E-4f), r,
-//                              _mm256_set1_ps(1.3981999507E-3f));
-//   y = _mm256_fmadd_ps(y, r, _mm256_set1_ps(8.3334519073E-3f));
-//   y = _mm256_fmadd_ps(y, r, _mm256_set1_ps(4.1665795894E-2f));
-//   y = _mm256_fmadd_ps(y, r, _mm256_set1_ps(1.6666665459E-1f));
-//   y = _mm256_fmadd_ps(y, r, _mm256_set1_ps(5.0000001201E-1f));
-//   y = _mm256_fmadd_ps(y, r, _mm256_set1_ps(1.0f));
-
-//   // Reconstruct exp(x) = 2^n * exp(r)
-//   __m256i emm0 = _mm256_cvttps_epi32(fx);
-//   emm0 = _mm256_add_epi32(emm0, _mm256_set1_epi32(127));
-//   emm0 = _mm256_slli_epi32(emm0, 23);
-//   __m256 pow2n = _mm256_castsi256_ps(emm0);
-
-//   __m256 result = _mm256_mul_ps(y, pow2n);
-
-//   // Handle -inf manually: exp(-inf) = 0
-//   __m256 mask_is_neginf =
-//       _mm256_cmp_ps(original_x, _mm256_set1_ps(-INFINITY), _CMP_EQ_OQ);
-//   result = _mm256_blendv_ps(result, _mm256_setzero_ps(), mask_is_neginf);
-
-//   return result;
-// }
-
-// void softmax_simd(float *forecast, const float *gains, float eta) {
-//   // Load 8 elements
-//   __m256 g_vec = _mm256_loadu_ps(gains);
-//   __m256 eta_vec = _mm256_set1_ps(eta);
-//   __m256 prod = _mm256_mul_ps(g_vec, eta_vec);
-//   __m256 expv = exp_ps(prod);
-
-//   // Store intermediate results
-//   _mm256_storeu_ps(forecast, expv);
-
-//   // // Final (9th element)
-//   // float final = std::exp(gains[8] * eta);
-//   // forecast[8] = final;
-
-//   // Sum
-//   __m256 sumv = expv;
-//   __m128 lo = _mm256_castps256_ps128(sumv);
-//   __m128 hi = _mm256_extractf128_ps(sumv, 1);
-//   __m128 sum128 = _mm_add_ps(lo, hi);
-//   sum128 = _mm_hadd_ps(sum128, sum128);
-//   sum128 = _mm_hadd_ps(sum128, sum128);
-//   float sum = _mm_cvtss_f32(sum128);
-
-//   // Normalize
-//   __m256 sum_vec = _mm256_set1_ps(sum);
-//   __m256 norm = _mm256_div_ps(expv, sum_vec);
-//   _mm256_storeu_ps(forecast, norm);
-//   // forecast[8] = final / sum;
-// }
-
-// void softmax(std::array<float, 9> &forecast, const std::array<float, 9>
-// &gains,
-//              float eta) {
-//   softmax_simd(forecast.data(), gains.data(), eta);
-// }
 
 void softmax(auto &forecast, const auto &gains, float eta) {
   float sum = 0;
@@ -136,7 +51,19 @@ template <> struct JointBanditDataBase<false> {
 #pragma pack(push, 1)
 template <float gamma = .1f, bool enable_visits = false>
 class JointBanditData : public JointBanditDataBase<enable_visits> {
+  static auto consteval get_name() {
+    constexpr auto trailing_precision = 3;
+    std::array<char, 5 + 3 + trailing_precision> name{"exp3-"};
+    auto gamma_char = to_char<gamma, trailing_precision>();
+    for (auto i = 0; i < 3 + trailing_precision; ++i) {
+      name[i + 5] = gamma_char[i];
+    }
+    return name;
+  }
+
 public:
+  static constexpr std::array<char, 11> name = get_name();
+
   using JointBanditDataBase<enable_visits>::p1_gains;
   using JointBanditDataBase<enable_visits>::p2_gains;
   using JointBanditDataBase<enable_visits>::_rows;
@@ -244,7 +171,7 @@ public:
 };
 #pragma pack(pop)
 
-// static_assert(sizeof(JointBanditData<.1f, true>) == 128);
-// static_assert(sizeof(JointBanditData<.1f, false>) == 76);
+static_assert(sizeof(JointBanditData<.1f, true>) == 128);
+static_assert(sizeof(JointBanditData<.1f, false>) == 76);
 
 }; // namespace Exp3

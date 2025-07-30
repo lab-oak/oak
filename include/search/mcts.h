@@ -3,7 +3,6 @@
 #include <pkmn.h>
 
 #include <libpkmn/layout.h>
-#include <libpkmn/options.h>
 #include <libpkmn/strings.h>
 #include <search/durations.h>
 #include <search/tree.h>
@@ -44,12 +43,11 @@ struct MCTS {
   pkmn_gen1_battle_options options;
   pkmn_gen1_chance_options chance_options;
   pkmn_gen1_calc_options calc_options;
-  size_t total_nodes;
-  size_t total_depth;
   std::array<pkmn_choice, 9> choices;
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;
 
+  // strategies, value estimate, etc. All info the search produces
   struct Output {
     uint m;
     uint n;
@@ -68,11 +66,36 @@ struct MCTS {
     std::chrono::milliseconds duration;
   };
 
+  using Obs = std::array<uint8_t, 16>;
+
+  // Helper for dynamic dispatch over different bandit types
+  // E.g. go<Exp3::Bandit<.03>>, Exp3::Bandit<.1>>("exp3.03", ...)
+
+  template <typename Bandit, typename... Bandits>
+  MCTS::Output go(std::string bandit_name, auto count, auto input, auto &model,
+                  MCTS::Output output = {}) {
+    if (std::string{Bandit::name.data()}.starts_with(bandit_name)) {
+      using Node = Tree::Node<Bandit, Obs>;
+      Node node{};
+      return run(count, node, input, model, output);
+    }
+
+    if constexpr (sizeof...(Bandits) > 0) {
+      return go<Bandits...>(bandit_name, count, input, model, output);
+    } else {
+      throw std::runtime_error{
+          "bandit name string does not match the names of any "
+          "bandits in the template params."};
+    }
+  }
+
   template <typename Options = Options<>>
   auto run(const auto dur, auto &node, const auto &input, auto &model,
            Output output = {}) {
 
     *this = {};
+    // if the node is not already init then a value estimate is wasted on the
+    // first iteration
     if (!node.is_init()) {
       auto m = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P1,
                                         pkmn_result_p1(input.result),
@@ -83,6 +106,8 @@ struct MCTS {
       node.init(m, n);
     }
 
+    // copy the state, do single mcts forward/backward, return player 1 leaf
+    // value
     const auto prepare_and_run_iteration = [this, &input, &model,
                                             &node]() -> float {
       auto copy = input;
@@ -95,7 +120,9 @@ struct MCTS {
       return run_iteration<Options>(&node, copy, model).first;
     };
 
-    // time duration
+    // Three types for 'dur' (the time investement of the search) are allowed
+
+    // chrono duration
     if constexpr (requires {
                     std::chrono::duration_cast<std::chrono::milliseconds>(dur);
                   }) {
@@ -111,7 +138,8 @@ struct MCTS {
       }
       output.duration +=
           std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-      // flag duration
+
+      // run while boolean flag is set
     } else if constexpr (requires { *dur; }) {
       const auto start = std::chrono::high_resolution_clock::now();
       while (*dur) {
@@ -121,7 +149,8 @@ struct MCTS {
       const auto end = std::chrono::high_resolution_clock::now();
       output.duration +=
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-      // iteration count
+
+      // number of iterations
     } else {
       const auto start = std::chrono::high_resolution_clock::now();
       for (auto i = 0; i < dur; ++i) {
@@ -133,8 +162,7 @@ struct MCTS {
           std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     }
 
-    // process output
-
+    // prepare output, solve empirical root matrix if enabled
     output.empirical_value = output.total_value / output.iterations;
     output.m = pkmn_gen1_battle_choices(
         &input.battle, PKMN_PLAYER_P1, pkmn_result_p1(input.result),
@@ -145,9 +173,9 @@ struct MCTS {
 
     if constexpr (Options::root_matrix) {
       // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
+      // TODO maybe use gmp since this is not the hot part of the code
       constexpr int discretize_factor = 80;
       std::array<int, 9 * 9> solve_matrix;
-
       for (int i = 0; i < output.m; ++i) {
         for (int j = 0; j < output.n; ++j) {
           output.visit_matrix[i][j] += visit_matrix[i][j];
@@ -164,7 +192,7 @@ struct MCTS {
       LRSNash::FastInput solve_input{static_cast<int>(output.m),
                                      static_cast<int>(output.n),
                                      solve_matrix.data(), discretize_factor};
-      // 2 extra entries for output denom, nash value
+      // LRSNash convention: 2 extra entries needed for output denom, nash value
       std::array<float, 9 + 2> nash1{}, nash2{};
       LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
       bool success = true;
@@ -173,14 +201,14 @@ struct MCTS {
       } catch (std::exception &e) {
         std::cerr << e.what() << std::endl;
         success = false;
+        // print offending matrix in lossless form
         std::cout << "value matrix" << std::endl;
         for (auto i = 0; i < output.m; ++i) {
           for (auto j = 0; j < output.n; ++j) {
-            auto n = output.visit_matrix[i][j];
-            n += (n == 0);
-            std::cout << output.value_matrix[i][j] / n << ' ';
+            std::cerr << "(" << output.value_matrix[i][j] << ", "
+                      << output.visit_matrix[i][j] << ") ";
           }
-          std::cout << std::endl;
+          std::cerr << std::endl;
         }
       }
 
@@ -192,17 +220,20 @@ struct MCTS {
         output.p2_empirical[j] /= (float)output.iterations;
         output.p2_nash[j] = nash2[j];
       }
+      output.nash_value = solve_output.value;
 
+      // set nash data to emprical rather than leave as garbage/zeros/etc
       if (!success) {
         output.p1_nash = output.p1_empirical;
         output.p2_nash = output.p2_empirical;
+        output.nash_value = output.empirical_value;
       }
-      output.nash_value = solve_output.value;
     }
 
     return output;
   }
 
+  // use battle seed to quickly compute a clamped damage roll
   template <size_t n_rolls>
   static constexpr uint8_t roll_byte(const uint8_t seed) {
     constexpr uint8_t lowest_roll{217};
@@ -216,6 +247,9 @@ struct MCTS {
     }
   }
 
+  // typical recursive mcts function
+  // we return value for each player because it's slightly faster than calcing 1
+  // - value at each node
   template <typename Options>
   std::pair<float, float> run_iteration(auto *node, auto &input, auto &model,
                                         size_t depth = 0) {
@@ -225,6 +259,7 @@ struct MCTS {
     auto &result = input.result;
     auto &device = model.device;
 
+    // debug print, optimized out if not enabled
     const auto print = [depth](const auto &data, bool new_line = true) -> void {
       if constexpr (!Options::debug_print) {
         return;
@@ -238,6 +273,7 @@ struct MCTS {
       }
     };
 
+    // pkmn_gen1_battle_options_set with constexpr logic
     const auto battle_options_set = [this, &battle, depth]() {
       if constexpr (!Options::clamping) {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
@@ -285,7 +321,7 @@ struct MCTS {
 
       battle_options_set();
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
-      const auto obs = std::bit_cast<const std::array<uint8_t, 16>>(
+      const auto obs = std::bit_cast<const Obs>(
           *pkmn_gen1_battle_options_chance_actions(&options));
 
       auto *child = (*node)(outcome.p1_index, outcome.p2_index, obs);
@@ -306,13 +342,11 @@ struct MCTS {
       return value;
     }
 
-    total_depth += depth;
-
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:
       [[likely]] {
         print("Initializing node");
-        ++total_nodes;
+        // model is a net
         if constexpr (requires {
                         model.inference(input.battle, input.durations);
                       }) {
@@ -328,6 +362,7 @@ struct MCTS {
               *pkmn_gen1_battle_options_chance_durations(&options));
           return {value, 1 - value};
         } else {
+          // model is monte-carlo
           return init_stats_and_rollout(node->stats(), device, battle, result);
         }
       }
