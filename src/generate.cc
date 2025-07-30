@@ -355,7 +355,7 @@ TeamPool team_pool{};
 
 using Obs = std::array<uint8_t, 16>;
 using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
-using UCBNode = Tree::Node<UCB::JointBanditData, Obs>;
+using UCBNode = Tree::Node<UCB::JointBanditData<2.0f>, Obs>;
 
 // Data that should persist only over a game - not the program or thread
 // lifetime. The build network uses a game-specific cache. It is not universal
