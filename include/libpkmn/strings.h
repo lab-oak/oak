@@ -176,53 +176,9 @@ std::string volatiles_to_string(const PKMN::Volatiles &vol) {
   return ss.str();
 }
 
-std::string battle_to_string(const pkmn_gen1_battle &battle) {
-  std::stringstream ss{};
-  const auto &b = View::ref(battle);
-  for (auto s = 0; s < 2; ++s) {
-    const auto &side = b.sides[s];
-
-    for (auto i = 0; i < 6; ++i) {
-      const auto slot = side.order[i];
-      if (slot == 0) {
-        continue;
-      }
-
-      auto &pokemon = side.pokemon[slot - 1];
-      if (i == 0) {
-        // pass for now
-      }
-
-      ss << species_char_array(pokemon.species);
-      if (pokemon.level != 100) {
-        ss << " L" << (int)pokemon.level;
-      }
-      ss << ": ";
-      const auto hp = pokemon.hp;
-      if (hp != 0) {
-        ss << pokemon.percent() << "% (" << pokemon.hp << '/'
-           << pokemon.stats.hp << ") ";
-      } else {
-        ss << "KO " << std::endl;
-        continue;
-      }
-      const auto st = pokemon.status;
-      if (st != Data::Status::None) {
-        ss << status_string(st) << ' ';
-      }
-      for (auto m = 0; m < 4; ++m) {
-        ss << move_char_array(pokemon.moves[m].id) << ' ';
-      }
-      ss << std::endl;
-    }
-    ss << std::endl;
-  }
-  return ss.str();
-}
-
 std::string battle_data_to_string(const pkmn_gen1_battle &battle,
                                   const pkmn_gen1_chance_durations &durations,
-                                  pkmn_result) {
+                                  pkmn_result result = {}) {
   std::stringstream ss{};
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {
@@ -238,24 +194,67 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
 
       const auto &pokemon = side.pokemon[id - 1];
       if (i == 0) {
+
+        // boosts
+        const auto &active = side.active;
+        bool equal = true;
+        if (active.stats.atk != pokemon.stats.atk) {
+          ss << "(atk " << pokemon.stats.atk << ">>" << active.stats.atk
+             << ") ";
+          equal = false;
+        }
+        if (active.stats.def != pokemon.stats.def) {
+          ss << "(def " << pokemon.stats.def << ">>" << active.stats.def
+             << ") ";
+          equal = false;
+        }
+        if (active.stats.spe != pokemon.stats.spe) {
+          ss << "(spe " << pokemon.stats.spe << ">>" << active.stats.spe
+             << ") ";
+          equal = false;
+        }
+        if (active.stats.spc != pokemon.stats.spc) {
+          ss << "(spc " << pokemon.stats.spc << ">>" << active.stats.spc
+             << ") ";
+          equal = false;
+        }
+        if (!equal) {
+          ss << "\n";
+        }
+
+        // durations
+        bool no_durations = true;
         if (duration.confusion()) {
           ss << "conf: " << static_cast<int>(duration.confusion());
+          no_durations = false;
         }
         if (duration.disable()) {
           ss << " disable: " << static_cast<int>(duration.disable());
+          no_durations = false;
         }
         if (duration.attacking()) {
           ss << " attacking: " << static_cast<int>(duration.attacking());
+          no_durations = false;
         }
         if (duration.binding()) {
           ss << " binding: " << static_cast<int>(duration.binding());
+          no_durations = false;
         }
-        ss << std::endl;
-        ss << volatiles_to_string(vol) << std::endl;
+        if (!no_durations) {
+          ss << '\n';
+        }
+
+        // vol
+        const auto vol_string = volatiles_to_string(vol);
+        if (!vol_string.empty()) {
+          ss << vol_string << '\n';
+        }
+
       } else {
         ss << "  ";
       }
 
+      // stored print
       ss << species_char_array(pokemon.species);
       if (pokemon.level != 100) {
         ss << " L" << (int)pokemon.level;
@@ -266,7 +265,7 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
         ss << pokemon.percent() << "% (" << pokemon.hp << '/'
            << pokemon.stats.hp << ") ";
       } else {
-        ss << "KO " << std::endl;
+        ss << "KO " << '\n';
         continue;
       }
       const auto st = pokemon.status;
@@ -277,9 +276,9 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
         const auto moveslot = pokemon.moves[m];
         ss << move_char_array(moveslot.id) << ":" << (int)moveslot.pp << ' ';
       }
-      ss << std::endl;
+      ss << '\n';
     }
-    ss << std::endl;
+    ss << '\n';
   }
   return ss.str();
 }

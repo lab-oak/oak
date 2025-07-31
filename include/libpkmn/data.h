@@ -40,8 +40,8 @@ struct alignas(1) Pokemon {
   uint8_t types;
   uint8_t level;
 
-  float percent() const noexcept {
-    return 100 * static_cast<float>(hp) / stats.hp;
+  int percent() const noexcept {
+    return std::ceil(100 * static_cast<float>(hp) / stats.hp);
   }
 };
 
