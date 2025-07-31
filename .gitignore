@@ -1,5 +1,5 @@
 build/
-./libpkmn/
+libpkmn-showdown.a
 *.battle
 *.build
 */build-network

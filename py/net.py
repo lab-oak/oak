@@ -21,21 +21,21 @@ class Affine(nn.Module):
         assert (
             out_dim == self.out_dim
         ), f"Expected out_dim={self.out_dim}, got {out_dim}"
-        self.layer.weight.data.copy_(
-            torch.frombuffer(
-                bytearray(f.read(self.layer.weight.numel() * 4)), dtype=torch.float32
-            ).reshape(self.layer.weight.shape)
-        )
         self.layer.bias.data.copy_(
             torch.frombuffer(
                 bytearray(f.read(self.layer.bias.numel() * 4)), dtype=torch.float32
             )
         )
+        self.layer.weight.data.copy_(
+            torch.frombuffer(
+                bytearray(f.read(self.layer.weight.numel() * 4)), dtype=torch.float32
+            ).reshape(self.layer.weight.shape)
+        )
 
     def write_parameters(self, f):
         f.write(struct.pack("<II", self.in_dim, self.out_dim))
-        f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
         f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
+        f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
 
     def clamp_parameters(self):
         self.layer.weight.data.clamp_(-2, 2)
