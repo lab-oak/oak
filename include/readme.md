@@ -1,12 +1,10 @@
 # libpkmn/
 
-The `libpkmn` C API is too minimal to use for a project of this scale. Only the outmost types like `Battle` and `Options` are exponsed, and only as raw bytes. Even something as simple as checking
-
-We are forced to reimplement much of the libraries zig code in C++.
+The `libpkmn` C API is too barebones for anything beyond the example. It is basically incumbent on the user to replicate some of the zig interface themselves. 
 
 ## libpkmn/data/
 
-Basic types
+Basic types 
 
 # data/
 
