@@ -92,27 +92,19 @@ struct Network {
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
 
-      if (!stored.hp) {
-        std::memset(main_input[s], 0, (1 + active_out_dim) * sizeof(float));
-      } else {
-        Encode::Active::write(stored, side.active, duration,
-                              active_input[s][0]);
-        active_net.propagate(active_input[s][0], main_input[s] + 1);
-        main_input[s][0] = (float)stored.hp / stored.stats.hp;
-      }
+      Encode::Active::write(stored, side.active, duration, active_input[s][0]);
+      active_net.propagate(active_input[s][0], main_input[s] + 1);
+      main_input[s][0] = (float)stored.hp / stored.stats.hp;
 
       for (auto slot = 2; slot <= 6; ++slot) {
-        float *input = pokemon_input[s][slot - 1];
+        float *input = pokemon_input[s][slot - 2];
         float *output = main_input[s] + main_input_index(slot - 1);
         const auto &pokemon = side.get(slot);
-        if (!pokemon.hp) {
-          std::memset(output, 0, (1 + pokemon_out_dim) * sizeof(float));
-        } else {
-          const auto sleep = duration.sleep(slot - 1);
-          Encode::Pokemon::write(pokemon, sleep, input);
-          pokemon_net.propagate(input, output + 1);
-          output[0] = (float)pokemon.hp / pokemon.stats.hp;
-        }
+
+        const auto sleep = duration.sleep(slot - 1);
+        Encode::Pokemon::write(pokemon, sleep, input);
+        pokemon_net.propagate(input, output + 1);
+        output[0] = (float)pokemon.hp / pokemon.stats.hp;
       }
     }
 
