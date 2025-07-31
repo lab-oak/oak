@@ -22,6 +22,28 @@
 #include <sstream>
 #include <thread>
 
+void print(const auto &data, const bool newline = true) {
+  if constexpr (!debug) {
+    return;
+  }
+  std::cout << data;
+  if (newline) {
+    std::cout << '\n';
+  }
+}
+
+std::string container_string(const auto &v) {
+  std::stringstream ss{};
+  for (auto x : v) {
+    if constexpr (std::is_same_v<decltype(x), std::string>) {
+      ss << x << ' ';
+    } else {
+      ss << std::to_string(x) << ' ';
+    }
+  }
+  return ss.str();
+}
+
 using Obs = std::array<uint8_t, 16>;
 using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
 using UCBNode = Tree::Node<UCB::JointBanditData<2.0f>, Obs>;
@@ -47,6 +69,15 @@ struct SearchOptions {
   char count_mode = 'i';
   std::string bandit_name = "exp3-0.29";
   size_t count = {1 << 10};
+
+  std::string to_string() const {
+    std::stringstream ss{};
+    ss << "model: " << battle_network_path;
+    ss << " mode: " << count_mode;
+    ss << " bandit: " << bandit_name;
+    ss << " count: " << count;
+    return ss.str();
+  }
 };
 
 struct PolicyOptions {
@@ -64,13 +95,22 @@ PolicyOptions p2_policy_options{};
 
 std::pair<int, int> sample(mt19937 &device, auto &p1_output, auto &p2_output) {
 
-  const auto process_and_sample = [&](const auto &policy,
+  const auto process_and_sample = [&](const auto &empirical, const auto &nash,
                                       const auto &policy_options) {
     const double t = policy_options.policy_temp;
-
     if (t <= 0) {
       throw std::runtime_error("Use positive policy power");
     }
+
+    std::array<double, 9> policy{};
+    if (policy_options.policy_mode == 'e') {
+      policy = empirical;
+    } else if (policy_options.policy_mode == 'n') {
+      policy = nash;
+    } else {
+      throw std::runtime_error("bad policy mode.");
+    }
+
     std::vector<double> p(policy.begin(), policy.end());
     double sum = 0;
     for (auto &val : p) {
@@ -94,25 +134,10 @@ std::pair<int, int> sample(mt19937 &device, auto &p1_output, auto &p2_output) {
     return index;
   };
 
-  if (p1_policy_options.policy_mode == 'n') {
-    return {process_and_sample(p1_output.p1_nash, p1_policy_options),
-            process_and_sample(p2_output.p2_nash, p2_policy_options)};
-  } else if (p1_policy_options.policy_mode == 'e') {
-    return {process_and_sample(p1_output.p1_empirical, p1_policy_options),
-            process_and_sample(p2_output.p2_empirical, p2_policy_options)};
-  } else if (p1_policy_options.policy_mode == 'm') {
-    const auto weighted_sum = [](const auto &a, const auto &b,
-                                 const auto alpha) {
-      auto result = a;
-      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
-                     [alpha](const auto &x, const auto &y) {
-                       return alpha * x + (decltype(alpha))(1) - alpha * y;
-                     });
-      return result;
-    };
-    return {0, 0};
-  }
-  throw std::runtime_error("Invalid policy mode.");
+  return {process_and_sample(p1_output.p1_empirical, p1_output.p1_nash,
+                             p1_policy_options),
+          process_and_sample(p2_output.p2_empirical, p2_output.p2_nash,
+                             p2_policy_options)};
 }
 
 void thread_fn(uint64_t seed) {
@@ -175,6 +200,35 @@ void thread_fn(uint64_t seed) {
         const auto p1_choice = p1_choices[p1_index];
         const auto p2_choice = p2_choices[p2_index];
 
+        print("UPDATE: " + std::to_string(updates));
+        print(Strings::battle_data_to_string(battle_data.battle,
+                                             battle_data.durations, {}));
+        print("Values: " + std::to_string(p1_output.empirical_value) + " : " +
+              std::to_string(p2_output.empirical_value));
+        std::vector<std::string> p1_labels{};
+        std::vector<std::string> p2_labels{};
+
+        for (auto i = 0; i < p1_choices.size(); ++i) {
+          p1_labels.push_back(Strings::side_choice_string(
+              battle_data.battle.bytes, p1_choices[i]));
+        }
+        for (auto i = 0; i < p2_choices.size(); ++i) {
+          p2_labels.push_back(Strings::side_choice_string(
+              battle_data.battle.bytes + Layout::Sizes::Side, p2_choices[i]));
+        }
+
+        print("P1 choices/empiricial/nash:");
+        print(container_string(p1_labels));
+        print(container_string(p1_output.p1_empirical));
+        print(container_string(p1_output.p1_nash));
+        print(Strings::side_choice_string(battle_data.battle.bytes, p1_choice));
+        print("P2 choices/empiricial/nash:");
+        print(container_string(p2_labels));
+        print(container_string(p2_output.p2_empirical));
+        print(container_string(p2_output.p2_nash));
+        print(Strings::side_choice_string(battle_data.battle.bytes + 184,
+                                          p2_choice));
+
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
                                           p2_choice, battle_options);
         battle_data.durations = PKMN::durations(battle_options);
@@ -222,8 +276,9 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
-  if (argc < 9) {
-    std::cerr << "Side: count mode bandit-name net-path.\n Input (Side) p1, "
+  if (argc < 11) {
+    std::cerr << "Side: count mode bandit-name net-path policy-mode.\n Input "
+                 "(Side) p1, "
                  "(Side) p2."
               << std::endl;
     return 1;
@@ -233,19 +288,24 @@ int main(int argc, char **argv) {
   p1_search_options.count_mode = argv[2][0];
   p1_search_options.bandit_name = std::string{argv[3]};
   p1_search_options.battle_network_path = std::string(argv[4]);
+  p1_policy_options.policy_mode = argv[5][0];
 
-  p2_search_options.count = std::atoll(argv[5]);
-  p2_search_options.count_mode = argv[6][0];
-  p2_search_options.bandit_name = std::string{argv[7]};
-  p2_search_options.battle_network_path = std::string(argv[8]);
+  p2_search_options.count = std::atoll(argv[6]);
+  p2_search_options.count_mode = argv[7][0];
+  p2_search_options.bandit_name = std::string{argv[8]};
+  p2_search_options.battle_network_path = std::string(argv[9]);
+  p1_policy_options.policy_mode = argv[10][0];
+
+  std::cout << "P1: " << p1_search_options.to_string() << std::endl;
+  std::cout << "P2: " << p2_search_options.to_string() << std::endl;
 
   size_t threads = 1;
   size_t seed = std::random_device{}();
-  if (argc > 9) {
-    threads = std::atoll(argv[9]);
+  if (argc > 11) {
+    threads = std::atoll(argv[11]);
   }
-  if (argc > 10) {
-    seed = std::atoll(argv[10]);
+  if (argc > 12) {
+    seed = std::atoll(argv[12]);
   }
 
   mt19937 device{seed};
