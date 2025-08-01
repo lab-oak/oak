@@ -6,3 +6,4 @@ libpkmn-showdown.a
 */args
 *.log
 *.net
+*.pyc

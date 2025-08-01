@@ -225,7 +225,7 @@ void thread_fn(uint64_t seed) {
         battle_data.durations = PKMN::durations(battle_options);
         ++updates;
       }
-      
+
       const size_t score = PKMN::score2(battle_data.result);
       RuntimeData::score.fetch_add(score);
       RuntimeData::n.fetch_add(1);

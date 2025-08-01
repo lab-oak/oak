@@ -4,9 +4,9 @@
 #include <libpkmn/data/species.h>
 
 namespace NN {
-static constexpr int pokemon_hidden_dim = 32;
+static constexpr int pokemon_hidden_dim = 64;
 static constexpr int pokemon_out_dim = 39;
-static constexpr int active_hidden_dim = 32;
+static constexpr int active_hidden_dim = 64;
 static constexpr int active_out_dim = 55;
 static constexpr int side_out_dim =
     (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);

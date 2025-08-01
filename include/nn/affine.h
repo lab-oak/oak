@@ -22,6 +22,10 @@ public:
 
   Affine() : weights(kOut, kIn), biases(kOut) {}
 
+  bool operator==(const Affine &other) const {
+    return (biases == other.biases) && (weights == other.weights);
+  }
+
   void initialize(auto &device) {
     const float k = 1.0f / std::sqrt(static_cast<float>(kIn));
     for (std::size_t i = 0; i < kOut; ++i) {
@@ -75,9 +79,5 @@ public:
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }
     }
-  }
-
-  bool operator==(const Affine &other) const {
-    return (biases == other.biases) && (weights == other.weights);
   }
 };
