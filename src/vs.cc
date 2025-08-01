@@ -22,6 +22,8 @@
 #include <sstream>
 #include <thread>
 
+auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
+
 void print(const auto &data, const bool newline = true) {
   std::cout << data;
   if (newline) {
@@ -41,10 +43,6 @@ std::string container_string(const auto &v) {
   return ss.str();
 }
 
-using Obs = std::array<uint8_t, 16>;
-using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
-using UCBNode = Tree::Node<UCB::JointBanditData<2.0f>, Obs>;
-
 using Exp3_03 = Exp3::JointBanditData<0.3f>;
 using Exp3_10 = Exp3::JointBanditData<0.1f>;
 using Exp3_20 = Exp3::JointBanditData<0.2f>;
@@ -58,10 +56,10 @@ bool suspended = false;
 
 std::atomic<size_t> score{};
 std::atomic<size_t> n{};
-
 } // namespace RuntimeData
 
 double print_prob = .01;
+double early_stop_log = 3.5;
 
 struct SearchOptions {
   std::string battle_network_path = "mc";
@@ -147,6 +145,7 @@ void thread_fn(uint64_t seed) {
     BattleData battle_data{battle, durations};
     pkmn_gen1_battle_options battle_options{};
     battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
+    bool early_stop = false;
 
     // Train::CompressedFrames<> training_frames{battle_data.battle};
 
@@ -165,12 +164,16 @@ void thread_fn(uint64_t seed) {
         MCTS::Output p1_output, p2_output;
         int p1_index = 0;
         int p2_index = 0;
+        int p1_early_stop = 0;
+        int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
           p1_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
                                          UCB_10, UCB_20>(
               battle_data, p1_search_options.count,
               p1_search_options.count_mode, p1_search_options.bandit_name,
               p1_search_options.battle_network_path);
+          p1_early_stop =
+              inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
                                         p1_output.p1_nash, p1_policy_options);
         }
@@ -180,8 +183,18 @@ void thread_fn(uint64_t seed) {
               battle_data, p2_search_options.count,
               p2_search_options.count_mode, p2_search_options.bandit_name,
               p2_search_options.battle_network_path);
+          p2_early_stop =
+              inverse_sigmoid(p2_output.empirical_value) / early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash, p2_policy_options);
+        }
+
+        // only if they have same sign are non both non zero
+        if ((p1_early_stop * p2_early_stop) > 0) {
+          early_stop = true;
+          const size_t score = (p1_early_stop > 0 ? 2 : 0);
+          RuntimeData::score.fetch_add(score);
+          break;
         }
 
         const auto p1_choice = p1_choices[p1_index];
@@ -226,8 +239,10 @@ void thread_fn(uint64_t seed) {
         ++updates;
       }
 
-      const size_t score = PKMN::score2(battle_data.result);
-      RuntimeData::score.fetch_add(score);
+      if (!early_stop) {
+        const size_t score = PKMN::score2(battle_data.result);
+        RuntimeData::score.fetch_add(score);
+      }
       RuntimeData::n.fetch_add(1);
 
     } catch (const std::exception &e) {
