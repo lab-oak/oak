@@ -1,4 +1,4 @@
-#include <data/sample-teams.h>
+#include <data/teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
 #include <libpkmn/strings.h>
@@ -225,10 +225,8 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    const auto p1_team =
-        SampleTeams::teams[device.random_int(SampleTeams::teams.size())];
-    const auto p2_team =
-        SampleTeams::teams[device.random_int(SampleTeams::teams.size())];
+    const auto p1_team = Teams::teams[device.random_int(Teams::teams.size())];
+    const auto p2_team = Teams::teams[device.random_int(Teams::teams.size())];
 
     play(p1_team, p2_team);
     play(p2_team, p1_team);

@@ -121,8 +121,31 @@ class MainNet(nn.Module):
         return value
 
 
-class Network(torch.nn.Module):
+# holds the output of the embedding nets, the input to main net, and value/policy output of main net
+class OutputBuffers:
+    def __init__(self, size):
+        self.size = size
+        self.pokemon = torch.zeros(
+            (size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32
+        )
+        self.active = torch.zeros(
+            (size, 2, 1, Network.active_out_dim), dtype=torch.float32
+        )
+        self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
+        self.value = torch.zeros((size, 1), dtype=torch.float32)
+        self.p1_policy = torch.zeros((size, 9))
+        self.p2_policy = torch.zeros((size, 9))
 
+    def clear(self):
+        self.pokemon.detach_().zero_()
+        self.active.detach_().zero_()
+        self.sides.detach_().zero_()
+        self.value.detach_().zero_()
+        self.p1_policy.detach_().zero_()
+        self.p2_policy.detach_().zero_()
+
+
+class Network(torch.nn.Module):
     pokemon_hidden_dim = libtrain.pokemon_hidden_dim
     pokemon_out_dim = libtrain.pokemon_out_dim
     active_hidden_dim = libtrain.active_hidden_dim
@@ -161,28 +184,23 @@ class Network(torch.nn.Module):
         self.active_net.write_parameters(f)
         self.main_net.write_parameters(f)
 
-    def clamp_parameters(
-        self,
-    ):
+    def clamp_parameters(self):
         self.pokemon_net.clamp_parameters()
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-
-class OutputBuffers:
-    def __init__(self, size):
-        self.size = size
-        self.pokemon = torch.zeros(
-            (size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32
-        )
-        self.active = torch.zeros(
-            (size, 2, 1, Network.active_out_dim), dtype=torch.float32
-        )
-        self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
-        self.value = torch.zeros((size, 1), dtype=torch.float32)
-
-    def clear(self):
-        self.pokemon.detach_().zero_()
-        self.active.detach_().zero_()
-        self.sides.detach_().zero_()
-        self.value.detach_().zero_()
+    def inference(self, input: libtrain.EncodedFrame, output: OutputBuffers):
+        size = min(input.size, output.size)
+        output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
+        output.active[:size] = self.active_net.forward(input.active[:size])
+        # active hp
+        output.sides[:size, :, :, 0] = input.hp[:size, :, :1, 0]
+        # active word
+        output.sides[:size, :, :, 1 : self.active_out_dim + 1] = output.active[:size]
+        # pokemon hp/word
+        pokemon_flat = torch.cat(
+            (input.hp[:size, :, 1:], output.pokemon[:size]), dim=3
+        ).view(size, 2, 1, 5 * (1 + self.pokemon_out_dim))
+        output.sides[:size, :, :, 1 + self.active_out_dim :] = pokemon_flat[:size]
+        battle = output.sides[:size].view(size, 2 * self.side_out_dim)
+        output.value[:size] = self.main_net.forward(battle)

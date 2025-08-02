@@ -1,13 +1,13 @@
 #include <util/random.h>
 
-#include <data/sample-teams.h>
+#include <data/teams.h>
 #include <util/debug-log.h>
 
 #include <iostream>
 
 int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
   constexpr size_t log_size{128};
-  using SampleTeams::teams;
+  using Teams::teams;
 
   if (argc != 4) {
     std::cout << "Usage: provide two sample team indices [0 - " << teams.size()

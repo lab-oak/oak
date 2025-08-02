@@ -1,11 +1,10 @@
-#include <data/sample-teams.h>
+#include <data/teams.h>
+#include <nn/network.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>
 #include <search/ucb.h>
 #include <util/random.h>
-
-#include <chrono>
 
 struct FastModel {
   fast_prng device;
@@ -16,16 +15,21 @@ struct FastModel {
 int benchmark(int argc, char **argv) {
   constexpr bool node_visits = false;
 
-  auto p1 = SampleTeams::benchmark_teams[0];
-  auto p2 = SampleTeams::benchmark_teams[1];
+  auto p1 = Teams::benchmark_teams[0];
+  auto p2 = Teams::benchmark_teams[1];
 
   const uint64_t seed = 1111111;
+
   // MonteCarlo::Model model{mt19937{seed}};
   const auto battle = PKMN::battle(p1, p2, seed);
   const auto durations = PKMN::durations(p1, p2);
   BattleData battle_data{battle, durations};
 
-  FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
+  // FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
+  NN::Network network{};
+  network.initialize();
+  network.fill_cache(battle);
+
   MCTS search{};
   int exp = 20;
   std::string bandit_string{"exp3"};
@@ -44,7 +48,7 @@ int benchmark(int argc, char **argv) {
 
   const auto output = search.go<Exp3::JointBanditData<.03f, node_visits>,
                                 UCB::JointBanditData<2.0f>>(
-      bandit_string, iterations, battle_data, model);
+      bandit_string, iterations, battle_data, network);
   std::cout << output.duration.count() << " ms." << std::endl;
 
   return 0;

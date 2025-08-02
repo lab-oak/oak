@@ -1,12 +1,13 @@
 #pragma once
 
 #include <libpkmn/data/moves.h>
+#include <libpkmn/data/strings.h>
 
 namespace Encode {
 
 namespace Policy {
 
-constexpr auto n_dim = 151 + 164;
+constexpr auto n_dim = 164 + 151;
 
 uint16_t get_index(const PKMN::Side &side, auto choice) {
   const auto choice_type = choice & 3;
@@ -20,12 +21,11 @@ uint16_t get_index(const PKMN::Side &side, auto choice) {
     return moveid - 1;
   }
   case 2: {
-
     assert(choice_data >= 2 && choice_data <= 6);
     const auto &pokemon = side.get(choice_data);
     auto species = static_cast<uint16_t>(pokemon.species);
     assert(species <= 151);
-    return 163 + species;
+    return 164 + species - 1;
   }
   case 0: {
     return 0;
@@ -36,6 +36,26 @@ uint16_t get_index(const PKMN::Side &side, auto choice) {
   }
   }
 }
+
+consteval auto get_dim_labels() {
+  std::array<std::array<char, 13>, n_dim> result{};
+  const auto copy = [](const auto &src, auto &dest) {
+    for (auto i = 0; i < src.size(); ++i) {
+      dest[i] = src[i];
+    }
+  };
+  auto index = 0;
+  for (auto i = 0; i < 164; ++i) {
+    copy(Data::MOVE_CHAR_ARRAY[i + 1], result[index + i]);
+  }
+  index += 164;
+  for (auto i = 0; i < 151; ++i) {
+    copy(Data::SPECIES_CHAR_ARRAY[i + 1], result[index + i]);
+  }
+  return result;
+}
+
+constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Policy
 

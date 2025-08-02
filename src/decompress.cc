@@ -1,4 +1,4 @@
-#include <data/sample-teams.h>
+#include <data/teams.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
 #include <train/compressed-frame.h>

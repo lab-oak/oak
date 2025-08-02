@@ -1,6 +1,6 @@
 import sys
 
-# Util for converting rby-ou.tsv (not public) into a header (sample-teams.h)
+# Util for converting rby-ou.tsv (not public) into a header (teams.h)
 
 libpkmn_species = ["None",       "Bulbasaur",  "Ivysaur",    "Venusaur",   "Charmander",
     "Charmeleon", "Charizard",  "Squirtle",   "Wartortle",  "Blastoise",

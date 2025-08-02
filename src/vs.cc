@@ -1,4 +1,4 @@
-#include <data/sample-teams.h>
+#include <data/teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/options.h>
 #include <libpkmn/strings.h>
@@ -141,9 +141,11 @@ void thread_fn(uint64_t seed) {
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) {
     const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    // RuntimeData::p1_network.fill_cache(battle);
+    // RuntimeData::p2_network.fill_cache(battle);
     const auto durations = PKMN::durations();
     BattleData battle_data{battle, durations};
-    pkmn_gen1_battle_options battle_options{};
+    auto battle_options = PKMN::options();
     battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
     bool early_stop = false;
 
@@ -254,10 +256,8 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    const auto p1_team =
-        SampleTeams::teams[device.random_int(SampleTeams::teams.size())];
-    const auto p2_team =
-        SampleTeams::teams[device.random_int(SampleTeams::teams.size())];
+    const auto p1_team = Teams::teams[device.random_int(Teams::teams.size())];
+    const auto p2_team = Teams::teams[device.random_int(Teams::teams.size())];
 
     play(p1_team, p2_team);
     play(p2_team, p1_team);

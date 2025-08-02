@@ -1,3 +1,5 @@
+from frame import Frame
+
 import ctypes
 
 import torch
@@ -6,22 +8,9 @@ import numpy as np
 
 lib = ctypes.CDLL("./build/libtrain.so")
 
-pokemon_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(
-    lib, "pokemon_dim_labels"
-)
-active_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "active_dim_labels")
-
-
-def char_pp_to_str_list(char_pp, count):
-    return [char_pp[i].decode("utf-8") for i in range(count)]
-
-
+# net hyperparams
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
 active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
-
-pokemon_dim_labels = char_pp_to_str_list(pokemon_dim_labels_raw, pokemon_in_dim)
-active_dim_labels = char_pp_to_str_list(active_dim_labels_raw, active_in_dim)
-
 pokemon_hidden_dim = ctypes.c_int.in_dll(lib, "pokemon_hidden_dim").value
 pokemon_out_dim = ctypes.c_int.in_dll(lib, "pokemon_out_dim").value
 active_hidden_dim = ctypes.c_int.in_dll(lib, "active_hidden_dim").value
@@ -32,6 +21,27 @@ value_hidden_dim = ctypes.c_int.in_dll(lib, "value_hidden_dim").value
 policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
 policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
+# dimension labels for encoding, lists of strings
+pokemon_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(
+    lib, "pokemon_dim_labels"
+)
+active_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "active_dim_labels")
+policy_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "policy_dim_labels")
+
+
+def char_pp_to_str_list(char_pp, count):
+    return [char_pp[i].decode("utf-8") for i in range(count)]
+
+
+pokemon_dim_labels: list[str] = char_pp_to_str_list(
+    pokemon_dim_labels_raw, pokemon_in_dim
+)
+active_dim_labels: list[str] = char_pp_to_str_list(active_dim_labels_raw, active_in_dim)
+policy_dim_labels: list[str] = char_pp_to_str_list(
+    policy_dim_labels_raw, policy_out_dim
+)
+
+# functions
 lib.read_battle_offsets.argtypes = [
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_uint16),
@@ -107,53 +117,7 @@ lib.encode_buffer_multithread.restype = ctypes.c_uint64
 # Python
 
 
-def ptr(array: torch.Tensor, dtype):
-    return ctypes.cast(array.detach().numpy().ctypes.data, ctypes.POINTER(dtype))
-
-
-class FrameInput:
-    def __init__(self, size: int):
-        self.size = size
-
-        self.m = np.zeros((size, 1), dtype=np.uint8)
-        self.n = np.zeros((size, 1), dtype=np.uint8)
-
-        self.battle = np.zeros((size, 384), dtype=np.uint8)
-        self.durations = np.zeros((size, 8), dtype=np.uint8)
-        self.result = np.zeros((size, 1), dtype=np.uint8)
-
-        self.p1_choices = np.zeros((size, 9), dtype=np.uint8)
-        self.p2_choices = np.zeros((size, 9), dtype=np.uint8)
-
-        self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
-        self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
-
-        self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value = np.zeros((size, 1), dtype=np.float32)
-        self.score = np.zeros((size, 1), dtype=np.float32)
-
-    def ptrs_for_index(self, i: int):
-        return (
-            ptr(self.m[i], ctypes.c_uint8),
-            ptr(self.n[i], ctypes.c_uint8),
-            ptr(self.battle[i], ctypes.c_uint8),
-            ptr(self.durations[i], ctypes.c_uint8),
-            ptr(self.result[i], ctypes.c_uint8),
-            ptr(self.p1_choices[i], ctypes.c_uint8),
-            ptr(self.p2_choices[i], ctypes.c_uint8),
-            ptr(self.p1_empirical[i], ctypes.c_float),
-            ptr(self.p1_nash[i], ctypes.c_float),
-            ptr(self.p2_empirical[i], ctypes.c_float),
-            ptr(self.p2_nash[i], ctypes.c_float),
-            ptr(self.empirical_value[i], ctypes.c_float),
-            ptr(self.nash_value[i], ctypes.c_float),
-            ptr(self.score[i], ctypes.c_float),
-        )
-
-
-class EncodedFrameInput:
+class EncodedFrame:
     def __init__(self, size):
         self.size = size
 
@@ -195,22 +159,32 @@ class EncodedFrameInput:
         self.nash_value.detach_().zero_()
         self.score.detach_().zero_()
 
-    def ptrs_for_index(self, i: int):
+    def raw_pointers(self, i: int):
         return (
-            ptr(self.m[i], ctypes.c_uint8),
-            ptr(self.n[i], ctypes.c_uint8),
-            ptr(self.p1_choice_indices[i], ctypes.c_uint16),
-            ptr(self.p2_choice_indices[i], ctypes.c_uint16),
-            ptr(self.pokemon[i], ctypes.c_float),
-            ptr(self.active[i], ctypes.c_float),
-            ptr(self.hp[i], ctypes.c_float),
-            ptr(self.p1_empirical[i], ctypes.c_float),
-            ptr(self.p1_nash[i], ctypes.c_float),
-            ptr(self.p2_empirical[i], ctypes.c_float),
-            ptr(self.p2_nash[i], ctypes.c_float),
-            ptr(self.empirical_value[i], ctypes.c_float),
-            ptr(self.nash_value[i], ctypes.c_float),
-            ptr(self.score[i], ctypes.c_float),
+            ctypes.cast(self.m[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
+            ctypes.cast(self.n[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
+            ctypes.cast(
+                self.p1_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_uint16)
+            ),
+            ctypes.cast(
+                self.p2_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_uint16)
+            ),
+            ctypes.cast(self.pokemon[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(self.active[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(self.hp[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(
+                self.p1_empirical[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
+            ),
+            ctypes.cast(self.p1_nash[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(
+                self.p2_empirical[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
+            ),
+            ctypes.cast(self.p2_nash[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(
+                self.empirical_value[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
+            ),
+            ctypes.cast(self.nash_value[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
+            ctypes.cast(self.score[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
         )
 
 
@@ -230,7 +204,7 @@ def read_battle_offsets(path, n):
 def read_buffer_to_frames(
     path: str,
     max_frames: int,
-    frame_input: FrameInput,
+    frame_input: Frame,
     start_index: int = 0,
     write_prob: float = 1,
 ):
@@ -240,7 +214,7 @@ def read_buffer_to_frames(
         ctypes.c_char_p(path_bytes),
         ctypes.c_uint64(max_count),
         ctypes.c_float(write_prob),
-    ) + frame_input.ptrs_for_index(start_index)
+    ) + frame_input.raw_pointers(start_index)
     count = lib.read_buffer_to_frames(*args)
     return count
 
@@ -248,7 +222,7 @@ def read_buffer_to_frames(
 def encode_buffer(
     path: str,
     max_frames: int,
-    encoded_frame_input: EncodedFrameInput,
+    encoded_frame_input: EncodedFrame,
     start_index: int = 0,
     write_prob: float = 1,
 ):
@@ -258,7 +232,7 @@ def encode_buffer(
         ctypes.c_char_p(path_bytes),
         ctypes.c_uint64(max_count),
         ctypes.c_float(write_prob),
-    ) + encoded_frame_input.ptrs_for_index(start_index)
+    ) + encoded_frame_input.raw_pointers(start_index)
     count = lib.encode_buffer(*args)
     return count
 
@@ -267,7 +241,7 @@ def encode_buffers(
     paths: list[str],
     threads: int,
     max_count: int,
-    encoded_frame_input: EncodedFrameInput,
+    encoded_frame_input: EncodedFrame,
     start_index: int = 0,
     write_prob: float = 1,
 ):
@@ -280,6 +254,6 @@ def encode_buffers(
         ctypes.c_uint64(threads),
         ctypes.c_uint64(max_count),
         ctypes.c_float(write_prob),
-    ) + encoded_frame_input.ptrs_for_index(start_index)
+    ) + encoded_frame_input.raw_pointers(start_index)
     count = lib.encode_buffer_multithread(*args)
     return count

@@ -5,7 +5,7 @@
 #include <libpkmn/data/species.h>
 #include <libpkmn/pkmn.h>
 
-namespace SampleTeams {
+namespace Teams {
 using enum Data::Move;
 using Data::Species;
 
@@ -200,4 +200,4 @@ constexpr std::array<PKMN::Team, 2> benchmark_teams{
                   {Blizzard, BodySlam, Earthquake, HyperBeam}}},
 };
 
-} // namespace SampleTeams
+} // namespace Teams
