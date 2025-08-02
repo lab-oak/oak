@@ -350,6 +350,14 @@ struct MCTS {
         if constexpr (requires {
                         model.inference(input.battle, input.durations);
                       }) {
+
+          if constexpr (requires { model.defer(input.battle); }) {
+            // use monte carlo anyway when mon count is low enough?
+            if (model.defer(input.battle)) {
+              return init_stats_and_rollout(node->stats(), device, battle,
+                                            result);
+            }
+          }
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
               PKMN_GEN1_MAX_CHOICES);

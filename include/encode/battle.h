@@ -52,8 +52,11 @@ consteval auto dim_labels() {
 namespace Status {
 constexpr auto get_status_index(auto status, uint8_t sleeps) {
   // brn, par, psn(vol encodes tox), frz
+  assert(static_cast<bool>(status));
   if (!Data::is_sleep(status)) {
-    return std::countr_zero(static_cast<uint8_t>(status)) - 3;
+    const auto n = std::countr_zero(static_cast<uint8_t>(status)) - 3;
+    assert(n >= 0 && n <= 3);
+    return n;
   } else {
     if (!Data::self(status)) {
       assert(sleeps > 0);
@@ -83,6 +86,8 @@ static_assert(get_status_index(Data::Status::Rest3, 1) == 11);
 static_assert(get_status_index(Data::Status::Rest2, 2) == 12);
 static_assert(get_status_index(Data::Status::Rest1, 3) == 13);
 
+// toxic and poison get the same status index, toxic also has a vol flag and a
+// counter
 constexpr auto n_dim = 14;
 
 float *write(const auto status, const auto sleep, float *t) {

@@ -28,6 +28,7 @@ auto run(const BattleData &battle_data, size_t count, char mode,
         throw std::runtime_error("Could not read network params.");
         return MCTS::Output{};
       }
+      network.fill_cache(battle_data.battle);
       return run_2(dur, network);
     }
   };

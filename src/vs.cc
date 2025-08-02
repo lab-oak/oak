@@ -189,7 +189,7 @@ void thread_fn(uint64_t seed) {
                                         p2_output.p2_nash, p2_policy_options);
         }
 
-        // only if they have same sign are non both non zero
+        // only if they have same sign and are both non zero
         if ((p1_early_stop * p2_early_stop) > 0) {
           early_stop = true;
           const size_t score = (p1_early_stop > 0 ? 2 : 0);
@@ -201,9 +201,11 @@ void thread_fn(uint64_t seed) {
         const auto p2_choice = p2_choices[p2_index];
 
         if (device.uniform() < print_prob) {
-          print("UPDATE: " + std::to_string(updates));
+          print("GAME: " + std::to_string(RuntimeData::n.load()), false);
+          print(" UPDATE: " + std::to_string(updates));
           print(Strings::battle_data_to_string(battle_data.battle,
-                                               battle_data.durations, {}));
+                                               battle_data.durations, {}),
+                false);
           print("Values: " + std::to_string(p1_output.empirical_value) + " : " +
                 std::to_string(p2_output.empirical_value));
           print("Times: " + std::to_string(p1_output.duration.count()) + " : " +

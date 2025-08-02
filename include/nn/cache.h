@@ -3,48 +3,63 @@
 #include <encode/battle-key.h>
 #include <encode/battle.h>
 #include <encode/team.h>
+#include <libpkmn/data/status.h>
+#include <nn/cache.h>
 
 namespace NN {
 
-template <int dim = 39> struct PokemonCache {
+using Data::Status;
+
+template <typename T, int dim = 39> struct PokemonCache {
 
   static constexpr auto n_status = Encode::Status::n_dim + 1;
   static constexpr auto n_pp = 16;
   static constexpr uint8_t n_embeddings = n_status * n_pp;
 
-  using Slot = std::array<std::array<float, dim>, n_embeddings>;
-  using Side = std::array<Slot, 6>;
+  // all status consditions that dont use sleep duration
+  static constexpr std::array<Status, 9> status_array{
+      Status::None,      Status::Poison, Status::Burn,  Status::Freeze,
+      Status::Paralysis, Status::Rest1,  Status::Rest2, Status::Rest3};
 
-  std::array<Side, 2> sides;
+  using Embedding = std::array<T, dim>;
+  std::array<Embedding, n_embeddings> embeddings;
 
-  static void fill_slot(const auto &net, auto &slot,
-                        const PKMN::Pokemon &pokemon) {
-    std::array<float, Encode::Pokemon::n_dim> input;
+  // iterate through all move pp/status combinations for a pokemon and store
+  // embedding
+  void fill(const auto &pokemon_net, const PKMN::Pokemon &base_pokemon) {
+    auto pokemon = base_pokemon;
+    // iterate through all 16 has-pp combinations
+    for (auto m = 0; m < 16; ++m) {
 
-    for (auto s = 0; s < n_status; ++s) {
-      for (uint8_t b = 0; b < 16; ++b) {
-        auto copy = pokemon;
-        // set moves
-        for (auto m = 0; m < 4; ++m) {
-          copy.moves[m].pp = b & (1 << m);
-        }
-        Encode::Pokemon::write(copy, 0, input.data());
-        // set status index
-        if (s > 0) {
-          input[Encode::Stats::n_dim + Encode::MoveSlots::n_dim + (s - 1)] = 1;
-        }
-        auto key = 16 * s + b;
-        net.propagate(input.data(), slot[key].data());
+      // set move pp based on bits of m
+      for (auto i = 0; i < 4; ++i) {
+        pokemon.moves[i].pp = m & (1 << i);
+      }
+
+      const auto get_entry = [&pokemon_net, &pokemon, this](const auto sleep) {
+        std::array<float, Encode::Pokemon::n_dim> input{};
+        Encode::Pokemon::write(pokemon, sleep, input.data());
+        const auto key = Encode::pokemon_key(pokemon, sleep);
+        pokemon_net.propagate(input.data(), this->embeddings[key].data());
+      };
+
+      // non slept status conditions
+      for (const auto status : status_array) {
+        pokemon.status = status;
+        get_entry(0);
+      }
+
+      // slept
+      pokemon.status = Status::Sleep1;
+      for (auto sleep = 1; sleep <= 7; ++sleep) {
+        get_entry(sleep);
       }
     }
   }
 
-  void fill(const auto &net, const PKMN::Battle &battle) {
-    for (auto s = 0; s < 2; ++s) {
-      for (auto p = 0; p < 6; ++p) {
-        fill_slot(net, sides[s][p], battle.sides[s].pokemon[p]);
-      }
-    }
+  const T *get(const auto &pokemon, const auto sleep) const {
+    const auto key = Encode::pokemon_key(pokemon, sleep);
+    return embeddings[key].data();
   }
 };
 
