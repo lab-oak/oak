@@ -16,9 +16,9 @@ The second layer is a collection of programs that form a serious platorm for tra
 
 * a script for generating self-play training data
 
-* a static library to quicly convert compressed training data into a python accessible buffer
+* a static library to quicly convert compressed training data into Pytorch tensors
 
-* (TODO) a tool to compare battle networks with each other and pure MCTS
+* a tool to compare battle networks with each other and pure MCTS
 
 * a tool for engine analysis of user defined positions
 

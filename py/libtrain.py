@@ -76,8 +76,8 @@ lib.encode_buffer.argtypes = [
     ctypes.c_float,
     ctypes.POINTER(ctypes.c_uint8),  # m
     ctypes.POINTER(ctypes.c_uint8),  # n
-    ctypes.POINTER(ctypes.c_uint16),  # p1_choice_indices
-    ctypes.POINTER(ctypes.c_uint16),  # p2_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p2_choice_indices
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
@@ -99,8 +99,8 @@ lib.encode_buffer_multithread.argtypes = [
     ctypes.c_float,
     ctypes.POINTER(ctypes.c_uint8),  # m
     ctypes.POINTER(ctypes.c_uint8),  # n
-    ctypes.POINTER(ctypes.c_uint16),  # p1_choice_indices
-    ctypes.POINTER(ctypes.c_uint16),  # p2_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p2_choice_indices
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
@@ -124,8 +124,8 @@ class EncodedFrame:
         self.m = torch.zeros((size, 1), dtype=torch.uint8)
         self.n = torch.zeros((size, 1), dtype=torch.uint8)
 
-        self.p1_choice_indices = torch.zeros((size, 9), dtype=torch.uint16)
-        self.p2_choice_indices = torch.zeros((size, 9), dtype=torch.uint16)
+        self.p1_choice_indices = torch.zeros((size, 9), dtype=torch.int64)
+        self.p2_choice_indices = torch.zeros((size, 9), dtype=torch.int64)
 
         self.pokemon = torch.zeros((size, 2, 5, pokemon_in_dim), dtype=torch.float32)
         self.active = torch.zeros((size, 2, 1, active_in_dim), dtype=torch.float32)
@@ -164,10 +164,10 @@ class EncodedFrame:
             ctypes.cast(self.m[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
             ctypes.cast(self.n[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
             ctypes.cast(
-                self.p1_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_uint16)
+                self.p1_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_int64)
             ),
             ctypes.cast(
-                self.p2_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_uint16)
+                self.p2_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_int64)
             ),
             ctypes.cast(self.pokemon[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
             ctypes.cast(self.active[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),

@@ -160,8 +160,8 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
 
 extern "C" int encode_buffer(const char *path, size_t max_count,
                              float write_prob, uint8_t *m, uint8_t *n,
-                             uint16_t *p1_choice_indices,
-                             uint16_t *p2_choice_indices, float *pokemon,
+                             int64_t *p1_choice_indices,
+                             int64_t *p2_choice_indices, float *pokemon,
                              float *active, float *hp, float *p1_empirical,
                              float *p1_nash, float *p2_empirical,
                              float *p2_nash, float *empirical_value,
@@ -237,8 +237,8 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
 
 extern "C" size_t encode_buffer_multithread(
     const char *const *paths, size_t n_paths, size_t threads, size_t max_count,
-    float write_prob, uint8_t *m, uint8_t *n, uint16_t *p1_choice_indices,
-    uint16_t *p2_choice_indices, float *pokemon, float *active, float *hp,
+    float write_prob, uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
+    int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
     float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
     float *empirical_value, float *nash_value, float *score) {
 

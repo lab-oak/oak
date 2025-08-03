@@ -112,8 +112,19 @@ class MainNet(nn.Module):
         self.policy1_fc2.clamp_parameters()
         self.policy2_fc1.clamp_parameters()
         self.policy2_fc2.clamp_parameters()
-
+    
     def forward(self, x):
+        b0 = self.fc0(x)
+        value_b1 = self.value_fc1(b0)
+        value_b2 = self.value_fc2(value_b1)
+        value = torch.sigmoid(value_b2)
+        p1_policy_b1 = self.policy1_fc1(b0)
+        p1_policy_b2 = self.policy1_fc2(p1_policy_b1)
+        p2_policy_b1 = self.policy2_fc1(b0)
+        p2_policy_b2 = self.policy2_fc2(p2_policy_b1)
+        return value, p1_policy_b2, p2_policy_b2
+
+    def forward_value_only(self, x):
         b0 = self.fc0(x)
         value_b1 = self.value_fc1(b0)
         value_b2 = self.value_fc2(value_b1)
@@ -133,6 +144,8 @@ class OutputBuffers:
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
+        self.p1_policy_raw = torch.zeros(size, libtrain.policy_out_dim + 1)
+        self.p2_policy_raw = torch.zeros(size, libtrain.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -141,6 +154,10 @@ class OutputBuffers:
         self.active.detach_().zero_()
         self.sides.detach_().zero_()
         self.value.detach_().zero_()
+        self.p1_policy_raw.detach_().zero_()
+        self.p2_policy_raw.detach_().zero_()
+        self.p1_policy_raw[:, -1] = -torch.inf
+        self.p2_policy_raw[:, -1] = -torch.inf
         self.p1_policy.detach_().zero_()
         self.p2_policy.detach_().zero_()
 
@@ -203,4 +220,6 @@ class Network(torch.nn.Module):
         ).view(size, 2, 1, 5 * (1 + self.pokemon_out_dim))
         output.sides[:size, :, :, 1 + self.active_out_dim :] = pokemon_flat[:size]
         battle = output.sides[:size].view(size, 2 * self.side_out_dim)
-        output.value[:size] = self.main_net.forward(battle)
+        output.value[:size], output.p1_policy_raw[:size, :-1], output.p2_policy_raw[:size, :-1] = self.main_net.forward(battle)
+        output.p1_policy[:size] = torch.gather(output.p1_policy_raw, 1, input.p1_choice_indices[:size])
+        output.p2_policy[:size] = torch.gather(output.p2_policy_raw, 1, input.p2_choice_indices[:size])

@@ -18,6 +18,9 @@ uint16_t get_index(const PKMN::Side &side, auto choice) {
     auto moveid =
         static_cast<uint16_t>(side.stored().moves[choice_data - 1].id);
     // assert(moveid < static_cast<uint16_t>(Data::Move::Struggle));
+    if (moveid == 0) {
+      return 0;
+    }
     return moveid - 1;
   }
   case 2: {

@@ -37,19 +37,39 @@ def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=Fal
     w_empirical = 1.0
     w_score = 0.0
 
-    target = (
+    value_target = (
         w_nash * input.nash_value[:size]
         + w_empirical * input.empirical_value[:size]
         + w_score * input.score[:size]
     )
 
+    w_nash_p = .5
+    w_empirical_p = 1 - w_nash_p
+
+    p1_policy_target = w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
+    p2_policy_target = w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
+
+    p1 = output.p1_policy[:size]
+    p2 = output.p2_policy[:size]
+
+    p1_mask = torch.isneginf(p1).logical_not()
+    p2_mask = torch.isneginf(p2).logical_not()
+
+    p1_loss = torch.nn.functional.cross_entropy(p1[p1_mask], p1_policy_target[p1_mask], reduction="mean")
+    p2_loss = torch.nn.functional.cross_entropy(p2[p2_mask], p2_policy_target[p2_mask], reduction="mean")
+    value_loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
+
+    loss = value_loss + p1_loss + p2_loss
+
     if print_flag:
-        window = 10
+        window = 5
+        x = torch.nn.functional.softmax(p1[:window], 1).view(window, 1, 9)
+        y = p1_policy_target[:window].view(window, 1, 9)
         print(
             torch.cat(
                 [
                     output.value[:window],
-                    target[:window],
+                    value_target[:window],
                     input.empirical_value[:window],
                     input.nash_value[:window],
                     input.score[:window],
@@ -57,8 +77,10 @@ def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=Fal
                 dim=1,
             )
         )
+        print(torch.cat([x, y], dim=1))
+        print(f"loss: v:{value_loss.mean()}, p1:{p1_loss}, p2:{p2_loss}")
 
-    return torch.nn.functional.mse_loss(output.value[:size], target)
+    return loss
 
 def main():
     threads = 4
@@ -69,6 +91,9 @@ def main():
     parent = sys.argv[2]
     size = int(sys.argv[3])
 
+    if (os.path.exists(net_dir)):
+        print(f"Folder {net_dir} already exists. Please specify a new dir for work.")
+        return
     os.makedirs(net_dir, exist_ok=False)
 
     paths = find_battle_files(parent)

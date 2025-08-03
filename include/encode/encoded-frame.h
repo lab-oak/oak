@@ -14,8 +14,8 @@ struct EncodedFrame {
   std::array<std::array<std::array<float, Active::n_dim>, 1>, 2> active;
   std::array<std::array<float, 6>, 2> hp;
 
-  std::array<uint16_t, 9> p1_choice_indices;
-  std::array<uint16_t, 9> p2_choice_indices;
+  std::array<int64_t, 9> p1_choice_indices;
+  std::array<int64_t, 9> p2_choice_indices;
 
   EncodedFrame() = default;
   EncodedFrame(const Train::Frame &frame)
@@ -54,8 +54,8 @@ struct EncodedFrameInput {
   uint8_t *m;
   uint8_t *n;
 
-  uint16_t *p1_choice_indices;
-  uint16_t *p2_choice_indices;
+  int64_t *p1_choice_indices;
+  int64_t *p2_choice_indices;
 
   float *pokemon;
   float *active;
@@ -104,10 +104,11 @@ struct EncodedFrameInput {
 
     std::fill_n(p1_empirical, 9, 0.f);
     std::fill_n(p1_nash, 9, 0.f);
-    std::fill_n(p1_choice_indices, 9, 0);
+    // we use 'one after last' index to encode invalid index.
+    std::fill_n(p1_choice_indices, 9, Encode::Policy::n_dim);
     std::fill_n(p2_empirical, 9, 0.f);
     std::fill_n(p2_nash, 9, 0.f);
-    std::fill_n(p2_choice_indices, 9, 0);
+    std::fill_n(p2_choice_indices, 9, Encode::Policy::n_dim);
 
     for (int i = 0; i < frame.m; ++i) {
       p1_empirical[i] = target.p1_empirical[i];
