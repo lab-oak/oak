@@ -29,6 +29,11 @@ class Optimizer:
     def zero_grad(self):
         self.opt.zero_grad()
 
+def kl_div(logit, target):
+    log_probs = torch.log_softmax(logit, dim=-1)
+    kl = target * (torch.log(target) - log_probs)
+    kl = kl.masked_fill(torch.isneginf(logit), 0)
+    return kl.sum(dim=1).mean(dim=0)
 
 def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=False):
     size = min(input.size, output.size)
@@ -52,11 +57,8 @@ def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=Fal
     p1 = output.p1_policy[:size]
     p2 = output.p2_policy[:size]
 
-    p1_mask = torch.isneginf(p1).logical_not()
-    p2_mask = torch.isneginf(p2).logical_not()
-
-    p1_loss = torch.nn.functional.cross_entropy(p1[p1_mask], p1_policy_target[p1_mask], reduction="mean")
-    p2_loss = torch.nn.functional.cross_entropy(p2[p2_mask], p2_policy_target[p2_mask], reduction="mean")
+    p1_loss = kl_div(p1, p1_policy_target)
+    p2_loss = kl_div(p2, p2_policy_target)
     value_loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
 
     loss = value_loss + p1_loss + p2_loss
