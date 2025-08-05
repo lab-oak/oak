@@ -55,7 +55,12 @@ public:
                      kOut * kIn * sizeof(float))) {
       return false;
     }
-    return (in == kIn) && (out == kOut);
+    bool match = (in == kIn) && (out == kOut);
+    // if (!match) {
+    //   std::cout << in << ' ' << kIn << std::endl;
+    //   std::cout << out << ' ' << kOut << std::endl;
+    // }
+    return match;
   }
 
   bool write_parameters(std::ostream &stream) const {
