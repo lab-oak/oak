@@ -112,7 +112,7 @@ class MainNet(nn.Module):
         self.policy1_fc2.clamp_parameters()
         self.policy2_fc1.clamp_parameters()
         self.policy2_fc2.clamp_parameters()
-    
+
     def forward(self, x):
         b0 = self.fc0(x)
         value_b1 = self.value_fc1(b0)
@@ -220,6 +220,14 @@ class Network(torch.nn.Module):
         ).view(size, 2, 1, 5 * (1 + self.pokemon_out_dim))
         output.sides[:size, :, :, 1 + self.active_out_dim :] = pokemon_flat[:size]
         battle = output.sides[:size].view(size, 2 * self.side_out_dim)
-        output.value[:size], output.p1_policy_raw[:size, :-1], output.p2_policy_raw[:size, :-1] = self.main_net.forward(battle)
-        output.p1_policy[:size] = torch.gather(output.p1_policy_raw, 1, input.p1_choice_indices[:size])
-        output.p2_policy[:size] = torch.gather(output.p2_policy_raw, 1, input.p2_choice_indices[:size])
+        (
+            output.value[:size],
+            output.p1_policy_raw[:size, :-1],
+            output.p2_policy_raw[:size, :-1],
+        ) = self.main_net.forward(battle)
+        output.p1_policy[:size] = torch.gather(
+            output.p1_policy_raw, 1, input.p1_choice_indices[:size]
+        )
+        output.p2_policy[:size] = torch.gather(
+            output.p2_policy_raw, 1, input.p2_choice_indices[:size]
+        )

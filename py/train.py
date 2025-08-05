@@ -10,6 +10,7 @@ import torch
 import libtrain
 import net
 
+
 def find_battle_files(root_dir):
     battle_files = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -18,6 +19,7 @@ def find_battle_files(root_dir):
                 full_path = os.path.join(dirpath, filename)
                 battle_files.append(full_path)
     return battle_files
+
 
 class Optimizer:
     def __init__(self, network: torch.nn.Module, lr):
@@ -29,11 +31,13 @@ class Optimizer:
     def zero_grad(self):
         self.opt.zero_grad()
 
+
 def kl_div(logit, target):
     log_probs = torch.log_softmax(logit, dim=-1)
     kl = target * (torch.log(target) - log_probs)
     kl = kl.masked_fill(torch.isneginf(logit), 0)
     return kl.sum(dim=1).mean(dim=0)
+
 
 def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=False):
     size = min(input.size, output.size)
@@ -48,11 +52,15 @@ def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=Fal
         + w_score * input.score[:size]
     )
 
-    w_nash_p = .5
+    w_nash_p = 1
     w_empirical_p = 1 - w_nash_p
 
-    p1_policy_target = w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
-    p2_policy_target = w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
+    p1_policy_target = (
+        w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
+    )
+    p2_policy_target = (
+        w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
+    )
 
     p1 = output.p1_policy[:size]
     p2 = output.p2_policy[:size]
@@ -84,6 +92,7 @@ def loss(input: libtrain.EncodedFrame, output: net.OutputBuffers, print_flag=Fal
 
     return loss
 
+
 def main():
     threads = 4
     steps = 2**16
@@ -93,7 +102,7 @@ def main():
     parent = sys.argv[2]
     size = int(sys.argv[3])
 
-    if (os.path.exists(net_dir)):
+    if os.path.exists(net_dir):
         print(f"Folder {net_dir} already exists. Please specify a new dir for work.")
         return
     os.makedirs(net_dir, exist_ok=False)
