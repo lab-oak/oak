@@ -49,6 +49,85 @@ extern "C" const int value_hidden_dim = NN::value_hidden_dim;
 extern "C" const int policy_hidden_dim = NN::policy_hidden_dim;
 extern "C" const int policy_out_dim = NN::policy_out_dim;
 
+extern "C" int get_compressed_battles_helper(const char *path, char *out_data,
+                                             uint16_t *offsets, uint16_t *frame_counts) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    std::cerr << "Failed to open file: " << path << std::endl;
+    return -1;
+  }
+
+  int n_games = 0;
+  size_t total_offset = 0;
+  while (true) {
+    uint16_t offset;
+    uint16_t frame_count;
+    file.read(reinterpret_cast<char *>(&offset), 2);
+    if (file.gcount() < 2) {
+      std::cerr << "bad offset read" << std::endl;
+      return -1;
+    }
+    file.read(reinterpret_cast<char *>(&frame_count), 2);
+    if (file.gcount() < 2) {
+      std::cerr << "bad frame count read" << std::endl;
+      return -1;
+    }
+    file.seekg(-4, std::ios::cur);
+
+    std::vector<char> buffer;
+    buffer.reserve(offset);
+    file.read(buffer.data(), offset);
+
+    if (file.gcount() < offset) {
+      std::cerr << "truncated battle frame" << std::endl;
+      return -1;
+    }
+
+    std::memcpy(out_data + total_offset, buffer.data(), offset);
+    offsets[n_games] = offset;
+    frame_counts[n_games] = frame_count;
+    total_offset += offset;
+    ++n_games;
+
+    if (file.peek() == EOF) {
+      break;
+    }
+  }
+
+  return n_games;
+}
+
+extern "C" void uncompress_training_frames(
+    const char *data, uint8_t *m, uint8_t *n, uint8_t *battle,
+    uint8_t *durations, uint8_t *result, uint8_t *p1_choices,
+    uint8_t *p2_choices, float *p1_empirical, float *p1_nash,
+    float *p2_empirical, float *p2_nash, float *empirical_value,
+    float *nash_value, float *score) {
+
+  Train::CompressedFrames<> compressed_frames{};
+  compressed_frames.read(data);
+
+  Train::FrameInput input{.m = m,
+                          .n = n,
+                          .battle = battle,
+                          .durations = durations,
+                          .result = result,
+                          .p1_choices = p1_choices,
+                          .p2_choices = p2_choices,
+                          .p1_empirical = p1_empirical,
+                          .p1_nash = p1_nash,
+                          .p2_empirical = p2_empirical,
+                          .p2_nash = p2_nash,
+                          .empirical_value = empirical_value,
+                          .nash_value = nash_value,
+                          .score = score};
+
+  const auto frames = compressed_frames.uncompress();
+  for (const auto frame : frames) {
+    input.write(frame);
+  }
+}
+
 extern "C" int read_battle_offsets(const char *path, uint16_t *out,
                                    size_t max_games) {
   std::ifstream file(path, std::ios::binary);
@@ -71,8 +150,7 @@ extern "C" int read_battle_offsets(const char *path, uint16_t *out,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::CompressedFrames<> battle_frames{};
-    battle_frames.read(buf);
+
     out[n_games++] = offset;
     if (file.peek() == EOF) {
       return n_games;

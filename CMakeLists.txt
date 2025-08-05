@@ -60,9 +60,9 @@ add_executable(generate src/generate.cc)
 target_include_directories(generate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(generate PRIVATE libpkmn_chance lrslib128 eigen)
 
-add_library(train SHARED src/train.cc)
-target_include_directories(train PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(train PRIVATE libpkmn_chance)
+add_library(pyoak SHARED src/pyoak.cc)
+target_include_directories(pyoak PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(pyoak PRIVATE libpkmn_chance)
 
 add_executable(decompress src/decompress.cc)
 target_include_directories(decompress PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
