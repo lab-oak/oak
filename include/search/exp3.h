@@ -3,6 +3,7 @@
 #pragma once
 
 #include <util/int.h>
+#include <util/softmax.h>
 
 #include <algorithm>
 #include <array>
@@ -14,21 +15,9 @@
 #include <util/to_char.h>
 #include <vector>
 
-constexpr float neg_inf = -std::numeric_limits<float>::infinity();
-
 namespace Exp3 {
 
-void softmax(auto &forecast, const auto &gains, float eta) {
-  float sum = 0;
-  for (auto i = 0; i < 9; ++i) {
-    const float y = std::exp(gains[i] * eta);
-    forecast[i] = y;
-    sum += y;
-  }
-  for (auto i = 0; i < 9; ++i) {
-    forecast[i] /= sum;
-  }
-}
+constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
 template <bool enabled> struct JointBanditDataBase;
 

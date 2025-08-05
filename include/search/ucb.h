@@ -79,8 +79,8 @@ public:
     _cols = cols;
     std::fill(p1_score.begin(), p1_score.begin() + rows, 0);
     std::fill(p2_score.begin(), p2_score.begin() + cols, 0);
-    std::fill(this->p1_visits.begin(), this->p1_visits.begin() + rows, 1);
-    std::fill(this->p2_visits.begin(), this->p2_visits.begin() + cols, 1);
+    std::fill(this->p1_visits.begin(), this->p1_visits.begin() + rows, 0);
+    std::fill(this->p2_visits.begin(), this->p2_visits.begin() + cols, 0);
   }
 
   bool is_init() const noexcept { return this->_rows != 0; }
@@ -103,12 +103,16 @@ public:
       for (auto i = 0; i < _rows; ++i) {
         q[i] = (float)p1_score[i] / p1_visits[i];
         N += p1_visits[i];
-        // can_halve &= p1_visits[i] | ~0xFFF;
       }
       float log_N = log(N);
       float max = 0;
+      const float p = 1.0 / _rows;
       for (auto i = 0; i < _rows; ++i) {
-        float e = c_ucb * sqrt(log_N / p1_visits[i]);
+        if (p1_visits[i] == 0) {
+          outcome.p1_index = i;
+          break;
+        }
+        float e = c_ucb * p * sqrt(log_N / p1_visits[i]);
         float a = e + q[i];
         if (a > max) {
           max = a;
@@ -128,8 +132,13 @@ public:
       }
       float log_N = log(N);
       float max = 0;
+      const float p = 1.0 / _cols;
       for (auto i = 0; i < _cols; ++i) {
-        float e = sqrt(log_N / p2_visits[i]);
+        if (p2_visits[i] == 0) {
+          outcome.p2_index = i;
+          break;
+        }
+        float e = c_ucb * p * sqrt(log_N / p2_visits[i]);
         float a = e + q[i];
         if (a > max) {
           max = a;
