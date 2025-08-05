@@ -2,11 +2,13 @@
 
 #include <pkmn.h>
 
+#include <encode/policy.h>
 #include <libpkmn/layout.h>
 #include <libpkmn/strings.h>
 #include <search/durations.h>
 #include <search/tree.h>
 #include <util/random.h>
+#include <util/softmax.h>
 
 #include <chrono>
 #include <iostream>
@@ -96,15 +98,17 @@ struct MCTS {
     *this = {};
     // if the node is not already init then a value estimate is wasted on the
     // first iteration
-    if (!node.is_init()) {
-      auto m = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P1,
-                                        pkmn_result_p1(input.result),
-                                        choices.data(), PKMN_GEN1_MAX_CHOICES);
-      auto n = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P2,
-                                        pkmn_result_p2(input.result),
-                                        choices.data(), PKMN_GEN1_MAX_CHOICES);
-      node.init(m, n);
-    }
+    // if (!node.is_init()) {
+    //   auto m = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P1,
+    //                                     pkmn_result_p1(input.result),
+    //                                     choices.data(),
+    //                                     PKMN_GEN1_MAX_CHOICES);
+    //   auto n = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P2,
+    //                                     pkmn_result_p2(input.result),
+    //                                     choices.data(),
+    //                                     PKMN_GEN1_MAX_CHOICES);
+    //   node.init(m, n);
+    // }
 
     // copy the state, do single mcts forward/backward, return player 1 leaf
     // value
@@ -358,17 +362,57 @@ struct MCTS {
                                             result);
             }
           }
-          const auto m = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
-              PKMN_GEN1_MAX_CHOICES);
-          const auto n = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
-              PKMN_GEN1_MAX_CHOICES);
-          node->stats().init(m, n);
-          const float value = model.inference(
-              input.battle,
-              *pkmn_gen1_battle_options_chance_durations(&options));
-          return {value, 1 - value};
+
+          if constexpr (requires {
+                          node->stats().init_priors(nullptr, nullptr);
+                        }) {
+            const auto &b = View::ref(input.battle);
+            const auto m = pkmn_gen1_battle_choices(
+                &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
+                PKMN_GEN1_MAX_CHOICES);
+            std::array<uint16_t, 9> p1_choice_indices;
+            for (auto i = 0; i < m; ++i) {
+              p1_choice_indices[i] =
+                  Encode::Policy::get_index(b.sides[0], choices[i]);
+            }
+            const auto n = pkmn_gen1_battle_choices(
+                &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
+                PKMN_GEN1_MAX_CHOICES);
+            std::array<uint16_t, 9> p2_choice_indices;
+            for (auto i = 0; i < n; ++i) {
+              p2_choice_indices[i] =
+                  Encode::Policy::get_index(b.sides[1], choices[i]);
+            }
+            node->stats().init(m, n);
+            std::array<float, 9> p1_logit;
+            std::array<float, 9> p2_logit;
+            const float value = model.inference(
+                input.battle,
+                *pkmn_gen1_battle_options_chance_durations(&options), m, n,
+                p1_choice_indices.data(), p2_choice_indices.data(),
+                p1_logit.data(), p2_logit.data());
+
+            std::array<float, 9> p1;
+            std::array<float, 9> p2;
+            softmax(p1.data(), p1_logit.data(), m);
+            softmax(p2.data(), p2_logit.data(), n);
+            node->stats().init_priors(p1.data(), p2.data());
+
+            return {value, 1 - value};
+
+          } else {
+            const auto m = pkmn_gen1_battle_choices(
+                &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
+                PKMN_GEN1_MAX_CHOICES);
+            const auto n = pkmn_gen1_battle_choices(
+                &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
+                PKMN_GEN1_MAX_CHOICES);
+            node->stats().init(m, n);
+            const float value = model.inference(
+                input.battle,
+                *pkmn_gen1_battle_options_chance_durations(&options));
+            return {value, 1 - value};
+          }
         } else {
           // model is monte-carlo
           return init_stats_and_rollout(node->stats(), device, battle, result);

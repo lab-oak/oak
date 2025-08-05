@@ -3,8 +3,10 @@
 #include <libpkmn/options.h>
 #include <libpkmn/strings.h>
 #include <nn/network.h>
+#include <search/exp3-policy.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
+#include <search/ucb-policy.h>
 #include <search/ucb.h>
 #include <train/compressed-frame.h>
 #include <util/random.h>
@@ -49,6 +51,12 @@ using Exp3_20 = Exp3::JointBanditData<0.2f>;
 using UCB_05 = UCB::JointBanditData<0.5f>;
 using UCB_10 = UCB::JointBanditData<1.0f>;
 using UCB_20 = UCB::JointBanditData<2.0f>;
+using Exp3p_10 = Exp3Policy::JointBanditData<.1f>;
+using Exp3p_20 = Exp3Policy::JointBanditData<.2f>;
+using Exp3p_50 = Exp3Policy::JointBanditData<.5f>;
+using UCBp_05 = UCBPolicy::JointBanditData<0.5f>;
+using UCBp_10 = UCBPolicy::JointBanditData<1.0f>;
+using UCBp_20 = UCBPolicy::JointBanditData<2.0f>;
 
 namespace RuntimeData {
 bool terminated = false;
@@ -170,7 +178,8 @@ void thread_fn(uint64_t seed) {
         int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
           p1_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
-                                         UCB_10, UCB_20>(
+                                         UCB_10, UCB_20, Exp3p_10, Exp3p_20,
+                                         Exp3p_50, UCBp_05, UCBp_10, UCBp_20>(
               battle_data, p1_search_options.count,
               p1_search_options.count_mode, p1_search_options.bandit_name,
               p1_search_options.battle_network_path);
@@ -181,7 +190,8 @@ void thread_fn(uint64_t seed) {
         }
         if (p2_choices.size() > 1) {
           p2_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
-                                         UCB_10, UCB_20>(
+                                         UCB_10, UCB_20, Exp3p_10, Exp3p_20,
+                                         Exp3p_50, UCBp_05, UCBp_10, UCBp_20>(
               battle_data, p2_search_options.count,
               p2_search_options.count_mode, p2_search_options.bandit_name,
               p2_search_options.battle_network_path);
@@ -224,18 +234,29 @@ void thread_fn(uint64_t seed) {
                 battle_data.battle.bytes + Layout::Sizes::Side, p2_choices[i]));
           }
 
-          print("P1 choices/empiricial/nash:");
+          print("P1:");
           print(container_string(p1_labels));
+          print("agent 1 empirical/nash");
           print(container_string(p1_output.p1_empirical));
           print(container_string(p1_output.p1_nash));
-          print(
-              Strings::side_choice_string(battle_data.battle.bytes, p1_choice));
-          print("P2 choices/empiricial/nash:");
+          print("agent 2 empirical/nash");
+          print(container_string(p2_output.p1_empirical));
+          print(container_string(p2_output.p1_nash));
+
+          print("P2:");
           print(container_string(p2_labels));
+          print("agent 1 empirical/nash");
+          print(container_string(p1_output.p2_empirical));
+          print(container_string(p1_output.p2_nash));
+          print("agent 2 empirical/nash");
           print(container_string(p2_output.p2_empirical));
           print(container_string(p2_output.p2_nash));
-          print(Strings::side_choice_string(battle_data.battle.bytes + 184,
-                                            p2_choice));
+
+          print(
+              Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
+              "/" +
+              Strings::side_choice_string(battle_data.battle.bytes + 184,
+                                          p2_choice));
         }
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
                                           p2_choice, battle_options);
@@ -265,6 +286,15 @@ void thread_fn(uint64_t seed) {
     if (RuntimeData::terminated) {
       return;
     }
+  }
+}
+
+void progress_thread_fn(int sec) {
+  while (!RuntimeData::terminated) {
+    sleep(sec);
+    std::cout << "score: "
+              << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
+              << " over " << RuntimeData::n.load() << " games." << std::endl;
   }
 }
 
@@ -330,9 +360,11 @@ int main(int argc, char **argv) {
   for (auto t = 0; t < threads; ++t) {
     thread_pool.emplace_back(std::thread{&thread_fn, device.uniform_64()});
   }
+  auto progress_thread = std::thread(&progress_thread_fn, 30);
   for (auto &thread : thread_pool) {
     thread.join();
   }
+  progress_thread.join();
 
   std::cout << "score: "
             << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
