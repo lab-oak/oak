@@ -1,5 +1,6 @@
 #pragma once
 
+#include <encode/policy.h>
 #include <nn/affine.h>
 
 namespace NN {
@@ -77,11 +78,49 @@ struct MainNet {
   // TODO for now main does not do policy out, thats done by full net
   float propagate(const float *input_data) const {
     static thread_local float buffer0[hidden_dim];
-    static thread_local float value_buffer1[hidden_dim];
+    static thread_local float value_buffer1[value_hidden_dim];
     static thread_local float value_buffer2[1];
     fc0.propagate(input_data, buffer0);
     value_fc1.propagate(buffer0, value_buffer1);
     value_fc2.propagate(value_buffer1, value_buffer2);
+    return 1 / (1 + std::exp(-value_buffer2[0]));
+  }
+
+  float propagate(const float *input_data, const auto m, const auto n,
+                  const auto *p1_choice_index, const auto *p2_choice_index,
+                  float *p1, float *p2) const {
+    static thread_local float buffer0[hidden_dim];
+    static thread_local float value_buffer1[value_hidden_dim];
+    static thread_local float value_buffer2[1];
+    static thread_local float policy1_buffer1[policy_hidden_dim];
+    static thread_local float policy2_buffer1[policy_hidden_dim];
+
+    fc0.propagate(input_data, buffer0);
+    value_fc1.propagate(buffer0, value_buffer1);
+    value_fc2.propagate(value_buffer1, value_buffer2);
+    policy1_fc1.propagate(buffer0, policy1_buffer1);
+    policy2_fc1.propagate(buffer0, policy2_buffer1);
+
+    for (auto i = 0; i < m; ++i) {
+      const auto p1_c = p1_choice_index[i];
+      assert(p1_c < Encode::Policy::n_dim);
+      const float logit =
+          policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              policy1_buffer1, value_hidden_dim)) +
+          policy1_fc2.biases[p1_c];
+        p1[i] = logit;
+    }
+
+    for (auto i = 0; i < n; ++i) {
+      const auto p2_c = p2_choice_index[i];
+      assert(p2_c < Encode::Policy::n_dim);
+      const float logit =
+          policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              policy2_buffer1, value_hidden_dim)) +
+          policy2_fc2.biases[p2_c];
+      p2[i] = logit;
+    }
+
     return 1 / (1 + std::exp(-value_buffer2[0]));
   }
 };
