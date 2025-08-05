@@ -45,7 +45,7 @@ std::string container_string(const auto &v) {
   return ss.str();
 }
 
-using Exp3_03 = Exp3::JointBanditData<0.3f>;
+using Exp3_03 = Exp3::JointBanditData<0.03f>;
 using Exp3_10 = Exp3::JointBanditData<0.1f>;
 using Exp3_20 = Exp3::JointBanditData<0.2f>;
 using UCB_05 = UCB::JointBanditData<0.5f>;
@@ -72,7 +72,7 @@ double early_stop_log = 3.5;
 struct SearchOptions {
   std::string battle_network_path = "mc";
   char count_mode = 'i';
-  std::string bandit_name = "exp3-0.29";
+  std::string bandit_name = "exp3-0.029";
   size_t count = {1 << 10};
 
   std::string to_string() const {

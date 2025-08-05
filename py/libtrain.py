@@ -3,44 +3,9 @@ from frame import Frame
 import ctypes
 import os
 
-import torch
-
 import numpy as np
 
 lib = ctypes.CDLL("./build/libpyoak.so")
-
-# net hyperparams
-pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
-active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
-pokemon_hidden_dim = ctypes.c_int.in_dll(lib, "pokemon_hidden_dim").value
-pokemon_out_dim = ctypes.c_int.in_dll(lib, "pokemon_out_dim").value
-active_hidden_dim = ctypes.c_int.in_dll(lib, "active_hidden_dim").value
-active_out_dim = ctypes.c_int.in_dll(lib, "active_out_dim").value
-side_out_dim = ctypes.c_int.in_dll(lib, "side_out_dim").value
-hidden_dim = ctypes.c_int.in_dll(lib, "hidden_dim").value
-value_hidden_dim = ctypes.c_int.in_dll(lib, "value_hidden_dim").value
-policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
-policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
-
-# dimension labels for encoding, lists of strings
-pokemon_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(
-    lib, "pokemon_dim_labels"
-)
-active_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "active_dim_labels")
-policy_dim_labels_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "policy_dim_labels")
-
-
-def char_pp_to_str_list(char_pp, count):
-    return [char_pp[i].decode("utf-8") for i in range(count)]
-
-
-pokemon_dim_labels: list[str] = char_pp_to_str_list(
-    pokemon_dim_labels_raw, pokemon_in_dim
-)
-active_dim_labels: list[str] = char_pp_to_str_list(active_dim_labels_raw, active_in_dim)
-policy_dim_labels: list[str] = char_pp_to_str_list(
-    policy_dim_labels_raw, policy_out_dim
-)
 
 # functions
 lib.read_battle_offsets.argtypes = [
@@ -143,76 +108,9 @@ lib.encode_buffer_multithread.restype = ctypes.c_uint64
 
 # Python
 
+import numpy as np
+import ctypes
 
-class EncodedFrame:
-    def __init__(self, size):
-        self.size = size
-
-        self.m = torch.zeros((size, 1), dtype=torch.uint8)
-        self.n = torch.zeros((size, 1), dtype=torch.uint8)
-
-        self.p1_choice_indices = torch.zeros((size, 9), dtype=torch.int64)
-        self.p2_choice_indices = torch.zeros((size, 9), dtype=torch.int64)
-
-        self.pokemon = torch.zeros((size, 2, 5, pokemon_in_dim), dtype=torch.float32)
-        self.active = torch.zeros((size, 2, 1, active_in_dim), dtype=torch.float32)
-        self.hp = torch.zeros((size, 2, 6, 1), dtype=torch.float32)
-
-        self.p1_empirical = torch.zeros((size, 9), dtype=torch.float32)
-        self.p1_nash = torch.zeros((size, 9), dtype=torch.float32)
-        self.p2_empirical = torch.zeros((size, 9), dtype=torch.float32)
-        self.p2_nash = torch.zeros((size, 9), dtype=torch.float32)
-
-        self.empirical_value = torch.zeros((size, 1), dtype=torch.float32)
-        self.nash_value = torch.zeros((size, 1), dtype=torch.float32)
-        self.score = torch.zeros((size, 1), dtype=torch.float32)
-
-    def clear(self):
-        self.m.detach_().zero_()
-        self.n.detach_().zero_()
-        self.p1_choice_indices.detach_().zero_()
-        self.p2_choice_indices.detach_().zero_()
-
-        self.pokemon.detach_().zero_()
-        self.active.detach_().zero_()
-        self.hp.detach_().zero_()
-
-        self.p1_empirical.detach_().zero_()
-        self.p1_nash.detach_().zero_()
-        self.p2_empirical.detach_().zero_()
-        self.p2_nash.detach_().zero_()
-
-        self.empirical_value.detach_().zero_()
-        self.nash_value.detach_().zero_()
-        self.score.detach_().zero_()
-
-    def raw_pointers(self, i: int):
-        return (
-            ctypes.cast(self.m[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
-            ctypes.cast(self.n[i].data_ptr(), ctypes.POINTER(ctypes.c_uint8)),
-            ctypes.cast(
-                self.p1_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_int64)
-            ),
-            ctypes.cast(
-                self.p2_choice_indices[i].data_ptr(), ctypes.POINTER(ctypes.c_int64)
-            ),
-            ctypes.cast(self.pokemon[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(self.active[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(self.hp[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(
-                self.p1_empirical[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
-            ),
-            ctypes.cast(self.p1_nash[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(
-                self.p2_empirical[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
-            ),
-            ctypes.cast(self.p2_nash[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(
-                self.empirical_value[i].data_ptr(), ctypes.POINTER(ctypes.c_float)
-            ),
-            ctypes.cast(self.nash_value[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-            ctypes.cast(self.score[i].data_ptr(), ctypes.POINTER(ctypes.c_float)),
-        )
 
 # Returns a list tuples containing: a bytes object, the number of wrtten to the bytes
 def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]]:
@@ -245,6 +143,7 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
 
     return result
 
+
 # convert bytes object into Frames
 def get_frames(data: bytes, frame_count: int) -> Frame:
     print(frame_count)
@@ -252,6 +151,7 @@ def get_frames(data: bytes, frame_count: int) -> Frame:
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
+
 
 def read_battle_offsets(path, n):
     path_bytes = path.encode("utf-8")

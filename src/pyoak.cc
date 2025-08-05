@@ -3,6 +3,7 @@
 #include <encode/policy.h>
 #include <encode/team.h>
 #include <nn/params.h>
+#include <train/build-trajectory.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
 #include <util/debug-log.h>
@@ -16,7 +17,7 @@
 #include <thread>
 #include <vector>
 
-auto dim_labels_to_c(const auto &data) {
+constexpr auto dim_labels_to_c(const auto &data) {
   constexpr auto size = data.size();
   std::array<const char *, size> ptrs{};
   auto i = 0;
@@ -25,6 +26,28 @@ auto dim_labels_to_c(const auto &data) {
   }
   return ptrs;
 }
+
+const auto move_names_ptrs = dim_labels_to_c(Data::MOVE_CHAR_ARRAY);
+const auto species_names_ptrs = dim_labels_to_c(Data::SPECIES_CHAR_ARRAY);
+extern "C" const char *const *move_names = move_names_ptrs.data();
+extern "C" const char *const *species_names = species_names_ptrs.data();
+
+extern "C" const auto species_move_list_size =
+    static_cast<int>(Encode::Team::species_move_list_size);
+
+consteval auto get_species_move_list_py() {
+  std::array<int, species_move_list_size * 2> result{};
+  for (auto i = 0; i < species_move_list_size; ++i) {
+    const auto pair = Encode::Team::SPECIES_MOVE_LIST[i];
+    result[2 * i] = static_cast<int>(pair.first);
+    result[2 * i + 1] = static_cast<int>(pair.second);
+  }
+  return result;
+}
+
+const auto species_move_list_py = get_species_move_list_py();
+
+extern "C" const int *species_move_list_ptrs = species_move_list_py.data();
 
 const auto pokemon_dim_label_ptrs =
     dim_labels_to_c(Encode::Pokemon::dim_labels);
@@ -50,7 +73,8 @@ extern "C" const int policy_hidden_dim = NN::policy_hidden_dim;
 extern "C" const int policy_out_dim = NN::policy_out_dim;
 
 extern "C" int get_compressed_battles_helper(const char *path, char *out_data,
-                                             uint16_t *offsets, uint16_t *frame_counts) {
+                                             uint16_t *offsets,
+                                             uint16_t *frame_counts) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     std::cerr << "Failed to open file: " << path << std::endl;
@@ -125,6 +149,37 @@ extern "C" void uncompress_training_frames(
   const auto frames = compressed_frames.uncompress();
   for (const auto frame : frames) {
     input.write(frame);
+  }
+}
+
+extern "C" void uncompress_and_encode_training_frames(
+    const char *data, uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
+    int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
+    float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
+    float *empirical_value, float *nash_value, float *score) {
+
+  Train::CompressedFrames<> compressed_frames{};
+  compressed_frames.read(data);
+
+  Encode::EncodedFrameInput input{.m = m,
+                                  .n = n,
+                                  .p1_choice_indices = p1_choice_indices,
+                                  .p2_choice_indices = p2_choice_indices,
+                                  .pokemon = pokemon,
+                                  .active = active,
+                                  .hp = hp,
+                                  .p1_empirical = p1_empirical,
+                                  .p1_nash = p1_nash,
+                                  .p2_empirical = p2_empirical,
+                                  .p2_nash = p2_nash,
+                                  .empirical_value = empirical_value,
+                                  .nash_value = nash_value,
+                                  .score = score};
+
+  const auto frames = compressed_frames.uncompress();
+  for (const auto frame : frames) {
+    Encode::EncodedFrame encoded{frame};
+    input.write(encoded, frame.target);
   }
 }
 
@@ -415,4 +470,43 @@ extern "C" size_t encode_buffer_multithread(
   }
 
   return std::min(count.load(), max_count);
+}
+
+extern "C" int read_build_buffer(const char *path, int64_t *action,
+                                 float *policy, float *eval, float *score) {
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    std::cerr << "Failed to open file: " << path << std::endl;
+    return -1;
+  }
+
+  Train::BuildTrajectoryInput input{
+      .action = action, .policy = policy, .eval = eval, .score = score};
+
+  const auto ptrs = std::bit_cast<std::array<void *, 4>>(input);
+  for (const auto *x : ptrs) {
+    if (!x) {
+      std::cerr << "read_build_buffer: null pointer in input" << std::endl;
+      return -1;
+    }
+  }
+
+  int count = 0;
+  constexpr auto size = sizeof(Train::BuildTrajectory);
+
+  while (true) {
+    Train::BuildTrajectory traj;
+    file.read(reinterpret_cast<char *>(&traj), size);
+    if (file.gcount() < size) {
+      std::cerr << "bad build trajectory read" << std::endl;
+      return -1;
+    }
+
+    input.write(traj);
+
+    if (file.peek() == EOF) {
+      return count;
+    }
+  }
 }

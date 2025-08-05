@@ -1,6 +1,7 @@
 import numpy as np
 import ctypes
 
+
 class Frame:
     def __init__(self, size: int):
         self.size = size

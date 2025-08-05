@@ -4,7 +4,9 @@ namespace Train {
 
 #pragma pack(push, 1)
 struct ActionPolicy {
+  // index of unrolled species/move list - see
   uint16_t action;
+  // quantized prob of selecting the above action
   uint16_t policy;
 
   ActionPolicy() = default;
@@ -21,6 +23,24 @@ struct BuildTrajectory {
   uint16_t score;
 };
 #pragma pack(pop)
+
+struct BuildTrajectoryInput {
+  int64_t *action;
+  float *policy;
+  float *eval;
+  float *score;
+
+  void write(const BuildTrajectory &traj) {
+    constexpr float den = std::numeric_limits<uint16_t>::max();
+
+    for (auto i = 0; i < 31; ++i) {
+      *action++ = traj.frames[i].action;
+      *policy++ = traj.frames[i].policy / den;
+    }
+    *eval++ = traj.eval / den;
+    *score++ = traj.score / 2;
+  }
+};
 
 static_assert(sizeof(BuildTrajectory) == (32 * 4));
 
