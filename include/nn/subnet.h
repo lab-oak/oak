@@ -108,7 +108,7 @@ struct MainNet {
           policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
               policy1_buffer1, value_hidden_dim)) +
           policy1_fc2.biases[p1_c];
-        p1[i] = logit;
+      p1[i] = logit;
     }
 
     for (auto i = 0; i < n; ++i) {
