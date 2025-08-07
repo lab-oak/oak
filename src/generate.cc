@@ -279,7 +279,7 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--bandit-mode=")) {
       Search::bandit_mode = arg[14];
     } else if (arg.starts_with("--battle-network-path=")) {
-      Search::battle_network_path = arg.substr(23);
+      Search::battle_network_path = arg.substr(22);
     } else if (arg.starts_with("--policy-mode=")) {
       Search::policy_mode = arg[14];
     } else if (arg.starts_with("--policy-temp=")) {
@@ -666,6 +666,17 @@ void generate(uint64_t seed) {
 
     SearchData search_data{NN::Network{}, std::make_unique<Exp3Node>(),
                            std::make_unique<UCBNode>()};
+
+    std::ifstream file{RuntimeOptions::Search::battle_network_path};
+    if (!file) {
+      std::cerr << "failed to open file" << std::endl;
+    }
+    if (!search_data.battle_network.read_parameters(file)) {
+      std::cerr << "no battle load " << std::endl;
+      throw std::runtime_error{"Failed to load network"};
+    }
+    search_data.battle_network.fill_cache(battle);
+
     Train::CompressedFrames<> training_frames{battle_data.battle};
 
     size_t updates = 0;

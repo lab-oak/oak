@@ -2,165 +2,95 @@
 
 #pragma once
 
-#include <util/int.h>
 #include <util/softmax.h>
 
 #include <algorithm>
 #include <array>
 #include <assert.h>
 #include <cmath>
-#include <cstdint>
-#include <sstream>
-#include <string>
-#include <util/to_char.h>
-#include <vector>
 
 namespace Exp3 {
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
-template <bool enabled> struct JointBanditDataBase;
-
-template <> struct JointBanditDataBase<true> {
-  std::array<float, 9> p1_gains;
-  std::array<float, 9> p2_gains;
-  std::array<uint24_t, 9> p1_visits;
-  std::array<uint24_t, 9> p2_visits;
-  uint8_t _rows;
-  uint8_t _cols;
+struct Params {
+  Params(const float gamma) : gamma{gamma}, one_minus_gamma{1 - gamma} {}
+  float gamma;
+  float one_minus_gamma;
 };
 
-template <> struct JointBanditDataBase<false> {
-  std::array<float, 9> p1_gains;
-  std::array<float, 9> p2_gains;
-  uint8_t _rows;
-  uint8_t _cols;
-};
+struct Bandit {
 
-#pragma pack(push, 1)
-template <float gamma = .1f, bool enable_visits = false>
-class JointBanditData : public JointBanditDataBase<enable_visits> {
-  static auto consteval get_name() {
-    constexpr auto trailing_precision = 3;
-    std::array<char, 5 + 3 + trailing_precision> name{"exp3-"};
-    auto gamma_char = to_char<gamma, trailing_precision>();
-    for (auto i = 0; i < 3 + trailing_precision; ++i) {
-      name[i + 5] = gamma_char[i];
-    }
-    return name;
+  std::array<float, 9> gains;
+  uint8_t k;
+
+  void init(const auto k) noexcept {
+    this->k = k;
+    std::fill(gains.begin(), gains.begin() + k, 0);
+    std::fill(gains.begin() + k, gains.end(), neg_inf);
   }
 
-public:
-  static constexpr std::array<char, 11> name = get_name();
+  void select(auto &device, const Params &params,
+              auto &outcome) const noexcept {
+    std::array<float, 9> policy;
+    if (k == 1) {
+      outcome.index = 0;
+      outcome.prob = 1;
+    } else {
+      const float eta{params.gamma / k};
+      softmax(policy, gains, eta);
+      std::transform(policy.begin(), policy.end(), policy.begin(),
+                     [eta, &params](const float value) {
+                       return params.one_minus_gamma * value + eta;
+                     });
+      outcome.index = device.sample_pdf(policy);
+      outcome.prob = policy[outcome.index];
+    }
+  }
 
-  using JointBanditDataBase<enable_visits>::p1_gains;
-  using JointBanditDataBase<enable_visits>::p2_gains;
-  using JointBanditDataBase<enable_visits>::_rows;
-  using JointBanditDataBase<enable_visits>::_cols;
+  void update(const auto &outcome) noexcept {
+    if ((gains[outcome.index] += outcome.value / outcome.prob) >= 0) {
+      const auto max = gains[outcome.index];
+      for (auto &v : gains) {
+        v -= max;
+      }
+    }
+  }
+};
+
+struct JointBandit {
 
   struct Outcome {
-    float p1_value;
-    float p2_value;
-    float p1_mu;
-    float p2_mu;
-    uint8_t p1_index;
-    uint8_t p2_index;
+    float value;
+    float prob;
+    uint8_t index;
   };
 
-  void init(auto rows, auto cols) noexcept {
-    _rows = rows;
-    _cols = cols;
-    std::fill(p1_gains.begin(), p1_gains.begin() + rows, 0);
-    std::fill(p2_gains.begin(), p2_gains.begin() + cols, 0);
-    std::fill(p1_gains.begin() + rows, p1_gains.end(), neg_inf);
-    std::fill(p2_gains.begin() + cols, p2_gains.end(), neg_inf);
-    if constexpr (enable_visits) {
-      std::fill(this->p1_visits.begin(), this->p1_visits.begin() + rows,
-                uint24_t{});
-      std::fill(this->p2_visits.begin(), this->p2_visits.begin() + cols,
-                uint24_t{});
-    }
+  struct JointOutcome {
+    Outcome p1;
+    Outcome p2;
+  };
+
+  Bandit p1;
+  Bandit p2;
+
+  void init(const auto m, const auto n) noexcept {
+    p1.init(m);
+    p2.init(n);
   }
 
-  bool is_init() const noexcept { return this->_rows != 0; }
+  bool is_init() const noexcept { return p1.k != 0; }
 
-  template <typename Outcome> void update(const Outcome &outcome) noexcept {
-    if constexpr (enable_visits) {
-      ++this->p1_visits[outcome.p1_index];
-      ++this->p2_visits[outcome.p2_index];
-    }
-
-    if ((p1_gains[outcome.p1_index] += outcome.p1_value / outcome.p1_mu) >= 0) {
-      const auto max = p1_gains[outcome.p1_index];
-      for (auto &v : p1_gains) {
-        v -= max;
-      }
-    }
-    if ((p2_gains[outcome.p2_index] += outcome.p2_value / outcome.p2_mu) >= 0) {
-      const auto max = p2_gains[outcome.p2_index];
-      for (auto &v : p2_gains) {
-        v -= max;
-      }
-    }
+  void select(auto &device, const Params &params,
+              JointOutcome &outcome) const noexcept {
+    p1.select(device, params, outcome.p1);
+    p2.select(device, params, outcome.p2);
   }
 
-  template <typename PRNG, typename Outcome>
-  void select(PRNG &device, Outcome &outcome) const noexcept {
-    constexpr float one_minus_gamma = 1 - gamma;
-    std::array<float, 9> forecast{};
-    if (_rows == 1) {
-      outcome.p1_index = 0;
-      outcome.p1_mu = 1;
-    } else {
-      const float eta{gamma / _rows};
-      softmax(forecast, p1_gains, eta);
-      std::transform(
-          forecast.begin(), forecast.end(), forecast.begin(),
-          [eta](const float value) { return one_minus_gamma * value + eta; });
-      outcome.p1_index = device.sample_pdf(forecast);
-      outcome.p1_mu = forecast[outcome.p1_index];
-    }
-    if (_cols == 1) {
-      outcome.p2_index = 0;
-      outcome.p2_mu = 1;
-    } else {
-      const float eta{gamma / _cols};
-      softmax(forecast, p2_gains, eta);
-      std::transform(
-          forecast.begin(), forecast.end(), forecast.begin(),
-          [eta](const float value) { return one_minus_gamma * value + eta; });
-      outcome.p2_index = device.sample_pdf(forecast);
-      outcome.p2_mu = forecast[outcome.p2_index];
-    }
-
-    outcome.p1_index =
-        std::min(outcome.p1_index, static_cast<uint8_t>(_rows - 1));
-    outcome.p2_index =
-        std::min(outcome.p2_index, static_cast<uint8_t>(_cols - 1));
-
-    assert(outcome.p1_index < _rows);
-    assert(outcome.p2_index < _cols);
-  }
-
-  std::string visit_string() const {
-    std::stringstream sstream{};
-    if constexpr (enable_visits) {
-      sstream << "V1: ";
-      for (auto i = 0; i < _rows; ++i) {
-        sstream << std::to_string(this->p1_visits[i]) << " ";
-      }
-      sstream << "V2: ";
-      for (auto i = 0; i < _cols; ++i) {
-        sstream << std::to_string(this->p2_visits[i]) << " ";
-      }
-      sstream.flush();
-    }
-    return sstream.str();
+  void update(const JointOutcome &outcome) noexcept {
+    p1.update(outcome.p1);
+    p2.update(outcome.p2);
   }
 };
-#pragma pack(pop)
-
-static_assert(sizeof(JointBanditData<.1f, true>) == 128);
-static_assert(sizeof(JointBanditData<.1f, false>) == 76);
 
 }; // namespace Exp3

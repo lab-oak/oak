@@ -70,30 +70,9 @@ struct MCTS {
 
   using Obs = std::array<uint8_t, 16>;
 
-  // Helper for dynamic dispatch over different bandit types
-  // E.g. go<Exp3::Bandit<.03>>, Exp3::Bandit<.1>>("exp3.03", ...)
-
-  template <typename Bandit, typename... Bandits>
-  MCTS::Output go(std::string bandit_name, auto count, auto input, auto &model,
-                  MCTS::Output output = {}) {
-    if (std::string{Bandit::name.data()}.starts_with(bandit_name)) {
-      using Node = Tree::Node<Bandit, Obs>;
-      Node node{};
-      return run(count, node, input, model, output);
-    }
-
-    if constexpr (sizeof...(Bandits) > 0) {
-      return go<Bandits...>(bandit_name, count, input, model, output);
-    } else {
-      throw std::runtime_error{
-          "bandit name string does not match the names of any "
-          "bandits in the template params."};
-    }
-  }
-
   template <typename Options = Options<>>
-  auto run(const auto dur, auto &node, const auto &input, auto &model,
-           Output output = {}) {
+  Output run(const auto dur, const auto &bandit_params, auto &node,
+             const auto &input, auto &model, Output output = {}) {
 
     *this = {};
     // if the node is not already init then a value estimate is wasted on the
@@ -112,8 +91,8 @@ struct MCTS {
 
     // copy the state, do single mcts forward/backward, return player 1 leaf
     // value
-    const auto prepare_and_run_iteration = [this, &input, &model,
-                                            &node]() -> float {
+    const auto prepare_and_run_iteration = [this, &bandit_params, &node, &input,
+                                            &model]() -> float {
       auto copy = input;
       auto *rng = reinterpret_cast<uint64_t *>(copy.battle.bytes +
                                                Layout::Offsets::Battle::rng);
@@ -121,7 +100,7 @@ struct MCTS {
       chance_options.durations = copy.durations;
       apply_durations(copy.battle, copy.durations);
       pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
-      return run_iteration<Options>(&node, copy, model).first;
+      return run_iteration<Options>(bandit_params, node, copy, model).first;
     };
 
     // Three types for 'dur' (the time investement of the search) are allowed:
@@ -255,7 +234,8 @@ struct MCTS {
   // we return value for each player because it's slightly faster than calcing 1
   // - value at each node
   template <typename Options>
-  std::pair<float, float> run_iteration(auto *node, auto &input, auto &model,
+  std::pair<float, float> run_iteration(const auto &bandit_params, auto &node,
+                                        auto &input, auto &model,
                                         size_t depth = 0) {
 
     auto &battle = input.battle;
@@ -303,43 +283,43 @@ struct MCTS {
       }
     };
 
-    if (node->stats().is_init()) {
-      using Bandit = std::remove_reference_t<decltype(node->stats())>;
-      using Outcome = typename Bandit::Outcome;
+    if (node.stats().is_init()) {
+      using Bandit = std::remove_reference_t<decltype(node.stats())>;
+      using JointOutcome = typename Bandit::JointOutcome;
 
       // do bandit
-      Outcome outcome;
+      JointOutcome outcome;
 
-      node->stats().select(device, outcome);
+      node.stats().select(device, bandit_params, outcome);
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
                                choices.data(), PKMN_GEN1_MAX_CHOICES);
-      const auto c1 = choices[outcome.p1_index];
+      const auto c1 = choices[outcome.p1.index];
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
                                choices.data(), PKMN_GEN1_MAX_CHOICES);
-      const auto c2 = choices[outcome.p2_index];
+      const auto c2 = choices[outcome.p2.index];
 
       print(
           "P1: " + Strings::side_choice_string(battle.bytes, c1) + " P2: " +
           Strings::side_choice_string(battle.bytes + Layout::Sizes::Side, c2));
-      print(node->stats().visit_string());
 
       battle_options_set();
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
       const auto obs = std::bit_cast<const Obs>(
           *pkmn_gen1_battle_options_chance_actions(&options));
 
-      auto *child = (*node)(outcome.p1_index, outcome.p2_index, obs);
-      const auto value = run_iteration<Options>(child, input, model, depth + 1);
-      outcome.p1_value = value.first;
-      outcome.p2_value = value.second;
-      node->stats().update(outcome);
+      auto &child = *node(outcome.p1.index, outcome.p2.index, obs);
+      const auto value =
+          run_iteration<Options>(bandit_params, child, input, model, depth + 1);
+      outcome.p1.value = value.first;
+      outcome.p2.value = value.second;
+      node.stats().update(outcome);
 
       print("value: " + std::to_string(value.first));
 
       if constexpr (Options::root_matrix) {
         if (depth == 0) {
-          ++visit_matrix[outcome.p1_index][outcome.p2_index];
-          value_matrix[outcome.p1_index][outcome.p2_index] += value.first;
+          ++visit_matrix[outcome.p1.index][outcome.p2.index];
+          value_matrix[outcome.p1.index][outcome.p2.index] += value.first;
         }
       }
 
@@ -358,13 +338,13 @@ struct MCTS {
           if constexpr (requires { model.defer(input.battle); }) {
             // use monte carlo anyway when mon count is low enough?
             if (model.defer(input.battle)) {
-              return init_stats_and_rollout(node->stats(), device, battle,
+              return init_stats_and_rollout(node.stats(), device, battle,
                                             result);
             }
           }
 
           if constexpr (requires {
-                          node->stats().init_priors(nullptr, nullptr);
+                          node.stats().init_priors(nullptr, nullptr);
                         }) {
             const auto &b = View::ref(input.battle);
             const auto m = pkmn_gen1_battle_choices(
@@ -383,7 +363,7 @@ struct MCTS {
               p2_choice_indices[i] =
                   Encode::Policy::get_index(b.sides[1], choices[i]);
             }
-            node->stats().init(m, n);
+            node.stats().init(m, n);
             std::array<float, 9> p1_logit;
             std::array<float, 9> p2_logit;
             const float value = model.inference(
@@ -396,7 +376,7 @@ struct MCTS {
             std::array<float, 9> p2;
             softmax(p1.data(), p1_logit.data(), m);
             softmax(p2.data(), p2_logit.data(), n);
-            node->stats().init_priors(p1.data(), p2.data());
+            node.stats().init_priors(p1.data(), p2.data());
 
             return {value, 1 - value};
 
@@ -407,7 +387,7 @@ struct MCTS {
             const auto n = pkmn_gen1_battle_choices(
                 &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
                 PKMN_GEN1_MAX_CHOICES);
-            node->stats().init(m, n);
+            node.stats().init(m, n);
             const float value = model.inference(
                 input.battle,
                 *pkmn_gen1_battle_options_chance_durations(&options));
@@ -415,7 +395,7 @@ struct MCTS {
           }
         } else {
           // model is monte-carlo
-          return init_stats_and_rollout(node->stats(), device, battle, result);
+          return init_stats_and_rollout(node.stats(), device, battle, result);
         }
       }
     case PKMN_RESULT_WIN: {
