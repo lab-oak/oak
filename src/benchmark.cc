@@ -3,7 +3,6 @@
 #include <search/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>
-#include <search/ucb.h>
 #include <util/random.h>
 
 struct FastModel {
@@ -45,10 +44,13 @@ int benchmark(int argc, char **argv) {
   const size_t iterations = 1 << exp;
 
   battle_data.result = PKMN::update(battle_data.battle, 0, 0, search.options);
+  Exp3::Params bandit_params{.03};
 
-  const auto output = search.go<Exp3::JointBanditData<.03f, node_visits>,
-                                UCB::JointBanditData<2.0f>>(
-      bandit_string, iterations, battle_data, network);
+  using Node = Tree::Node<Exp3::JointBandit, MCTS::Obs>;
+  Node node{};
+
+  const auto output =
+      search.run(iterations, bandit_params, node, battle_data, network);
   std::cout << output.duration.count() << " ms." << std::endl;
 
   return 0;
