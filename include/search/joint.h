@@ -29,4 +29,13 @@ template <typename Bandit> struct Joint {
     p1.update(outcome.p1);
     p2.update(outcome.p2);
   }
+
+  void init_priors(const float *p1_priors, const float *p2_priors) noexcept
+    requires requires(const float *ptr) {
+      std::declval<Bandit>().init_priors(ptr);
+    }
+  {
+    p1.init_priors(p1_priors);
+    p2.init_priors(p2_priors);
+  }
 };

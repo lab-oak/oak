@@ -4,8 +4,8 @@
 #include <libpkmn/strings.h>
 #include <search/exp3.h>
 #include <search/mcts.h>
+#include <util/parse.h>
 #include <util/random.h>
-#include <util/strings.h>
 
 #include <csignal>
 #include <iostream>

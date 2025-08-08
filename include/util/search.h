@@ -1,7 +1,11 @@
 #pragma once
 
 #include <nn/network.h>
+#include <search/exp3-policy.h>
+#include <search/exp3.h>
 #include <search/mcts.h>
+#include <search/ucb-policy.h>
+#include <search/ucb.h>
 
 #include <filesystem>
 #include <fstream>
@@ -26,6 +30,16 @@ auto run(const BattleData &battle_data, size_t count, char mode,
       const float c = std::stof(lower.substr(4));
       UCB::Bandit::Params params{c};
       Tree::Node<UCB::JointBandit, MCTS::Obs> node{};
+      return search.run(dur, params, node, battle_data, model);
+    } else if (lower.starts_with("pexp3-")) {
+      const float gamma = std::stof(lower.substr(6));
+      PExp3::Bandit::Params params{gamma};
+      Tree::Node<PExp3::JointBandit, MCTS::Obs> node{};
+      return search.run(dur, params, node, battle_data, model);
+    } else if (lower.starts_with("pucb-")) {
+      const float c = std::stof(lower.substr(5));
+      PUCB::Bandit::Params params{c};
+      Tree::Node<PUCB::JointBandit, MCTS::Obs> node{};
       return search.run(dur, params, node, battle_data, model);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + lower);

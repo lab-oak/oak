@@ -25,20 +25,20 @@ struct Bandit {
     uint8_t index;
   };
 
-  std::array<float, 9> score;
+  std::array<float, 9> scores;
   std::array<uint24_t, 9> visits;
   uint8_t k;
 
   void init(const auto k) noexcept {
     this->k = k;
-    std::fill(score.begin(), score.begin() + k, 0);
+    std::fill(scores.begin(), scores.begin() + k, 0);
     std::fill(visits.begin(), visits.begin() + k, 0);
   }
 
   bool is_init() const noexcept { return k; }
 
   void update(const auto &outcome) noexcept {
-    score[outcome.index] += outcome.value;
+    scores[outcome.index] += outcome.value;
     ++visits[outcome.index];
   }
 
@@ -54,7 +54,7 @@ struct Bandit {
           outcome.index = i;
           return;
         }
-        q[i] = (float)score[i] / visits[i];
+        q[i] = (float)scores[i] / visits[i];
         N += visits[i];
       }
       float log_N = std::log(N);
