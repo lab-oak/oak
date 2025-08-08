@@ -1,6 +1,5 @@
 #include <data/teams.h>
 #include <libpkmn/data.h>
-#include <libpkmn/options.h>
 #include <libpkmn/strings.h>
 #include <nn/network.h>
 #include <search/exp3-policy.h>
@@ -44,19 +43,6 @@ std::string container_string(const auto &v) {
   }
   return ss.str();
 }
-
-using Exp3_03 = Exp3::JointBanditData<0.03f>;
-using Exp3_10 = Exp3::JointBanditData<0.1f>;
-using Exp3_20 = Exp3::JointBanditData<0.2f>;
-using UCB_05 = UCB::JointBanditData<0.5f>;
-using UCB_10 = UCB::JointBanditData<1.0f>;
-using UCB_20 = UCB::JointBanditData<2.0f>;
-using Exp3p_10 = Exp3Policy::JointBanditData<.1f>;
-using Exp3p_20 = Exp3Policy::JointBanditData<.2f>;
-using Exp3p_50 = Exp3Policy::JointBanditData<.5f>;
-using UCBp_05 = UCBPolicy::JointBanditData<0.5f>;
-using UCBp_10 = UCBPolicy::JointBanditData<1.0f>;
-using UCBp_20 = UCBPolicy::JointBanditData<2.0f>;
 
 namespace RuntimeData {
 bool terminated = false;
@@ -177,24 +163,20 @@ void thread_fn(uint64_t seed) {
         int p1_early_stop = 0;
         int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
-          p1_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
-                                         UCB_10, UCB_20, Exp3p_10, Exp3p_20,
-                                         Exp3p_50, UCBp_05, UCBp_10, UCBp_20>(
-              battle_data, p1_search_options.count,
-              p1_search_options.count_mode, p1_search_options.bandit_name,
-              p1_search_options.battle_network_path);
+          p1_output = RuntimeSearch::run(battle_data, p1_search_options.count,
+                                         p1_search_options.count_mode,
+                                         p1_search_options.bandit_name,
+                                         p1_search_options.battle_network_path);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
                                         p1_output.p1_nash, p1_policy_options);
         }
         if (p2_choices.size() > 1) {
-          p2_output = RuntimeSearch::run<Exp3_03, Exp3_10, Exp3_20, UCB_05,
-                                         UCB_10, UCB_20, Exp3p_10, Exp3p_20,
-                                         Exp3p_50, UCBp_05, UCBp_10, UCBp_20>(
-              battle_data, p2_search_options.count,
-              p2_search_options.count_mode, p2_search_options.bandit_name,
-              p2_search_options.battle_network_path);
+          p2_output = RuntimeSearch::run(battle_data, p2_search_options.count,
+                                         p2_search_options.count_mode,
+                                         p2_search_options.bandit_name,
+                                         p2_search_options.battle_network_path);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
@@ -269,7 +251,6 @@ void thread_fn(uint64_t seed) {
         RuntimeData::score.fetch_add(score);
       }
       RuntimeData::n.fetch_add(1);
-
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
       return;

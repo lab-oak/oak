@@ -1,7 +1,6 @@
 #include <data/teams.h>
 #include <encode/team.h>
 #include <libpkmn/data.h>
-#include <libpkmn/options.h>
 #include <libpkmn/strings.h>
 #include <nn/network.h>
 #include <search/exp3.h>
@@ -354,14 +353,16 @@ TeamPool team_pool{};
 }; // namespace RuntimeData
 
 using Obs = std::array<uint8_t, 16>;
-using Exp3Node = Tree::Node<Exp3::JointBanditData<.03f, false>, Obs>;
-using UCBNode = Tree::Node<UCB::JointBanditData<2.0f>, Obs>;
+using Exp3Node = Tree::Node<Exp3::JointBandit, Obs>;
+using UCBNode = Tree::Node<UCB::JointBandit, Obs>;
 
 // Data that should persist only over a game - not the program or thread
 // lifetime. The build network uses a game-specific cache. It is not universal
 // unlike the build network.
 struct SearchData {
   NN::Network battle_network;
+  Exp3::Bandit::Params exp3_params{.03};
+  UCB::Bandit::Params ucb_params{.03};
   std::unique_ptr<Exp3Node> exp3_unique_node;
   std::unique_ptr<UCBNode> ucb_unique_node;
 };
@@ -482,31 +483,34 @@ auto search(size_t c, mt19937 &device, const BattleData &battle_data,
             SearchData &search_data) {
   using namespace RuntimeOptions::Search;
 
-  auto run_search_model = [&](auto &unique_node, auto &model) {
+  auto run_search_model = [&](const auto &bandit_params, auto &unique_node,
+                              auto &model) {
     auto &node = *unique_node;
     MCTS search;
     if (count_mode == 'i' || count_mode == 'n') {
-      return search.run(c, node, battle_data, model);
+      return search.run(c, bandit_params, node, battle_data, model);
     } else if (count_mode == 't') {
       std::chrono::milliseconds ms{c};
-      return search.run(ms, node, battle_data, model);
+      return search.run(ms, bandit_params, node, battle_data, model);
     }
     throw std::runtime_error("Invalid count mode char.");
   };
 
-  auto run_search_node = [&](auto &unique_node) {
+  auto run_search_node = [&](const auto &bandit_params, auto &unique_node) {
     if (battle_network_path.empty()) {
       MonteCarlo::Model model{device};
-      return run_search_model(unique_node, model);
+      return run_search_model(bandit_params, unique_node, model);
     } else {
-      return run_search_model(unique_node, search_data.battle_network);
+      return run_search_model(bandit_params, unique_node,
+                              search_data.battle_network);
     }
   };
 
   if (bandit_mode == 'e') {
-    return run_search_node(search_data.exp3_unique_node);
+    return run_search_node(search_data.exp3_params,
+                           search_data.exp3_unique_node);
   } else if (bandit_mode == 'u') {
-    return run_search_node(search_data.ucb_unique_node);
+    return run_search_node(search_data.ucb_params, search_data.ucb_unique_node);
   }
   throw std::runtime_error("Invalid bandit mode char.");
 }
@@ -664,8 +668,9 @@ void generate(uint64_t seed) {
     pkmn_gen1_battle_options battle_options{};
     battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
 
-    SearchData search_data{NN::Network{}, std::make_unique<Exp3Node>(),
-                           std::make_unique<UCBNode>()};
+    SearchData search_data{
+        NN::Network{}, Exp3::Bandit::Params{.03}, UCB::Bandit::Params{2.0},
+        std::make_unique<Exp3Node>(), std::make_unique<UCBNode>()};
 
     std::ifstream file{RuntimeOptions::Search::battle_network_path};
     if (!file) {

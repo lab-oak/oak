@@ -2,9 +2,6 @@
 
 #include <data/legal-moves.h>
 #include <libpkmn/data/moves.h>
-#include <libpkmn/options.h>
-
-#include <cstdint>
 
 namespace Data {
 consteval auto get_move_pools() {

@@ -15,7 +15,7 @@ using Strings::string_to_move;
 using Strings::string_to_species;
 
 using Obs = std::array<uint8_t, 16>;
-using Node = Tree::Node<Exp3::JointBanditData<.03f, true>, Obs>;
+using Node = Tree::Node<Exp3::JointBandit, Obs>;
 
 bool run_search = true;
 
@@ -25,26 +25,9 @@ void handle_suspend(int signal) {
 }
 
 BattleData parse_input(const std::string &line) {
-  const auto side_strings = split(line, '|');
-  if (side_strings.size() != 2) {
-    throw std::runtime_error("Battle input string must have \'|\' ");
-  }
-  std::vector<std::vector<PKMN::Set>> sides{};
-  for (const auto &side_string : side_strings) {
-    std::vector<PKMN::Set> sets{};
-    auto set_strings = split(side_string, ';');
-    for (const auto &set_string : set_strings) {
-      auto words = split(set_string, ' ');
-      PKMN::Set set = parse_set(words);
-      sets.push_back(set);
-    }
-    sides.push_back(sets);
-  }
   mt19937 device{std::random_device{}()};
-
-  const auto battle = PKMN::battle(sides[0], sides[1], device.uniform_64());
-  const auto durations = PKMN::durations(sides[0], sides[1]);
-
+  const auto [battle, durations] =
+      Parse::parse_battle(line, device.uniform_64());
   return {battle, durations};
 }
 
@@ -103,6 +86,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Starting search. Suspend (Ctrl + Z) to stop." << std::endl;
 
+    Exp3::Bandit::Params bandit_params{.03f};
     MonteCarlo::Model model{device.uniform_64()};
     MCTS search{};
     MCTS::Output output{};
@@ -110,7 +94,8 @@ int main(int argc, char **argv) {
 
     while (true) {
       run_search = true;
-      output = search.run(&run_search, node, battle_data, model, output);
+      output = search.run(&run_search, bandit_params, node, battle_data, model,
+                          output);
       print_output(output, battle_data.battle, p1_labels, p2_labels);
       b = device.sample_pdf(output.p2_nash);
       std::cout << "(If the next input is a P1 choice index the battle is "

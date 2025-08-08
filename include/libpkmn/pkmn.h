@@ -8,11 +8,11 @@
 
 namespace PKMNDetail {
 
-template <typename T> auto get(T *t) { return t; }
+template <typename T> auto get_pointer(const T *t) { return t; }
 
 template <typename T>
   requires(!std::is_pointer_v<T>)
-auto get(const T &t) {
+auto get_pointer(const T &t) {
   return &t;
 }
 } // namespace PKMNDetail
@@ -20,18 +20,20 @@ auto get(const T &t) {
 namespace PKMN {
 
 struct Set {
-  static constexpr std::array<uint8_t, 4> max_pp{255, 255, 255, 255};
+
+  constexpr bool operator==(const Set &) const = default;
 
   Data::Species species;
   std::array<Data::Move, 4> moves;
 
-  std::array<uint8_t, 4> pp{max_pp};
+  static constexpr std::array<uint8_t, 4> max_pp{255, 255, 255, 255};
+
+  std::array<uint8_t, 4> pp = max_pp;
   float hp = 100 / 100;
-  uint8_t status = 0;
+  Data::Status status = Data::Status::None;
   uint8_t sleeps = 0;
   Init::Boosts boosts = {};
   uint8_t level = 100;
-  constexpr bool operator==(const Set &) const noexcept = default;
 };
 
 using Team = std::array<Set, 6>;
@@ -70,9 +72,9 @@ const auto &durations(const pkmn_gen1_battle_options &options) {
 
 void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
          const auto &calc) {
-  using PKMNDetail::get;
-  return pkmn_gen1_battle_options_set(&options, get(log), get(chance),
-                                      get(calc));
+  using PKMNDetail::get_pointer;
+  return pkmn_gen1_battle_options_set(&options, get_pointer(log),
+                                      get_pointer(chance), get_pointer(calc));
 }
 
 void set(pkmn_gen1_battle_options &options) {

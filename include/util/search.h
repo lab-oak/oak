@@ -8,13 +8,28 @@
 
 namespace RuntimeSearch {
 
-template <typename... Bandits>
 auto run(const BattleData &battle_data, size_t count, char mode,
          std::string bandit_name, std::string network_path) {
 
   const auto run_2 = [&](auto dur, auto &model) {
     MCTS search{};
-    return search.go<Bandits...>(bandit_name, dur, battle_data, model);
+    auto lower = bandit_name;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](auto c) { return std::tolower(c); });
+
+    if (lower.starts_with("exp3-")) {
+      const float gamma = std::stof(lower.substr(5));
+      Exp3::Bandit::Params params{gamma};
+      Tree::Node<Exp3::JointBandit, MCTS::Obs> node{};
+      return search.run(dur, params, node, battle_data, model);
+    } else if (lower.starts_with("ucb-")) {
+      const float c = std::stof(lower.substr(4));
+      UCB::Bandit::Params params{c};
+      Tree::Node<UCB::JointBandit, MCTS::Obs> node{};
+      return search.run(dur, params, node, battle_data, model);
+    } else {
+      throw std::runtime_error("Could not parse bandit string: " + lower);
+    }
   };
 
   const auto run_1 = [&](auto dur) {

@@ -462,3 +462,62 @@ struct MCTS {
     };
   }
 };
+
+void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
+                  const auto &p1_labels, const auto &p2_labels) {
+
+  auto print_strategy = [](const auto *bytes, const auto &choices,
+                           const std::array<double, 9> &strat, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+      std::string label = Strings::side_choice_string(bytes, choices[i]);
+      std::cout << label << ":" << std::fixed << std::setprecision(2)
+                << strat[i] << "  ";
+    }
+    std::cout << '\n';
+  };
+
+  constexpr auto label_width = 8;
+
+  const auto fix_label = [label_width](auto label) {
+    std::stringstream ss{};
+    ss << std::left << std::setw(label_width) << label.substr(0, label_width);
+    return ss.str();
+  };
+
+  std::cout << "iterations: " << output.iterations
+            << ", time: " << output.duration.count() / 1000.0 << " sec\n";
+  std::cout << "value: " << std::fixed << std::setprecision(2)
+            << output.empirical_value << "\n";
+
+  std::cout << "P1 emprical - ";
+  print_strategy(battle.bytes, output.p1_choices, output.p1_empirical,
+                 output.m);
+  std::cout << "P1 nash -     ";
+  print_strategy(battle.bytes, output.p1_choices, output.p1_nash, output.m);
+  std::cout << "P2 emprical - ";
+  print_strategy(battle.bytes + Layout::Sizes::Side, output.p2_choices,
+                 output.p2_empirical, output.n);
+  std::cout << "P2 nash -     ";
+  print_strategy(battle.bytes + Layout::Sizes::Side, output.p2_choices,
+                 output.p2_nash, output.n);
+
+  std::cout << "\nmatrix:\n      ";
+  std::cout << std::setw(label_width + 1);
+  for (size_t j = 0; j < output.n; ++j)
+    std::cout << fix_label(p2_labels[j]) << " ";
+  std::cout << "\n";
+
+  for (size_t i = 0; i < output.m; ++i) {
+    std::cout << fix_label(p1_labels[i]) << " ";
+    for (size_t j = 0; j < output.n; ++j) {
+      if (output.visit_matrix[i][j] == 0) {
+        std::cout << "  ----   ";
+      } else {
+        double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
+        std::cout << std::left << std::fixed << std::setw(label_width)
+                  << std::setprecision(2) << avg << " ";
+      }
+    }
+    std::cout << '\n';
+  }
+}

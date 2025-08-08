@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <search/joint.h>
 #include <util/softmax.h>
 
 #include <algorithm>
@@ -13,13 +14,19 @@ namespace Exp3 {
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
-struct Params {
-  Params(const float gamma) : gamma{gamma}, one_minus_gamma{1 - gamma} {}
-  float gamma;
-  float one_minus_gamma;
-};
-
 struct Bandit {
+
+  struct Outcome {
+    float value;
+    float prob;
+    uint8_t index;
+  };
+
+  struct Params {
+    Params(const float gamma) : gamma{gamma}, one_minus_gamma{1 - gamma} {}
+    float gamma;
+    float one_minus_gamma;
+  };
 
   std::array<float, 9> gains;
   uint8_t k;
@@ -29,6 +36,8 @@ struct Bandit {
     std::fill(gains.begin(), gains.begin() + k, 0);
     std::fill(gains.begin() + k, gains.end(), neg_inf);
   }
+
+  bool is_init() const noexcept { return k; }
 
   void select(auto &device, const Params &params,
               auto &outcome) const noexcept {
@@ -46,6 +55,8 @@ struct Bandit {
       outcome.index = device.sample_pdf(policy);
       outcome.prob = policy[outcome.index];
     }
+
+    assert(outcome.index < k);
   }
 
   void update(const auto &outcome) noexcept {
@@ -58,39 +69,6 @@ struct Bandit {
   }
 };
 
-struct JointBandit {
-
-  struct Outcome {
-    float value;
-    float prob;
-    uint8_t index;
-  };
-
-  struct JointOutcome {
-    Outcome p1;
-    Outcome p2;
-  };
-
-  Bandit p1;
-  Bandit p2;
-
-  void init(const auto m, const auto n) noexcept {
-    p1.init(m);
-    p2.init(n);
-  }
-
-  bool is_init() const noexcept { return p1.k != 0; }
-
-  void select(auto &device, const Params &params,
-              JointOutcome &outcome) const noexcept {
-    p1.select(device, params, outcome.p1);
-    p2.select(device, params, outcome.p2);
-  }
-
-  void update(const JointOutcome &outcome) noexcept {
-    p1.update(outcome.p1);
-    p2.update(outcome.p2);
-  }
-};
+using JointBandit = Joint<Bandit>;
 
 }; // namespace Exp3

@@ -10,8 +10,8 @@
 #include <libpkmn/layout.h>
 #include <util/random.h>
 
-#include <assert.h>
 #include <bit>
+#include <cassert>
 #include <cstddef>
 #include <cstring>
 #include <sstream>
@@ -148,10 +148,12 @@ constexpr void init_party(const auto &party, uint8_t *const bytes) {
   }
 }
 
-constexpr void init_party(const auto &party, PKMN::Duration &duration) {
+constexpr void init_duration(const auto &party, PKMN::Duration &duration) {
+  if constexpr (requires { party.pokemon; }) {
+    init_party(party.pokemon, duration);
+  }
   const auto n = party.size();
-  assert(n > 0 && n <= 6);
-  auto n_alive = 0;
+  assert(n <= 6);
   for (auto i = 0; i < n; ++i) {
     const auto &pokemon = party[i];
     if constexpr (requires { pokemon.sleeps; }) {
@@ -170,14 +172,6 @@ constexpr void init_side(const auto &side, uint8_t *const bytes) {
     }
   } else {
     init_party(side, bytes);
-  }
-}
-
-constexpr void init_duration(const auto &side, PKMN::Duration &duration) {
-  if constexpr (requires { side.pokemon; }) {
-    init_party(side.pokemon, duration);
-  } else {
-    init_party(side, duration);
   }
 }
 

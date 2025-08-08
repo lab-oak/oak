@@ -24,10 +24,10 @@ int benchmark(int argc, char **argv) {
   const auto durations = PKMN::durations(p1, p2);
   BattleData battle_data{battle, durations};
 
-  // FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
-  NN::Network network{};
-  network.initialize();
-  network.fill_cache(battle);
+  FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
+  // NN::Network network{};
+  // network.initialize();
+  // network.fill_cache(battle);
 
   MCTS search{};
   int exp = 20;
@@ -44,13 +44,13 @@ int benchmark(int argc, char **argv) {
   const size_t iterations = 1 << exp;
 
   battle_data.result = PKMN::update(battle_data.battle, 0, 0, search.options);
-  Exp3::Params bandit_params{.03};
+  Exp3::Bandit::Params bandit_params{.03};
 
   using Node = Tree::Node<Exp3::JointBandit, MCTS::Obs>;
   Node node{};
 
   const auto output =
-      search.run(iterations, bandit_params, node, battle_data, network);
+      search.run(iterations, bandit_params, node, battle_data, model);
   std::cout << output.duration.count() << " ms." << std::endl;
 
   return 0;
