@@ -672,15 +672,16 @@ void generate(uint64_t seed) {
         NN::Network{}, Exp3::Bandit::Params{.03}, UCB::Bandit::Params{2.0},
         std::make_unique<Exp3Node>(), std::make_unique<UCBNode>()};
 
-    std::ifstream file{RuntimeOptions::Search::battle_network_path};
-    if (!file) {
-      std::cerr << "failed to open file" << std::endl;
+    if (!RuntimeOptions::Search::battle_network_path.empty()) {
+      std::ifstream file{RuntimeOptions::Search::battle_network_path};
+      if (!file) {
+        std::cerr << "failed to open file" << std::endl;
+      }
+      if (!search_data.battle_network.read_parameters(file)) {
+        throw std::runtime_error{"Failed to load network"};
+      }
+      search_data.battle_network.fill_cache(battle);
     }
-    if (!search_data.battle_network.read_parameters(file)) {
-      std::cerr << "no battle load " << std::endl;
-      throw std::runtime_error{"Failed to load network"};
-    }
-    search_data.battle_network.fill_cache(battle);
 
     Train::CompressedFrames<> training_frames{battle_data.battle};
 
