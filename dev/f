@@ -1,1 +1,1 @@
-clang-format -i src/*.cc include/libpkmn/*.h include/libpkmn/data/*.h include/util/*.h include/search/*.h include/train/*.h include/nn/*.h include/nn/quantized/*.h include/encode/*.h include/data/*.h
+clang-format -i src/*.cc include/libpkmn/*.h include/libpkmn/data/*.h include/util/*.h include/search/*.h include/train/*.h include/nn/*.h include/encode/*.h include/data/*.h
