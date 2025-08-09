@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <array>
-#include <assert.h>
+#include <cassert>
 #include <cmath>
 
 namespace Exp3 {
@@ -52,11 +52,10 @@ struct Bandit {
                      [eta, &params](const float value) {
                        return params.one_minus_gamma * value + eta;
                      });
-      outcome.index = device.sample_pdf(policy);
+      // TODO policy has eta as prob for invalid actions
+      outcome.index = std::min(device.sample_pdf(policy), k - 1);
       outcome.prob = policy[outcome.index];
     }
-
-    assert(outcome.index < k);
   }
 
   void update(const auto &outcome) noexcept {

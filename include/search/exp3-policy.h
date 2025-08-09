@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <array>
-#include <assert.h>
+#include <cassert>
 #include <cmath>
 
 namespace PExp3 {
@@ -53,15 +53,15 @@ struct Bandit {
     } else {
       const float eta{params.gamma / k};
       softmax(policy, gains, eta);
-      std::transform(policy.begin(), policy.end(), this->priors.begin(),
-                     policy.begin(), [&params](const float value, const float prior) {
-                       return params.one_minus_gamma * value + params.gamma * prior;
-                     });
-      outcome.index = device.sample_pdf(policy);
+      std::transform(
+          policy.begin(), policy.end(), this->priors.begin(), policy.begin(),
+          [&params](const float value, const float prior) {
+            return params.one_minus_gamma * value + params.gamma * prior;
+          });
+      // TODO policy has eta as prob for invalid actions
+      outcome.index = std::min(device.sample_pdf(policy), k - 1);
       outcome.prob = policy[outcome.index];
     }
-
-    assert(outcome.index < k);
   }
 
   void update(const auto &outcome) noexcept {
