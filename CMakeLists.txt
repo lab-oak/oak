@@ -64,10 +64,6 @@ add_library(pyoak SHARED src/pyoak.cc)
 target_include_directories(pyoak PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(pyoak PRIVATE libpkmn_chance)
 
-add_executable(decompress src/decompress.cc)
-target_include_directories(decompress PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(decompress PRIVATE libpkmn_client)
-
 add_executable(vs src/vs.cc)
 target_include_directories(vs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(vs PRIVATE libpkmn_chance lrslib128 eigen)
