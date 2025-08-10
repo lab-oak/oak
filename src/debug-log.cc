@@ -44,7 +44,7 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
   auto turns = 0;
   pkmn_choice c1{0};
   pkmn_choice c2{0};
-  auto result = debug_log.update(battle, c1, c2, options);
+  auto result = PKMN::result();
   while (!pkmn_result_type(result)) {
     const auto m = pkmn_gen1_battle_choices(
         &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),

@@ -39,8 +39,8 @@ constexpr PKMN::Pokemon init_pokemon(const auto &set) {
   }
   // level
   if constexpr (requires { set.level; }) {
-    assert(pokemon.level >= 1 && pokemon.level <= 100);
     pokemon.level = set.level;
+    assert(pokemon.level >= 1 && pokemon.level <= 100);
   } else {
     pokemon.level = 100;
   }

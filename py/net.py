@@ -1,9 +1,29 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import libtrain
+
+import read
+
 import struct
+
+
+class EncodedFrameTorch:
+    def __init__(self, encoded_frame: read.EncodedFrame):
+        self.size = encoded_frame.size
+        self.m = torch.from_numpy(encoded_frame.m)
+        self.n = torch.from_numpy(encoded_frame.n)
+        self.p1_choice_indices = torch.from_numpy(encoded_frame.p1_choice_indices)
+        self.p2_choice_indices = torch.from_numpy(encoded_frame.p2_choice_indices)
+        self.pokemon = torch.from_numpy(encoded_frame.pokemon)
+        self.active = torch.from_numpy(encoded_frame.active)
+        self.hp = torch.from_numpy(encoded_frame.hp)
+        self.p1_empirical = torch.from_numpy(encoded_frame.p1_empirical)
+        self.p1_nash = torch.from_numpy(encoded_frame.p1_nash)
+        self.p2_empirical = torch.from_numpy(encoded_frame.p2_empirical)
+        self.p2_nash = torch.from_numpy(encoded_frame.p2_nash)
+        self.empirical_value = torch.from_numpy(encoded_frame.empirical_value)
+        self.nash_value = torch.from_numpy(encoded_frame.nash_value)
+        self.score = torch.from_numpy(encoded_frame.score)
 
 
 class Affine(nn.Module):
@@ -144,8 +164,8 @@ class OutputBuffers:
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
-        self.p1_policy_raw = torch.zeros(size, libtrain.policy_out_dim + 1)
-        self.p2_policy_raw = torch.zeros(size, libtrain.policy_out_dim + 1)
+        self.p1_policy_raw = torch.zeros(size, read.policy_out_dim + 1)
+        self.p2_policy_raw = torch.zeros(size, read.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -163,17 +183,17 @@ class OutputBuffers:
 
 
 class Network(torch.nn.Module):
-    pokemon_hidden_dim = libtrain.pokemon_hidden_dim
-    pokemon_out_dim = libtrain.pokemon_out_dim
-    active_hidden_dim = libtrain.active_hidden_dim
-    active_out_dim = libtrain.active_out_dim
-    side_out_dim = libtrain.side_out_dim
-    hidden_dim = libtrain.hidden_dim
-    value_hidden_dim = libtrain.value_hidden_dim
-    policy_hidden_dim = libtrain.policy_hidden_dim
-    policy_out_dim = libtrain.policy_out_dim
-    pokemon_in_dim = libtrain.pokemon_in_dim
-    active_in_dim = libtrain.active_in_dim
+    pokemon_hidden_dim = read.pokemon_hidden_dim
+    pokemon_out_dim = read.pokemon_out_dim
+    active_hidden_dim = read.active_hidden_dim
+    active_out_dim = read.active_out_dim
+    side_out_dim = read.side_out_dim
+    hidden_dim = read.hidden_dim
+    value_hidden_dim = read.value_hidden_dim
+    policy_hidden_dim = read.policy_hidden_dim
+    policy_out_dim = read.policy_out_dim
+    pokemon_in_dim = read.pokemon_in_dim
+    active_in_dim = read.active_in_dim
 
     def __init__(self):
         super().__init__()
@@ -206,7 +226,7 @@ class Network(torch.nn.Module):
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-    def inference(self, input: libtrain.EncodedFrame, output: OutputBuffers):
+    def inference(self, input: EncodedFrameTorch, output: OutputBuffers):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])

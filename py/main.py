@@ -69,14 +69,16 @@ def main():
         return
     print(total)
 
+
 import sys
+
 if __name__ == "__main__":
     trajectories = read.read_build_trajectories("/home/user/train/data/0.build")
 
     i = int(sys.argv[1])
     for i in range(trajectories.size):
 
-        if (trajectories.score[i, 0] < 1):
+        if trajectories.score[i, 0] < 1:
             continue
 
         for index, p in zip(trajectories.actions[i], trajectories.policy[i]):

@@ -23,14 +23,18 @@ policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
 
 species_move_list_size = ctypes.c_int.in_dll(lib, "species_move_list_size").value
-species_move_list_raw = ctypes.POINTER(ctypes.c_int).in_dll(lib, "species_move_list_ptrs")
+species_move_list_raw = ctypes.POINTER(ctypes.c_int).in_dll(
+    lib, "species_move_list_ptrs"
+)
 
 species_move_list = []
 for _ in range(species_move_list_size):
-    species_move_list.append((
-        int(species_move_list_raw[2 * _]),
-        int(species_move_list_raw[2 * _ + 1]),
-    ))
+    species_move_list.append(
+        (
+            int(species_move_list_raw[2 * _]),
+            int(species_move_list_raw[2 * _ + 1]),
+        )
+    )
 
 # dimension labels for encoding, lists of strings
 species_names_raw = ctypes.POINTER(ctypes.c_char_p).in_dll(lib, "species_names")
@@ -110,6 +114,29 @@ lib.read_build_trajectories.argtypes = [
 ]
 lib.read_build_trajectories.restype = ctypes.c_int
 
+lib.encode_buffer_multithread.argtypes = [
+    ctypes.POINTER(ctypes.c_char_p),
+    ctypes.c_uint64,
+    ctypes.c_uint64,
+    ctypes.c_uint64,
+    ctypes.c_float,
+    ctypes.POINTER(ctypes.c_uint8),  # m
+    ctypes.POINTER(ctypes.c_uint8),  # n
+    ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p2_choice_indices
+    ctypes.POINTER(ctypes.c_float),  # pokemon
+    ctypes.POINTER(ctypes.c_float),  # active
+    ctypes.POINTER(ctypes.c_float),  # hp
+    ctypes.POINTER(ctypes.c_float),  # p1_empirical
+    ctypes.POINTER(ctypes.c_float),  # p1_nash
+    ctypes.POINTER(ctypes.c_float),  # p2_empirical
+    ctypes.POINTER(ctypes.c_float),  # p2_nash
+    ctypes.POINTER(ctypes.c_float),  # empirical_value
+    ctypes.POINTER(ctypes.c_float),  # nash_value
+    ctypes.POINTER(ctypes.c_float),  # score
+]
+lib.encode_buffer_multithread.restype = ctypes.c_uint64
+
 
 # Returns a list tuples containing: a bytes object, the number of wrtten to the bytes
 def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]]:
@@ -149,7 +176,6 @@ def get_frames(data: bytes, frame_count: int) -> Frame:
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
-
 
 
 class EncodedFrame:
@@ -223,6 +249,7 @@ def get_encoded_frames(data: bytes, frame_count: int) -> EncodedFrame:
     lib.uncompress_and_encode_training_frames(*args)
     return encoded_frames
 
+
 # convert bytes object into Frames
 def read_build_trajectories(path) -> BuildTrajectory:
     buffer_size = int(os.path.getsize(path) / 128)
@@ -232,3 +259,25 @@ def read_build_trajectories(path) -> BuildTrajectory:
     args = (ctypes.c_char_p(path_bytes),) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
     return trajectories
+
+
+def encode_buffers(
+    paths: list[str],
+    threads: int,
+    max_count: int,
+    encoded_frame_input: EncodedFrame,
+    start_index: int = 0,
+    write_prob: float = 1,
+):
+    encoded_paths = [path.encode("utf-8") for path in paths]
+    arr = (ctypes.c_char_p * len(encoded_paths))(*encoded_paths)
+    max_count = min(max_count, encoded_frame_input.size)
+    args = (
+        arr,
+        ctypes.c_uint64(len(encoded_paths)),
+        ctypes.c_uint64(threads),
+        ctypes.c_uint64(max_count),
+        ctypes.c_float(write_prob),
+    ) + encoded_frame_input.raw_pointers(start_index)
+    count = lib.encode_buffer_multithread(*args)
+    return count

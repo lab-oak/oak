@@ -666,7 +666,7 @@ void generate(uint64_t seed) {
     const auto durations = PKMN::durations(p1_team, p2_team);
     BattleData battle_data{battle, durations};
     pkmn_gen1_battle_options battle_options{};
-    battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
+    battle_data.result = PKMN::result();
 
     SearchData search_data{
         NN::Network{}, Exp3::Bandit::Params{.03}, UCB::Bandit::Params{2.0},
@@ -732,17 +732,23 @@ void generate(uint64_t seed) {
           }
         }
 
-        print("P1 choices/empiricial/nash:");
+        print("P1:");
         print(container_string(p1_labels));
+        print("empirical/nash");
         print(container_string(output.p1_empirical));
         print(container_string(output.p1_nash));
-        print(Strings::side_choice_string(battle_data.battle.bytes, p1_choice));
-        print("P2 choices/empiricial/nash:");
+
+        print("P2:");
         print(container_string(p2_labels));
+        print("empirical/nash");
         print(container_string(output.p2_empirical));
         print(container_string(output.p2_nash));
-        print(Strings::side_choice_string(battle_data.battle.bytes + 184,
-                                          p2_choice));
+
+        print(
+            Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
+            "/" +
+            Strings::side_choice_string(battle_data.battle.bytes + 184,
+                                        p2_choice));
 
         // update train data
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
