@@ -24,6 +24,8 @@ struct alignas(1) Stats {
   uint16_t def;
   uint16_t spe;
   uint16_t spc;
+
+  bool operator==(const Stats &) const noexcept = default;
 };
 
 struct alignas(1) MoveSlot {

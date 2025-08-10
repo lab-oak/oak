@@ -52,12 +52,12 @@ int main(int argc, char **argv) {
     break;
   }
 
-  battle_data.result = PKMN::update(battle_data.battle, 0, 0, options);
+  battle_data.result = PKMN::result();
 
   while (!pkmn_result_type(battle_data.result)) {
     std::cout << "\nBattle:" << std::endl;
     std::cout << Strings::battle_data_to_string(battle_data.battle,
-                                                battle_data.durations, {});
+                                                battle_data.durations);
     const auto [p1_choices, p2_choices] =
         PKMN::choices(battle_data.battle, battle_data.result);
     std::vector<std::string> p1_labels{};

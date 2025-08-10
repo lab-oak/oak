@@ -702,7 +702,7 @@ void generate(uint64_t seed) {
         }
 
         print(Strings::battle_data_to_string(battle_data.battle,
-                                             battle_data.durations, {}));
+                                             battle_data.durations));
 
         // search and sample actions
         const auto output =

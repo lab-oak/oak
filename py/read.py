@@ -1,4 +1,5 @@
 from frame import Frame
+from build_trajectory import BuildTrajectory
 
 import ctypes
 import os
@@ -100,14 +101,14 @@ lib.uncompress_and_encode_training_frames.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # score
 ]
 
-lib.read_build_buffer.argtypes = [
+lib.read_build_trajectories.argtypes = [
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_int64),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
 ]
-lib.read_build_buffer.restype = ctypes.c_int
+lib.read_build_trajectories.restype = ctypes.c_int
 
 
 # Returns a list tuples containing: a bytes object, the number of wrtten to the bytes
@@ -149,26 +150,6 @@ def get_frames(data: bytes, frame_count: int) -> Frame:
     lib.uncompress_training_frames(*args)
     return frames
 
-
-class BuildTrajectory:
-    def __init__(self, size):
-        self.size = size
-
-        self.actions = np.zeros((size, 31), dtype=np.int64)
-        self.policy = np.zeros((size, 31), dtype=np.float32)
-        self.eval = np.zeros((size, 1), dtype=np.float32)
-        self.score = np.zeros((size, 1), dtype=np.float32)
-
-    def raw_pointers(self, i: int):
-        def ptr(x, dtype):
-            return x[i].ctypes.data_as(ctypes.POINTER(dtype))
-
-        return (
-            ptr(self.actions, ctypes.c_int64),
-            ptr(self.policy, ctypes.c_float),
-            ptr(self.eval, ctypes.c_float),
-            ptr(self.score, ctypes.c_float),
-        )
 
 
 class EncodedFrame:
@@ -243,11 +224,11 @@ def get_encoded_frames(data: bytes, frame_count: int) -> EncodedFrame:
     return encoded_frames
 
 # convert bytes object into Frames
-def read_build_buffer(path) -> BuildTrajectory:
+def read_build_trajectories(path) -> BuildTrajectory:
     buffer_size = int(os.path.getsize(path) / 128)
     path_bytes = path.encode("utf-8")
 
     trajectories = BuildTrajectory(buffer_size)
     args = (ctypes.c_char_p(path_bytes),) + trajectories.raw_pointers(0)
-    count = lib.read_build_buffer(*args)
+    count = lib.read_build_trajectories(*args)
     return trajectories

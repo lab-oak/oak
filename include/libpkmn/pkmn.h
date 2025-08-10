@@ -19,6 +19,26 @@ auto get_pointer(const T &t) {
 
 namespace PKMN {
 
+enum class Result : std::underlying_type_t<std::byte> {
+  None = 0,
+  Win = 1,
+  Lose = 2,
+  Tie = 3,
+  Error = 4,
+};
+
+enum class Choice : std::underlying_type_t<std::byte> {
+  Pass = 0,
+  Move = 1,
+  Switch = 2,
+};
+
+pkmn_result result(Result result = Result::None, Choice p1 = Choice::Move,
+                   Choice p2 = Choice::Move) {
+  return static_cast<uint8_t>(result) | (static_cast<uint8_t>(p1) << 4) |
+         (static_cast<uint8_t>(p2) << 6);
+}
+
 struct Set {
 
   constexpr bool operator==(const Set &) const = default;
@@ -34,20 +54,19 @@ struct Set {
   uint8_t sleeps = 0;
   Init::Boosts boosts = {};
   uint8_t level = 100;
+  Stats stats = {};
 };
 
 using Team = std::array<Set, 6>;
 
 constexpr auto battle(const auto &p1, const auto &p2,
                       uint64_t seed = 0x123445) {
-  pkmn_gen1_battle battle{};
-  Init::init_side(p1, battle.bytes);
-  Init::init_side(p2, battle.bytes + Layout::Sizes::Side);
-  auto *ptr_64 =
-      std::bit_cast<uint64_t *>(battle.bytes + Layout::Offsets::Battle::turn);
-  ptr_64[0] = 0; // turn, last used, etc
-  ptr_64[1] = seed;
-  return battle;
+  PKMN::Battle battle{};
+  battle.sides[0] = Init::init_side(p1);
+  battle.sides[1] = Init::init_side(p2);
+  battle.turn = 1;
+  battle.rng = seed;
+  return std::bit_cast<pkmn_gen1_battle>(battle);
 }
 
 constexpr pkmn_gen1_chance_durations durations() { return {}; }

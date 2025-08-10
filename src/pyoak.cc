@@ -472,8 +472,9 @@ extern "C" size_t encode_buffer_multithread(
   return std::min(count.load(), max_count);
 }
 
-extern "C" int read_build_buffer(const char *path, int64_t *action,
-                                 float *policy, float *eval, float *score) {
+extern "C" int read_build_trajectories(const char *path, int64_t *action,
+                                       float *policy, float *eval,
+                                       float *score) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -487,7 +488,8 @@ extern "C" int read_build_buffer(const char *path, int64_t *action,
   const auto ptrs = std::bit_cast<std::array<void *, 4>>(input);
   for (const auto *x : ptrs) {
     if (!x) {
-      std::cerr << "read_build_buffer: null pointer in input" << std::endl;
+      std::cerr << "read_build_trajectories: null pointer in input"
+                << std::endl;
       return -1;
     }
   }

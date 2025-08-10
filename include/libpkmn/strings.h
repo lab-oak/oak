@@ -30,6 +30,9 @@ std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
     return "pass";
   }
   case 1: {
+    if (choice_data == 0) {
+      return "None";
+    }
     return move_string(get_pokemon_from_slot(side, 1)[8 + 2 * choice_data]);
   }
   case 2: {
@@ -177,8 +180,7 @@ std::string volatiles_to_string(const PKMN::Volatiles &vol) {
 }
 
 std::string battle_data_to_string(const pkmn_gen1_battle &battle,
-                                  const pkmn_gen1_chance_durations &durations,
-                                  pkmn_result result = {}) {
+                                  const pkmn_gen1_chance_durations &durations) {
   std::stringstream ss{};
   const auto &b = View::ref(battle);
   for (auto s = 0; s < 2; ++s) {

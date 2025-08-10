@@ -71,7 +71,7 @@ def main():
 
 import sys
 if __name__ == "__main__":
-    trajectories = read.read_build_buffer("/home/user/train/data/0.build")
+    trajectories = read.read_build_trajectories("/home/user/train/data/0.build")
 
     i = int(sys.argv[1])
     for i in range(trajectories.size):

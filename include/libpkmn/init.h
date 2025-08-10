@@ -30,63 +30,59 @@ constexpr uint16_t compute_stat(uint8_t base, bool hp = false,
   return core * level / 100 + factor;
 }
 
-constexpr std::array<uint16_t, 5> compute_stats(const auto &pokemon) {
-  std::array<uint16_t, 5> stats;
-  const auto base = Data::get_species_data(pokemon.species).base_stats;
-  for (int s = 0; s < 5; ++s) {
-    stats[s] = compute_stat(base[s], s == 0, pokemon.level);
+constexpr PKMN::Pokemon init_pokemon(const auto &set) {
+  PKMN::Pokemon pokemon{};
+  // species
+  pokemon.species = set.species;
+  if (pokemon.species == Data::Species::None) {
+    return pokemon;
   }
-  return stats;
-}
-
-constexpr void init_pokemon(const auto &pokemon, uint8_t *const bytes,
-                            auto i = 0) {
-  const auto species = pokemon.species;
-  if (species == Data::Species::None) {
-    return;
-  }
-  if constexpr (requires { pokemon.level; }) {
-    bytes[23] = pokemon.level;
+  // level
+  if constexpr (requires { set.level; }) {
+    assert(pokemon.level >= 1 && pokemon.level <= 100);
+    pokemon.level = set.level;
   } else {
-    bytes[23] = 100;
+    pokemon.level = 100;
   }
-  const auto stats = compute_stats(pokemon);
-  auto *u16_ptr = std::bit_cast<uint16_t *>(bytes);
-  for (int s = 0; s < 5; ++s) {
-    u16_ptr[s] = stats[s];
-  }
-
-  auto *move_bytes = bytes + 10;
-  std::array<uint8_t, 5> dv, ev;
+  // stats
+  const auto base_stats = Data::get_species_data(pokemon.species).base_stats;
+  pokemon.stats.hp = compute_stat(base_stats[0], true, pokemon.level);
+  pokemon.stats.atk = compute_stat(base_stats[1], false, pokemon.level);
+  pokemon.stats.def = compute_stat(base_stats[2], false, pokemon.level);
+  pokemon.stats.spe = compute_stat(base_stats[3], false, pokemon.level);
+  pokemon.stats.spc = compute_stat(base_stats[4], false, pokemon.level);
+  // moves
   for (auto m = 0; m < 4; ++m) {
-    const auto move = pokemon.moves[m];
-    move_bytes[0] = static_cast<uint8_t>(move);
-    move_bytes[1] = get_max_pp(move);
-    if constexpr (requires { pokemon.pp; }) {
-      move_bytes[1] = std::min(move_bytes[1], pokemon.pp[m]);
-    }
-    move_bytes += 2;
-  }
-
-  if constexpr (requires { pokemon.hp; }) {
-    using HP = std::decay_t<decltype(pokemon.hp)>;
-    if constexpr (std::is_floating_point_v<HP>) {
-      u16_ptr[9] = std::min(std::max(pokemon.hp, HP{0}), HP{1}) * u16_ptr[0];
+    if constexpr (std::is_convertible_v<decltype(set.moves[0]), Data::Move>) {
+      pokemon.moves[m].id = static_cast<Data::Move>(set.moves[m]);
+      pokemon.moves[m].pp = get_max_pp(pokemon.moves[m].id);
     } else {
-      u16_ptr[9] = pokemon.hp;
+      pokemon.moves[m] = set.moves[m];
+      pokemon.moves[m].pp =
+          std::min(set.moves[m].pp, get_max_pp(pokemon.moves[m].id));
     }
-  } else {
-    u16_ptr[9] = u16_ptr[0];
   }
-  if constexpr (requires { pokemon.status; }) {
-    bytes[20] = static_cast<uint8_t>(pokemon.status);
+  // hp
+  if constexpr (requires { set.hp; }) {
+    uint16_t hp;
+    if constexpr (std::is_floating_point_v<decltype(set.hp)>) {
+      hp = set.hp * pokemon.stats.hp;
+    } else {
+      hp = set.hp;
+    }
+    pokemon.hp = std::min(hp, pokemon.stats.hp);
   } else {
-    bytes[20] = 0;
+    pokemon.hp = pokemon.stats.hp;
   }
-  bytes[21] = static_cast<uint8_t>(species);
-  const auto types = get_types(species);
-  bytes[22] =
-      (static_cast<uint8_t>(types[1]) << 4) | static_cast<uint8_t>(types[0]);
+  // status
+  if constexpr (requires { set.status; }) {
+    pokemon.status = static_cast<Data::Status>(set.status);
+  }
+  // types
+  const auto types = get_types(pokemon.species);
+  pokemon.types =
+      static_cast<uint8_t>(types[0]) | (static_cast<uint8_t>(types[1]) << 4);
+  return pokemon;
 }
 
 constexpr uint16_t boost(uint16_t stat, int b) {
@@ -94,58 +90,78 @@ constexpr uint16_t boost(uint16_t stat, int b) {
   return std::min(999, stat * pair[0] / pair[1]);
 }
 
-constexpr void init_active(const auto &active, uint8_t *const bytes) {
-  auto &pokemon = *reinterpret_cast<PKMN::Pokemon *>(bytes);
-  auto &active_pokemon = *reinterpret_cast<PKMN::ActivePokemon *>(
-      bytes + Layout::Offsets::Side::active);
+constexpr PKMN::ActivePokemon init_active(const auto &set,
+                                          const PKMN::Pokemon &pokemon) {
+  // turn 0
+  PKMN::ActivePokemon active{};
+  active.stats = pokemon.stats;
+  active.species = pokemon.species;
+  active.types = pokemon.types;
+  active.moves = pokemon.moves;
 
-  if constexpr (requires { active.volatiles; }) {
+  // boosts
+  if constexpr (requires { set.boosts.atk; }) {
+    active.stats.atk = boost(pokemon.stats.atk, set.boosts.atk);
+    active.boosts.set_atk(set.boosts.atk);
   }
-  auto *stats =
-      reinterpret_cast<uint16_t *>(bytes + Layout::Offsets::Side::active);
-  if constexpr (requires { active.boosts.atk; }) {
-    stats[1] = boost(pokemon.stats.atk, active.boosts.atk);
-    active_pokemon.boosts.set_atk(active.boosts.atk);
+  if constexpr (requires { set.boosts.def; }) {
+    active.stats.def = boost(pokemon.stats.def, set.boosts.def);
+    active.boosts.set_def(set.boosts.def);
   }
-  if constexpr (requires { active.boosts.def; }) {
-    stats[2] = boost(pokemon.stats.def, active.boosts.def);
-    active_pokemon.boosts.set_def(active.boosts.def);
+  if constexpr (requires { set.boosts.spe; }) {
+    active.stats.spe = boost(pokemon.stats.spe, set.boosts.spe);
+    active.boosts.set_spe(set.boosts.spe);
   }
-  if constexpr (requires { active.boosts.spe; }) {
-    stats[3] = boost(pokemon.stats.spe, active.boosts.spe);
-    active_pokemon.boosts.set_spe(active.boosts.spe);
+  if constexpr (requires { set.boosts.spc; }) {
+    active.stats.spc = boost(pokemon.stats.spc, set.boosts.spc);
+    active.boosts.set_spc(set.boosts.spc);
   }
-  if constexpr (requires { active.boosts.spc; }) {
-    stats[4] = boost(pokemon.stats.spc, active.boosts.spc);
-    active_pokemon.boosts.set_spc(active.boosts.spc);
+
+  // de-facto stats
+  if constexpr (requires { set.stats.atk; }) {
+    if (set.stats.atk) {
+      active.stats.atk = set.stats.atk;
+    }
   }
+  if constexpr (requires { set.stats.def; }) {
+    if (set.stats.def) {
+      active.stats.def = set.stats.def;
+    }
+  }
+  if constexpr (requires { set.stats.spe; }) {
+    if (set.stats.spe) {
+      active.stats.spe = set.stats.spe;
+    }
+  }
+  if constexpr (requires { set.stats.spc; }) {
+    if (set.stats.spc) {
+      active.stats.spc = set.stats.spc;
+    }
+  }
+
+  // volatiles
+  // TODO
+
+  return active;
 }
 
-constexpr void init_party(const auto &party, uint8_t *const bytes) {
-  const uint8_t n = party.size();
-  assert(n > 0 && n <= 6);
-  std::memset(bytes, 0, 24 * 6);
-  std::memset(bytes + Layout::Offsets::Side::order, 0, 6);
+constexpr PKMN::Side init_side(const auto &sets) {
+  PKMN::Side side{};
 
-  uint8_t n_alive = 0;
-
-  for (uint8_t i = 0; i < n; ++i) {
-    const auto &set = party[i];
-    assert(set.moves.size() <= 4);
-    init_pokemon(set, bytes + i * Layout::Sizes::Pokemon, i);
-    if (i == 0) {
-      init_active(set, bytes);
-    }
-    if (set.species != Data::Species::None) {
-      if constexpr (requires { set.hp; }) {
-        if (set.hp == 0) {
-          continue;
-        }
+  bool first_alive = true;
+  for (auto i = 0; i < sets.size(); ++i) {
+    const auto pokemon = init_pokemon(sets[i]);
+    if (pokemon.hp) {
+      side.order[i] = i + 1;
+      if (first_alive) {
+        side.active = init_active(sets[i], pokemon);
+        first_alive = false;
       }
-      bytes[Layout::Offsets::Side::order + n_alive] = i + 1;
-      ++n_alive;
     }
+    side.pokemon[i] = pokemon;
   }
+
+  return side;
 }
 
 constexpr void init_duration(const auto &party, PKMN::Duration &duration) {
@@ -161,17 +177,6 @@ constexpr void init_duration(const auto &party, PKMN::Duration &duration) {
         duration.set_sleep(i, pokemon.sleeps);
       }
     }
-  }
-}
-
-constexpr void init_side(const auto &side, uint8_t *const bytes) {
-  if constexpr (requires { side.pokemon; }) {
-    init_party(side.pokemon, bytes);
-    if constexpr (requires { side.active; }) {
-      init_active(side.active, bytes + Layout::Offsets::Side::active);
-    }
-  } else {
-    init_party(side, bytes);
   }
 }
 

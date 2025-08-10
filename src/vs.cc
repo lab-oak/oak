@@ -193,8 +193,7 @@ void thread_fn(uint64_t seed) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
           print(Strings::battle_data_to_string(battle_data.battle,
-                                               battle_data.durations, {}),
-                false);
+                                               battle_data.durations));
           print("Values: " + std::to_string(p1_output.empirical_value) + " : " +
                 std::to_string(p2_output.empirical_value));
           print("Times: " + std::to_string(p1_output.duration.count()) + " : " +
