@@ -132,6 +132,9 @@ parse_battle(const std::string &battle_string, uint64_t seed = 0x123456) {
   }
   const auto p1 = parse_side(side_strings[0]);
   const auto p2 = parse_side(side_strings[1]);
+  // auto battle = PKMN::battle(p1, p2, seed);
+  // const auto durations = PKMN::battle(p1, p2);
+
   return {PKMN::battle(p1, p2, seed), PKMN::durations(p1, p2)};
 }
 
