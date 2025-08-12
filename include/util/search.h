@@ -62,11 +62,21 @@ auto run(const BattleData &battle_data, size_t count, char mode,
     }
   };
 
-  const auto run_0 = [&]() {
-    if (mode == 'i') {
-      return run_1(count);
-    } else if (mode == 't') {
-      return run_1(std::chrono::milliseconds{count});
+  // get duration
+  const auto search_0 = [&]() {
+    if (agent.flag != nullptr) {
+      return search_1(agent.flag);
+    }
+    const auto pos = agent.search_time.find_first_not_of("0123456789");
+    size_t number = std::stoll(agent.search_time.substr(0, pos));
+    std::string unit =
+        (pos == std::string::npos) ? "" : agent.search_time.substr(pos);
+    if (unit.empty()) {
+      return search_1(number);
+    } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
+      return search_1(std::chrono::milliseconds{number});
+    } else if (unit == "s" || unit == "sec" || "seconds") {
+      return search_1(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid duration mode char.");
       return MCTS::Output{};

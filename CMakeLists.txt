@@ -48,6 +48,10 @@ add_executable(benchmark src/benchmark.cc)
 target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
 
+add_executable(dur src/dur.cc)
+target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(dur PRIVATE libpkmn_chance lrslib128)
+
 add_executable(debug-log src/debug-log.cc)
 target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(debug-log PRIVATE libpkmn_client)

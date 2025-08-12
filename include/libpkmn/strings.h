@@ -12,6 +12,7 @@
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 #include <libpkmn/data/strings.h>
+#include <libpkmn/data/status.h>
 #include <libpkmn/layout.h>
 
 constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
@@ -272,13 +273,20 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
       }
       const auto st = pokemon.status;
       if (st != Data::Status::None) {
-        ss << status_string(st) << ' ';
+        ss << status_string(st);
+        if (Data::is_sleep(st)) {
+          ss << ':' << (int)duration.sleep(i);  
+        }
+        ss << ' ';
       }
       for (auto m = 0; m < 4; ++m) {
         const auto moveslot = pokemon.moves[m];
         ss << move_char_array(moveslot.id) << ":" << (int)moveslot.pp << ' ';
       }
       ss << '\n';
+      if (s == 0) {
+        ss << "-\n";
+      }
     }
   }
   return ss.str();
