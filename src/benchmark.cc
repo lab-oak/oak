@@ -1,6 +1,6 @@
 #include <data/teams.h>
 #include <nn/network.h>
-#include <search/exp3.h>
+#include <search/bandit/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>
 #include <util/random.h>

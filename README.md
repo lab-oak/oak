@@ -1,34 +1,33 @@
 # About
 
-This project has two layers. The first is a header-only library that defines
+Oak is a software toolkit for perfect info search and neural network training for the first generation of Pokemon (RBY). It includes:
 
-* a C++ interface for `libpkmn` that closely replicates the feel of using the library in native Zig
+* A program for generating neural network training data for both battling and team building
 
-* *sound*, high performance MCTS for perfect information battles
+* An analyis engine that accepts any position in a a simple text format
 
-* both full-precision and fast, quantized (TODO) neural network implementations for CPU
+* A tool for comparing the strength of different neural network and search parameters
 
-* a lossless battle encoding for neural network inputs
+* A python library for quickly reading training data into numpy arrays
 
-* highly compressed disk formats for battle and build network training data
+This is all is intended to work out of the box to allow people with no programming knowledge to compile training data and train neural networks in Python
 
-The second layer is a collection of programs that form a serious platorm for training and evaluating neural networks for battling and team building. These include:
+These programs were all built from a shared header library that is easy to extend and modify. This library includes:
 
-* a script for generating self-play training data
+* a complete C++ interface for `libpkmn` that mirrors the original Zig code
 
-* a static library to quicly convert compressed training data into Pytorch tensors
+* correct, high-performance mcts implementations
 
-* a tool to compare battle networks with each other and pure MCTS
+* simple neural network for value and policy inference
 
-* a tool for engine analysis of user defined positions
+* compressed training data formats for battling and team generation. These are independent of the kind of model being trained
 
-More information about the header-library is in [here](include/readme.md)
-
-Information about the programs can be found by running them with `--help`.
+* highly compressed disk formats for battle and build network training
+the programs can be found by running them with `--help`.
 
 # Building
 
-Must have cmake and zig installed. The bash below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
+Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
 ```
 git clone --recurse-submodules https://github.com/lab-oak/oak

@@ -3,9 +3,9 @@
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
 #include <nn/network.h>
-#include <search/exp3.h>
+#include <search/bandit/exp3.h>
+#include <search/bandit/ucb.h>
 #include <search/mcts.h>
-#include <search/ucb.h>
 #include <train/build-trajectory.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
@@ -744,11 +744,10 @@ void generate(uint64_t seed) {
         print(container_string(output.p2_empirical));
         print(container_string(output.p2_nash));
 
-        print(
-            Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
-            "/" +
-            Strings::side_choice_string(battle_data.battle.bytes + 184,
-                                        p2_choice));
+        print(Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
+              "/" +
+              Strings::side_choice_string(battle_data.battle.bytes + 184,
+                                          p2_choice));
 
         // update train data
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);

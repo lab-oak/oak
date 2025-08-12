@@ -3,7 +3,7 @@ import torch
 import argparse
 import random
 
-import read
+import pyoak
 import net
 
 
@@ -28,7 +28,7 @@ class Optimizer:
         self.opt.zero_grad()
 
 
-def kl_div(logit, target):
+def masked_kl_div(logit, target):
     log_probs = torch.log_softmax(logit, dim=-1)
     kl = target * (torch.log(target) - log_probs)
     kl = kl.masked_fill(torch.isneginf(logit), 0)
@@ -40,14 +40,14 @@ def loss(
 ):
     size = min(input.size, output.size)
 
-    # Value target weighting
+    # Value target
     value_target = (
         args.w_nash * input.nash_value[:size]
         + args.w_empirical * input.empirical_value[:size]
         + args.w_score * input.score[:size]
     )
 
-    # Policy target weighting
+    # Policy target
     w_nash_p = args.w_nash_p
     w_empirical_p = 1 - w_nash_p
 
@@ -58,22 +58,21 @@ def loss(
         w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
     )
 
-    # Loss components
+    # Loss
     value_loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
 
-    if args.use_policy_loss:
-        p1_loss = kl_div(output.p1_policy[:size], p1_policy_target)
-        p2_loss = kl_div(output.p2_policy[:size], p2_policy_target)
-    else:
+    if args.no_policy_loss:
         p1_loss = torch.tensor(0.0, device=value_loss.device)
         p2_loss = torch.tensor(0.0, device=value_loss.device)
+    else:
+        p1_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
+        p2_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
+
 
     total_loss = value_loss + p1_loss + p2_loss
 
     if print_flag:
         window = args.print_window
-        x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(window, 1, 9)
-        y = p1_policy_target[:window].view(window, 1, 9)
         print(
             torch.cat(
                 [
@@ -86,7 +85,10 @@ def loss(
                 dim=1,
             )
         )
-        print(torch.cat([x, y], dim=1))
+        if not args.no_policy_loss:
+            x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(window, 1, 9)
+            y = p1_policy_target[:window].view(window, 1, 9)
+            print(torch.cat([x, y], dim=1))
         print(f"loss: v:{value_loss.mean()}, p1:{p1_loss}, p2:{p2_loss}")
 
     return total_loss
@@ -100,14 +102,14 @@ def set_seed(seed):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train the network.")
-    parser.add_argument("net_dir", help="Directory to store network checkpoints")
-    parser.add_argument("battle_dir", help="Directory containing .battle files")
-    parser.add_argument("buffer_size", type=int, help="Training buffer size")
+    parser = argparse.ArgumentParser(description="Train an Oak battle network.")
+    parser.add_argument("net_dir", help="Write directory for network weights")
+    parser.add_argument("battle_dir", help="Read directory for battle files. All subdirectories are scanned.")
+    parser.add_argument("batch_size", type=int, help="Batch size")
 
     # General training
     parser.add_argument(
-        "--threads", type=int, default=4, help="Number of worker threads"
+        "--threads", type=int, default=1, help="Number of threads for data loading"
     )
     parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
     parser.add_argument(
@@ -118,7 +120,7 @@ def main():
         "--write-prob",
         type=float,
         default=1 / 100,
-        help="Write probability for encode_buffers",
+        help="Write probability for encode_buffers. A lower value means less correlated samples.",
     )
 
     # Loss weighting
@@ -146,15 +148,9 @@ def main():
 
     # Policy loss toggle
     parser.add_argument(
-        "--use-policy-loss",
-        action="store_true",
-        default=True,
-        help="Enable policy loss computation",
-    )
-    parser.add_argument(
         "--no-policy-loss",
-        action="store_false",
-        dest="use_policy_loss",
+        action="store_true",
+        dest="no_policy_loss",
         help="Disable policy loss computation",
     )
 
@@ -197,9 +193,9 @@ def main():
     paths = find_battle_files(args.battle_dir)
     print(f"{len(paths)} paths found")
 
-    encoded_frames = read.EncodedFrame(args.buffer_size)
+    encoded_frames = pyoak.EncodedFrame(args.batch_size)
     encoded_frames_torch = net.EncodedFrameTorch(encoded_frames)
-    output_buffer = net.OutputBuffers(args.buffer_size)
+    output_buffer = net.OutputBuffers(args.batch_size)
     network = net.Network().to(args.device)
     optimizer = Optimizer(network, args.lr)
 
@@ -207,10 +203,10 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        read.encode_buffers(
+        pyoak.encode_buffers(
             paths,
             args.threads,
-            args.buffer_size,
+            args.batch_size,
             encoded_frames,
             start_index=0,
             write_prob=args.write_prob,

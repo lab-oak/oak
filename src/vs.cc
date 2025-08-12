@@ -3,6 +3,7 @@
 #include <libpkmn/strings.h>
 #include <nn/network.h>
 #include <train/compressed-frame.h>
+#include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
 
@@ -66,20 +67,6 @@ struct SearchOptions {
   }
 };
 
-struct PolicyOptions {
-  double policy_temp = 1;
-  double policy_min_prob = 0;
-  char policy_mode = 'n';
-
-  std::string to_string() const {
-    std::stringstream ss{};
-    ss << "temp: " << policy_temp;
-    ss << " min-prob: " << policy_min_prob;
-    ss << " mode: " << policy_mode;
-    return ss.str();
-  }
-};
-
 SearchOptions p1_search_options{};
 SearchOptions p2_search_options{};
 
@@ -133,9 +120,8 @@ void thread_fn(uint64_t seed) {
     // RuntimeData::p1_network.fill_cache(battle);
     // RuntimeData::p2_network.fill_cache(battle);
     const auto durations = PKMN::durations();
-    BattleData battle_data{battle, durations};
+    BattleData battle_data{battle, durations, PKMN::result()};
     auto battle_options = PKMN::options();
-    battle_data.result = PKMN::update(battle_data.battle, 0, 0, battle_options);
     bool early_stop = false;
 
     // Train::CompressedFrames<> training_frames{battle_data.battle};

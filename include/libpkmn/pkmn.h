@@ -5,6 +5,7 @@
 #include <libpkmn/data/status.h>
 #include <libpkmn/data/strings.h>
 #include <libpkmn/init.h>
+#include <libpkmn/strings.h>
 
 namespace PKMNDetail {
 
@@ -150,6 +151,22 @@ auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
   p1_choices.resize(m);
   p2_choices.resize(n);
   return {p1_choices, p2_choices};
+}
+
+auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
+    -> std::pair<std::vector<std::string>, std::vector<std::string>> {
+  const auto [p1_choices, p2_choices] = choices(battle, result);
+  std::vector<std::string> p1_labels{};
+  std::vector<std::string> p2_labels{};
+  for (auto i = 0; i < p1_choices.size(); ++i) {
+    p1_labels.push_back(
+        Strings::side_choice_string(battle.bytes, p1_choices[i]));
+  }
+  for (auto i = 0; i < p2_choices.size(); ++i) {
+    p2_labels.push_back(Strings::side_choice_string(
+        battle.bytes + Layout::Sizes::Side, p2_choices[i]));
+  }
+  return {p1_labels, p2_labels};
 }
 
 constexpr float score(const pkmn_result result) noexcept {

@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import read
+import pyoak
 
 import struct
 
 
 class EncodedFrameTorch:
-    def __init__(self, encoded_frame: read.EncodedFrame):
+    def __init__(self, encoded_frame: pyoak.EncodedFrame):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
         self.n = torch.from_numpy(encoded_frame.n)
@@ -164,8 +164,8 @@ class OutputBuffers:
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
-        self.p1_policy_raw = torch.zeros(size, read.policy_out_dim + 1)
-        self.p2_policy_raw = torch.zeros(size, read.policy_out_dim + 1)
+        self.p1_policy_raw = torch.zeros(size, pyoak.policy_out_dim + 1)
+        self.p2_policy_raw = torch.zeros(size, pyoak.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -183,17 +183,17 @@ class OutputBuffers:
 
 
 class Network(torch.nn.Module):
-    pokemon_hidden_dim = read.pokemon_hidden_dim
-    pokemon_out_dim = read.pokemon_out_dim
-    active_hidden_dim = read.active_hidden_dim
-    active_out_dim = read.active_out_dim
-    side_out_dim = read.side_out_dim
-    hidden_dim = read.hidden_dim
-    value_hidden_dim = read.value_hidden_dim
-    policy_hidden_dim = read.policy_hidden_dim
-    policy_out_dim = read.policy_out_dim
-    pokemon_in_dim = read.pokemon_in_dim
-    active_in_dim = read.active_in_dim
+    pokemon_hidden_dim = pyoak.pokemon_hidden_dim
+    pokemon_out_dim = pyoak.pokemon_out_dim
+    active_hidden_dim = pyoak.active_hidden_dim
+    active_out_dim = pyoak.active_out_dim
+    side_out_dim = pyoak.side_out_dim
+    hidden_dim = pyoak.hidden_dim
+    value_hidden_dim = pyoak.value_hidden_dim
+    policy_hidden_dim = pyoak.policy_hidden_dim
+    policy_out_dim = pyoak.policy_out_dim
+    pokemon_in_dim = pyoak.pokemon_in_dim
+    active_in_dim = pyoak.active_in_dim
 
     def __init__(self):
         super().__init__()

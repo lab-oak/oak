@@ -1,6 +1,6 @@
 import os
 
-import read
+import pyoak
 
 
 def find_battle_files(root_dir):
@@ -17,15 +17,15 @@ def main():
     total = 0
     files = find_battle_files("/home/user/train/2025-07-14-18:30:58/")
     for file in files:
-        battle_data = read.read_battle_data(file)
-        # battle_frames = [libread.get_frames(*pee) for pee in battle_data]        # battle_frames = [libread.get_frames(*pee) for pee in battle_data]
-        encoded_frames = read.get_encoded_frames(*battle_data[0])
+        battle_data = pyoak.read_battle_data(file)
+        # battle_frames = [libpyoak.get_frames(*pee) for pee in battle_data]        # battle_frames = [libpyoak.get_frames(*pee) for pee in battle_data]
+        encoded_frames = pyoak.get_encoded_frames(*battle_data[0])
 
         turn = 73
 
         p1 = [
             (
-                read.policy_dim_labels[i],
+                pyoak.policy_dim_labels[i],
                 int(e.item() * 1000) / 10,
                 int(n.item() * 1000) / 10,
             )
@@ -37,7 +37,7 @@ def main():
         ]
         p2 = [
             (
-                read.policy_dim_labels[i],
+                pyoak.policy_dim_labels[i],
                 int(e.item() * 1000) / 10,
                 int(n.item() * 1000) / 10,
             )
@@ -64,7 +64,7 @@ def main():
             encoded_frames.nash_value[turn].item(),
         )
         # print(encoded_frames.p2_empirical[turn])
-        # print([read.policy_dim_labels[i] for i in encoded_frames.p2_choice_indices[turn]])
+        # print([pyoak.policy_dim_labels[i] for i in encoded_frames.p2_choice_indices[turn]])
 
         return
     print(total)
@@ -73,7 +73,7 @@ def main():
 import sys
 
 if __name__ == "__main__":
-    trajectories = read.read_build_trajectories("/home/user/train/data/0.build")
+    trajectories = pyoak.read_build_trajectories("/home/user/train/data/0.build")
 
     i = int(sys.argv[1])
     for i in range(trajectories.size):
@@ -82,8 +82,8 @@ if __name__ == "__main__":
             continue
 
         for index, p in zip(trajectories.actions[i], trajectories.policy[i]):
-            pair = read.species_move_list[index]
-            print(p, read.species_names[pair[0]], read.move_names[pair[1]])
+            pair = pyoak.species_move_list[index]
+            print(p, pyoak.species_names[pair[0]], pyoak.move_names[pair[1]])
         print(trajectories.eval[i])
         print(trajectories.score[i])
 
