@@ -2,10 +2,10 @@
 #include <libpkmn/data/strings.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
-#include <search/exp3.h>
-#include <search/mcts.h>
 #include <util/parse.h>
+#include <util/policy.h>
 #include <util/random.h>
+#include <util/search.h>
 
 #include <csignal>
 #include <iostream>
@@ -57,12 +57,12 @@ int main(int argc, char **argv) {
   std::signal(SIGTSTP, handle_suspend);
 
   mt19937 device{std::random_device{}()};
-
+  // snorlax surf 50% rest1 | rhyd 1% seismic
   pkmn_gen1_battle_options options{};
   BattleData battle_data;
   while (true) {
     std::string line;
-    std::cout << "Enter battle string: " << std::endl;
+    std::cout << "Input: battle-string" << std::endl;
     std::getline(std::cin, line);
     try {
       battle_data = parse_input(line, seed);
@@ -121,8 +121,7 @@ int main(int argc, char **argv) {
       output = search.run(&run_search, bandit_params, node, battle_data, model,
                           output);
       print_output(output, battle_data.battle, p1_labels, p2_labels);
-      std::cout << "(If the next input is a P1 choice index the battle is "
-                   "advanced; otherwise search is resumed.):"
+      std::cout << "Input: p1 index (p2_index); Negative index = sample."
                 << std::endl;
       std::string line;
       if (!std::getline(std::cin, line)) {
@@ -132,23 +131,26 @@ int main(int argc, char **argv) {
 
       std::istringstream iss(line);
       if (iss >> p1_index) {
-        if (p1_index >= 0 && p1_index < output.m) {
+        if (p1_index < (int)output.m) {
           if (iss >> p2_index) {
-            if (p2_index >= 0 && p2_index < output.m) {
-              p1_index = p1_index;
-              p2_index = p2_index;
+            if (p2_index < (int)output.n) {
               break;
             }
           } else {
-            p1_index = p1_index;
             break;
           }
         }
       }
-      std::cout << "Invalid index. Resuming search." << std::endl;
+      std::cout << "Invalid index (pair). Resuming search." << std::endl;
     }
 
+    if (p1_index < 0) {
+      std::cout << "Sampling Player 1" << std::endl;
+      p1_index = RuntimePolicy::process_and_sample(
+          device, output.p1_empirical, output.p1_nash, policy_options);
+    }
     if (p2_index < 0) {
+      std::cout << "Sampling Player 2" << std::endl;
       p2_index = RuntimePolicy::process_and_sample(
           device, output.p2_empirical, output.p2_nash, policy_options);
     }
@@ -156,13 +158,17 @@ int main(int argc, char **argv) {
     auto c1 = p1_choices[p1_index];
     auto c2 = p2_choices[p2_index];
 
-    std::cout << p1_labels[a] << ' ' << p2_labels[b] << std::endl;
+    std::cout << "Actions: " << p1_labels[p1_index] << ' '
+              << p2_labels[p2_index] << std::endl;
 
     battle_data.result = PKMN::update(battle_data.battle, c1, c2, options);
     battle_data.durations =
         *pkmn_gen1_battle_options_chance_durations(&options);
   }
 
+  std::cout << "\nBattle:" << std::endl;
+  std::cout << Strings::battle_data_to_string(battle_data.battle,
+                                              battle_data.durations);
   std::cout << "Score: " << PKMN::score(battle_data.result) << std::endl;
 
   return 0;

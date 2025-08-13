@@ -50,7 +50,11 @@ target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
 
 add_executable(dur src/dur.cc)
 target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(dur PRIVATE libpkmn_chance lrslib128)
+target_link_libraries(dur PRIVATE libpkmn_chance lrslib128  eigen``)
+
+add_executable(chall src/chall.cc)
+target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(chall PRIVATE libpkmn_chance lrslib128 eigen)
 
 add_executable(debug-log src/debug-log.cc)
 target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

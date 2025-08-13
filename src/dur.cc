@@ -1,21 +1,24 @@
-#include <battle/init.h>
-#include <battle/sample-teams.h>
-#include <battle/strings.h>
-#include <battle/util.h>
-
-#include <data/moves.h>
+#include <data/teams.h>
+#include <libpkmn/data/strings.h>
+#include <libpkmn/pkmn.h>
+#include <libpkmn/strings.h>
+#include <util/parse.h>
+#include <util/policy.h>
 #include <util/random.h>
+#include <util/search.h>
 
+#include <csignal>
 #include <iostream>
 #include <limits>
 #include <type_traits>
+#include <vector>
 
 #include <map>
 
 using Key = std::pair<int, int>;
 std::map<Key, size_t> map{};
 
-std::array<std::array<Init::Set, 6>, 16> teams = SampleTeams::teams;
+std::array<std::array<PKMN::Set, 6>, 16> teams = Teams::teams;
 pkmn_gen1_battle old_battle;
 pkmn_gen1_battle_options old_options;
 
@@ -26,7 +29,7 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
 
   for (auto s = 0; s < 2; ++s) {
     const auto &vol = battle.side(s).active().volatiles();
-    const auto &duration = View::ref(durations).duration(s);
+    const auto &duration = View::ref(durations).get(s);
 
     if (vol.disable_move() != 0) {
       // This is all you have to change besides setting the first move in main
@@ -39,10 +42,9 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
         const pkmn_gen1_chance_durations &old_durations =
             *pkmn_gen1_battle_options_chance_durations(&old_options);
         std::cout << "START" << std::endl;
-        std::cout << Strings::battle_data_to_string(old_battle, old_durations,
-                                                    0);
+        std::cout << Strings::battle_data_to_string(old_battle, old_durations);
         std::cout << "________" << std::endl;
-        std::cout << Strings::battle_data_to_string(b, durations, 0);
+        std::cout << Strings::battle_data_to_string(b, durations);
         std::cout << "END" << std::endl;
       }
     }
@@ -65,11 +67,12 @@ int main(int argc, char **argv) {
     }
   }
 
-  prng device{2323423344634};
+  mt19937 device{2323423344634};
 
   for (auto i = 0; i < std::atoll(argv[1]); ++i) {
-    auto [battle, durations] = Init::battle_data(
-        teams[i % 16], teams[(i + 1) % 16], device.uniform_64());
+    auto battle =
+        PKMN::battle(teams[i % 16], teams[(i + 1) % 16], device.uniform_64());
+
     pkmn_gen1_battle_options options{};
     Util::rollout_and_exec(device, battle, options, F);
   }

@@ -88,6 +88,14 @@ PKMN::Set parse_set(const auto &words) {
       const auto sleeps = std::stoll(lower.substr(3));
       pokemon.status = Status::Sleep7;
       pokemon.sleeps = sleeps;
+    } else if (lower.starts_with("rst")) {
+      const auto hidden = std::stoll(lower.substr(3));
+      if (hidden > 3 || hidden == 0) {
+        throw std::runtime_error(
+            "parse_pokemon(): Invalid sleep duration for rest: " +
+            std::to_string(hidden));
+      }
+      pokemon.status = Data::rest(hidden);
     }
 
     if (lower.starts_with("atk")) {

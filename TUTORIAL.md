@@ -144,7 +144,7 @@ Earthqua 0.15     0.20     0.16
 
 This information includes the information from the first search period, e.g. the first 748,371 iterations are counted among the second 9,710,356 iterations, etc.
 
-The battle position is advanced by selecting an index for player 1. The player 2 Nash policy is sampled for the other action. The battle is given a random seed [0, 2^64 - 1] which can be set as the optional third argument.
+The battle position is advanced in two different ways. If one valid choice index for player 1 in entered, the choice index for player 2 will be sampled from that player's Nash policy. The user can also enter choice indices for both players separated by a space. If the user plays out the battle, they may find 
 
 ## generate
 

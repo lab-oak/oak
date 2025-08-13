@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <type_traits>
 
@@ -35,5 +36,9 @@ constexpr bool self(const auto status) {
 constexpr Status sleep(const auto n) {
   assert((n & 7) == n);
   return static_cast<Status>(n);
+}
+constexpr Status rest(const auto n) {
+  assert((n & 3) == n);
+  return static_cast<Status>(0b10000000 | n);
 }
 } // namespace Data
