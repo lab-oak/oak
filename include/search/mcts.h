@@ -509,7 +509,7 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     std::cout << fix_label(p1_labels[i]) << " ";
     for (size_t j = 0; j < output.n; ++j) {
       if (output.visit_matrix[i][j] == 0) {
-        std::cout << "  -----  ";
+        std::cout << " ----    ";
       } else {
         double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
         std::cout << std::left << std::fixed << std::setw(label_width)
