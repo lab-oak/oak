@@ -59,14 +59,16 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
       vol.set_attacks(multi[binding - 1][index]);
     }
 
-    if (const auto sleep = duration.sleep(0)) {
-      auto &pokemon = side.stored();
-      auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
+    for (auto i = 0; i < 6; ++i) {
+      if (const auto sleep = duration.sleep(i)) {
+        auto &pokemon = side.get(i + 1);
+        auto &status = reinterpret_cast<uint8_t &>(pokemon.status);
 
-      if (Data::is_sleep(status) && !Data::self(status)) {
-        const uint8_t max = 8 - sleep;
-        status &= 0b11111000; // clear sleep remaining
-        status |= static_cast<uint8_t>((battle.rng % max) + 1);
+        if (Data::is_sleep(status) && !Data::self(status)) {
+          const uint8_t max = 8 - sleep;
+          status &= 0b11111000;
+          status |= static_cast<uint8_t>((battle.rng % max) + 1);
+        }
       }
     }
   }
