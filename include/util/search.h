@@ -13,19 +13,24 @@
 
 namespace RuntimeSearch {
 
-struct Nodes {
-  std::unique_ptr<Tree::Node<Exp3::JointBandit, MCTS::Obs>> exp3;
-  std::unique_ptr<Tree::Node<PExp3::JointBandit, MCTS::Obs>> pexp3;
-  std::unique_ptr<Tree::Node<UCB::JointBandit, MCTS::Obs>> ucb;
-  std::unique_ptr<Tree::Node<PUCB::JointBandit, MCTS::Obs>> pucb;
+template <typename T>
+using OptionalUniqueNode =
+    std::optional<std::unique_ptr<Tree::Node<T, MCTS::Obs>>>;
 
-  Nodes() { reset(); }
+struct Nodes {
+  OptionalUniqueNode<Exp3::JointBandit> exp3;
+  OptionalUniqueNode<PExp3::JointBandit> pexp3;
+  OptionalUniqueNode<UCB::JointBandit> ucb;
+  OptionalUniqueNode<PUCB::JointBandit> pucb;
+  bool set;
+
+  Nodes() : set{false} { reset(); }
 
   void reset() {
-    exp3 = std::make_unique<decltype(exp3)::element_type>();
-    pexp3 = std::make_unique<decltype(pexp3)::element_type>();
-    ucb = std::make_unique<decltype(ucb)::element_type>();
-    pucb = std::make_unique<decltype(pucb)::element_type>();
+    exp3.reset();
+    pexp3.reset();
+    ucb.reset();
+    pucb.reset();
   }
 };
 
@@ -47,22 +52,41 @@ auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
     // std::transform(lower.begin(), lower.end(), lower.begin(),
     //                [](auto c) { return std::tolower(c); });
 
+    const auto get = [&nodes](auto &node) -> auto & {
+      using Node = std::remove_reference_t<decltype(*node.value())>;
+      if (!node.has_value()) {
+        if (nodes.set) {
+          throw std::runtime_error("RuntimeSearch::run(): Wrong node type");
+        } else {
+          nodes.set = true;
+          node.emplace(std::make_unique<Node>());
+          assert(node.has_value());
+          assert(node.value().get());
+        }
+      }
+      return *node.value();
+    };
+
     if (lower.starts_with("exp3-")) {
       const float gamma = std::stof(lower.substr(5));
       Exp3::Bandit::Params params{gamma};
-      return search.run(dur, params, *nodes.exp3, battle_data, model, output);
+      return search.run(dur, params, get(nodes.exp3), battle_data, model,
+                        output);
     } else if (lower.starts_with("ucb-")) {
       const float c = std::stof(lower.substr(4));
       UCB::Bandit::Params params{c};
-      return search.run(dur, params, *nodes.ucb, battle_data, model, output);
+      return search.run(dur, params, get(nodes.ucb), battle_data, model,
+                        output);
     } else if (lower.starts_with("pexp3-")) {
       const float gamma = std::stof(lower.substr(6));
       PExp3::Bandit::Params params{gamma};
-      return search.run(dur, params, *nodes.pexp3, battle_data, model, output);
+      return search.run(dur, params, get(nodes.pexp3), battle_data, model,
+                        output);
     } else if (lower.starts_with("pucb-")) {
       const float c = std::stof(lower.substr(5));
       PUCB::Bandit::Params params{c};
-      return search.run(dur, params, *nodes.pucb, battle_data, model, output);
+      return search.run(dur, params, get(nodes.pucb), battle_data, model,
+                        output);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + lower);
       return output;
