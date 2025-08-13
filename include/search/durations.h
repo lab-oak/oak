@@ -65,7 +65,7 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
 
       if (Data::is_sleep(status) && !Data::self(status)) {
         const uint8_t max = 8 - sleep;
-        status &= 0b11111000; // keep rest bit, clear sleep remaining
+        status &= 0b11111000; // clear sleep remaining
         status |= static_cast<uint8_t>((battle.rng % max) + 1);
       }
     }

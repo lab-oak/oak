@@ -85,11 +85,11 @@ PKMN::Set parse_set(const auto &words) {
     } else if (lower == "brn") {
       pokemon.status = Status::Burn;
     } else if (lower.starts_with("slp")) {
-      const auto sleeps = std::stoll(lower.substr(3));
+      const auto sleeps = std::stoul(lower.substr(3));
       pokemon.status = Status::Sleep7;
       pokemon.sleeps = sleeps;
     } else if (lower.starts_with("rst")) {
-      const auto hidden = std::stoll(lower.substr(3));
+      const auto hidden = std::stoul(lower.substr(3));
       if (hidden > 3 || hidden == 0) {
         throw std::runtime_error(
             "parse_pokemon(): Invalid sleep duration for rest: " +
@@ -98,18 +98,29 @@ PKMN::Set parse_set(const auto &words) {
       pokemon.status = Data::rest(hidden);
     }
 
-    if (lower.starts_with("atk")) {
+    if (lower.starts_with("atk=")) {
+      pokemon.stats.atk = std::stoul(lower.substr(4));
+    } else if (lower.starts_with("atk")) {
       pokemon.boosts.atk = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("def=")) {
+      pokemon.stats.def = std::stoul(lower.substr(4));
     } else if (lower.starts_with("def")) {
       pokemon.boosts.def = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("spe=")) {
+      pokemon.stats.spe = std::stoul(lower.substr(4));
     } else if (lower.starts_with("spe")) {
       pokemon.boosts.spe = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("spc=")) {
+      pokemon.stats.spc = std::stoul(lower.substr(4));
     } else if (lower.starts_with("spc")) {
       pokemon.boosts.spc = std::stoi(lower.substr(3));
     }
 
     if (lower.starts_with("lvl")) {
-      pokemon.level = std::stoll(lower.substr(3));
+      pokemon.level = std::stoul(lower.substr(3));
     }
   }
 

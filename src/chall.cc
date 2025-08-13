@@ -27,7 +27,7 @@ void handle_suspend(int signal) {
 BattleData parse_input(const std::string &line, uint64_t seed) {
   mt19937 device{std::random_device{}()};
   const auto [battle, durations] = Parse::parse_battle(line, seed);
-  return {battle, durations, PKMN::result()};
+  return {battle, durations, PKMN::result(battle)};
 }
 
 int main(int argc, char **argv) {
@@ -57,8 +57,6 @@ int main(int argc, char **argv) {
   std::signal(SIGTSTP, handle_suspend);
 
   mt19937 device{std::random_device{}()};
-  // snorlax surf 50% rest1 | rhyd 1% seismic
-  pkmn_gen1_battle_options options{};
   BattleData battle_data;
   while (true) {
     std::string line;
@@ -73,7 +71,11 @@ int main(int argc, char **argv) {
     break;
   }
 
-  battle_data.result = PKMN::result();
+  // set the durations inside the options to start
+  auto options = PKMN::options();
+  pkmn_gen1_chance_options chance_options{};
+  chance_options.durations = battle_data.durations;
+  pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
   apply_durations(battle_data.battle, battle_data.durations);
 

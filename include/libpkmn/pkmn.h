@@ -40,6 +40,45 @@ pkmn_result result(Result result = Result::None, Choice p1 = Choice::Move,
          (static_cast<uint8_t>(p2) << 6);
 }
 
+pkmn_result result(const pkmn_gen1_battle &b) {
+  const auto &battle = View::ref(b);
+  const auto &p1 = battle.sides[0];
+  const auto &p2 = battle.sides[1];
+
+  bool p1_alive = false;
+  bool p2_alive = false;
+  for (const auto &pokemon : p1.pokemon) {
+    p1_alive |= (pokemon.hp);
+  }
+  for (const auto &pokemon : p2.pokemon) {
+    p2_alive |= (pokemon.hp);
+  }
+
+  if (!p1_alive) {
+    if (!p2_alive) {
+      return result(Result::Tie, Choice::Pass, Choice::Pass);
+    } else {
+      return result(Result::Lose, Choice::Pass, Choice::Pass);
+    }
+  }
+  if (!p2_alive) {
+    return result(Result::Win, Choice::Pass, Choice::Pass);
+  }
+
+  if (!p1.stored().hp) {
+    if (!p2.stored().hp) {
+      return result(Result::None, Choice::Switch, Choice::Switch);
+    } else {
+      return result(Result::None, Choice::Switch, Choice::Pass);
+    }
+  }
+  if (!p2.stored().hp) {
+    return result(Result::None, Choice::Pass, Choice::Switch);
+  }
+
+  return result();
+}
+
 struct Set {
 
   constexpr bool operator==(const Set &) const = default;

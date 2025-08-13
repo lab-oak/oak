@@ -26,6 +26,8 @@ If the user wants to make changes to the source, it is recommended they read [th
 
 ## chall
 
+### about
+
 This is the 'analysis engine' and the most interactive part of Oak. The program accepts two optional args on startup: the first for the path to the saved network parameters and the second for the specific search algorithm. By default the network path is "mc" which indicates that Monte-Carlo evaluation should be used instead. The default selection algorithm is [Exp3](https://en.wikipedia.org/wiki/Multi-armed_bandit#Exp3) with a 'gamma' value of 0.03.
 
 ```
@@ -39,6 +41,8 @@ On the other hand it can be slow (it can take hundreds of turns for a 6v6 battle
 The considerations above make the strength of Monte-Carlo search highly context dependent. In positions with low number of Pokemon and an absence of recovery moves this eval is competent. Conversely, is is rather hopeless in a full 6v6. The real question: What positions is Monte-Carlo strong/correct with a reasonable search time?
 
 With the disclaimers out of the way, let's try using the program
+
+### Reading the Program Output
 
 ```bash
 
