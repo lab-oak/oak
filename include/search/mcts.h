@@ -492,7 +492,7 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
   print_arr(output.p1_empirical, output.m);
   print_arr(output.p1_nash, output.m);
   std::cout << "P2" << std::endl;
-  print_arr(p2_labels, output.m);
+  print_arr(p2_labels, output.n);
   print_arr(output.p2_empirical, output.n);
   print_arr(output.p2_nash, output.n);
 

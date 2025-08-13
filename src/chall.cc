@@ -17,11 +17,11 @@ using Strings::string_to_species;
 using Obs = std::array<uint8_t, 16>;
 using Node = Tree::Node<Exp3::JointBandit, Obs>;
 
-bool run_search = true;
+bool search_flag = true;
 
 void handle_suspend(int signal) {
   std::cout << '!' << std::endl;
-  run_search = false;
+  search_flag = false;
 }
 
 BattleData parse_input(const std::string &line, uint64_t seed) {
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 
   std::string default_bandit = "exp3-0.03";
   RuntimeSearch::Agent agent{"0", default_bandit, "mc", std::nullopt,
-                             &run_search};
+                             &search_flag};
   uint64_t seed = mt19937{std::random_device{}()}.uniform_64();
 
   if (argc > 1) {
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
     int p2_index = -1;
 
     while (true) {
-      run_search = true;
+      search_flag = true;
       output = RuntimeSearch::run(battle_data, nodes, agent, output);
       print_output(output, battle_data.battle, p1_labels, p2_labels);
       std::cout << "Input: p1 index (p2_index); Negative index = sample."
@@ -149,6 +149,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Actions: " << p1_labels[p1_index] << ' '
               << p2_labels[p2_index] << std::endl;
+    sleep(1);
 
     battle_data.result = PKMN::update(battle_data.battle, c1, c2, options);
     battle_data.durations =
