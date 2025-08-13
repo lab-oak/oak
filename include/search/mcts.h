@@ -486,22 +486,22 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
 
   std::cout << "iterations: " << output.iterations
             << ", time: " << output.duration.count() / 1000.0 << " sec\n";
-  std::cout << "value: " << std::fixed << std::setprecision(2)
+  std::cout << "Value: " << std::fixed << std::setprecision(2)
             << output.empirical_value << "\n";
 
-  std::cout << "P1 emprical - ";
+  std::cout << "P1 empirical - ";
   print_strategy(battle.bytes, output.p1_choices, output.p1_empirical,
                  output.m);
   std::cout << "P1 nash -     ";
   print_strategy(battle.bytes, output.p1_choices, output.p1_nash, output.m);
-  std::cout << "P2 emprical - ";
+  std::cout << "P2 empirical - ";
   print_strategy(battle.bytes + Layout::Sizes::Side, output.p2_choices,
                  output.p2_empirical, output.n);
   std::cout << "P2 nash -     ";
   print_strategy(battle.bytes + Layout::Sizes::Side, output.p2_choices,
                  output.p2_nash, output.n);
 
-  std::cout << "\nmatrix:\n      ";
+  std::cout << "\nMatrix:\n      ";
   std::cout << std::setw(label_width + 1);
   for (size_t j = 0; j < output.n; ++j)
     std::cout << fix_label(p2_labels[j]) << " ";
