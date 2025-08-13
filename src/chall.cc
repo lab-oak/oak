@@ -25,7 +25,6 @@ void handle_suspend(int signal) {
 }
 
 BattleData parse_input(const std::string &line, uint64_t seed) {
-  mt19937 device{std::random_device{}()};
   const auto [battle, durations] = Parse::parse_battle(line, seed);
   return {battle, durations, PKMN::result(battle)};
 }
@@ -85,18 +84,10 @@ int main(int argc, char **argv) {
                                                 battle_data.durations);
     const auto [p1_choices, p2_choices] =
         PKMN::choices(battle_data.battle, battle_data.result);
-    std::vector<std::string> p1_labels{};
-    std::vector<std::string> p2_labels{};
-    for (auto i = 0; i < p1_choices.size(); ++i) {
-      p1_labels.push_back(
-          Strings::side_choice_string(battle_data.battle.bytes, p1_choices[i]));
-    }
-    for (auto i = 0; i < p2_choices.size(); ++i) {
-      p2_labels.push_back(Strings::side_choice_string(
-          battle_data.battle.bytes + Layout::Sizes::Side, p2_choices[i]));
-    }
+    const auto [p1_labels, p2_labels] =
+        PKMN::choice_labels(battle_data.battle, battle_data.result);
 
-    std::cout << "P1 choices:" << std::endl;
+    std::cout << "\nP1 choices:" << std::endl;
     for (auto i = 0; i < p1_choices.size(); ++i) {
       std::cout << i << ": " << p1_labels[i] << ' ';
     }
@@ -109,19 +100,15 @@ int main(int argc, char **argv) {
 
     std::cout << "Starting search. Suspend (Ctrl + Z) to stop." << std::endl;
 
-    Exp3::Bandit::Params bandit_params{.03f};
-    MonteCarlo::Model model{device.uniform_64()};
-    MCTS search{};
+    RuntimeSearch::Nodes nodes{};
     MCTS::Output output{};
-    Node node{};
 
     int p1_index = -1;
     int p2_index = -1;
 
     while (true) {
       run_search = true;
-      output = search.run(&run_search, bandit_params, node, battle_data, model,
-                          output);
+      output = RuntimeSearch::run(battle_data, nodes, agent, output);
       print_output(output, battle_data.battle, p1_labels, p2_labels);
       std::cout << "Input: p1 index (p2_index); Negative index = sample."
                 << std::endl;
