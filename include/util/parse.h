@@ -58,7 +58,7 @@ PKMN::Set parse_set(const auto &words) {
       if (move_parse_success) {
         pokemon.moves[n_moves] = m;
         if (move_pp.size() > 1) {
-          pp = std::min(255LL, std::stoll(move_pp[1]));
+          pp = std::min(255UL, std::stoul(move_pp[1]));
         }
         pokemon.pp[n_moves] = pp;
         ++n_moves;
@@ -85,15 +85,20 @@ PKMN::Set parse_set(const auto &words) {
     } else if (lower == "brn") {
       pokemon.status = Status::Burn;
     } else if (lower.starts_with("slp")) {
-      const auto sleeps = std::stoul(lower.substr(3));
+      const auto sleeps_client = std::stoul(lower.substr(3));
+      if (sleeps_client >= 7) {
+        throw std::runtime_error(
+            "parse_pokemon(): Invalid turns slept (must be [0, 6]): " +
+            std::to_string(sleeps_client));
+      }
       pokemon.status = Status::Sleep7;
-      pokemon.sleeps = sleeps;
+      pokemon.sleeps = sleeps_client + 1;
     } else if (lower.starts_with("rst")) {
       const auto hidden = std::stoul(lower.substr(3));
       if (hidden > 3 || hidden == 0) {
-        throw std::runtime_error(
-            "parse_pokemon(): Invalid sleep duration for rest: " +
-            std::to_string(hidden));
+        throw std::runtime_error("parse_pokemon(): Invalid sleep duration for "
+                                 "rest (must be [1, 3]): " +
+                                 std::to_string(hidden));
       }
       pokemon.status = Data::rest(hidden);
     }

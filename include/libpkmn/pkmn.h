@@ -7,17 +7,6 @@
 #include <libpkmn/init.h>
 #include <libpkmn/strings.h>
 
-namespace PKMNDetail {
-
-template <typename T> auto get_pointer(const T *t) { return t; }
-
-template <typename T>
-  requires(!std::is_pointer_v<T>)
-auto get_pointer(const T &t) {
-  return &t;
-}
-} // namespace PKMNDetail
-
 namespace PKMN {
 
 enum class Result : std::underlying_type_t<std::byte> {
@@ -86,7 +75,7 @@ struct Set {
   Data::Species species;
   std::array<Data::Move, 4> moves;
 
-  static constexpr std::array<uint8_t, 4> max_pp{255, 255, 255, 255};
+  static constexpr std::array<uint8_t, 4> max_pp{64, 64, 64, 64};
 
   std::array<uint8_t, 4> pp = max_pp;
   float hp = 100 / 100;
@@ -127,13 +116,6 @@ auto &durations(pkmn_gen1_battle_options &options) {
 
 const auto &durations(const pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
-}
-
-void set(pkmn_gen1_battle_options &options, const auto &log, const auto &chance,
-         const auto &calc) {
-  using PKMNDetail::get_pointer;
-  return pkmn_gen1_battle_options_set(&options, get_pointer(log),
-                                      get_pointer(chance), get_pointer(calc));
 }
 
 void set(pkmn_gen1_battle_options &options) {

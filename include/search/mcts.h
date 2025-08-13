@@ -307,7 +307,7 @@ struct MCTS {
       const auto obs = std::bit_cast<const Obs>(
           *pkmn_gen1_battle_options_chance_actions(&options));
 
-      auto &child = *node(outcome.p1.index, outcome.p2.index, obs);
+      auto &child = node(outcome.p1.index, outcome.p2.index, obs);
       const auto value =
           run_iteration<Options>(bandit_params, child, input, model, depth + 1);
       outcome.p1.value = value.first;
@@ -467,8 +467,8 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
                   const auto &p1_labels, const auto &p2_labels) {
 
   auto print_strategy = [](const auto *bytes, const auto &choices,
-                           const std::array<double, 9> &strat, size_t count) {
-    for (size_t i = 0; i < count; ++i) {
+                           const std::array<double, 9> &strat, size_t k) {
+    for (size_t i = 0; i < k; ++i) {
       std::string label = Strings::side_choice_string(bytes, choices[i]);
       std::cout << label << ":" << std::fixed << std::setprecision(2)
                 << strat[i] << "  ";
@@ -476,7 +476,7 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     std::cout << '\n';
   };
 
-  constexpr auto label_width = 8;
+  constexpr auto label_width = 9;
 
   const auto fix_label = [label_width](auto label) {
     std::stringstream ss{};
@@ -484,8 +484,8 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     return ss.str();
   };
 
-  std::cout << "iterations: " << output.iterations
-            << ", time: " << output.duration.count() / 1000.0 << " sec\n";
+  std::cout << "Iterations: " << output.iterations
+            << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
   std::cout << "Value: " << std::fixed << std::setprecision(2)
             << output.empirical_value << "\n";
 
@@ -511,11 +511,11 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     std::cout << fix_label(p1_labels[i]) << " ";
     for (size_t j = 0; j < output.n; ++j) {
       if (output.visit_matrix[i][j] == 0) {
-        std::cout << "  ----   ";
+        std::cout << "  -----   ";
       } else {
         double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
         std::cout << std::left << std::fixed << std::setw(label_width)
-                  << std::setprecision(2) << avg << " ";
+                  << std::setprecision(3) << avg << " ";
       }
     }
     std::cout << '\n';

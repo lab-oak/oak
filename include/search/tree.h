@@ -21,9 +21,8 @@ template <typename BanditData, typename Obs> struct Node {
 
   bool is_init() const noexcept { return _data.is_init(); }
 
-  Node *operator()(auto p1_index, auto p2_index, auto obs) {
-    auto &node = _map[{p1_index, p2_index, obs}];
-    return &node;
+  Node &operator()(auto p1_index, auto p2_index, auto obs) {
+    return _map[{p1_index, p2_index, obs}];
   }
 
   auto find(auto p1_index, auto p2_index, auto obs) {

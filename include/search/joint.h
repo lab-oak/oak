@@ -1,5 +1,6 @@
 #pragma once
 
+#pragma pack(push, 1)
 template <typename Bandit> struct Joint {
   using Params = typename Bandit::Params;
   using Outcome = typename Bandit::Outcome;
@@ -39,3 +40,4 @@ template <typename Bandit> struct Joint {
     p2.init_priors(p2_priors);
   }
 };
+#pragma pack(pop)
