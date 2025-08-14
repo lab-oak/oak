@@ -6,17 +6,15 @@ import random
 import pyoak
 import net
 
+def print_tensors(obj):
+    for name, value in vars(obj).items():
+        if isinstance(value, torch.Tensor):
+            print(
+                f"{name}: shape={tuple(value.shape)}, dtype={value.dtype}, device={value.device}"
+            )
+            print(value)
 
-def find_battle_files(root_dir):
-    battle_files = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.endswith(".battle"):
-                full_path = os.path.join(dirpath, filename)
-                battle_files.append(full_path)
-    return battle_files
-
-
+# TODO accept other optims as arg
 class Optimizer:
     def __init__(self, network: torch.nn.Module, lr):
         self.opt = torch.optim.Adam(network.parameters(), lr=lr)
@@ -68,7 +66,6 @@ def loss(
         p1_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
         p2_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
 
-
     total_loss = value_loss + p1_loss + p2_loss
 
     if print_flag:
@@ -86,7 +83,9 @@ def loss(
             )
         )
         if not args.no_policy_loss:
-            x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(window, 1, 9)
+            x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
+                window, 1, 9
+            )
             y = p1_policy_target[:window].view(window, 1, 9)
             print(torch.cat([x, y], dim=1))
         print(f"loss: v:{value_loss.mean()}, p1:{p1_loss}, p2:{p2_loss}")
@@ -101,10 +100,23 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
+def find_battle_files(root_dir):
+    battle_files = []
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for filename in filenames:
+            if filename.endswith(".battle"):
+                full_path = os.path.join(dirpath, filename)
+                battle_files.append(full_path)
+    return battle_files
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train an Oak battle network.")
     parser.add_argument("net_dir", help="Write directory for network weights")
-    parser.add_argument("battle_dir", help="Read directory for battle files. All subdirectories are scanned.")
+    parser.add_argument(
+        "battle_dir",
+        help="Read directory for battle files. All subdirectories are scanned.",
+    )
     parser.add_argument("batch_size", type=int, help="Batch size")
 
     # General training
@@ -211,6 +223,10 @@ def main():
             start_index=0,
             write_prob=args.write_prob,
         )
+
+        # apply symmetries for more varied data
+        encoded_frames_torch.permute_pokemon()
+        encoded_frames_torch.permute_sides()
 
         network.inference(encoded_frames_torch, output_buffer)
 

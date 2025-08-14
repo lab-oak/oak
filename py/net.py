@@ -25,6 +25,32 @@ class EncodedFrameTorch:
         self.nash_value = torch.from_numpy(encoded_frame.nash_value)
         self.score = torch.from_numpy(encoded_frame.score)
 
+    def permute_pokemon(self):
+        perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
+        perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, pyoak.pokemon_in_dim)
+        torch.gather(self.pokemon, dim=2, index=perms_expanded)
+
+    def permute_sides(self, prob = 0.5):
+        mask = torch.rand(self.size) < prob
+
+        self.pokemon[mask] = self.pokemon[mask].flip(dims=[1])
+        self.active[mask] = self.active[mask].flip(dims=[1])
+        self.hp[mask] = self.hp[mask].flip(dims=[1])
+
+        self.empirical_value[mask] = 1 - self.empirical_value[mask]
+        self.nash_value[mask] = 1 - self.nash_value[mask]
+        self.score[mask] = 1 - self.score[mask]
+
+        def swap(mask, x, y):
+            temp = x[mask].clone().detach()
+            x[mask] = y[mask]
+            y[mask] = temp
+
+        swap(mask, self.m, self.n)
+        swap(mask, self.p1_choice_indices, self.p2_choice_indices)
+        swap(mask, self.p1_empirical, self.p2_empirical)
+        swap(mask, self.p1_nash, self.p2_nash)
+
 
 class Affine(nn.Module):
     def __init__(self, in_dim, out_dim, clamp=True):
@@ -34,6 +60,7 @@ class Affine(nn.Module):
         self.layer = torch.nn.Linear(in_dim, out_dim)
         self.clamp = clamp
 
+    # Read the parameters in the same way as the C++ net
     def read_parameters(self, f):
         dims = f.read(8)
         in_dim, out_dim = struct.unpack("<II", dims)
@@ -57,6 +84,7 @@ class Affine(nn.Module):
         f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
         f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
 
+    # To make the network quantizable using the Stockfish scheme
     def clamp_parameters(self):
         self.layer.weight.data.clamp_(-2, 2)
 
@@ -164,8 +192,9 @@ class OutputBuffers:
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
-        self.p1_policy_raw = torch.zeros(size, pyoak.policy_out_dim + 1)
-        self.p2_policy_raw = torch.zeros(size, pyoak.policy_out_dim + 1)
+        # last dim in neg inf to supply logit for invalid actions
+        self.p1_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
+        self.p2_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -174,10 +203,10 @@ class OutputBuffers:
         self.active.detach_().zero_()
         self.sides.detach_().zero_()
         self.value.detach_().zero_()
-        self.p1_policy_raw.detach_().zero_()
-        self.p2_policy_raw.detach_().zero_()
-        self.p1_policy_raw[:, -1] = -torch.inf
-        self.p2_policy_raw[:, -1] = -torch.inf
+        self.p1_policy_logit.detach_().zero_()
+        self.p2_policy_logit.detach_().zero_()
+        self.p1_policy_logit[:, -1] = -torch.inf
+        self.p2_policy_logit[:, -1] = -torch.inf
         self.p1_policy.detach_().zero_()
         self.p2_policy.detach_().zero_()
 
@@ -230,6 +259,9 @@ class Network(torch.nn.Module):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])
+        # mask output for hp
+        output.pokemon[:size] *= (input.hp[:size, :, 1:] != 0).float()
+        output.active[:size] *= (input.hp[:size, :, :1] != 0).float()
         # active hp
         output.sides[:size, :, :, 0] = input.hp[:size, :, :1, 0]
         # active word
@@ -242,12 +274,12 @@ class Network(torch.nn.Module):
         battle = output.sides[:size].view(size, 2 * self.side_out_dim)
         (
             output.value[:size],
-            output.p1_policy_raw[:size, :-1],
-            output.p2_policy_raw[:size, :-1],
+            output.p1_policy_logit[:size, :-1],
+            output.p2_policy_logit[:size, :-1],
         ) = self.main_net.forward(battle)
         output.p1_policy[:size] = torch.gather(
-            output.p1_policy_raw, 1, input.p1_choice_indices[:size]
+            output.p1_policy_logit, 1, input.p1_choice_indices[:size]
         )
         output.p2_policy[:size] = torch.gather(
-            output.p2_policy_raw, 1, input.p2_choice_indices[:size]
+            output.p2_policy_logit, 1, input.p2_choice_indices[:size]
         )

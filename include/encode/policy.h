@@ -7,6 +7,7 @@ namespace Encode {
 
 namespace Policy {
 
+// all moves besides struggle, all pokemon. No None.
 constexpr auto n_dim = 164 + 151;
 
 uint16_t get_index(const PKMN::Side &side, auto choice) {
