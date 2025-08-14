@@ -51,23 +51,73 @@ struct alignas(1) Volatiles {
   uint64_t bits;
 
   bool bide() const { return bits & (1ULL << 0); }
+  void set_bide(bool val) { val ? bits |= (1ULL << 0) : bits &= ~(1ULL << 0); }
   bool thrashing() const { return bits & (1ULL << 1); }
+  void set_thrashing(bool val) {
+    val ? bits |= (1ULL << 1) : bits &= ~(1ULL << 1);
+  }
   bool multi_hit() const { return bits & (1ULL << 2); }
+  void set_multi_hit(bool val) {
+    val ? bits |= (1ULL << 2) : bits &= ~(1ULL << 2);
+  }
   bool flinch() const { return bits & (1ULL << 3); }
+  void set_flinch(bool val) {
+    val ? bits |= (1ULL << 3) : bits &= ~(1ULL << 3);
+  }
   bool charging() const { return bits & (1ULL << 4); }
+  void set_charging(bool val) {
+    val ? bits |= (1ULL << 4) : bits &= ~(1ULL << 4);
+  }
   bool binding() const { return bits & (1ULL << 5); }
+  void set_binding(bool val) {
+    val ? bits |= (1ULL << 5) : bits &= ~(1ULL << 5);
+  }
   bool invulnerable() const { return bits & (1ULL << 6); }
+  void set_invulnerable(bool val) {
+    val ? bits |= (1ULL << 6) : bits &= ~(1ULL << 6);
+  }
   bool confusion() const { return bits & (1ULL << 7); }
+  void set_confusion(bool val) {
+    val ? bits |= (1ULL << 7) : bits &= ~(1ULL << 7);
+  }
   bool mist() const { return bits & (1ULL << 8); }
+  void set_mist(bool val) { val ? bits |= (1ULL << 8) : bits &= ~(1ULL << 8); }
   bool focus_energy() const { return bits & (1ULL << 9); }
+  void set_focus_energy(bool val) {
+    val ? bits |= (1ULL << 9) : bits &= ~(1ULL << 9);
+  }
   bool substitute() const { return bits & (1ULL << 10); }
+  void set_substitute(bool val) {
+    val ? bits |= (1ULL << 10) : bits &= ~(1ULL << 10);
+  }
   bool recharging() const { return bits & (1ULL << 11); }
+  void set_recharging(bool val) {
+    val ? bits |= (1ULL << 11) : bits &= ~(1ULL << 11);
+  }
   bool rage() const { return bits & (1ULL << 12); }
+  void set_rage(bool val) {
+    val ? bits |= (1ULL << 12) : bits &= ~(1ULL << 12);
+  }
   bool leech_seed() const { return bits & (1ULL << 13); }
+  void set_leech_seed(bool val) {
+    val ? bits |= (1ULL << 13) : bits &= ~(1ULL << 13);
+  }
   bool toxic() const { return bits & (1ULL << 14); }
+  void set_toxic(bool val) {
+    val ? bits |= (1ULL << 14) : bits &= ~(1ULL << 14);
+  }
   bool light_screen() const { return bits & (1ULL << 15); }
+  void set_light_screen(bool val) {
+    val ? bits |= (1ULL << 15) : bits &= ~(1ULL << 15);
+  }
   bool reflect() const { return bits & (1ULL << 16); }
+  void set_reflect(bool val) {
+    val ? bits |= (1ULL << 16) : bits &= ~(1ULL << 16);
+  }
   bool transform() const { return bits & (1ULL << 17); }
+  void set_transform(bool val) {
+    val ? bits |= (1ULL << 17) : bits &= ~(1ULL << 17);
+  }
   uint8_t confusion_left() const { return (bits >> 18) & 0b111; }
   void set_confusion_left(uint8_t val) {
     bits &= ~(uint64_t{0b111} << 18);

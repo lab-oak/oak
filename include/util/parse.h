@@ -4,15 +4,14 @@
 #include <libpkmn/strings.h>
 #include <search/mcts.h>
 
-#include <iomanip>
 #include <string>
 #include <vector>
 
 namespace Parse {
 
 std::vector<std::string> split(const std::string &input, const char delim) {
-  std::vector<std::string> result;
-  std::string token;
+  std::vector<std::string> result{};
+  std::string token{};
 
   for (char c : input) {
     if (c == delim) {
@@ -24,7 +23,9 @@ std::vector<std::string> split(const std::string &input, const char delim) {
       token += c;
     }
   }
-  result.push_back(token);
+  if (!result.empty()) {
+    result.push_back(token);
+  }
   return result;
 }
 
@@ -132,11 +133,56 @@ PKMN::Set parse_set(const auto &words) {
   return pokemon;
 }
 
-std::array<PKMN::Set, 6> parse_side(const std::string &side_string) {
+PKMN::Volatiles parse_volatiles(const auto &words) {
+  PKMN::Volatiles vol{};
+
+  for (const auto &word : words) {
+    auto lower = word;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](auto c) { return std::tolower(c); });
+
+    if (lower == "(leech-seed)" || lower == "(leechseed)" ||
+        lower == "(leech)") {
+      vol.set_leech_seed(true);
+    }
+    if (lower == "(invuln)" || lower == "(invulnerable)" || lower == "(dig)" ||
+        lower == "(fly)") {
+      vol.set_invulnerable(true);
+    }
+    if (lower == "(lightscreen)" || lower == "(light-screen)" ||
+        lower == "(ls)") {
+      vol.set_light_screen(true);
+    }
+    if (lower == "(reflect)") {
+      vol.set_reflect(true);
+    }
+
+    const auto read_n = [](const auto &lower, const auto &prefix) {
+      return std::stoul(
+          lower.substr(prefix.size(), lower.size() - 1 - lower.size()));
+    };
+
+    // // TODO check durations so its matches client (like sleep dur does now)
+    // static std::vector<std::string> confusion_prefixes{"(conf:",
+    // "(confusion:"}; for (const auto &prefix : confusion_prefixes) {
+    //   if (lower.starts_with(prefix)) {
+    //     const auto n = read_n(lower, prefix);
+    //     vol.set_confusion(true);
+    //   }
+    // }
+  }
+  return vol;
+}
+
+auto parse_side(const std::string &side_string)
+    -> std::pair<std::array<PKMN::Set, 6>, PKMN::Volatiles> {
   const auto set_strings = split(side_string, ';');
   if (set_strings.size() > 6) {
     throw std::runtime_error(
         "parse_side(): too many sets (delineated by \';\')");
+  }
+  if (set_strings.size() == 0) {
+    throw std::runtime_error("parse_side(): side requires at least one set");
   }
   std::array<PKMN::Set, 6> side{};
   std::transform(set_strings.begin(), set_strings.end(), side.begin(),
@@ -144,7 +190,9 @@ std::array<PKMN::Set, 6> parse_side(const std::string &side_string) {
                    const auto words = split(string, ' ');
                    return parse_set(words);
                  });
-  return side;
+  const auto active_words = split(set_strings[0], ' ');
+  const auto volatiles = parse_volatiles(active_words);
+  return {side, volatiles};
 }
 
 std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>
@@ -154,12 +202,14 @@ parse_battle(const std::string &battle_string, uint64_t seed = 0x123456) {
     throw std::runtime_error(
         "parse_battle(): must have two sides, delineated by \'|\'");
   }
-  const auto p1 = parse_side(side_strings[0]);
-  const auto p2 = parse_side(side_strings[1]);
-  // auto battle = PKMN::battle(p1, p2, seed);
-  // const auto durations = PKMN::battle(p1, p2);
-
-  return {PKMN::battle(p1, p2, seed), PKMN::durations(p1, p2)};
+  const auto [p1, p1_vol] = parse_side(side_strings[0]);
+  const auto [p2, p2_vol] = parse_side(side_strings[1]);
+  auto battle = PKMN::battle(p1, p2, seed);
+  auto &b = View::ref(battle);
+  const auto durations = PKMN::durations(p1, p2);
+  b.sides[0].active.volatiles = p1_vol;
+  b.sides[1].active.volatiles = p2_vol;
+  return {battle, durations};
 }
 
 } // namespace Parse

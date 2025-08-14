@@ -50,8 +50,9 @@ int benchmark(int argc, char **argv) {
       search.run(iterations, bandit_params, node, battle_data, model);
 
   // RuntimeSearch::Nodes nodes{};
-  // RuntimeSearch::Agent agent{std::to_string(iterations), bandit_name, network_path};
-  // const auto output = RuntimeSearch::run(battle_data, nodes, agent);
+  // RuntimeSearch::Agent agent{std::to_string(iterations), bandit_name,
+  // network_path}; const auto output = RuntimeSearch::run(battle_data, nodes,
+  // agent);
   //     std::cout << output.duration.count() << " ms." << std::endl;
 
   return 0;
