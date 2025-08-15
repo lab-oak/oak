@@ -32,7 +32,7 @@ constexpr out_type uncompress_probs(in_type x) {
 }
 
 template <typename policy_type = uint16_t, typename value_type = uint16_t>
-struct CompressedFrames {
+struct CompressedFramesImpl {
 
   struct Update {
     // rolling out
@@ -237,9 +237,6 @@ struct CompressedFrames {
   }
 };
 
-std::vector<size_t> scan_battle_offsets(std::istream &stream) {
-  std::vector<size_t> offsets{};
-  return offsets;
-}
+using CompressedFrames = CompressedFramesImpl<>;
 
 }; // namespace Train

@@ -51,80 +51,40 @@ std::atomic<size_t> n{};
 double print_prob = .01;
 double early_stop_log = 3.5;
 
-struct SearchOptions {
-  std::string battle_network_path = "mc";
-  char count_mode = 'i';
-  std::string bandit_name = "exp3-0.029";
-  size_t count = {1 << 10};
+RuntimeSearch::Agent p1_agent{};
+RuntimeSearch::Agent p2_agent{};
 
-  std::string to_string() const {
-    std::stringstream ss{};
-    ss << "model: " << battle_network_path;
-    ss << " mode: " << count_mode;
-    ss << " bandit: " << bandit_name;
-    ss << " count: " << count;
-    return ss.str();
-  }
-};
-
-SearchOptions p1_search_options{};
-SearchOptions p2_search_options{};
-
-PolicyOptions p1_policy_options{};
-PolicyOptions p2_policy_options{};
-
-int process_and_sample(auto &device, const auto &empirical, const auto &nash,
-                       const auto &policy_options) {
-  const double t = policy_options.policy_temp;
-  if (t <= 0) {
-    throw std::runtime_error("Use positive policy power");
-  }
-
-  std::array<double, 9> policy{};
-  if (policy_options.policy_mode == 'e') {
-    policy = empirical;
-  } else if (policy_options.policy_mode == 'n') {
-    policy = nash;
-  } else {
-    throw std::runtime_error("bad policy mode.");
-  }
-
-  std::vector<double> p(policy.begin(), policy.end());
-  double sum = 0;
-  for (auto &val : p) {
-    val = std::pow(val, t);
-    sum += val;
-  }
-  if (policy_options.policy_min_prob > 0) {
-    const double l = policy_options.policy_min_prob * sum;
-    sum = 0;
-    for (auto &val : p) {
-      if (val < l)
-        val = 0;
-      sum += val;
-    }
-  }
-  for (auto &val : p) {
-    val /= sum;
-  }
-
-  const auto index = device.sample_pdf(p);
-  return index;
-}
+RuntimePolicy::Options p1_policy_options{};
+RuntimePolicy::Options p2_policy_options{};
 
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) {
     const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
-    // RuntimeData::p1_network.fill_cache(battle);
-    // RuntimeData::p2_network.fill_cache(battle);
+    if (!p1_agent.empty() && p1_agent.network_path != "mc") {
+      p1_agent.network.emplace();
+      std::ifstream file{std::filesystem::path{p1_agent.network_path}};
+      if (file.fail() || !p1_agent.network.value().read_parameters(file)) {
+        throw std::runtime_error("Could not read p1 network params.");
+        return MCTS::Output{};
+      }
+      p1_agent.network.value().fill_cache(battle);
+    }
+    if (!p2_agent.empty() && p2_agent.network_path != "mc") {
+      p2_agent.network.emplace();
+      std::ifstream file{std::filesystem::path{p2_agent.network_path}};
+      if (file.fail() || !p2_agent.network.value().read_parameters(file)) {
+        throw std::runtime_error("Could not read p1 network params.");
+        return MCTS::Output{};
+      }
+      p2_agent.network.value().fill_cache(battle);
+    }
+
     const auto durations = PKMN::durations();
     BattleData battle_data{battle, durations, PKMN::result()};
     auto battle_options = PKMN::options();
     bool early_stop = false;
-
-    // Train::CompressedFrames<> training_frames{battle_data.battle};
 
     size_t updates = 0;
     try {
@@ -144,10 +104,7 @@ void thread_fn(uint64_t seed) {
         int p1_early_stop = 0;
         int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
-          p1_output = RuntimeSearch::run(battle_data, p1_search_options.count,
-                                         p1_search_options.count_mode,
-                                         p1_search_options.bandit_name,
-                                         p1_search_options.battle_network_path);
+          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
@@ -178,47 +135,6 @@ void thread_fn(uint64_t seed) {
         if (device.uniform() < print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
-          print(Strings::battle_data_to_string(battle_data.battle,
-                                               battle_data.durations));
-          print("Values: " + std::to_string(p1_output.empirical_value) + " : " +
-                std::to_string(p2_output.empirical_value));
-          print("Times: " + std::to_string(p1_output.duration.count()) + " : " +
-                std::to_string(p2_output.duration.count()));
-          std::vector<std::string> p1_labels{};
-          std::vector<std::string> p2_labels{};
-
-          for (auto i = 0; i < p1_choices.size(); ++i) {
-            p1_labels.push_back(Strings::side_choice_string(
-                battle_data.battle.bytes, p1_choices[i]));
-          }
-          for (auto i = 0; i < p2_choices.size(); ++i) {
-            p2_labels.push_back(Strings::side_choice_string(
-                battle_data.battle.bytes + Layout::Sizes::Side, p2_choices[i]));
-          }
-
-          print("P1:");
-          print(container_string(p1_labels));
-          print("agent 1 empirical/nash");
-          print(container_string(p1_output.p1_empirical));
-          print(container_string(p1_output.p1_nash));
-          print("agent 2 empirical/nash");
-          print(container_string(p2_output.p1_empirical));
-          print(container_string(p2_output.p1_nash));
-
-          print("P2:");
-          print(container_string(p2_labels));
-          print("agent 1 empirical/nash");
-          print(container_string(p1_output.p2_empirical));
-          print(container_string(p1_output.p2_nash));
-          print("agent 2 empirical/nash");
-          print(container_string(p2_output.p2_empirical));
-          print(container_string(p2_output.p2_nash));
-
-          print(
-              Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
-              "/" +
-              Strings::side_choice_string(battle_data.battle.bytes + 184,
-                                          p2_choice));
         }
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
                                           p2_choice, battle_options);

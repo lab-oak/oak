@@ -72,12 +72,30 @@ void write(const PKMN::Team &team, float *const t) {
   }
 }
 
-[[nodiscard]] bool write_policy_mask(const PKMN::Team &team, float *const t) {
+Train::BuildTrajectory initial_trajectory(const auto &team) {
+  Train::BuildTrajectory traj{};
+  auto i = 0;
+  for (const auto &set : team) {
+    if (set.species != Data::Species::None) {
+      traj.frames[i++] =
+          Train::ActionPolicy{species_move_table(set.species, 0), 0};
+      for (const auto move : set.moves) {
+        if (move != Data::Move::None) {
+          traj.frames[i++] =
+              Train::ActionPolicy{species_move_table(set.species, move), 0};
+        }
+      }
+    }
+  }
+  return traj;
+}
+
+[[nodiscard]] bool write_policy_mask(const auto &team, float *const t) {
   bool needs_species = false;
   bool complete = true;
+  uint n_pokemon = 0;
   for (const auto &set : team) {
     if (static_cast<bool>(set.species)) {
-      bool needs_move = false;
       auto n_moves = 0;
       for (const auto move : set.moves) {
         n_moves += static_cast<bool>(move);

@@ -14,23 +14,43 @@
 namespace RuntimeSearch {
 
 template <typename T>
-using OptionalUniqueNode =
-    std::optional<std::unique_ptr<Tree::Node<T, MCTS::Obs>>>;
+using UniqueNode = std::unique_ptr<Tree::Node<T, MCTS::Obs>>;
 
 struct Nodes {
-  OptionalUniqueNode<Exp3::JointBandit> exp3;
-  OptionalUniqueNode<PExp3::JointBandit> pexp3;
-  OptionalUniqueNode<UCB::JointBandit> ucb;
-  OptionalUniqueNode<PUCB::JointBandit> pucb;
+  UniqueNode<Exp3::JointBandit> exp3;
+  UniqueNode<PExp3::JointBandit> pexp3;
+  UniqueNode<UCB::JointBandit> ucb;
+  UniqueNode<PUCB::JointBandit> pucb;
   bool set;
 
-  Nodes() : set{false} { reset(); }
+  Nodes() { reset(); }
 
   void reset() {
-    exp3.reset();
-    pexp3.reset();
-    ucb.reset();
-    pucb.reset();
+    exp3.release();
+    pexp3.release();
+    ucb.release();
+    pucb.release();
+    set = false;
+  }
+
+  bool update(auto i1, auto i2, const auto &obs) {
+    auto update_node = [&](auto &node) -> bool {
+      if (!node || !node->is_init()) {
+        return false;
+      }
+      auto child = node->find(i1, i2, obs);
+      if (child == node->_map.end()) {
+        node = std::make_unique<std::decay_t<decltype(*node)>>();
+        return false;
+      } else {
+        auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
+            std::move((*child).second));
+        node.swap(unique_child);
+        return true;
+      }
+    };
+    return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
+           update_node(pucb);
   }
 };
 
@@ -41,6 +61,19 @@ struct Agent {
   // valid if already loaded/cache set
   std::optional<NN::Network> network;
   bool *flag;
+
+  bool is_monte_carlo() const {
+    return agent.network_path.empty() || network_path == "mc" ||
+           network_path == "montecarlo" || network_path == "monte-carlo";
+  }
+
+  void read_network_parameters() {
+    network.emplace();
+    std::ifstream file{std::filesystem::path{network_path}};
+    if (file.fail() || !agent.network.value().read_parameters(file)) {
+      throw std::runtime_error("Could not read network params.");
+    }
+  }
 };
 
 auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
@@ -54,17 +87,16 @@ auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
 
     const auto get = [&nodes](auto &node) -> auto & {
       using Node = std::remove_reference_t<decltype(*node.value())>;
-      if (!node.has_value()) {
+      if (!node.get()) {
         if (nodes.set) {
           throw std::runtime_error("RuntimeSearch::run(): Wrong node type");
         } else {
           nodes.set = true;
-          node.emplace(std::make_unique<Node>());
-          assert(node.has_value());
+          node = std::make_unique<Node>();
           assert(node.value().get());
         }
       }
-      return *node.value();
+      return *node;
     };
 
     if (lower.starts_with("exp3-")) {
@@ -95,19 +127,12 @@ auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
 
   // get model
   const auto search_1 = [&](const auto dur) {
-    if (agent.network_path.empty() || agent.network_path == "mc" ||
-        agent.network_path == "montecarlo" ||
-        agent.network_path == "monte-carlo") {
+    if (agent.is_monte_carlo()) {
       MonteCarlo::Model model{std::random_device{}()};
       return run_2(dur, model);
     } else {
       if (!agent.network.has_value()) {
-        agent.network.emplace();
-        std::ifstream file{std::filesystem::path{agent.network_path}};
-        if (file.fail() || !agent.network.value().read_parameters(file)) {
-          throw std::runtime_error("Could not read network params.");
-          return MCTS::Output{};
-        }
+        agent.read_network_parameters();
         agent.network.value().fill_cache(battle_data.battle);
       }
       return run_2(dur, agent.network.value());

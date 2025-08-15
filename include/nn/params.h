@@ -16,4 +16,6 @@ static constexpr int policy_hidden_dim = 32;
 static constexpr int policy_out_dim =
     static_cast<int>(Data::Species::Mew) +
     (static_cast<int>(Data::Move::Struggle) - 1); // no Struggle, None
+
+static constexpr int team_hidden_dim = 512;
 } // namespace NN

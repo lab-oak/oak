@@ -1,138 +1,23 @@
 #include <data/teams.h>
 #include <encode/team.h>
 #include <libpkmn/data.h>
-#include <libpkmn/strings.h>
 #include <nn/network.h>
-#include <search/bandit/exp3.h>
-#include <search/bandit/ucb.h>
-#include <search/mcts.h>
 #include <train/build-trajectory.h>
 #include <train/compressed-frame.h>
 #include <train/frame.h>
+#include <util/parse.h>
+#include <util/policy.h>
 #include <util/random.h>
+#include <util/search.h>
 
 #include <atomic>
-#include <cmath>
-#include <csignal>
-#include <cstring>
-#include <exception>
-#include <filesystem>
-#include <format>
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #include <thread>
-
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
 
 #ifdef NDEBUG
 constexpr bool debug = false;
 #else
 constexpr bool debug = true;
 #endif
-
-std::string container_string(const auto &v) {
-  std::stringstream ss{};
-  for (auto x : v) {
-    if constexpr (std::is_same_v<decltype(x), std::string>) {
-      ss << x << ' ';
-    } else {
-      ss << std::to_string(x) << ' ';
-    }
-  }
-  return ss.str();
-}
-
-// TODO move to nn
-namespace NN {
-
-constexpr auto build_net_hidden_dim = 512;
-
-using BuildNet = EmbeddingNet<Encode::Team::in_dim, build_net_hidden_dim,
-                              Encode::Team::out_dim, true, false>;
-}; // namespace NN
-
-// Stats for sample team matchup matrix
-struct TeamPool {
-
-  static constexpr auto n_teams = Teams::teams.size();
-  static constexpr auto n_entries = n_teams * (n_teams - 1) / 2;
-
-  struct Entry {
-    std::atomic<size_t> n;
-    std::atomic<size_t> v;
-  };
-
-  std::array<Entry, n_entries> entries{};
-
-  static constexpr size_t flat(auto i, auto j) {
-    if (i < j) {
-      return flat(j, i);
-    }
-    const auto index = i * (i - 1) / 2 + j;
-    assert(index < n_entries);
-    return index;
-  }
-
-  Entry &operator()(auto i, auto j) { return entries[flat(i, j)]; }
-
-  void update(auto i, auto j, auto score) {
-    if (i == j) {
-      return;
-    } else if (i < j) {
-      return update(j, i, 2 - score);
-    }
-    auto &entry = (*this)(i, j);
-    entry.n.fetch_add(1);
-    entry.v.fetch_add(score);
-  }
-};
-
-namespace RuntimeOptions {
-
-uint64_t seed = std::random_device{}();
-size_t threads = 0;
-size_t max_frames = 1 << 30; // actually terminates the program
-
-size_t buffer_size_mb = 8;
-size_t max_build_traj = 1 << 10;
-
-size_t print_interval_sec = 30;
-bool debug_print = true;
-
-namespace Search {
-
-// iterations/time per search
-size_t count = 1 << 10;
-// 0 means normal count. First turn eval is also used for team gen
-size_t t1_count = 0;
-char count_mode = 'i'; // (n)/(i)terations, (t)ime
-
-// search algo, model type/path
-char bandit_mode = 'e'; // (e)xp3, (u)cb
-std::string battle_network_path;
-
-// move selection
-char policy_mode = 'n'; // (n)ash, (e)mpirical, (m)ix
-double policy_temp = 1.0;
-double policy_min_prob = 0.0; // zerod if below this threshold
-double mix_nash_weight = 1.0; // (m)ix mode only
-
-bool keep_node = true; // reuse the search tree after update
-}; // namespace Search
-
-namespace TeamGen {
-// required since an untrained random network can still act as the source of
-// randomness while also generating training data
-std::string build_network_path = "";
-double modify_team_prob = 0;
-double pokemon_delete_prob = 0;
-double move_delete_prob = 0;
-}; // namespace TeamGen
-
-}; // namespace RuntimeOptions
 
 void print(const auto &data, const bool newline = true) {
   if constexpr (!debug) {
@@ -145,6 +30,162 @@ void print(const auto &data, const bool newline = true) {
   if (newline) {
     std::cout << '\n';
   }
+}
+
+namespace RuntimeOptions {
+
+uint64_t seed = std::random_device{}();
+size_t threads = 0;
+size_t max_frames = 1 << 30;
+
+size_t buffer_size_mb = 8;
+size_t max_build_traj = 1 << 10;
+
+size_t print_interval_sec = 30;
+bool debug_print = true;
+
+RuntimeSearch::Agent agent{"4096", "exp3-0.03", "mc"};
+RuntimeSearch::Agent t1_agent;
+RuntimePolicy::Options policy_options{};
+
+namespace TeamGen {
+// required since an untrained random network can still act as the source of
+// randomness while also generating training data
+uint max_pokemon = 6;
+double skip_game_prob = 0;
+std::string teams_path = "";
+std::string build_network_path = "";
+double modify_team_prob = 0;
+double pokemon_delete_prob = 0;
+double move_delete_prob = 0;
+}; // namespace TeamGen
+
+}; // namespace RuntimeOptions
+
+bool parse_options(int argc, char **argv) {
+  using namespace RuntimeOptions;
+
+  if (argc < 2) {
+    std::cout << "Usage: ./generate [OPTIONS]\nArg '--threads=' is "
+                 "required.\n--help for more."
+              << std::endl;
+    return true;
+  }
+
+  std::vector<char *> args(argv, argv + c);
+  assert(args.size() == argc);
+
+  for (auto &a : args) {
+    if (a == nullptr) {
+      continue;
+    }
+    auto b = nullptr;
+    std::swap(a, b);
+    std::string arg{a};
+    if (arg.starts_with("--help")) {
+      std::cout << generate_help_text() << std::endl;
+      return true;
+    } else if (arg.starts_with("--threads=")) {
+      threads = std::stoul(arg.substr(10));
+    } else if (arg.starts_with("--seed=")) {
+      seed = std::stoul(arg.substr(7));
+    } else if (arg.starts_with("--max-frames=")) {
+      max_frames = std::stoul(arg.substr(13));
+    } else if (arg.starts_with("--buffer-size=")) {
+      buffer_size_mb = std::stoul(arg.substr(14));
+    } else if (arg.starts_with("--debug-print=")) {
+      debug_print = (arg.substr(14)[0] == '1' || arg.substr(14) == "true");
+    } else if (arg.starts_with("--print-interval=")) {
+      print_interval_sec = std::stoll(arg.substr(17));
+    } else if (arg.starts_with("--search-time=")) {
+      t1_agent.search_time = arg.substr(14);
+    } else if (arg.starts_with("--bandit-name=")) {
+      t1_agent.bandit_name = arg.substr(14);
+    } else if (arg.starts_with("--battle-network-path=")) {
+      t1_agent.network_path = arg.substr(22);
+    } else if (arg.starts_with("--policy-mode=")) {
+      policy_options.mode = arg[14];
+    } else if (arg.starts_with("--policy-temp=")) {
+      policy_options.temp = std::stod(arg.substr(14));
+    } else if (arg.starts_with("--policy-min-prob=")) {
+      policy_options.min_prob = std::stod(arg.substr(18));
+    } else if (arg.starts_with("--policy-nash-weight=")) {
+      policy_options.nash_weight = std::stod(arg.substr(21));
+    } else if (arg.starts_with("--keep-node=")) {
+      Search::keep_node =
+          (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
+    } else if (arg.starts_with("--skip-game-prob=")) {
+      TeamGen::skip_game_prob = std::stoul(arg.substr(17));
+    } else if (arg.starts_with("--max-pokemon=")) {
+      TeamGen::max_pokemon = std::stoul(arg.substr(14));
+    } else if (arg.starts_with("--teams=")) {
+      TeamGen::teams_path = arg.substr(8);
+    } else if (arg.starts_with("--build-network-path=")) {
+      TeamGen::build_network_path = arg.substr(21);
+    } else if (arg.starts_with("--modify-team-prob=")) {
+      TeamGen::modify_team_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--pokemon-delete-prob=")) {
+      TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
+    } else if (arg.starts_with("--move-delete-prob=")) {
+      TeamGen::move_delete_prob = std::stod(arg.substr(19));
+    } else {
+      std::swap(a, b);
+    }
+  }
+
+  RuntimeOptions::p1_agent = RuntimeOptions::agent;
+
+  for (auto &a : args) {
+    if (a == nullptr) {
+      continue;
+    }
+    auto b = nullptr;
+    std::swap(a, b);
+    std::string arg{a};
+    if (arg.starts_with("--t1-search-time=")) {
+      t1_agent.search_time = arg.substr(17);
+    } else if (arg.starts_with("--t1-bandit-name=")) {
+      t1_agent.bandit_name = arg.substr(17);
+    } else if (arg.starts_with("--t1-battle-network-path=")) {
+      t1_agent.network_path = arg.substr(25);
+    } else {
+      std::swap(a, b);
+    }
+  }
+
+  for (auto a : args) {
+    if (a != nullptr) {
+      throw std::runtime_error{"Unrecognized arg: " + std::string(a)};
+    }
+  }
+
+  return threads == 0;
+}
+
+auto runtime_arg_string() -> std::string {
+  using namespace RuntimeOptions;
+  std::ostringstream out;
+  out << "--threads=" << threads << '\n';
+  out << "--seed=" << seed << '\n';
+  out << "--max-frames=" << max_frames << '\n';
+  out << "--buffer-size=" << buffer_size_mb << '\n';
+  out << "--debug-print=" << (debug_print ? "true" : "false") << '\n';
+  out << "--print-interval=" << print_interval_sec << '\n';
+  out << "--count=" << Search::count << '\n';
+  out << "--t1-count=" << Search::t1_count << '\n';
+  out << "--count-mode=" << Search::count_mode << '\n';
+  out << "--bandit-mode=" << Search::bandit_mode << '\n';
+  out << "--battle-network-path=" << Search::battle_network_path << '\n';
+  out << "--policy-mode=" << policy_options.mode << '\n';
+  out << "--policy-temp=" << policy_options.temp << '\n';
+  out << "--policy-min-prob=" << policy_options.min_prob << '\n';
+  out << "--mix-nash-weight=" << Search::mix_nash_weight << '\n';
+  out << "--keep-node=" << (Search::keep_node ? "true" : "false") << '\n';
+  out << "--build-network-path=" << TeamGen::build_network_path << '\n';
+  out << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n';
+  out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
+  out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
+  return out.str();
 }
 
 std::string generate_help_text() {
@@ -202,14 +243,14 @@ std::string generate_help_text() {
      << "  Path to the battle evaluation network.\n"
      << "  If not provided then monte-carlo rollouts will be used for eval "
         "instead.\n\n";
-  ss << "--policy-mode=" << RuntimeOptions::Search::policy_mode << '\n'
+  ss << "--policy-mode=" << RuntimeOptions::policy_options.mode << '\n'
      << "  Which search policy to use for processing and sampling.\n"
      << "  n : Nash equilibrium of empirical value matrix at the root\n"
      << "  e : Empirical policy\n"
      << "  m : Weighted combination of Nash and empirical\n\n";
-  ss << "--policy-temp=" << RuntimeOptions::Search::policy_temp << '\n'
+  ss << "--policy-temp=" << RuntimeOptions::policy_options.temp << '\n'
      << "  The 'p' to use for p-normalizing the policy.\n\n";
-  ss << "--policy-min-prob=" << RuntimeOptions::Search::policy_min_prob << '\n'
+  ss << "--policy-min-prob=" << RuntimeOptions::policy_options.min_prob << '\n'
      << "  Minimum probability threshold for policy distribution.\n\n";
   ss << "--mix-nash-weight=" << RuntimeOptions::Search::mix_nash_weight << '\n'
      << "  Weight of the Nash equilibrium for mixed policy mode.\n\n";
@@ -243,98 +284,44 @@ std::string generate_help_text() {
   return ss.str();
 }
 
-bool parse_options(int argc, char **argv) {
-  if (argc == 1) {
-    std::cout << "Usage: ./generate [OPTIONS]\nArg '--threads=' is "
-                 "required.\n--help for more."
-              << std::endl;
-    return true;
-  }
+// Stats for sample team matchup matrix
+struct MatchupMatrix {
 
-  using namespace RuntimeOptions;
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg.starts_with("--help")) {
-      std::cout << generate_help_text() << std::endl;
-      return true;
-    } else if (arg.starts_with("--threads=")) {
-      threads = std::stoul(arg.substr(10));
-    } else if (arg.starts_with("--seed=")) {
-      seed = std::stoul(arg.substr(7));
-    } else if (arg.starts_with("--max-frames=")) {
-      max_frames = std::stoul(arg.substr(13));
-    } else if (arg.starts_with("--buffer-size=")) {
-      buffer_size_mb = std::stoul(arg.substr(14));
-    } else if (arg.starts_with("--debug-print=")) {
-      debug_print = (arg.substr(14)[0] == '1' || arg.substr(14) == "true");
-    } else if (arg.starts_with("--print-interval=")) {
-      print_interval_sec = std::stoll(arg.substr(17));
-    } else if (arg.starts_with("--count=")) {
-      Search::count = std::stoul(arg.substr(8));
-    } else if (arg.starts_with("--t1-count=")) {
-      Search::t1_count = std::stoul(arg.substr(11));
-    } else if (arg.starts_with("--count-mode=")) {
-      Search::count_mode = arg[13];
-    } else if (arg.starts_with("--bandit-mode=")) {
-      Search::bandit_mode = arg[14];
-    } else if (arg.starts_with("--battle-network-path=")) {
-      Search::battle_network_path = arg.substr(22);
-    } else if (arg.starts_with("--policy-mode=")) {
-      Search::policy_mode = arg[14];
-    } else if (arg.starts_with("--policy-temp=")) {
-      Search::policy_temp = std::stod(arg.substr(14));
-    } else if (arg.starts_with("--policy-min-prob=")) {
-      Search::policy_min_prob = std::stod(arg.substr(18));
-    } else if (arg.starts_with("--mix-nash-weight=")) {
-      Search::mix_nash_weight = std::stod(arg.substr(18));
-    } else if (arg.starts_with("--keep-node=")) {
-      Search::keep_node =
-          (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
-    } else if (arg.starts_with("--build-network-path=")) {
-      TeamGen::build_network_path = arg.substr(21);
-    } else if (arg.starts_with("--modify-team-prob=")) {
-      TeamGen::modify_team_prob = std::stod(arg.substr(19));
-    } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
-    } else if (arg.starts_with("--move-delete-prob=")) {
-      TeamGen::move_delete_prob = std::stod(arg.substr(19));
-    } else {
-      throw std::runtime_error("Invalid arg: " + arg);
+  MatchupMatrix(const auto &teams)
+      : n_teams{teams.size()}, n_entries{n_teams * (n_teams - 1) / 2} {}
+
+  size_t n_teams;
+  size_t n_entries;
+
+  struct Entry {
+    std::atomic<size_t> n;
+    std::atomic<size_t> v;
+  };
+
+  std::array<Entry, n_entries> entries{};
+
+  static constexpr size_t flat(auto i, auto j) {
+    if (i < j) {
+      return flat(j, i);
     }
+    const auto index = i * (i - 1) / 2 + j;
+    assert(index < n_entries);
+    return index;
   }
 
-  if (Search::t1_count == 0) {
-    Search::t1_count = Search::count;
+  Entry &operator()(auto i, auto j) { return entries[flat(i, j)]; }
+
+  void update(auto i, auto j, auto score) {
+    if (i == j) {
+      return;
+    } else if (i < j) {
+      return update(j, i, 2 - score);
+    }
+    auto &entry = (*this)(i, j);
+    entry.n.fetch_add(1);
+    entry.v.fetch_add(score);
   }
-
-  return threads == 0;
-}
-
-std::string runtime_arg_string() {
-  using namespace RuntimeOptions;
-  std::ostringstream out;
-  out << "--threads=" << threads << '\n';
-  out << "--seed=" << seed << '\n';
-  out << "--max-frames=" << max_frames << '\n';
-  out << "--buffer-size=" << buffer_size_mb << '\n';
-  out << "--debug-print=" << (debug_print ? "true" : "false") << '\n';
-  out << "--print-interval=" << print_interval_sec << '\n';
-  out << "--count=" << Search::count << '\n';
-  out << "--t1-count=" << Search::t1_count << '\n';
-  out << "--count-mode=" << Search::count_mode << '\n';
-  out << "--bandit-mode=" << Search::bandit_mode << '\n';
-  out << "--battle-network-path=" << Search::battle_network_path << '\n';
-  out << "--policy-mode=" << Search::policy_mode << '\n';
-  out << "--policy-temp=" << Search::policy_temp << '\n';
-  out << "--policy-min-prob=" << Search::policy_min_prob << '\n';
-  out << "--mix-nash-weight=" << Search::mix_nash_weight << '\n';
-  out << "--keep-node=" << (Search::keep_node ? "true" : "false") << '\n';
-  out << "--build-network-path=" << TeamGen::build_network_path << '\n';
-  out << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n';
-  out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
-  out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
-  return out.str();
-}
+};
 
 namespace RuntimeData {
 bool terminated = false;
@@ -348,98 +335,25 @@ std::atomic<size_t> frame_counter{};
 std::atomic<size_t> traj_counter{};
 std::atomic<size_t> update_counter{};
 std::atomic<size_t> update_with_node_counter{};
-NN::BuildNet build_network{}; // is not battle specific unlike the net
-TeamPool team_pool{};
+std::vector<PKMN::Team> teams;
+MatchupMatrix team_pool;
 }; // namespace RuntimeData
 
-using Obs = std::array<uint8_t, 16>;
-using Exp3Node = Tree::Node<Exp3::JointBandit, Obs>;
-using UCBNode = Tree::Node<UCB::JointBandit, Obs>;
-
-// Data that should persist only over a game - not the program or thread
-// lifetime. The build network uses a game-specific cache. It is not universal
-// unlike the build network.
-struct SearchData {
-  NN::Network battle_network;
-  Exp3::Bandit::Params exp3_params{.03};
-  UCB::Bandit::Params ucb_params{.03};
-  std::unique_ptr<Exp3Node> exp3_unique_node;
-  std::unique_ptr<UCBNode> ucb_unique_node;
-};
-
-Train::BuildTrajectory
-rollout_build_network(PKMN::Team &team, NN::BuildNet &build_net, auto &device) {
-  using namespace Encode::Team;
-  Train::BuildTrajectory traj{};
-
-  auto i = 0;
-  for (const auto &set : team) {
-    if (set.species != Data::Species::None) {
-      traj.frames[i++] =
-          Train::ActionPolicy{species_move_table(set.species, 0), 0};
-      for (const auto move : set.moves) {
-        if (move != Data::Move::None) {
-          traj.frames[i++] =
-              Train::ActionPolicy{species_move_table(set.species, move), 0};
-        }
-      }
-    }
-  }
-
-  std::array<float, in_dim> input{};
-  write(team, input.data());
-  std::array<float, out_dim> mask;
-  std::array<float, out_dim> output;
-
-  while (true) {
-    mask = {};
-
-    const bool only_requires_lead_selection =
-        write_policy_mask(team, mask.data());
-
-    build_net.propagate(input.data(), output.data());
-
-    // softmax
-    float sum = 0;
-    for (auto k = 0; k < out_dim; ++k) {
-      if (mask[k]) {
-        output[k] = std::exp(output[k]);
-        sum += output[k];
-      } else {
-        output[k] = 0;
-      }
-    }
-    for (auto &x : output) {
-      x /= sum;
-    }
-
-    const auto index = device.sample_pdf(output);
-    traj.frames[i++] =
-        Train::ActionPolicy{static_cast<uint16_t>(index), output[index]};
-    input[index] = 1;
-    const auto [s, m] = species_move_list(index);
-    apply_index_to_team(team, s, m);
-
-    if (only_requires_lead_selection) {
-      break;
-    }
-  }
-
-  return traj;
-}
-
-// produces a (modified) team from the pool and the index of unmodified team or
-// -1 if modified.
-std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(mt19937 &device) {
+// produces a (modified) team from the pool and the index of unmodified team
+// or -1 if modified.
+auto generate_team(mt19937 &device)
+    -> std::tuple<std::vector<PKMN::Set>, int, Train::BuildTrajectory> {
   using namespace RuntimeOptions::TeamGen;
 
   const auto index = device.random_int(Teams::teams.size());
-  auto team = Teams::teams[index];
-
+  const auto base_team = RuntimeData::teams[index];
+  std::vector<PKMN::Set> team{base_team.begin(),
+                              base_team.begin() + max_pokemon};
+  const auto original_team = team;
   // randomly delete mons/moves for the net to fill in
   const auto r = device.uniform();
   if (r < modify_team_prob) {
-    for (auto p = 0; p < 6; ++p) {
+    for (auto p = 0; p < max_pokemon; ++p) {
       const auto r = device.uniform();
       if (r < pokemon_delete_prob) {
         team[p] = {};
@@ -454,7 +368,7 @@ std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(mt19937 &device) {
     }
   }
 
-  const bool changed = (team != Teams::teams[index]);
+  const bool changed = (team != original_team);
   Train::BuildTrajectory build_traj{};
   if (changed) {
     const auto team_string = [](const auto &team) {
@@ -471,133 +385,11 @@ std::tuple<PKMN::Team, int, Train::BuildTrajectory> get_team(mt19937 &device) {
     print("Team " + std::to_string(index) + " modified:");
     print(team_string(team));
     build_traj =
-        rollout_build_network(team, RuntimeData::build_network, device);
+        NN::rollout_build_network(team, RuntimeData::build_network, device);
     print(team_string(team));
   }
 
   return {team, changed ? -1 : index, build_traj};
-}
-
-// run search, use output to update battle data and nodes and training frame
-auto search(size_t c, mt19937 &device, const BattleData &battle_data,
-            SearchData &search_data) {
-  using namespace RuntimeOptions::Search;
-
-  auto run_search_model = [&](const auto &bandit_params, auto &unique_node,
-                              auto &model) {
-    auto &node = *unique_node;
-    MCTS search;
-    if (count_mode == 'i' || count_mode == 'n') {
-      return search.run(c, bandit_params, node, battle_data, model);
-    } else if (count_mode == 't') {
-      std::chrono::milliseconds ms{c};
-      return search.run(ms, bandit_params, node, battle_data, model);
-    }
-    throw std::runtime_error("Invalid count mode char.");
-  };
-
-  auto run_search_node = [&](const auto &bandit_params, auto &unique_node) {
-    if (battle_network_path.empty()) {
-      MonteCarlo::Model model{device};
-      return run_search_model(bandit_params, unique_node, model);
-    } else {
-      return run_search_model(bandit_params, unique_node,
-                              search_data.battle_network);
-    }
-  };
-
-  if (bandit_mode == 'e') {
-    return run_search_node(search_data.exp3_params,
-                           search_data.exp3_unique_node);
-  } else if (bandit_mode == 'u') {
-    return run_search_node(search_data.ucb_params, search_data.ucb_unique_node);
-  }
-  throw std::runtime_error("Invalid bandit mode char.");
-}
-
-std::pair<int, int> sample(mt19937 &device, auto &output) {
-  using namespace RuntimeOptions::Search;
-  const double t = policy_temp;
-
-  const auto process_and_sample = [&](const auto &policy) {
-    if (t <= 0) {
-      throw std::runtime_error("Use positive policy power");
-    }
-    std::vector<double> p(policy.begin(), policy.end());
-    double sum = 0;
-    for (auto &val : p) {
-      val = std::pow(val, t);
-      sum += val;
-    }
-    if (policy_min_prob > 0) {
-      const double l = policy_min_prob * sum;
-      sum = 0;
-      for (auto &val : p) {
-        if (val < l)
-          val = 0;
-        sum += val;
-      }
-    }
-    for (auto &val : p) {
-      val /= sum;
-    }
-
-    print("Processed policy:");
-    print(container_string(p));
-
-    const auto index = device.sample_pdf(p);
-    return index;
-  };
-
-  if (policy_mode == 'n') {
-    return {process_and_sample(output.p1_nash),
-            process_and_sample(output.p2_nash)};
-  } else if (policy_mode == 'e') {
-    return {process_and_sample(output.p1_empirical),
-            process_and_sample(output.p2_empirical)};
-  } else if (policy_mode == 'm') {
-    const auto weighted_sum = [](const auto &a, const auto &b,
-                                 const auto alpha) {
-      auto result = a;
-      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
-                     [alpha](const auto &x, const auto &y) {
-                       return alpha * x + (decltype(alpha))(1) - alpha * y;
-                     });
-      return result;
-    };
-    return {process_and_sample(weighted_sum(output.p1_nash, output.p1_empirical,
-                                            mix_nash_weight)),
-            process_and_sample(weighted_sum(output.p2_nash, output.p2_empirical,
-                                            mix_nash_weight))};
-  }
-  throw std::runtime_error("Invalid policy mode.");
-}
-
-// either reset the node or swap it with its child
-void update_nodes(SearchData &search_data, auto i1, auto i2, const auto &obs) {
-  auto update_node = [&](auto &unique_node) {
-    if (!unique_node || !unique_node->is_init()) {
-      return;
-    }
-    if (RuntimeOptions::Search::keep_node) {
-      auto child = unique_node->find(i1, i2, obs);
-      RuntimeData::update_counter.fetch_add(1);
-      if (child == unique_node->_map.end()) {
-        unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
-      } else {
-        RuntimeData::update_with_node_counter.fetch_add(1);
-        auto unique_child =
-            std::make_unique<std::decay_t<decltype(*unique_node)>>(
-                std::move((*child).second));
-        unique_node.swap(unique_child);
-      }
-    } else {
-      unique_node = std::make_unique<std::decay_t<decltype(*unique_node)>>();
-    }
-  };
-
-  update_node(search_data.exp3_unique_node);
-  update_node(search_data.ucb_unique_node);
 }
 
 // loop to generate teams, self-play battle with mcts/net, save training
@@ -608,6 +400,7 @@ void generate(uint64_t seed) {
                                              << 20;
   const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
                                           << 20;
+
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
   // These are generated slowly so a vector is fine
@@ -659,35 +452,37 @@ void generate(uint64_t seed) {
   };
 
   while (true) {
-    auto [p1_team, p1_team_index, p1_build_traj] = get_team(device);
-    auto [p2_team, p2_team_index, p2_build_traj] = get_team(device);
+    auto [p1_team, p1_team_index, p1_build_traj] = generate_team(device);
+    auto [p2_team, p2_team_index, p2_build_traj] = generate_team(device);
 
-    const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     const auto durations = PKMN::durations(p1_team, p2_team);
-    BattleData battle_data{battle, durations};
-    pkmn_gen1_battle_options battle_options{};
+    apply_durations(battle, durations);
+
+    BattleData battle_data{battle, durations, PKMN::result(battle)};
+    auto options = PKMN::options();
     battle_data.result = PKMN::result();
 
-    SearchData search_data{
-        NN::Network{}, Exp3::Bandit::Params{.03}, UCB::Bandit::Params{2.0},
-        std::make_unique<Exp3Node>(), std::make_unique<UCBNode>()};
+    auto agent = RuntimeOptions::agent;
+    auto t1_agent = RuntimeOptions::t1_agent;
+    auto nodes = RuntimeOptions::nodes;
 
-    if (!RuntimeOptions::Search::battle_network_path.empty()) {
-      std::ifstream file{RuntimeOptions::Search::battle_network_path};
-      if (!file) {
-        std::cerr << "failed to open file" << std::endl;
-      }
-      if (!search_data.battle_network.read_parameters(file)) {
-        throw std::runtime_error{"Failed to load network"};
-      }
-      search_data.battle_network.fill_cache(battle);
+    // if the std::optional<NN::Network> is not set then the params/cache will
+    // be loaded/filled before every turn.
+    if (!agent.is_monte_carlo()) {
+      agent.read_network_parameters();
+      agent.network.value().fill_cache(battle_data.battle);
+    }
+    if (!t1_agent.is_monte_carlo()) {
+      t1_agent.read_network_parameters();
+      t1_agent.network.value().fill_cache(battle_data.battle);
     }
 
-    Train::CompressedFrames<> training_frames{battle_data.battle};
+    Train::CompressedFrames training_frames{battle_data.battle};
 
     size_t updates = 0;
     try {
-      // playout game
+
       while (!pkmn_result_type(battle_data.result)) {
 
         while (RuntimeData::suspended) {
@@ -709,45 +504,20 @@ void generate(uint64_t seed) {
             search(updates == 0 ? RuntimeOptions::Search::t1_count
                                 : RuntimeOptions::Search::count,
                    device, battle_data, search_data);
-        const auto [p1_index, p2_index] = sample(device, output);
 
-        const auto [p1_choices, p2_choices] =
-            PKMN::choices(battle_data.battle, battle_data.result);
-        const auto p1_choice = p1_choices[p1_index];
-        const auto p2_choice = p2_choices[p2_index];
-
-        print("Value: " + std::to_string(output.empirical_value));
-
-        std::vector<std::string> p1_labels{};
-        std::vector<std::string> p2_labels{};
-
-        if constexpr (debug) {
-          for (auto i = 0; i < p1_choices.size(); ++i) {
-            p1_labels.push_back(Strings::side_choice_string(
-                battle_data.battle.bytes, p1_choices[i]));
-          }
-          for (auto i = 0; i < p2_choices.size(); ++i) {
-            p2_labels.push_back(Strings::side_choice_string(
-                battle_data.battle.bytes + Layout::Sizes::Side, p2_choices[i]));
-          }
+        if (updates == 0) {
+          agent =
         }
 
-        print("P1:");
-        print(container_string(p1_labels));
-        print("empirical/nash");
-        print(container_string(output.p1_empirical));
-        print(container_string(output.p1_nash));
-
-        print("P2:");
-        print(container_string(p2_labels));
-        print("empirical/nash");
-        print(container_string(output.p2_empirical));
-        print(container_string(output.p2_nash));
-
-        print(Strings::side_choice_string(battle_data.battle.bytes, p1_choice) +
-              "/" +
-              Strings::side_choice_string(battle_data.battle.bytes + 184,
-                                          p2_choice));
+        const auto output = RuntimeSearch::run(battle_data, nodes, agent);
+        const auto p1_index =
+            process_and_sample(device, output.p1_empirical, output.p1_nash,
+                               RuntimeOptions::policy_options);
+        const auto p2_index =
+            process_and_sample(device, output.p2_empirical, output.p2_nash,
+                               RuntimeOptions::policy_options);
+        const auto p1_choice = output.p1_choices[p1_index];
+        const auto p2_choice = output.p2_choices[p2_index];
 
         // update train data
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
@@ -759,12 +529,15 @@ void generate(uint64_t seed) {
             *pkmn_gen1_battle_options_chance_durations(&battle_options);
 
         // set nodes
-        const auto &obs = *reinterpret_cast<const Obs *>(
+        const auto &obs = *reinterpret_cast<const MCTS::Obs *>(
             pkmn_gen1_battle_options_chance_actions(&battle_options));
-        update_nodes(search_data, p1_index, p2_index, obs);
+        if (RuntimeOptions::keep_node) {
+          nodes.update(search_data, p1_index, p2_index, obs);
+        } else {
+          nodes.reset();
+        }
 
         ++updates;
-
         print("update: " + std::to_string(updates));
       }
     } catch (const std::exception &e) {
@@ -799,7 +572,7 @@ void generate(uint64_t seed) {
     training_frames.write(buffer + frame_buffer_write_index);
     frame_buffer_write_index += n_bytes_frames;
 
-    // stats
+    // data
     if (RuntimeData::frame_counter.fetch_add(training_frames.updates.size()) >
         RuntimeOptions::max_frames) {
       RuntimeData::terminated = true;
@@ -883,6 +656,7 @@ void prepare() {
   const bool created = std::filesystem::create_directory(working_dir, ec);
   if (ec) {
     std::cerr << "Error creating directory: " << ec.message() << '\n';
+    throw std::runtime_error("Could not create datetime dir.");
   } else if (created) {
     std::cout << "Created directory " << RuntimeData::start_datetime
               << std::endl;
@@ -899,6 +673,12 @@ void prepare() {
     }
     args_file << runtime_arg_string();
   }
+  // get teams
+  if (!RuntimeOptions::TeamGen::teams_path.empty()) {
+    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+  } else {
+    RuntimeData::teams = {Teams::teams.begin(), Team::teams.end()};
+  }
 
   // build network save/load
   if (RuntimeOptions::TeamGen::build_network_path == "") {
@@ -910,19 +690,12 @@ void prepare() {
     mt19937 device{RuntimeOptions::seed};
     RuntimeData::build_network.initialize(device);
     RuntimeData::build_network.write_parameters(stream);
-  } else {
-    std::ifstream stream{RuntimeOptions::TeamGen::build_network_path,
-                         std::ios::binary};
-    const bool read_success =
-        RuntimeData::build_network.read_parameters(stream);
-    std::cout << "Build Network read success: "
-              << std::string(read_success ? "true" : "false") << std::endl;
   }
 }
 
 void cleanup() {
   std::cout << "Sample Team Matchup Info" << std::endl;
-  for (auto i = 0; i < TeamPool::n_teams; ++i) {
+  for (auto i = 0; i < MatchupMatrix::n_teams; ++i) {
     for (auto j = 0; j < i; ++j) {
       std::cout << i << ' ' << j << ": ";
       const auto &entry = RuntimeData::team_pool(i, j);

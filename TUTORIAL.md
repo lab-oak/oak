@@ -53,14 +53,12 @@ With the disclaimers out of the way, let's try using the program
 the program outputs
 
 ```bash
-
 network path: mc
 bandit algorithm: exp3-0.03
 Enter battle string:
-
 ```
 
-Battle strings are in the form
+A battle string is a compact text representation of a battle position. It takes the form
 
 `[Side] | [Side]`
 
@@ -81,57 +79,42 @@ is not, since 'slow' matches both Slowpoke and Slowbro, and 'psy' matches multip
 If we input the correct string into the program we get a print of the parsed battle position
 
 ```bash
-
 Battle:
-
-Snorlax: 100% (523/523) BodySlam:24 Reflect:32 Rest:16 Earthquake:16
-
-Slowbro: 100% (393/393) Psychic:16 Rest:16 None:0 None:0
+Snorlax: 100% (523/523) BodySlam:24 Rest:16 None:0 None:0 
+-
+Slowbro: 100% (393/393) Psychic:16 Amnesia:32 Blizzard:8 Rest:16 
 
 P1 choices:
-
-0: BodySlam 1: Reflect 2: Rest 3: Earthquake
-
+0: BodySlam 1: Rest 
 P2 choices:
-
-0: Psychic 1: Rest
-
+0: Psychic 1: Amnesia 2: Blizzard 3: Rest 
 Starting search. Suspend (Ctrl + Z) to stop.
-
 ```
 
 The search will continue until paused (Ctrl + Z) or the program is terminated (Ctrl + C).
 
-Note that the memory usage will almost always rise slowly as the search continues. Uses with low memory (8Gb, lol) should mind it.
+Note that the memory usage will almost always rise slowly as the search continues. Uses with low memory (8Gb, lol) should mind it. The search tree is cleared after the root battle is updated but the programs memory usage does not typically decrease.
 
 If we pause the program we get a summary of the search results.
 
 ```
+Iterations: 1058462, Time: 6.572 sec
+Value: 0.337
 
-iterations: 748371, time: 5.039 sec
-
-value: 0.20
-
-P1 emprical - BodySlam:0.97 Reflect:0.01 Rest:0.01 Earthquake:0.01
-
-P1 nash - BodySlam:1.00 Reflect:0.00 Rest:0.00 Earthquake:0.00
-
-P2 emprical - Psychic:0.98 Rest:0.01 Amnesia:0.01
-
-P2 nash - Psychic:0.00 Rest:0.00 Amnesia:1.00
-
-matrix:
-
-Psychic Rest Amnesia
-
-BodySlam 0.20 0.25 0.20
-
-Reflect 0.10 0.14 0.12
-
-Rest 0.09 0.19 0.15
-
-Earthqua 0.14 0.19 0.19
-
+P1
+BodySlam  Rest      
+0.985     0.015     
+1.000     0.000     
+P2
+Psychic   Amnesia   Blizzard  Rest      
+0.447     0.293     0.251     0.008     
+0.000     0.000     1.000     0.000     
+ge
+Matrix:
+         Psychic  Amnesia  Blizzar  Rest     
+BodySla  0.335    0.349    0.335    0.383    
+Rest     0.133    0.182    0.161    0.215    
+Input: p1 index (p2_index); Negative index = sample.
 ```
 
 The 'value' is the expected value for player 1 at the root position we've entered. Player 1 wins are given a value of 1.0, losses 0.0, and draws 0.5. This means that the Slowbro significantly favored here (4:1 odds of winning).
