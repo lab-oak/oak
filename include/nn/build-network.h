@@ -6,11 +6,13 @@
 #include <train/build-trajectory.h>
 namespace NN {
 
-using BuildNet = EmbeddingNet<Encode::Team::in_dim, team_hidden_dim,
-                              Encode::Team::out_dim, true, false>;
+using BuildNetwork = EmbeddingNet<Encode::Team::in_dim, team_hidden_dim,
+                                  Encode::Team::out_dim, true, false>;
 
-auto rollout_build_network(auto &team, NN::BuildNet &build_net, auto &device)
-    -> Train::BuildTrajectory {
+auto rollout_build_network(auto &team, NN::BuildNetwork &build_net,
+                           auto &device) -> Train::BuildTrajectory {
+
+  using namespace Encode::Team;
 
   auto traj = Encode::Team::initial_trajectory(team);
 

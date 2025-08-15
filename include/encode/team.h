@@ -4,6 +4,7 @@
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/pkmn.h>
+#include <train/build-trajectory.h>
 
 #include <array>
 #include <cassert>
@@ -72,7 +73,7 @@ void write(const PKMN::Team &team, float *const t) {
   }
 }
 
-Train::BuildTrajectory initial_trajectory(const auto &team) {
+[[nodiscard]] Train::BuildTrajectory initial_trajectory(const auto &team) {
   Train::BuildTrajectory traj{};
   auto i = 0;
   for (const auto &set : team) {

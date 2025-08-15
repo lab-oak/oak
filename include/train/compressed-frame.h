@@ -143,8 +143,8 @@ struct CompressedFramesImpl {
   pkmn_result result;
   std::vector<Update> updates;
 
-  CompressedFrames() = default;
-  CompressedFrames(const pkmn_gen1_battle &battle) : battle{battle} {}
+  CompressedFramesImpl() = default;
+  CompressedFramesImpl(const pkmn_gen1_battle &battle) : battle{battle} {}
 
   auto n_bytes() const {
     auto n =

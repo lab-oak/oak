@@ -63,15 +63,15 @@ struct Agent {
   bool *flag;
 
   bool is_monte_carlo() const {
-    return agent.network_path.empty() || network_path == "mc" ||
+    return network_path.empty() || network_path == "mc" ||
            network_path == "montecarlo" || network_path == "monte-carlo";
   }
 
-  void read_network_parameters() {
+  bool read_network_parameters() {
     network.emplace();
     std::ifstream file{std::filesystem::path{network_path}};
-    if (file.fail() || !agent.network.value().read_parameters(file)) {
-      throw std::runtime_error("Could not read network params.");
+    if (file.fail() || !network.value().read_parameters(file)) {
+      return false;
     }
   }
 };
@@ -86,14 +86,14 @@ auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
     //                [](auto c) { return std::tolower(c); });
 
     const auto get = [&nodes](auto &node) -> auto & {
-      using Node = std::remove_reference_t<decltype(*node.value())>;
+      using Node = std::remove_reference_t<decltype(*node)>;
       if (!node.get()) {
         if (nodes.set) {
           throw std::runtime_error("RuntimeSearch::run(): Wrong node type");
         } else {
           nodes.set = true;
           node = std::make_unique<Node>();
-          assert(node.value().get());
+          assert(node.get());
         }
       }
       return *node;
