@@ -60,7 +60,7 @@ inline constexpr auto species_move_list(const auto index) {
   return SPECIES_MOVE_LIST[index];
 }
 
-void write(const PKMN::Team &team, float *const t) {
+void write(const auto &team, float *const t) {
   for (const auto &set : team) {
     if (static_cast<bool>(set.species)) {
       t[species_move_table(set.species, 0)] = 1;
@@ -73,9 +73,10 @@ void write(const PKMN::Team &team, float *const t) {
   }
 }
 
-[[nodiscard]] Train::BuildTrajectory initial_trajectory(const auto &team) {
+[[nodiscard]] auto initial_trajectory(const auto &team)
+    -> std::pair<Train::BuildTrajectory, int> {
   Train::BuildTrajectory traj{};
-  auto i = 0;
+  int i = 0;
   for (const auto &set : team) {
     if (set.species != Data::Species::None) {
       traj.frames[i++] =
@@ -88,7 +89,7 @@ void write(const PKMN::Team &team, float *const t) {
       }
     }
   }
-  return traj;
+  return {traj, i};
 }
 
 [[nodiscard]] bool write_policy_mask(const auto &team, float *const t) {
@@ -139,7 +140,7 @@ void write(const PKMN::Team &team, float *const t) {
   return complete;
 }
 
-void apply_index_to_team(PKMN::Team &team, auto s, auto m) {
+void apply_index_to_team(auto &team, auto s, auto m) {
   if (!m) {
     for (auto &set : team) {
       if (set.species == Data::Species::None) {

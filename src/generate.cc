@@ -10,7 +10,12 @@
 #include <util/search.h>
 
 #include <atomic>
+#include <csignal>
 #include <thread>
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #ifdef NDEBUG
 constexpr bool debug = false;
@@ -285,20 +290,23 @@ auto runtime_arg_string() -> std::string {
 
 // Stats for sample team matchup matrix
 struct MatchupMatrix {
-  MatchupMatrix() = default;
-  MatchupMatrix(const auto size)
-      : n_teams{size}, n_entries{n_teams * (n_teams - 1) / 2} {
-    entries.resize(n_entries);
-  }
 
   struct Entry {
     std::atomic<size_t> n;
     std::atomic<size_t> v;
   };
 
+  void resize(const auto n_teams) {
+    this->n_teams = n_teams;
+    n_entries = n_teams * (n_teams - 1) / 2;
+    entries = new Entry{n_entries};
+  }
+
+  ~MatchupMatrix() { delete[] entries; }
+
   size_t n_teams;
   size_t n_entries;
-  std::vector<Entry> entries{};
+  Entry *entries;
 
   size_t flat(auto i, auto j) {
     if (i < j) {
@@ -453,6 +461,7 @@ void generate(uint64_t seed) {
     auto [p2_team, p2_team_index, p2_build_traj] = generate_team(device);
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    auto battle_options = PKMN::options();
     const auto durations = PKMN::durations(p1_team, p2_team);
     apply_durations(battle, durations);
 
@@ -464,7 +473,7 @@ void generate(uint64_t seed) {
 
     auto agent = RuntimeOptions::agent;
     auto t1_agent = RuntimeOptions::t1_agent;
-    auto nodes = RuntimeOptions::nodes;
+    auto nodes = RuntimeSearch::Nodes{};
 
     // if the std::optional<NN::Network> is not set then the params/cache will
     // be loaded/filled before every turn.
@@ -492,16 +501,6 @@ void generate(uint64_t seed) {
         print(Strings::battle_data_to_string(battle_data.battle,
                                              battle_data.durations));
 
-        // search and sample actions
-        const auto output =
-            search(updates == 0 ? RuntimeOptions::Search::t1_count
-                                : RuntimeOptions::Search::count,
-                   device, battle_data, search_data);
-
-        if (updates == 0) {
-          agent =
-        }
-
         const auto output = RuntimeSearch::run(
             battle_data, nodes, (updates == 0) ? t1_agent : agent);
         const auto p1_index =
@@ -526,7 +525,7 @@ void generate(uint64_t seed) {
         const auto &obs = *reinterpret_cast<const MCTS::Obs *>(
             pkmn_gen1_battle_options_chance_actions(&battle_options));
         if (RuntimeOptions::keep_node) {
-          nodes.update(search_data, p1_index, p2_index, obs);
+          nodes.update(p1_index, p2_index, obs);
         } else {
           nodes.reset();
         }
@@ -672,7 +671,8 @@ void setup() {
       throw std::runtime_error{"Could not parse teams"};
     }
   } else {
-    RuntimeData::teams = {Teams::teams.begin(), Team::teams.end()};
+    RuntimeData::teams =
+        std::vector<PKMN::Team>(Teams::teams.begin(), Teams::teams.end());
     RuntimeData::matchup_matrix = MatchupMatrix{RuntimeData::teams.size()};
   }
 
@@ -684,14 +684,15 @@ void setup() {
     const auto new_path = working_dir / "build-network";
     std::ofstream stream{new_path, std::ios::binary};
     mt19937 device{RuntimeOptions::seed};
-    RuntimeData::build_network.initialize(device);
-    RuntimeData::build_network.write_parameters(stream);
+    NN::BuildNetwork build_network{};
+    build_network.initialize(device);
+    build_network.write_parameters(stream);
   }
 }
 
 void cleanup() {
   std::cout << "Sample Team Matchup Info" << std::endl;
-  for (auto i = 0; i < MatchupMatrix::n_teams; ++i) {
+  for (auto i = 0; i < RuntimeData::matchup_matrix.n_teams; ++i) {
     for (auto j = 0; j < i; ++j) {
       std::cout << i << ' ' << j << ": ";
       const auto &entry = RuntimeData::matchup_matrix(i, j);

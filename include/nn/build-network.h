@@ -4,6 +4,7 @@
 #include <nn/params.h>
 #include <nn/subnet.h>
 #include <train/build-trajectory.h>
+
 namespace NN {
 
 using BuildNetwork = EmbeddingNet<Encode::Team::in_dim, team_hidden_dim,
@@ -14,7 +15,7 @@ auto rollout_build_network(auto &team, NN::BuildNetwork &build_net,
 
   using namespace Encode::Team;
 
-  auto traj = Encode::Team::initial_trajectory(team);
+  auto [traj, i] = Encode::Team::initial_trajectory(team);
 
   std::array<float, in_dim> input{};
   Encode::Team::write(team, input.data());
