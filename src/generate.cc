@@ -42,7 +42,7 @@ namespace TeamGen {
 uint max_pokemon = 6;
 double skip_game_prob = 0;
 std::string teams_path = "";
-std::string build_network_path = "";
+std::string network_path = "";
 double modify_team_prob = 0;
 double pokemon_delete_prob = 0;
 double move_delete_prob = 0;
@@ -89,7 +89,7 @@ auto generate_help_text() -> std::string {
         "program "
         "can be paused/resumed with SIGTSTP (ctrl + z)\n";
   ss << "The program also maintains a 'matchup matrix' for all the sample "
-        "teams that is updated whenever unmodified teams battle.\n\n";
+        "teams that is updated whenever two unmodified teams battle.\n\n";
   ss << "--threads=" << threads << '\n'
      << "  Number of threads to use for parallel computation.\n\n";
   ss << "--seed=" << seed << '\n'
@@ -130,7 +130,7 @@ auto generate_help_text() -> std::string {
      << "  Maximum Pokémon per team.\n\n";
   ss << "--teams=" << TeamGen::teams_path << '\n'
      << "  Path to a directory of team files.\n\n";
-  ss << "--build-network-path=" << TeamGen::build_network_path << '\n'
+  ss << "--build-network-path=" << TeamGen::network_path << '\n'
      << "  Path to the team-building evaluation network.\n\n";
   ss << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n'
      << "  Probability of starting the team modification process.\n\n";
@@ -207,7 +207,7 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--teams=")) {
       TeamGen::teams_path = arg.substr(8);
     } else if (arg.starts_with("--build-network-path=")) {
-      TeamGen::build_network_path = arg.substr(21);
+      TeamGen::network_path = arg.substr(21);
     } else if (arg.starts_with("--modify-team-prob=")) {
       TeamGen::modify_team_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--pokemon-delete-prob=")) {
@@ -271,7 +271,7 @@ auto runtime_arg_string() -> std::string {
   out << "--skip-game-prob=" << TeamGen::skip_game_prob << '\n';
   out << "--max-pokemon=" << TeamGen::max_pokemon << '\n';
   out << "--teams=" << TeamGen::teams_path << '\n';
-  out << "--build-network-path=" << TeamGen::build_network_path << '\n';
+  out << "--build-network-path=" << TeamGen::network_path << '\n';
   out << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n';
   out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
   out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
@@ -285,8 +285,9 @@ auto runtime_arg_string() -> std::string {
 
 // Stats for sample team matchup matrix
 struct MatchupMatrix {
-  MatchupMatrix(const auto &teams)
-      : n_teams{teams.size()}, n_entries{n_teams * (n_teams - 1) / 2} {
+  MatchupMatrix() = default;
+  MatchupMatrix(const auto size)
+      : n_teams{size}, n_entries{n_teams * (n_teams - 1) / 2} {
     entries.resize(n_entries);
   }
 
@@ -335,7 +336,7 @@ std::atomic<size_t> traj_counter{};
 std::atomic<size_t> update_counter{};
 std::atomic<size_t> update_with_node_counter{};
 std::vector<PKMN::Team> teams;
-MatchupMatrix team_pool;
+MatchupMatrix matchup_matrix;
 }; // namespace RuntimeData
 
 auto generate_team(mt19937 &device)
@@ -382,8 +383,8 @@ auto generate_team(mt19937 &device)
     print("Team " + std::to_string(index) + " modified:");
     print(team_string(team));
     NN::BuildNetwork build_network{};
-    build_network.read_parameters(
-        std::ifstream{RuntimeOptions::build_network_path});
+    std::ifstream file{RuntimeOptions::TeamGen::network_path};
+    build_network.read_parameters(file);
     print(team_string(team));
     return {team, -1, NN::rollout_build_network(team, build_network, device)};
   }
@@ -540,8 +541,8 @@ void generate(uint64_t seed) {
 
     // build
     if ((p1_team_index >= 0) && (p2_team_index >= 0)) {
-      RuntimeData::team_pool.update(p1_team_index, p2_team_index,
-                                    PKMN::score(battle_data.result));
+      RuntimeData::matchup_matrix.update(p1_team_index, p2_team_index,
+                                         PKMN::score(battle_data.result));
     }
     if (p1_team_index == -1) {
       p1_build_traj.score =
@@ -630,7 +631,7 @@ void create_working_dir() {
   }
 }
 
-void prepare() {
+void setup() {
   // create working dir
   const std::filesystem::path working_dir = RuntimeData::start_datetime;
   std::error_code ec;
@@ -656,13 +657,27 @@ void prepare() {
   }
   // get teams
   if (!RuntimeOptions::TeamGen::teams_path.empty()) {
+    using RuntimeData::teams;
     std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+    while (true) {
+      std::string line{};
+      std::getline(file, line);
+      if (line.empty()) {
+        break;
+      }
+      const auto [side, volatiles] = Parse::parse_side(line);
+      RuntimeData::teams.push_back(side);
+    }
+    if (RuntimeData::teams.size() == 0) {
+      throw std::runtime_error{"Could not parse teams"};
+    }
   } else {
     RuntimeData::teams = {Teams::teams.begin(), Team::teams.end()};
+    RuntimeData::matchup_matrix = MatchupMatrix{RuntimeData::teams.size()};
   }
 
   // build network save/load
-  if (RuntimeOptions::TeamGen::build_network_path == "") {
+  if (RuntimeOptions::TeamGen::network_path == "") {
     print("no build network path provided.");
     std::cout << "Build Network: No path provided, saving to work dir."
               << std::endl;
@@ -679,7 +694,7 @@ void cleanup() {
   for (auto i = 0; i < MatchupMatrix::n_teams; ++i) {
     for (auto j = 0; j < i; ++j) {
       std::cout << i << ' ' << j << ": ";
-      const auto &entry = RuntimeData::team_pool(i, j);
+      const auto &entry = RuntimeData::matchup_matrix(i, j);
       if (entry.n) {
         std::cout << entry.v / 2.0 / entry.n << std::endl;
       } else {
@@ -709,7 +724,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  prepare();
+  setup();
 
   mt19937 device{RuntimeOptions::seed};
 
