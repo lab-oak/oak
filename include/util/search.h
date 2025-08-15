@@ -73,6 +73,7 @@ struct Agent {
     if (file.fail() || !network.value().read_parameters(file)) {
       return false;
     }
+    return true;
   }
 };
 

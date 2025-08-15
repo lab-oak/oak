@@ -40,6 +40,7 @@ auto rollout_build_network(auto &team, NN::BuildNetwork &build_net,
         output[k] = 0;
       }
     }
+    assert(sum > 0);
     for (auto &x : output) {
       x /= sum;
     }

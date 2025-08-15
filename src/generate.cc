@@ -164,8 +164,8 @@ bool parse_options(int argc, char **argv) {
     return true;
   }
 
-  std::vector<char *> args(argv, argv + argc);
-  assert(args.size() == argc);
+  std::vector<char *> args(argv + 1, argv + argc);
+  assert(args.size() == argc - 1);
 
   for (auto &a : args) {
     if (a == nullptr) {
@@ -173,7 +173,7 @@ bool parse_options(int argc, char **argv) {
     }
     char *b = nullptr;
     std::swap(a, b);
-    std::string arg{a};
+    std::string arg{b};
     if (arg.starts_with("--help")) {
       std::cout << generate_help_text() << std::endl;
       return true;
@@ -232,7 +232,7 @@ bool parse_options(int argc, char **argv) {
     }
     char *b = nullptr;
     std::swap(a, b);
-    std::string arg{a};
+    std::string arg{b};
     if (arg.starts_with("--t1-search-time=")) {
       t1_agent.search_time = arg.substr(17);
     } else if (arg.starts_with("--t1-bandit-name=")) {
@@ -296,17 +296,17 @@ struct MatchupMatrix {
     std::atomic<size_t> v;
   };
 
-  void resize(const auto n_teams) {
-    this->n_teams = n_teams;
-    n_entries = n_teams * (n_teams - 1) / 2;
-    entries = new Entry{n_entries};
-  }
-
-  ~MatchupMatrix() { delete[] entries; }
-
   size_t n_teams;
   size_t n_entries;
   Entry *entries;
+
+  void resize(const auto n) {
+    n_teams = n;
+    n_entries = n_teams * (n_teams - 1) / 2;
+    entries = new Entry[n_entries]{};
+  }
+
+  ~MatchupMatrix() { delete[] entries; }
 
   size_t flat(auto i, auto j) {
     if (i < j) {
@@ -356,18 +356,18 @@ auto generate_team(mt19937 &device)
   std::vector<PKMN::Set> team{base_team.begin(),
                               base_team.begin() + max_pokemon};
   const auto original_team = team;
-  // randomly delete mons/moves for the net to fill in
+
   const auto r = device.uniform();
   if (r < modify_team_prob) {
-    for (auto p = 0; p < max_pokemon; ++p) {
+    for (auto &pokemon : team) {
       const auto r = device.uniform();
       if (r < pokemon_delete_prob) {
-        team[p] = {};
+        pokemon = {};
       } else {
         for (auto m = 0; m < 4; ++m) {
           const auto rm = device.uniform();
           if (rm < move_delete_prob) {
-            team[p].moves[m] = Data::Move::None;
+            pokemon.moves[m] = Data::Move::None;
           }
         }
       }
@@ -392,9 +392,12 @@ auto generate_team(mt19937 &device)
     print(team_string(team));
     NN::BuildNetwork build_network{};
     std::ifstream file{RuntimeOptions::TeamGen::network_path};
-    build_network.read_parameters(file);
+    if (!build_network.read_parameters(file)) {
+      throw std::runtime_error{"cant read build net params"};
+    }
+    const auto traj = NN::rollout_build_network(team, build_network, device);
     print(team_string(team));
-    return {team, -1, NN::rollout_build_network(team, build_network, device)};
+    return {team, -1, traj};
   }
 }
 
@@ -655,8 +658,8 @@ void setup() {
     args_file << runtime_arg_string();
   }
   // get teams
+  using RuntimeData::teams;
   if (!RuntimeOptions::TeamGen::teams_path.empty()) {
-    using RuntimeData::teams;
     std::ifstream file{RuntimeOptions::TeamGen::teams_path};
     while (true) {
       std::string line{};
@@ -665,29 +668,33 @@ void setup() {
         break;
       }
       const auto [side, volatiles] = Parse::parse_side(line);
-      RuntimeData::teams.push_back(side);
+      teams.push_back(side);
     }
-    if (RuntimeData::teams.size() == 0) {
+    if (teams.size() == 0) {
       throw std::runtime_error{"Could not parse teams"};
     }
   } else {
-    RuntimeData::teams =
-        std::vector<PKMN::Team>(Teams::teams.begin(), Teams::teams.end());
-    RuntimeData::matchup_matrix = MatchupMatrix{RuntimeData::teams.size()};
+    teams = std::vector<PKMN::Team>(Teams::teams.begin(), Teams::teams.end());
+    RuntimeData::matchup_matrix.resize(teams.size());
   }
 
   // build network save/load
-  if (RuntimeOptions::TeamGen::network_path == "") {
-    print("no build network path provided.");
-    std::cout << "Build Network: No path provided, saving to work dir."
-              << std::endl;
-    const auto new_path = working_dir / "build-network";
-    std::ofstream stream{new_path, std::ios::binary};
-    mt19937 device{RuntimeOptions::seed};
-    NN::BuildNetwork build_network{};
-    build_network.initialize(device);
-    build_network.write_parameters(stream);
-  }
+  {
+    using namespace RuntimeOptions::TeamGen;
+    const bool may_build = (modify_team_prob > 0) &&
+                           (pokemon_delete_prob > 0 || move_delete_prob > 0);
+    if (may_build && network_path == "") {
+      std::cout << "Build Network: No path provided, saving to work dir."
+                << std::endl;
+      const auto new_path = working_dir / "build-network";
+      network_path = new_path.string();
+      std::ofstream stream{new_path, std::ios::binary};
+      mt19937 device{RuntimeOptions::seed};
+      NN::BuildNetwork build_network{};
+      build_network.initialize(device);
+      build_network.write_parameters(stream);
+    }
+  } 
 }
 
 void cleanup() {
