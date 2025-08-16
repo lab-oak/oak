@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
       search_flag = true;
       output = RuntimeSearch::run(battle_data, nodes, agent, output);
       print_output(output, battle_data.battle, p1_labels, p2_labels);
-      std::cout << "Input: p1 index (p2_index); Negative index = sample."
+      std::cout << "Input: P1 index (P2 index); Negative index = sample."
                 << std::endl;
       std::string line;
       if (!std::getline(std::cin, line)) {

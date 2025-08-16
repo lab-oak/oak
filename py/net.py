@@ -30,7 +30,7 @@ class EncodedFrameTorch:
         perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, pyoak.pokemon_in_dim)
         torch.gather(self.pokemon, dim=2, index=perms_expanded)
 
-    def permute_sides(self, prob = 0.5):
+    def permute_sides(self, prob=0.5):
         mask = torch.rand(self.size) < prob
 
         self.pokemon[mask] = self.pokemon[mask].flip(dims=[1])

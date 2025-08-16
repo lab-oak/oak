@@ -8,7 +8,7 @@ import numpy as np
 
 lib = ctypes.CDLL("./build/libpyoak.so")
 
-# net hyperparams
+# battle net hyperparams
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value
 active_in_dim = ctypes.c_int.in_dll(lib, "active_in_dim").value
 pokemon_hidden_dim = ctypes.c_int.in_dll(lib, "pokemon_hidden_dim").value
@@ -21,6 +21,8 @@ value_hidden_dim = ctypes.c_int.in_dll(lib, "value_hidden_dim").value
 policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
 policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
+# build net hyperparams
+# TODO
 
 species_move_list_size = ctypes.c_int.in_dll(lib, "species_move_list_size").value
 species_move_list_raw = ctypes.POINTER(ctypes.c_int).in_dll(

@@ -6,6 +6,7 @@ import random
 import pyoak
 import net
 
+
 def print_tensors(obj):
     for name, value in vars(obj).items():
         if isinstance(value, torch.Tensor):
@@ -13,6 +14,7 @@ def print_tensors(obj):
                 f"{name}: shape={tuple(value.shape)}, dtype={value.dtype}, device={value.device}"
             )
             print(value)
+
 
 # TODO accept other optims as arg
 class Optimizer:

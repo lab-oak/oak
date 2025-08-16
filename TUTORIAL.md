@@ -11,9 +11,7 @@ When running the `dev/libpkmn` script, you may notice a message about a performa
 This program is not part of the usual workflow. It simply runs a search on a fixed battle for 2^n iterations. 'n'=20 by default (1,048,576 iterations) but it can be set as the first argument to the program, e.g.
 
 ```
-
 ./build/benchmark 10
-
 ```
 
 The search completes in ~22 seconds on very modest hardware (AMD Ryzen 5 5500U). The above command and all others assume the user is currently in the oak/ directory.
@@ -26,7 +24,7 @@ If the user wants to make changes to the source, it is recommended they read [th
 
 ## chall
 
-### about
+### About
 
 This is the 'analysis engine' and the most interactive part of Oak. The program accepts two optional args on startup: the first for the path to the saved network parameters and the second for the specific search algorithm. By default the network path is "mc" which indicates that Monte-Carlo evaluation should be used instead. The default selection algorithm is [Exp3](https://en.wikipedia.org/wiki/Multi-armed_bandit#Exp3) with a 'gamma' value of 0.03.
 
@@ -44,10 +42,8 @@ With the disclaimers out of the way, let's try using the program
 
 ### Reading the Program Output
 
-```bash
-
+```
 ./build/chall
-
 ```
 
 the program outputs
@@ -76,7 +72,7 @@ is valid input while
 
 is not, since 'slow' matches both Slowpoke and Slowbro, and 'psy' matches multiple moves.
 
-If we input the correct string into the program we get a print of the parsed battle position
+Let's try this position out, but first we can make it a bit easier for the program. It is clear that Snolax's moves Reflect and Earthquake are not useful. So let's just remove them from the battle string.
 
 ```bash
 Battle:
@@ -93,7 +89,7 @@ Starting search. Suspend (Ctrl + Z) to stop.
 
 The search will continue until paused (Ctrl + Z) or the program is terminated (Ctrl + C).
 
-Note that the memory usage will almost always rise slowly as the search continues. Uses with low memory (8Gb, lol) should mind it. The search tree is cleared after the root battle is updated but the programs memory usage does not typically decrease.
+Memory usage will increase as the search tree gets larger. Users with low memory (8Gb or less) should watch it to get a sense of how quickly it rises. The search tree is cleared after the root battle is updated but the programs alloted memory does not typically decrease.
 
 If we pause the program we get a summary of the search results.
 
@@ -114,17 +110,16 @@ Matrix:
          Psychic  Amnesia  Blizzar  Rest     
 BodySla  0.335    0.349    0.335    0.383    
 Rest     0.133    0.182    0.161    0.215    
-Input: p1 index (p2_index); Negative index = sample.
+Input: P1 index (P2 index); Negative index = sample.
 ```
 
-The 'value' is the expected value for player 1 at the root position we've entered. Player 1 wins are given a value of 1.0, losses 0.0, and draws 0.5. This means that the Slowbro significantly favored here (4:1 odds of winning).
+The 'value' is the expected value for player 1 at the root position we've entered. Player 1 wins are given a value of 1.0, losses 0.0, and draws 0.5. This suggests that the Slowbro is favored.
 
-The bottom portion is the 'empirical matrix'. During each MCTS iteration, both players use their bandit algorithms to select an action. The pairs of actions define a matrix and each iteration will update an entry of the matrix, which stores the average (P1) value. This average includes the chance element of the game (e.g., the average value for the pair `(BodySlam, BodySlam)` in the position `Snorlax BodySlam 1% | Snorlax BodySlam 1%` is .5, since the outcome is decided by speed ties and 255 misses.)
+The bottom portion is the 'empirical matrix': During each MCTS iteration, both players use their bandit algorithms to select an action. The pairs of actions define a matrix and each iteration will update a single entry matrix entry. This entry stores the average value which depends on chance and subsequent player actions further in the tree.
 
-Lastly we have the search policies. The empirical policies are just the number of times the bandit algorithm chose that action at the root node, divided by the number of iterations. As a result it almost always have non-zero probability for each action, even terrible ones. The 'Nash' policy is more refined. It is produces by solving Nash equilibrium to the empirical matrix.
-
+Lastly we have the search policies. The empirical policies are just the number of times the bandit algorithm chose that action at the root node, divided by the number of iterations. As a result it almost always has non-zero probability for each action, even terrible ones. The 'Nash' policy is more refined. It is produces by solving Nash equilibrium to the empirical matrix:
+    
 ```
-
 The following might be helpful for understanding the 'Nash' aspect if the reader is familiar with vanilla MCTS setups.
 
 In the famous RL algorithm AlphaZero, the search uses a UCB-backed MCTS. During self-play training, the algorithm selects moves in proportion to the empirical policy. This is to balance playing good moves with exploration. However during the testing phase (playing vs Stockfish) the moves with the highest average value were selected.
@@ -133,53 +128,227 @@ The policy given by solving the emprical value matrix is the '2D' analog of the 
 
 ```
 
-With the above in mind we can interpret the output of this very brief search.
+### Making Moves
 
-Most of iterations were spent by P1 on Body Slam, which makes sense since it's wins are likely achieved with full paralysis. No other moves make sense as well. Similarly P2 spent most of the 750k iterations on Psychic. It has a chance of spc drop which will let Slowbro break though rest spam.
-
-But notice that the P2 Nash strategy is to always select Amnesia. This makes sense since Slowbro can immediately start breaking without fishing for drops via Psychic. This was determined by solving the empirical matrix even though Amnesia was not selected nearly as many times.
-
-This 1v1 is simple enough that we can interpret the players Nash strategies as the game theoretic solutions. We can support this idea by allowing the search to continue. The program informs us
+Below the search summary we see
 
 ```
-
-(If the next input is a P1 choice index the battle is advanced; otherwise search is resumed.):
-
+Input: p1 index (p2 index); Negative index = sample.
 ```
 
-Simply hitting enter will resume the search. We can pause it again to get another output print.
+Depending on our input we can either commit actions and advance the battle position or we can resume the search. Any input that can't be parsed as a a lone integer or pair of integers will resume the search. Simply hitting enter with no text entered will suffice.
+
+Let's allow the search to continue for a while.
 
 ```
-iterations: 9710356, time: 75.81 sec
+Iterations: 52584005, Time: 386.654 sec
+Value: 0.419
 
-value: 0.24
+P1
+BodySlam  Rest      
+0.985     0.015     
+1.000     0.000     
+P2
+Psychic   Amnesia   Blizzard  Rest      
+0.367     0.354     0.272     0.008     
+0.000     0.000     1.000     0.000     
 
-P1 emprical - BodySlam:0.98 Reflect:0.01 Rest:0.01 Earthquake:0.01
-
-P1 nash - BodySlam:1.00 Reflect:0.00 Rest:0.00 Earthquake:0.00
-
-P2 emprical - Psychic:0.84 Rest:0.01 Amnesia:0.15
-
-P2 nash - Psychic:0.00 Rest:0.00 Amnesia:1.00
-
-matrix:
-
-Psychic Rest Amnesia
-
-BodySlam 0.24 0.27 0.24
-
-Reflect 0.11 0.14 0.10
-
-Rest 0.09 0.16 0.11
-
-Earthqua 0.15 0.20 0.16
-
+Matrix:
+         Psychic  Amnesia  Blizzar  Rest     
+BodySla  0.418    0.432    0.415    0.497    
+Rest     0.155    0.189    0.177    0.274  
 ```
 
-This information includes the information from the first search period, e.g. the first 748,371 iterations are counted among the second 9,710,356 iterations, etc.
+This second output includes the information from the first search period, e.g. the first 1,058,462 iterations are counted among the second 52,584,005 iterations, etc.
 
-The battle position is advanced in two different ways. If one valid choice index for player 1 in entered, the choice index for player 2 will be sampled from that player's Nash policy. The user can also enter choice indices for both players separated by a space. If the user plays out the battle, they may find that first turn Value estimate was pessimistic for Snorlax.
+The nash strategies have not changed but the expected score for Snorlax has risen somewhat. The truth is that calculating the actual expected value for this position is difficult for MCTS since both pokemon know rest. Without critical hits the Slowbro should be able to stall out the Body Slams but a crit + speed tie loss at the right turn should result in a Snorlax victory.
+
+The folling should explain how selecting moves works. 'Sampled' means the index is sampled from that player's nash policy.
+
+| Input | P1 Move | P2 Move | 
+| ----------- | ----------- | ----------- |
+| 0 | Body Slam | Sampled |
+| 1 | Rest | Sampled | 
+| -1 0 | Sampled | Psychic |
+| -1 3 | Sampled | Rest |
+| -1 -1 | Sampled | Sampled |
+
+When the battle is concluded the score is printed and the program terminates.
+
+## Pyoak
+
+This is not a program but rather a library of functions that can be used in a Python script.
+
+The functions are exposed to python in [this](include/pyoak/py) module. The functions are one-to-one with the underlying C++ implementations [here](src/pyoak.cc).
+
+The data structures `Frame` (raw training data for battling), `EncodedFrame` (where battle bytes are converted into tensors), and `BuildTrajectory` are mirrored in Python as well. The python versions are 'batched' and the data is stored as Numpy arrays so they work with `Pytorch` without any further conversion.
+
+This library allows users to view and manipulate training data without any C++ programming knowledge. If you can follow a Medium article you can train a RBY neural network.
+
+### tutorial.py
+
+This script was writting for this tutorial. Run it with the various args to view the results of the rest of this guide.
 
 ## generate
 
-There is not
+This program uses self-play to play-out battles. Each turn will have value and policy targets associated with it. The program accepts many keyword arguments and it would take too long to explain them here. For this tutorial, will run the program with settings that allow millions of battle and team generation samples to be created within an hour on a consumer machine.
+
+```
+./build/generate --threads=8 --max-pokemon=1 --modify-team-prob=1 --pokemon-delete-prob=1
+```
+
+### Arguments Explained
+
+* `--threads=8`
+
+My laptop has 6 cores with 2 threads per, but I use only 2/3 of them so that I can run this program in the background.
+
+* `--max-pokemon=1`
+
+This is what allows quick generation. All the battles will be 1v1's which conclude much faster than a full 6v6. Also, the default evaluation is Monte-Carlo, so the searches run much faster as well since the rollouts are much shorter too.
+
+Besides the practical reasons for this setting, it may be possible to train battle and team builder networks for the full 6v6 by starting on 1v1's and increasing the mon count. The rest of the turorial will show how this can be done by simply running the vanilla programs with different arguments
+
+* `--modify-team-prob=1`
+
+The program accepts an argument `teams` for the path to a line separated list of teams in the battle string format described in the #chall section. If not provided, the program will use the hard-coded OU sample teams [here](include/data/teams.h). The teams are the 'base'.
+
+A value of 1 means the program will attempt to delete information from the team and fill it back it with the team generation network. This is done at the start of each battle for both players.
+
+* `--pokemon-delete-prob=1`
+
+The probabilty that the entire set (species and moves) will be deleted and filled in. This and the previous two args mean that the build network will generate each single-pokemon team from scratch.
+
+
+### Output
+
+The program will automatically create a directory named after the date-time of creation.
+
+Statistics about the data generation speed will display periodically. The 'keep-node' ratio is the percentage of search trees that were retained after a battle update.
+
+After some time we end the program with `Ctrl + C`. If we inspect the contents of this run's work dir
+
+```
+~/oak$ ls 2025-08-15-20:55:37
+0.battle  1.build   30.build  41.build  52.build  63.build  74.build  85.build  97.build
+0.build   20.build  31.build  42.build  53.build  64.build  75.build  86.build  98.build
+10.build  21.build  32.build  43.build  54.build  65.build  76.build  87.build  9.build
+11.build  22.build  33.build  44.build  55.build  66.build  77.build  88.build  args
+12.build  23.build  34.build  45.build  56.build  67.build  78.build  89.build  build-network
+13.build  24.build  35.build  46.build  57.build  68.build  79.build  8.build
+14.build  25.build  36.build  47.build  58.build  69.build  7.battle  90.build
+15.build  26.build  37.build  48.build  59.build  6.battle  7.build   91.build
+16.build  27.build  38.build  49.build  5.battle  6.build   80.build  92.build
+17.build  28.build  39.build  4.battle  5.build   70.build  81.build  93.build
+18.build  29.build  3.battle  4.build   60.build  71.build  82.build  94.build
+19.build  2.battle  3.build   50.build  61.build  72.build  83.build  95.build
+1.battle  2.build   40.build  51.build  62.build  73.build  84.build  96.build
+```
+
+we can see a large number of '.build' files. The ratio of build to battle files is skewed compared to full 6v6 self-play. Each build file contains ~128K teams and the battle files are 8mb of raw battle/update/stat information by default. 
+
+```
+~/oak$ cat 2025-08-15-20:55:37/args
+--threads=8
+--seed=4127720828
+--max-frames=1073741824
+--buffer-size=8
+--debug-print=true
+--print-interval=30
+--search-time=4096
+--bandit-name=exp3-0.03
+--battle-network-path=mc
+--policy-mode=n
+--policy-temp=1
+--policy-min-prob=0
+--policy-nash-weight=0.5
+--keep-node=true
+--skip-game-prob=0
+--max-pokemon=1
+--teams=
+--build-network-path=
+--modify-team-prob=1
+--pokemon-delete-prob=1
+--move-delete-prob=0
+--t1-search-time=4096
+--t1-bandit-name=exp3-0.03
+--t1-battle-network-path=mc
+```
+
+reports the args used. The build network path is empty/was not provided so a new network was initialized and saved in the work dir as `build-network`.
+
+### Inspecting the Data with Python
+
+```bash
+~/oak$ python3 py/tutorial.py read-build-trajectories
+```
+
+This option will print the first 10 build trajectories from the first build file it finds in the `oak` directory.
+
+```
+Sample 0:
+[(('Onix', 'None'), 0.006469825282692909), (('Onix', 'Substitute'), 0.04887464642524719), (('Onix', 'Bind'), 0.05099565163254738), (('Onix', 'Explosion'), 0.05064469203352928), (('Onix', 'SkullBash'), 0.05670252442359924), (('Onix', 'None'), 1.0)]
+```
+
+The network is freshly initialized so its predictions for species/moves are basically uniformly random. Any OU legal pokemon is possible and any of its legal moves is possible. This project does not consider the few illegal moveset combinations that exist in RBY; They may be picked but they are not competitively relevant.
+
+The actions for the network are all possible '(OU Pokemon, Move it Learns by lvl 100)' pairs. If the move is `None` it means that action was picking the species to begin with. The final such pair is the selection of the teams lead.
+
+```
+(pokemon 1, None), (pokemon 2, None), (pokemon 1, move 1)
+```
+
+The probability the net produced for selecting the move is stored. This value is necessary for Policy Gradient learning algorithms. The build network is simply rolled out - not used in any search/planning capacity. This means we cannot produce entire policy targets like the battle net does.
+
+### Training a Build Network
+
+TODO is a simple script for training using [PPO](https://en.wikipedia.org/wiki/Proximal_policy_optimization). It is an on-policy algorithm, which means it works best if trained using data that it produced itself (rather than say a previous version of the network).
+
+// Run the program
+
+// List karg for using the network in another data generation run
+
+// Visually inspect build rollouts of this new network (hopefull observe no onix lol)
+
+### Training a Battle Network
+
+```
+~/oak$ python3 py/train.py
+usage: train.py [-h] [--threads THREADS] [--steps STEPS] [--checkpoint CHECKPOINT] [--lr LR]
+                [--write-prob WRITE_PROB] [--w-nash W_NASH] [--w-empirical W_EMPIRICAL]
+                [--w-score W_SCORE] [--w-nash-p W_NASH_P] [--no-policy-loss] [--seed SEED]
+                [--device DEVICE] [--print-window PRINT_WINDOW]
+                net_dir battle_dir batch_size
+train.py: error: the following arguments are required: net_dir, battle_dir, batch_size
+```
+
+A few kargs deserve some explanation
+
+* `--write-prob=`
+
+* `--w-score`/`--w-nash`/`--w-empirical`
+
+* `--threads`
+
+Of the required positional args
+
+* `net_dir`
+
+Output directory to be created for network weights
+
+* `battle_dir`
+
+Directory to recursively scan for battle files. Simply `.` will scan the current working (oak) directory and find all data from all runs. If you want to restrict to to a specific one that just provided that path.
+
+* `batch_size`
+
+Batch size for the optimizer.
+
+```
+~/oak$ python3 py/train.py --steps=2000 --w-empirical=1 --
+```
+
+## Iteration
+
+### Second Data Generation
+

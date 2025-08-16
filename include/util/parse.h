@@ -23,7 +23,7 @@ std::vector<std::string> split(const std::string &input, const char delim) {
       token += c;
     }
   }
-  if (!result.empty()) {
+  if (!token.empty()) {
     result.push_back(token);
   }
   return result;

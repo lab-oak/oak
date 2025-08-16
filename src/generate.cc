@@ -528,10 +528,12 @@ void generate(uint64_t seed) {
         const auto &obs = *reinterpret_cast<const MCTS::Obs *>(
             pkmn_gen1_battle_options_chance_actions(&battle_options));
         if (RuntimeOptions::keep_node) {
-          nodes.update(p1_index, p2_index, obs);
+          const bool node_kept = nodes.update(p1_index, p2_index, obs);
+          RuntimeData::update_with_node_counter.fetch_add(node_kept);
         } else {
           nodes.reset();
         }
+        RuntimeData::update_counter.fetch_add(1);
 
         ++updates;
         print("update: " + std::to_string(updates));
@@ -694,7 +696,7 @@ void setup() {
       build_network.initialize(device);
       build_network.write_parameters(stream);
     }
-  } 
+  }
 }
 
 void cleanup() {
