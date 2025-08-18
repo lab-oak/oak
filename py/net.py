@@ -6,6 +6,15 @@ import pyoak
 
 import struct
 
+import torch
+
+class BuildTrajectoryTorch:
+    def __init__(self, traj: pyoak.BuildTrajectory, device="cpu"):
+        self.size = traj.size
+        self.actions = torch.from_numpy(traj.actions).long().to(device)
+        self.policy = torch.from_numpy(traj.policy).float().to(device)
+        self.eval   = torch.from_numpy(traj.eval).float().to(device)
+        self.score  = torch.from_numpy(traj.score).float().to(device)
 
 class EncodedFrameTorch:
     def __init__(self, encoded_frame: pyoak.EncodedFrame):

@@ -4,10 +4,10 @@
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/pkmn.h>
-#include <train/build-trajectory.h>
 
 #include <array>
 #include <cassert>
+#include <functional>
 
 namespace Encode {
 
@@ -24,6 +24,19 @@ consteval auto get_species_move_list_size() {
   }
   return size;
 }
+
+consteval int get_max_actions() {
+  int n = 0;
+  auto stored = Data::MOVE_POOL_SIZES;
+  std::sort(stored.begin(), stored.end(), std::greater<uint8_t>());
+  for (auto i = 0; i < 5; ++i) {
+    n += (int)stored[i];
+  }
+  n += 151 - 5;
+  return n;
+}
+
+constexpr int max_actions = get_max_actions();
 
 constexpr auto species_move_list_size = get_species_move_list_size();
 
@@ -73,29 +86,9 @@ void write(const auto &team, float *const t) {
   }
 }
 
-[[nodiscard]] auto initial_trajectory(const auto &team)
-    -> std::pair<Train::BuildTrajectory, int> {
-  Train::BuildTrajectory traj{};
-  int i = 0;
-  for (const auto &set : team) {
-    if (set.species != Data::Species::None) {
-      traj.frames[i++] =
-          Train::ActionPolicy{species_move_table(set.species, 0), 0};
-      for (const auto move : set.moves) {
-        if (move != Data::Move::None) {
-          traj.frames[i++] =
-              Train::ActionPolicy{species_move_table(set.species, move), 0};
-        }
-      }
-    }
-  }
-  return {traj, i};
-}
-
 [[nodiscard]] bool write_policy_mask(const auto &team, float *const t) {
   bool needs_species = false;
   bool complete = true;
-  uint n_pokemon = 0;
   for (const auto &set : team) {
     if (static_cast<bool>(set.species)) {
       auto n_moves = 0;
@@ -140,6 +133,64 @@ void write(const auto &team, float *const t) {
   return complete;
 }
 
+void write_policy_mask_flat(const auto &team, auto *t) {
+  auto *t0 = t;
+  assert(t0);
+  bool needs_species = false;
+  for (const auto &set : team) {
+
+    if (!static_cast<bool>(set.species)) {
+      needs_species = true;
+      continue;
+    }
+
+    auto n_moves = 0;
+    for (const auto move : set.moves) {
+      n_moves += static_cast<bool>(move);
+    }
+    if (n_moves >= std::min(Data::move_pool_size(set.species), (uint8_t)4)) {
+      continue;
+    }
+
+    auto pool = move_pool(set.species);
+    // remove all moves already in the set
+    for (const auto move : set.moves) {
+      if (static_cast<bool>(move)) {
+        for (auto &m : pool) {
+          if (m == move) {
+            m = Data::Move::None;
+            break;
+          }
+        }
+      }
+    }
+    // write remaining moves
+    for (const auto move : pool) {
+      if (static_cast<bool>(move)) {
+      std::cout << std::distance(t0, t);
+      *t++ = species_move_table(set.species, move);
+      std::cout << ' ' << *t << std::endl;
+      }
+    }
+  }
+  if (needs_species) {
+    std::array<bool, 152> not_available{};
+    for (const auto &set : team) {
+      if (static_cast<bool>(set.species)) {
+        not_available[static_cast<uint8_t>(set.species)] = true;
+      }
+    }
+    for (auto i = 1; i <= 149; ++i) {
+      if (not_available[i]) {
+        continue;
+      }
+      std::cout << std::distance(t0, t);
+      *t++ = species_move_table(i, 0);
+      std::cout << ' ' << *t << std::endl;
+    }
+  }
+}
+
 void apply_index_to_team(auto &team, auto s, auto m) {
   if (!m) {
     for (auto &set : team) {
@@ -170,5 +221,4 @@ void apply_index_to_team(auto &team, auto s, auto m) {
 }
 
 } // namespace Team
-
 }; // namespace Encode

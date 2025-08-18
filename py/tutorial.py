@@ -20,23 +20,28 @@ def read_build_trajectories():
     files = find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
-    file = files[0]
+    from random import sample
+
+    file = sample(files, 1)[0]
     build_trajectories = pyoak.read_build_trajectories(file)
 
     assert build_trajectories.size > 0, f"No data found in {file}."
 
     for i in range(min(10, build_trajectories.size)):
-        print(f"Sample {i}:")
+        index = sample(list(range(build_trajectories.size)), 1)[0]
+        print(f"Sample {index}:")
         species_move = [
-            pyoak.species_move_list[_] for _ in build_trajectories.actions[i]
+            pyoak.species_move_list[_] for _ in build_trajectories.actions[index]
         ]
         species_move_string = [
             (pyoak.species_names[s], pyoak.move_names[m]) for s, m in species_move
         ]
-        selection_probs = [float(_) for _ in build_trajectories.policy[i]]
+        selection_probs = [float(_) for _ in build_trajectories.policy[index]]
 
         data = [(sm, p) for sm, p in zip(species_move_string, selection_probs) if p > 0]
         print(data)
+        print(build_trajectories.eval[index])
+        print(build_trajectories.score[index])
 
 
 def create_set():
@@ -46,6 +51,9 @@ def create_set():
     network = EmbeddingNet(
         pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
     )
+
+    print(pyoak.species_move_list_size)
+    print(pyoak.builder_max_actions)
 
     if (len(sys.argv) < 3):
         print("no build network path provided; using randomly initialized net")

@@ -22,7 +22,7 @@ policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
 policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
 # build net hyperparams
-# TODO
+builder_max_actions = ctypes.c_int.in_dll(lib, "builder_max_actions").value
 
 species_move_list_size = ctypes.c_int.in_dll(lib, "species_move_list_size").value
 species_move_list_raw = ctypes.POINTER(ctypes.c_int).in_dll(
@@ -110,6 +110,7 @@ lib.uncompress_and_encode_training_frames.argtypes = [
 lib.read_build_trajectories.argtypes = [
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_int64),
+    ctypes.POINTER(ctypes.c_int64),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
@@ -178,6 +179,29 @@ def get_frames(data: bytes, frame_count: int) -> Frame:
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
+
+
+class BuildTrajectory:
+    def __init__(self, size):
+        self.size = size
+
+        self.actions = np.zeros((size, 31), dtype=np.int64)
+        self.mask = np.zeros((size, builder_max_actions), dtype=np.int64)
+        self.policy = np.zeros((size, 31), dtype=np.float32)
+        self.eval = np.zeros((size, 1), dtype=np.float32)
+        self.score = np.zeros((size, 1), dtype=np.float32)
+
+    def raw_pointers(self, i: int):
+        def ptr(x, dtype):
+            return x[i].ctypes.data_as(ctypes.POINTER(dtype))
+
+        return (
+            ptr(self.actions, ctypes.c_int64),
+            ptr(self.mask, ctypes.c_int64),
+            ptr(self.policy, ctypes.c_float),
+            ptr(self.eval, ctypes.c_float),
+            ptr(self.score, ctypes.c_float),
+        )
 
 
 class EncodedFrame:
