@@ -31,12 +31,12 @@ def read_build_trajectories():
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [
-            pyoak.species_move_list[_] for _ in build_trajectories.actions[index]
+            pyoak.species_move_list[_] for _ in build_trajectories.actions[index].reshape(-1)
         ]
         species_move_string = [
             (pyoak.species_names[s], pyoak.move_names[m]) for s, m in species_move
         ]
-        selection_probs = [float(_) for _ in build_trajectories.policy[index]]
+        selection_probs = [float(_) for _ in build_trajectories.policy[index].reshape(-1)]
 
         data = [(sm, p) for sm, p in zip(species_move_string, selection_probs) if p > 0]
         print(data)
@@ -51,9 +51,6 @@ def create_set():
     network = EmbeddingNet(
         pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
     )
-
-    print(pyoak.species_move_list_size)
-    print(pyoak.builder_max_actions)
 
     if (len(sys.argv) < 3):
         print("no build network path provided; using randomly initialized net")

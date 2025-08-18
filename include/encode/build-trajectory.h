@@ -14,7 +14,7 @@ struct BuildTrajectoryInput {
   void write(const Train::BuildTrajectory &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
     PKMN::Team team{};
-
+    
     std::fill(mask, mask + Team::max_actions, -1);
 
     bool ignore_zero_probs = false;

@@ -1,5 +1,4 @@
 from frame import Frame
-from build_trajectory import BuildTrajectory
 
 import ctypes
 import os
@@ -185,9 +184,9 @@ class BuildTrajectory:
     def __init__(self, size):
         self.size = size
 
-        self.actions = np.zeros((size, 31), dtype=np.int64)
-        self.mask = np.zeros((size, builder_max_actions), dtype=np.int64)
-        self.policy = np.zeros((size, 31), dtype=np.float32)
+        self.actions = np.zeros((size, 31, 1), dtype=np.int64)
+        self.mask = np.zeros((size, 31, builder_max_actions), dtype=np.int64)
+        self.policy = np.zeros((size, 31, 1), dtype=np.float32)
         self.eval = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
 
