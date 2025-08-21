@@ -21,6 +21,8 @@ policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
 policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
 # build net hyperparams
+builder_policy_hidden_dim = ctypes.c_int.in_dll(lib, "builder_policy_hidden_dim").value
+builder_value_hidden_dim = ctypes.c_int.in_dll(lib, "builder_value_hidden_dim").value
 builder_max_actions = ctypes.c_int.in_dll(lib, "builder_max_actions").value
 
 species_move_list_size = ctypes.c_int.in_dll(lib, "species_move_list_size").value
@@ -189,6 +191,7 @@ class BuildTrajectory:
         self.policy = np.zeros((size, 31, 1), dtype=np.float32)
         self.eval = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
+        self.team_size = np.zeros((size, 1), dtype=np.int64)
 
     def raw_pointers(self, i: int):
         def ptr(x, dtype):
@@ -200,6 +203,7 @@ class BuildTrajectory:
             ptr(self.policy, ctypes.c_float),
             ptr(self.eval, ctypes.c_float),
             ptr(self.score, ctypes.c_float),
+            ptr(self.team_size, ctypes.c_int64),
         )
 
 

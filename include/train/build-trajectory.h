@@ -1,7 +1,5 @@
 #pragma once
 
-#include <encode/team.h>
-
 namespace Train {
 
 #pragma pack(push, 1)
@@ -22,29 +20,11 @@ struct ActionPolicy {
 struct BuildTrajectory {
   std::array<ActionPolicy, 31> frames;
   uint16_t eval;
-  uint16_t score;
+  uint8_t score;
+  uint8_t size;
 };
 #pragma pack(pop)
 
 static_assert(sizeof(BuildTrajectory) == (32 * 4));
-
-[[nodiscard]] auto initial_trajectory(const auto &team)
-    -> std::pair<Train::BuildTrajectory, int> {
-  Train::BuildTrajectory traj{};
-  int i = 0;
-  for (const auto &set : team) {
-    if (set.species != Data::Species::None) {
-      traj.frames[i++] =
-          Train::ActionPolicy{species_move_table(set.species, 0), 0};
-      for (const auto move : set.moves) {
-        if (move != Data::Move::None) {
-          traj.frames[i++] =
-              Train::ActionPolicy{species_move_table(set.species, move), 0};
-        }
-      }
-    }
-  }
-  return {traj, i};
-}
 
 }; // namespace Train

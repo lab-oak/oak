@@ -73,6 +73,9 @@ extern "C" const int value_hidden_dim = NN::value_hidden_dim;
 extern "C" const int policy_hidden_dim = NN::policy_hidden_dim;
 extern "C" const int policy_out_dim = NN::policy_out_dim;
 
+extern "C" const int builder_policy_hidden_dim = NN::builder_policy_hidden_dim;
+extern "C" const int builder_value_hidden_dim = NN::builder_value_hidden_dim;
+// input and output dim for policy net due to encoding
 extern "C" const int builder_max_actions = Encode::Team::max_actions;
 
 extern "C" int get_compressed_battles_helper(const char *path, char *out_data,
@@ -477,7 +480,8 @@ extern "C" size_t encode_buffer_multithread(
 
 extern "C" int read_build_trajectories(const char *path, int64_t *action,
                                        int64_t *mask, float *policy,
-                                       float *eval, float *score) {
+                                       float *eval, float *score,
+                                       int64_t *size) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -489,9 +493,9 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
                                      .mask = mask,
                                      .policy = policy,
                                      .eval = eval,
-                                     .score = score};
+                                     .score = score..size = size};
 
-  const auto ptrs = std::bit_cast<std::array<void *, 5>>(input);
+  const auto ptrs = std::bit_cast<std::array<void *, 6>>(input);
   for (const auto *x : ptrs) {
     if (!x) {
       std::cerr << "read_build_trajectories: null pointer in input"
@@ -512,9 +516,11 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
     }
 
     input.write(traj);
+    ++count;
 
     if (file.peek() == EOF) {
       return count;
     }
   }
+  return -1;
 }

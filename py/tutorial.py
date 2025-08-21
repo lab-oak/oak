@@ -27,7 +27,9 @@ def read_build_trajectories():
 
     assert build_trajectories.size > 0, f"No data found in {file}."
 
-    for i in range(min(10, build_trajectories.size)):
+    print(build_trajectories.size)
+
+    for i in range(min(2, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [
@@ -42,6 +44,34 @@ def read_build_trajectories():
         print(data)
         print(build_trajectories.eval[index])
         print(build_trajectories.score[index])
+
+    import net
+    import torch
+
+    network = net.EmbeddingNet(
+        pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
+    )
+
+    traj = net.BuildTrajectoryTorch(build_trajectories)
+    states = torch.zeros((traj.size, 31, pyoak.species_move_list_size), dtype=torch.float32)
+
+    ones = torch.ones_like(traj.actions, dtype=torch.float32)
+    torch.set_printoptions(threshold=10_000)
+    print(traj.mask.shape)
+    # print(traj.mask[1, 0])
+    for b in range(31):
+        print(traj.mask[0, b])
+
+    # states = torch.zeros([traj.size, 1, pyoak.species_move_list_size])
+    # print(states.shape, traj.actions.shape, ones.shape)
+
+    # for step in range(31):
+
+    #     logits = network.forward(states)
+
+    #     print(torch.sum(states[0]))
+
+    #     states = torch.scatter(states,-1, traj.actions[:, step : step + 1], ones)
 
 
 def create_set():

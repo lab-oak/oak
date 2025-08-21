@@ -12,9 +12,11 @@ class BuildTrajectoryTorch:
     def __init__(self, traj: pyoak.BuildTrajectory, device="cpu"):
         self.size = traj.size
         self.actions = torch.from_numpy(traj.actions).long().to(device)
+        self.mask = torch.from_numpy(traj.mask).long().to(device)
         self.policy = torch.from_numpy(traj.policy).float().to(device)
         self.eval   = torch.from_numpy(traj.eval).float().to(device)
         self.score  = torch.from_numpy(traj.score).float().to(device)
+        self.team_size = torch.from_numpy(traj.team_size).long().to(device)
 
 class EncodedFrameTorch:
     def __init__(self, encoded_frame: pyoak.EncodedFrame):
@@ -127,6 +129,21 @@ class EmbeddingNet(nn.Module):
     def forward(self, x):
         return self.fc1(self.fc0(x))
 
+class BuildNet(nn.Module):
+    def __init__(self, in_dim, policy_hidden_dim, value_hidden_dim):
+        self.policy_net = EmbeddingNet(in_dim, policy_hidden_dim, in_dim, True, False)
+        self.value_net = EmbeddingNet(in_dim, value_hidden_dim, 1, True, False)
+
+    def read_parameters(self, f):
+        self.policy_net.read_parameters(f)
+        self.value_net.read_parameters(f)
+
+    def write_parameters(self, f):
+        self.policy_net.write_parameters(f)
+        self.value_net.write_parameters(f)
+
+    def forward(self, x):
+        return self.policy_net.forward(x), self.value_net.forward(x)
 
 class MainNet(nn.Module):
     def __init__(

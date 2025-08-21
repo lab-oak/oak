@@ -4,6 +4,7 @@
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/pkmn.h>
+#include <train/build-trajectory.h>
 
 #include <array>
 #include <cassert>
@@ -71,6 +72,26 @@ inline constexpr auto species_move_table(const auto species, const auto move) {
 
 inline constexpr auto species_move_list(const auto index) {
   return SPECIES_MOVE_LIST[index];
+}
+
+[[nodiscard]] auto initial_trajectory(const auto &team)
+    -> std::pair<Train::BuildTrajectory, int> {
+  Train::BuildTrajectory traj{};
+  int i = 0;
+  for (const auto &set : team) {
+    if (set.species != Data::Species::None) {
+      traj.frames[i++] =
+          Train::ActionPolicy{species_move_table(set.species, 0), 0};
+      for (const auto move : set.moves) {
+        if (move != Data::Move::None) {
+          traj.frames[i++] =
+              Train::ActionPolicy{species_move_table(set.species, move), 0};
+        }
+      }
+    }
+  }
+  traj.size = team.size();
+  return {traj, i};
 }
 
 void write(const auto &team, float *const t) {
@@ -167,9 +188,7 @@ void write_policy_mask_flat(const auto &team, auto *t) {
     // write remaining moves
     for (const auto move : pool) {
       if (static_cast<bool>(move)) {
-      // std::cout << std::distance(t0, t);
-      *t++ = species_move_table(set.species, move);
-      // std::cout << ' ' << *t << std::endl;
+        *t++ = species_move_table(set.species, move);
       }
     }
   }
@@ -184,9 +203,7 @@ void write_policy_mask_flat(const auto &team, auto *t) {
       if (not_available[i]) {
         continue;
       }
-      // std::cout << std::distance(t0, t);
       *t++ = species_move_table(i, 0);
-      // std::cout << ' ' << *t << std::endl;
     }
   }
 }

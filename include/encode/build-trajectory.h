@@ -10,17 +10,18 @@ struct BuildTrajectoryInput {
   float *policy;
   float *eval;
   float *score;
+  int64_t *size;
 
   void write(const Train::BuildTrajectory &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
-    PKMN::Team team{};
-    
-    std::fill(mask, mask + Team::max_actions, -1);
+    std::vector<PKMN::Set> team{};
+    team.resize(traj.size);
 
     bool ignore_zero_probs = false;
     for (auto i = 0; i < 31; ++i) {
       const auto &frame = traj.frames[i];
-      const auto [s, m] = Team::species_move_list(frame.policy);
+      const auto [s, m] = Team::species_move_list(frame.action);
+      std::fill(mask, mask + Team::max_actions, -1);
 
       if (frame.policy == 0) {
         if (!ignore_zero_probs) {
@@ -39,6 +40,7 @@ struct BuildTrajectoryInput {
 
     *eval++ = traj.eval / den;
     *score++ = traj.score / 2.0;
+    *size++ = traj.size;
   }
 };
 
