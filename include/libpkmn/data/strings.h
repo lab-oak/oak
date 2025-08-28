@@ -10,6 +10,8 @@
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/species.h>
 
+namespace PKMN {
+
 namespace Data {
 
 constexpr size_t MAX_MOVE_LEN = 12;
@@ -123,3 +125,5 @@ std::string types_string(const auto types) noexcept {
          '/' +
          std::string{Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) / 16]};
 }
+
+} // namespace PKMN

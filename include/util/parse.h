@@ -30,9 +30,9 @@ std::vector<std::string> split(const std::string &input, const char delim) {
 }
 
 // convert vector of strings to a set
-PKMN::Set parse_set(const auto &words) {
+PKMN::PokemonInit parse_set(const auto &words) {
 
-  PKMN::Set pokemon{};
+  PKMN::PokemonInit pokemon{};
 
   pokemon.species = Strings::string_to_species(words[0]);
 
@@ -174,8 +174,16 @@ PKMN::Volatiles parse_volatiles(const auto &words) {
   return vol;
 }
 
+auto parse_active(PKMN::Pokemon &pokemon, const auto &words) {
+  PKMN::ActivePokemon active{};
+  active.species = pokemon.species;
+  active.moves = pokemon.moves;
+  active.stats = pokemon.stats;
+  active.volatiles = parse_volatiles(words);
+}
+
 auto parse_side(const std::string &side_string)
-    -> std::pair<std::array<PKMN::Set, 6>, PKMN::Volatiles> {
+    -> std::pair<std::array<PKMN::PokemonInit, 6>, PKMN::Volatiles> {
   const auto set_strings = split(side_string, ';');
   if (set_strings.size() > 6) {
     throw std::runtime_error(
@@ -184,7 +192,7 @@ auto parse_side(const std::string &side_string)
   if (set_strings.size() == 0) {
     throw std::runtime_error("parse_side(): side requires at least one set");
   }
-  std::array<PKMN::Set, 6> side{};
+  std::array<PKMN::PokemonInit, 6> side{};
   std::transform(set_strings.begin(), set_strings.end(), side.begin(),
                  [](const auto &string) {
                    const auto words = split(string, ' ');

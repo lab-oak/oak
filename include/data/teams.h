@@ -6,8 +6,8 @@
 #include <libpkmn/pkmn.h>
 
 namespace Teams {
-using enum Data::Move;
-using Data::Species;
+using enum PKMN::Data::Move;
+using PKMN::Data::Species;
 
 constexpr std::array<PKMN::Team, 16> teams{
     PKMN::Team{

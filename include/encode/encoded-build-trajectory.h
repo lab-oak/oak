@@ -4,6 +4,9 @@
 #include <train/build-trajectory.h>
 
 namespace Encode {
+
+struct EncodedBuildTrajectory {};
+
 struct BuildTrajectoryInput {
   int64_t *action;
   int64_t *mask;
@@ -14,7 +17,7 @@ struct BuildTrajectoryInput {
 
   void write(const Train::BuildTrajectory &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
-    std::vector<PKMN::Set> team{};
+    std::vector<PKMN::PokemonInit> team{};
     team.resize(traj.size);
 
     bool ignore_zero_probs = false;

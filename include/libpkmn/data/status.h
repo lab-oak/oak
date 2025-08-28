@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <type_traits>
 
+namespace PKMN {
+
 namespace Data {
 enum class Status : std::underlying_type_t<std::byte> {
   None = 0b00000000,
@@ -42,3 +44,5 @@ constexpr Status rest(const auto n) {
   return static_cast<Status>(0b10000000 | n);
 }
 } // namespace Data
+
+} // namespace PKMN

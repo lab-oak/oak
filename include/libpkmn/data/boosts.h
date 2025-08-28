@@ -3,6 +3,8 @@
 #include <array>
 #include <cstddef>
 
+namespace PKMN {
+
 namespace Data {
 constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
     std::array<uint8_t, 2>{25, 100}, // -6
@@ -20,3 +22,5 @@ constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
     {4, 1}                           // +6
 };
 };
+
+} // namespace PKMN

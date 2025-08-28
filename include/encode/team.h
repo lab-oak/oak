@@ -80,12 +80,12 @@ inline constexpr auto species_move_list(const auto index) {
   int i = 0;
   for (const auto &set : team) {
     if (set.species != Data::Species::None) {
-      traj.frames[i++] =
-          Train::ActionPolicy{species_move_table(set.species, 0), 0};
+      traj.frames[i++] = Train::EncodedBuildTrajectory2::Update{
+          species_move_table(set.species, 0), 0};
       for (const auto move : set.moves) {
         if (move != Data::Move::None) {
-          traj.frames[i++] =
-              Train::ActionPolicy{species_move_table(set.species, move), 0};
+          traj.frames[i++] = Train::EncodedBuildTrajectory2::Update{
+              species_move_table(set.species, move), 0};
         }
       }
     }

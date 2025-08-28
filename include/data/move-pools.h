@@ -5,7 +5,7 @@
 
 namespace Data {
 consteval auto get_move_pools() {
-  using enum Data::Move;
+  using enum PKMN::Data::Move;
   auto MOVE_POOLS = Data::LEARNSETS;
   for (auto &move_pool : MOVE_POOLS) {
     move_pool[static_cast<uint8_t>(Dig)] = false;
@@ -42,12 +42,12 @@ constexpr auto max_move_pool_size =
     *std::max_element(MOVE_POOL_SIZES.begin(), MOVE_POOL_SIZES.end());
 
 consteval auto get_move_pools_flat() {
-  std::array<std::array<Data::Move, max_move_pool_size>, 152> list{};
+  std::array<std::array<PKMN::Data::Move, max_move_pool_size>, 152> list{};
   for (auto i = 0; i <= 151; ++i) {
     auto index = 0;
     for (uint8_t m = 0; m < 166; ++m) {
       if (MOVE_POOLS[i][m]) {
-        list[i][index++] = static_cast<Data::Move>(m);
+        list[i][index++] = static_cast<PKMN::Data::Move>(m);
       }
     }
   }

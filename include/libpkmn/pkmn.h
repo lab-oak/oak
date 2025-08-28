@@ -9,6 +9,21 @@
 
 namespace PKMN {
 
+struct Set {
+  Data::Species species;
+  std::array<Data::Move, 4> moves;
+
+  constexpr bool operator==(const Set &other) const {
+    auto a = moves;
+    auto b = other.moves;
+    std::sort(a.begin(), a.end());
+    std::sort(b.begin(), b.end());
+    return (species == other.species) && (a == b);
+  }
+};
+
+using Team = std::array<Set, 6>;
+
 enum class Result : std::underlying_type_t<std::byte> {
   None = 0,
   Win = 1,
@@ -68,45 +83,16 @@ pkmn_result result(const pkmn_gen1_battle &b) {
   return result();
 }
 
-struct Set {
-
-  constexpr bool operator==(const Set &) const = default;
-
-  Data::Species species;
-  std::array<Data::Move, 4> moves;
-
-  static constexpr std::array<uint8_t, 4> max_pp{64, 64, 64, 64};
-
-  std::array<uint8_t, 4> pp = max_pp;
-  float hp = 100 / 100;
-  Data::Status status = Data::Status::None;
-  uint8_t sleeps = 0;
-  Init::Boosts boosts = {};
-  uint8_t level = 100;
-  Stats stats = {};
-};
-
-using Team = std::array<Set, 6>;
-
 constexpr auto battle(const auto &p1, const auto &p2,
-                      uint64_t seed = 0x123445) {
+                      uint64_t seed = 0x123456) {
   PKMN::Battle battle{};
   battle.sides[0] = Init::init_side(p1);
   battle.sides[1] = Init::init_side(p2);
-  battle.turn = 1;
   battle.rng = seed;
   return std::bit_cast<pkmn_gen1_battle>(battle);
 }
 
 constexpr pkmn_gen1_chance_durations durations() { return {}; }
-
-constexpr auto durations(const auto &p1, const auto &p2) {
-  pkmn_gen1_chance_durations durations{};
-  auto &dur = View::ref(durations);
-  Init::init_duration(p1, dur.get(0));
-  Init::init_duration(p2, dur.get(1));
-  return durations;
-}
 
 constexpr pkmn_gen1_battle_options options() { return {}; }
 
@@ -180,12 +166,11 @@ auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
   std::vector<std::string> p1_labels{};
   std::vector<std::string> p2_labels{};
   for (auto i = 0; i < p1_choices.size(); ++i) {
-    p1_labels.push_back(
-        Strings::side_choice_string(battle.bytes, p1_choices[i]));
+    p1_labels.push_back(side_choice_string(battle.bytes, p1_choices[i]));
   }
   for (auto i = 0; i < p2_choices.size(); ++i) {
-    p2_labels.push_back(Strings::side_choice_string(
-        battle.bytes + Layout::Sizes::Side, p2_choices[i]));
+    p2_labels.push_back(
+        side_choice_string(battle.bytes + Layout::Sizes::Side, p2_choices[i]));
   }
   return {p1_labels, p2_labels};
 }

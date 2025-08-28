@@ -10,6 +10,10 @@
 
 namespace Encode {
 
+using PKMN::Data::Move;
+using PKMN::Data::Species;
+using PKMN::Data::Type;
+
 namespace Stats {
 constexpr float max_stat_value = 999;
 constexpr float max_hp_value = 706;
@@ -30,10 +34,10 @@ consteval auto dim_labels() {
 } // namespace Stats
 
 namespace MoveSlots {
-constexpr auto n_dim = static_cast<uint8_t>(Data::Move::Struggle) - 1;
+constexpr auto n_dim = static_cast<uint8_t>(Move::Struggle) - 1;
 float *write(const std::array<PKMN::MoveSlot, 4> &move_slots, float *t) {
   for (const auto [id, pp] : move_slots) {
-    if (id != Data::Move::Struggle && id != Data::Move::None) {
+    if (id != Move::Struggle && id != Move::None) {
       t[static_cast<uint8_t>(id) - 1] = static_cast<bool>(pp);
     }
   }
@@ -43,7 +47,7 @@ float *write(const std::array<PKMN::MoveSlot, 4> &move_slots, float *t) {
 consteval auto dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
-    result[i] = Data::MOVE_CHAR_ARRAY[i + 1];
+    result[i] = PKMN::Data::MOVE_CHAR_ARRAY[i + 1];
   }
   return result;
 }
@@ -53,12 +57,12 @@ namespace Status {
 constexpr auto get_status_index(auto status, uint8_t sleeps) {
   // brn, par, psn(vol encodes tox), frz
   assert(static_cast<bool>(status));
-  if (!Data::is_sleep(status)) {
+  if (!is_sleep(status)) {
     const auto n = std::countr_zero(static_cast<uint8_t>(status)) - 3;
     assert(n >= 0 && n <= 3);
     return n;
   } else {
-    if (!Data::self(status)) {
+    if (!self(status)) {
       assert(sleeps > 0);
       return 3 + sleeps;
     } else {
@@ -69,22 +73,22 @@ constexpr auto get_status_index(auto status, uint8_t sleeps) {
   }
 }
 
-static_assert(get_status_index(Data::Status::Poison, 0) == 0);
-static_assert(get_status_index(Data::Status::Burn, 0) == 1);
-static_assert(get_status_index(Data::Status::Freeze, 0) == 2);
-static_assert(get_status_index(Data::Status::Paralysis, 0) == 3);
-static_assert(get_status_index(Data::Status::Toxic, 0) == 0);
+static_assert(get_status_index(PKMN::Data::Status::Poison, 0) == 0);
+static_assert(get_status_index(PKMN::Data::Status::Burn, 0) == 1);
+static_assert(get_status_index(PKMN::Data::Status::Freeze, 0) == 2);
+static_assert(get_status_index(PKMN::Data::Status::Paralysis, 0) == 3);
+static_assert(get_status_index(PKMN::Data::Status::Toxic, 0) == 0);
 // further down corresponds to more likely to wake up
-static_assert(get_status_index(Data::Status::Sleep7, 1) == 4);
-static_assert(get_status_index(Data::Status::Sleep6, 2) == 5);
-static_assert(get_status_index(Data::Status::Sleep5, 3) == 6);
-static_assert(get_status_index(Data::Status::Sleep4, 4) == 7);
-static_assert(get_status_index(Data::Status::Sleep3, 5) == 8);
-static_assert(get_status_index(Data::Status::Sleep2, 6) == 9);
-static_assert(get_status_index(Data::Status::Sleep1, 7) == 10);
-static_assert(get_status_index(Data::Status::Rest3, 1) == 11);
-static_assert(get_status_index(Data::Status::Rest2, 2) == 12);
-static_assert(get_status_index(Data::Status::Rest1, 3) == 13);
+static_assert(get_status_index(PKMN::Data::Status::Sleep7, 1) == 4);
+static_assert(get_status_index(PKMN::Data::Status::Sleep6, 2) == 5);
+static_assert(get_status_index(PKMN::Data::Status::Sleep5, 3) == 6);
+static_assert(get_status_index(PKMN::Data::Status::Sleep4, 4) == 7);
+static_assert(get_status_index(PKMN::Data::Status::Sleep3, 5) == 8);
+static_assert(get_status_index(PKMN::Data::Status::Sleep2, 6) == 9);
+static_assert(get_status_index(PKMN::Data::Status::Sleep1, 7) == 10);
+static_assert(get_status_index(PKMN::Data::Status::Rest3, 1) == 11);
+static_assert(get_status_index(PKMN::Data::Status::Rest2, 2) == 12);
+static_assert(get_status_index(PKMN::Data::Status::Rest1, 3) == 13);
 
 // toxic and poison get the same status index, toxic also has a vol flag and a
 // counter
@@ -145,7 +149,7 @@ consteval auto get_dim_labels() {
   }
   index += Status::n_dim;
   for (auto i = 0; i < Types::n_dim; ++i) {
-    copy(Data::TYPE_CHAR_ARRAY[i], result[index + i]);
+    copy(PKMN::Data::TYPE_CHAR_ARRAY[i], result[index + i]);
   }
   return result;
 }
@@ -161,7 +165,7 @@ constexpr float scale = 1 / 4.0;
 constexpr float scale_acceva = 1 / 3.0;
 float *write(const PKMN::ActivePokemon &active, float *t) {
   const auto get_multiplier = [](auto index) -> float {
-    const auto x = Data::boosts[index + 6];
+    const auto x = PKMN::Data::boosts[index + 6];
     return (float)x[0] / x[1];
   };
 
@@ -325,7 +329,7 @@ consteval auto get_dim_labels() {
   index += Stats::n_dim;
 
   for (auto i = 0; i < Types::n_dim; ++i) {
-    copy(Data::TYPE_CHAR_ARRAY[i], result[index + i]);
+    copy(PKMN::Data::TYPE_CHAR_ARRAY[i], result[index + i]);
   }
   index += Types::n_dim;
 

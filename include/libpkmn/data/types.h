@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <type_traits>
 
+namespace PKMN {
+
 namespace Data {
 
 enum class Type : std::underlying_type_t<std::byte> {
@@ -81,3 +83,5 @@ constexpr bool is_physical(const auto type) noexcept {
 static_assert(sizeof(Type) == 1);
 
 } // namespace Data
+
+} // namespace PKMN

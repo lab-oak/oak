@@ -5,6 +5,8 @@
 #include <array>
 #include <cstdint>
 
+namespace PKMN {
+
 namespace Data {
 
 enum class Move : std::underlying_type_t<std::byte> {
@@ -1784,3 +1786,5 @@ constexpr uint8_t get_max_pp(const auto move) noexcept {
 }
 
 } // namespace Data
+
+} // namespace PKMN

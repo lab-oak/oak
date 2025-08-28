@@ -1,30 +1,29 @@
 #pragma once
 
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
+#include <libpkmn/pkmn.h>
+
+#include <vector>
+
 namespace Train {
 
-#pragma pack(push, 1)
-struct ActionPolicy {
-  // index of unrolled species/move list
-  uint16_t action;
-  // quantized prob of selecting the above action
-  uint16_t policy;
-
-  ActionPolicy() = default;
-  ActionPolicy(uint16_t action, float policy)
-      : action{action}, policy{static_cast<uint16_t>(
-                            std::numeric_limits<uint16_t>::max() * policy)} {
-    this->policy += (policy > 0) && (this->policy == 0);
-  }
-};
-
 struct BuildTrajectory {
-  std::array<ActionPolicy, 31> frames;
-  uint16_t eval;
-  uint8_t score;
-  uint8_t size;
-};
-#pragma pack(pop)
 
-static_assert(sizeof(BuildTrajectory) == (32 * 4));
+  struct Update {
+    PKMN::Data::Species species;
+    PKMN::Data::Move move;
+    float prob;
+    std::array<int, 100> mask;
+  };
+
+  std::vector<Update> updates;
+
+  float score;
+  float value;
+
+  std::vector<PKMN::PokemonInit> team;
+  std::vector<PKMN::PokemonInit> opp_team;
+};
 
 }; // namespace Train

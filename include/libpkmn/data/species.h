@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <type_traits>
 
+namespace PKMN {
+
 namespace Data {
 enum class Species : std::underlying_type_t<std::byte> {
   None,
@@ -935,3 +937,5 @@ constexpr auto get_types(Species species) noexcept {
 }
 
 } // namespace Data
+
+} // namespace PKMN

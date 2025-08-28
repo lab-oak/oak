@@ -21,7 +21,11 @@ constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
   return side + 24 * index;
 }
 
-namespace Strings {
+namespace PKMN {
+
+using PKMN::Data::Move;
+using PKMN::Data::Species;
+using PKMN::Data::Status;
 
 std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
   const auto choice_type = choice & 3;
@@ -272,11 +276,11 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
         continue;
       }
       const auto st = pokemon.status;
-      if (st != Data::Status::None) {
+      if (st != Status::None) {
         ss << status_string(st);
-        if (Data::is_sleep(st)) {
+        if (is_sleep(st)) {
           ss << ':';
-          if (Data::self(st)) {
+          if (self(st)) {
             ss << (static_cast<uint32_t>(st) & 7);
           } else {
             ss << (int)duration.sleep(i);
@@ -297,24 +301,24 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   return ss.str();
 }
 
-Data::Species string_to_species(const std::string &str) {
-  const int index = unique_index(Data::SPECIES_CHAR_ARRAY, str);
+Species string_to_species(const std::string &str) {
+  const int index = unique_index(PKMN::Data::SPECIES_CHAR_ARRAY, str);
   if (index < 0) {
     throw std::runtime_error{"Could not match string to Species"};
-    return Data::Species::None;
+    return Species::None;
   } else {
-    return static_cast<Data::Species>(index);
+    return static_cast<Species>(index);
   }
 }
 
-Data::Move string_to_move(const std::string &str) {
-  const int index = unique_index(Data::MOVE_CHAR_ARRAY, str);
+Move string_to_move(const std::string &str) {
+  const int index = unique_index(PKMN::Data::MOVE_CHAR_ARRAY, str);
   if (index < 0) {
     throw std::runtime_error{"Could not match string to Move"};
-    return Data::Move::None;
+    return Move::None;
   } else {
-    return static_cast<Data::Move>(index);
+    return static_cast<Move>(index);
   }
 }
 
-} // namespace Strings
+}  // namespace PKMN

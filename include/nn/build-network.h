@@ -76,8 +76,8 @@ auto rollout_build_network(auto &team, NN::BuildNetwork &build_net,
     }
 
     const auto index = device.sample_pdf(output);
-    traj.frames[i++] =
-        Train::ActionPolicy{static_cast<uint16_t>(index), output[index]};
+    traj.frames[i++] = Train::EncodedBuildTrajectory2::Update{
+        static_cast<uint16_t>(index), output[index]};
     input[index] = 1;
     const auto [s, m] = species_move_list(index);
     apply_index_to_team(team, s, m);

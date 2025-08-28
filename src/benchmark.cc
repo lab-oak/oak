@@ -1,10 +1,8 @@
 #include <data/teams.h>
-#include <nn/network.h>
 #include <search/bandit/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>
 #include <util/random.h>
-// #include <util/search.h>
 
 struct FastModel {
   fast_prng device;
@@ -19,8 +17,10 @@ int benchmark(int argc, char **argv) {
 
   const uint64_t seed = 1111111;
 
-  const auto battle = PKMN::battle(p1, p2, seed);
-  const auto durations = PKMN::durations(p1, p2);
+  auto battle = PKMN::battle(p1, p2, seed);
+  auto options = PKMN::options();
+  const auto _ = PKMN::update(battle, 0, 0, options);
+  const auto durations = PKMN::durations();
   BattleData battle_data{battle, durations};
 
   FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
@@ -49,10 +49,6 @@ int benchmark(int argc, char **argv) {
   const auto output =
       search.run(iterations, bandit_params, node, battle_data, model);
 
-  // RuntimeSearch::Nodes nodes{};
-  // RuntimeSearch::Agent agent{std::to_string(iterations), bandit_name,
-  // network_path}; const auto output = RuntimeSearch::run(battle_data, nodes,
-  // agent);
   std::cout << output.duration.count() << " ms." << std::endl;
 
   return 0;
