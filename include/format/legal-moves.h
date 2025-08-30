@@ -1,9 +1,9 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 
-namespace Data {
+namespace Format {
+
 constexpr std::array<std::array<bool, 166>, 152> LEARNSETS = {
     // None
     std::array<bool, 166>{},
@@ -2726,4 +2726,4 @@ constexpr std::array<std::array<bool, 166>, 152> LEARNSETS = {
         false, false, false, true,  true,  false, false, false, true,  true,
         false, false, false, true,  false, false, true,  true,  false, false,
         false, true,  false, false, true,  false}};
-} // namespace Data
+} // namespace Format

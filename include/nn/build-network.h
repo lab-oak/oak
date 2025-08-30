@@ -47,6 +47,9 @@ auto rollout_build_network(auto &team, NN::BuildNetwork &build_net,
 
   auto [traj, i] = Encode::Team::initial_trajectory(team);
 
+  Train::BuildTrajectory traj{};
+  traj.initial = team;
+
   std::array<float, in_dim> input{};
   Encode::Team::write(team, input.data());
   std::array<float, out_dim> mask;

@@ -5,7 +5,9 @@
 #include <libpkmn/data/species.h>
 #include <libpkmn/pkmn.h>
 
-namespace Teams {
+namespace Format {
+
+namespace OU {
 
 using enum PKMN::Data::Move;
 using PKMN::Set;
@@ -158,4 +160,6 @@ constexpr std::array<Team, 2> benchmark_teams{
          Set{Species::Tauros, {Blizzard, BodySlam, Earthquake, HyperBeam}}},
 };
 
-} // namespace Teams
+} // namespace OU
+
+} // namespace Format

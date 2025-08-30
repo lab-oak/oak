@@ -3,7 +3,7 @@
 #pragma once
 
 #include <search/joint.h>
-#include <util/int.h>
+#include <search/bandit/int.h>
 
 #include <algorithm>
 #include <array>

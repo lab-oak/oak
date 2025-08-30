@@ -1,4 +1,4 @@
-#include <data/teams.h>
+#include <format/teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
 #include <nn/network.h>

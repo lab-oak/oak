@@ -1,12 +1,13 @@
 #pragma once
 
-#include <data/legal-moves.h>
+#include <format/legal-moves.h>
 #include <libpkmn/data/moves.h>
 
-namespace Data {
+namespace Format {
+
 consteval auto get_move_pools() {
   using enum PKMN::Data::Move;
-  auto MOVE_POOLS = Data::LEARNSETS;
+  auto MOVE_POOLS = LEARNSETS;
   for (auto &move_pool : MOVE_POOLS) {
     move_pool[static_cast<uint8_t>(Dig)] = false;
     move_pool[static_cast<uint8_t>(Fly)] = false;
@@ -59,4 +60,4 @@ constexpr auto MOVE_POOLS_FLAT = get_move_pools_flat();
 constexpr const auto &move_pool(const auto species) noexcept {
   return MOVE_POOLS_FLAT[static_cast<uint8_t>(species)];
 }
-} // namespace Data
+} // namespace Format

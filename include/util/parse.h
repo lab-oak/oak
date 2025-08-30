@@ -112,12 +112,7 @@ auto parse_set(const auto &words) {
   return set;
 }
 
-PKMN::Duration parse_duration(const auto &words) {
-  PKMN::Duration duration{};
-
-  return duration;
-}
-
+// TODO moves
 // struct alignas(1) ActivePokemon {
 //   Stats stats;
 //   PKMN::Data::Species species;
@@ -180,6 +175,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     }
 
     // volatliles
+
     if (lower == "(leech-seed)" || lower == "(leechseed)" ||
         lower == "(leech)") {
       vol.set_leech_seed(true);
@@ -210,7 +206,8 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
       return x;
     };
 
-    // confusion, disable, attacking, binding
+    // durations
+
     if (const auto conf = parse_split(lower, "(conf"); conf >= 0) {
       vol.set_confusion(true);
       duration.set_confusion(conf);
@@ -226,6 +223,10 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     if (const auto thrashing = parse_split(lower, "(petal"); thrashing >= 0) {
       vol.set_thrashing(true);
       duration.set_attacking(thrashing);
+    }
+    if (const auto binding = parse_split(lower, "(bind"); binding >= 0) {
+    }
+    if (const auto binding = parse_split(lower, "(wrap"); binding >= 0) {
     }
   }
 
@@ -269,6 +270,10 @@ auto parse_side(const std::string &side_string)
   auto [active, duration] = parse_active(side.pokemon[0], active_words);
   side.active = active;
   PKMN::Init::init_sleeps(sets, duration);
+  for (auto i = 0; i < 6; ++i) {
+    std::cout << (int)side.order[i];
+  }
+  std::cout << std::endl;
   return {side, duration};
 }
 
@@ -285,6 +290,8 @@ parse_battle(const std::string &battle_string, uint64_t seed = 0x123456) {
   auto durations = PKMN::Durations{};
   battle.sides[0] = p1;
   battle.sides[1] = p2;
+  battle.turn = 1;
+  battle.rng = seed;
   durations.get(0) = p1_dur;
   durations.get(1) = p2_dur;
   return {std::bit_cast<pkmn_gen1_battle>(battle),

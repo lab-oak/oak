@@ -1,4 +1,4 @@
-#include <data/teams.h>
+#include <format/teams.h>
 #include <search/bandit/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>

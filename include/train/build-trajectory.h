@@ -1,7 +1,5 @@
 #pragma once
 
-#include <libpkmn/data/moves.h>
-#include <libpkmn/data/species.h>
 #include <libpkmn/pkmn.h>
 
 #include <vector>
@@ -14,16 +12,15 @@ struct BuildTrajectory {
     PKMN::Data::Species species;
     PKMN::Data::Move move;
     float prob;
-    std::array<int, 100> mask;
   };
 
+  std::vector<PKMN::Set> initial;
   std::vector<Update> updates;
+  std::vector<PKMN::Set> terminal;
+  std::vector<PKMN::Set> opponent;
 
   float score;
   float value;
-
-  std::vector<PKMN::PokemonInit> team;
-  std::vector<PKMN::PokemonInit> opp_team;
 };
 
 }; // namespace Train

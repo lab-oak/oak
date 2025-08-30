@@ -1,4 +1,4 @@
-#include <data/teams.h>
+#include <format/teams.h>
 #include <nn/build-network.h>
 #include <nn/network.h>
 #include <train/build-trajectory.h>

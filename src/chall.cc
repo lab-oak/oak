@@ -5,7 +5,6 @@
 
 #include <csignal>
 #include <iostream>
-#include <vector>
 
 bool search_flag = true;
 
@@ -15,7 +14,8 @@ void handle_suspend(int signal) {
 }
 
 BattleData parse_input(const std::string &line, uint64_t seed) {
-  const auto [battle, durations] = Parse::parse_battle(line, seed);
+  auto [battle, durations] = Parse::parse_battle(line, seed);
+  apply_durations(battle, durations);
   return {battle, durations, PKMN::result(battle)};
 }
 

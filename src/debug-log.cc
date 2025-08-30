@@ -1,6 +1,6 @@
 #include <util/random.h>
 
-#include <data/teams.h>
+#include <format/teams.h>
 #include <util/debug-log.h>
 
 #include <iostream>

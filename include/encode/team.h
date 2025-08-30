@@ -1,6 +1,6 @@
 #pragma once
 
-#include <data/move-pools.h>
+#include <format/move-pools.h>
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/pkmn.h>
@@ -18,7 +18,7 @@ consteval auto get_species_move_list_size() {
   uint16_t size = 0;
   for (auto s = 1; s <= 149; ++s) {
     for (auto m = 0; m < 166; ++m) {
-      if (Data::MOVE_POOLS[s][m] || !m) {
+      if (Format::MOVE_POOLS[s][m] || !m) {
         ++size;
       }
     }
@@ -26,9 +26,14 @@ consteval auto get_species_move_list_size() {
   return size;
 }
 
+constexpr auto species_move_list_size = get_species_move_list_size();
+constexpr auto in_dim = species_move_list_size;
+constexpr auto out_dim = in_dim;
+
+// max number of actions when rolling out the build network
 consteval int get_max_actions() {
   int n = 0;
-  auto stored = Data::MOVE_POOL_SIZES;
+  auto stored = Format::MOVE_POOL_SIZES;
   std::sort(stored.begin(), stored.end(), std::greater<uint8_t>());
   for (auto i = 0; i < 5; ++i) {
     n += (int)stored[i];
@@ -39,11 +44,6 @@ consteval int get_max_actions() {
 
 constexpr int max_actions = get_max_actions();
 
-constexpr auto species_move_list_size = get_species_move_list_size();
-
-constexpr auto in_dim = species_move_list_size;
-constexpr auto out_dim = in_dim;
-
 consteval auto get_species_move_data() {
   std::array<std::array<uint16_t, 166>, 152> table{};
   std::array<std::pair<uint8_t, uint8_t>, species_move_list_size> list{};
@@ -51,7 +51,7 @@ consteval auto get_species_move_data() {
   uint16_t index = 0;
   for (auto s = 1; s <= 149; ++s) {
     for (auto m = 0; m < 166; ++m) {
-      if (Data::MOVE_POOLS[s][m] || !m) {
+      if (Format::MOVE_POOLS[s][m] || !m) {
         table[s][m] = index;
         list[index] = {s, m};
         ++index;
@@ -74,26 +74,7 @@ inline constexpr auto species_move_list(const auto index) {
   return SPECIES_MOVE_LIST[index];
 }
 
-[[nodiscard]] auto initial_trajectory(const auto &team)
-    -> std::pair<Train::BuildTrajectory, int> {
-  Train::BuildTrajectory traj{};
-  int i = 0;
-  for (const auto &set : team) {
-    if (set.species != Data::Species::None) {
-      traj.frames[i++] = Train::EncodedBuildTrajectory2::Update{
-          species_move_table(set.species, 0), 0};
-      for (const auto move : set.moves) {
-        if (move != Data::Move::None) {
-          traj.frames[i++] = Train::EncodedBuildTrajectory2::Update{
-              species_move_table(set.species, move), 0};
-        }
-      }
-    }
-  }
-  traj.size = team.size();
-  return {traj, i};
-}
-
+// probably should not be used, instead incrementally update input
 void write(const auto &team, float *const t) {
   for (const auto &set : team) {
     if (static_cast<bool>(set.species)) {
@@ -116,7 +97,8 @@ void write(const auto &team, float *const t) {
       for (const auto move : set.moves) {
         n_moves += static_cast<bool>(move);
       }
-      if (n_moves < std::min(Data::move_pool_size(set.species), (uint8_t)4)) {
+      if (n_moves <
+          std::min(PKMN::Data::move_pool_size(set.species), (uint8_t)4)) {
         complete = false;
         for (const auto move : move_pool(set.species)) {
           if (!static_cast<bool>(move)) {
@@ -169,7 +151,7 @@ void write_policy_mask_flat(const auto &team, auto *t) {
     for (const auto move : set.moves) {
       n_moves += static_cast<bool>(move);
     }
-    if (n_moves >= std::min(Data::move_pool_size(set.species), (uint8_t)4)) {
+    if (n_moves >= std::min(Format::move_pool_size(set.species), (uint8_t)4)) {
       continue;
     }
 
@@ -179,7 +161,7 @@ void write_policy_mask_flat(const auto &team, auto *t) {
       if (static_cast<bool>(move)) {
         for (auto &m : pool) {
           if (m == move) {
-            m = Data::Move::None;
+            m = PKMN::Data::Move::None;
             break;
           }
         }
@@ -211,10 +193,10 @@ void write_policy_mask_flat(const auto &team, auto *t) {
 void apply_index_to_team(auto &team, auto s, auto m) {
   if (!m) {
     for (auto &set : team) {
-      if (set.species == Data::Species::None) {
-        set.species = static_cast<Data::Species>(s);
+      if (set.species == PKMN::Data::Species::None) {
+        set.species = static_cast<PKMN::Data::Species>(s);
         return;
-      } else if (set.species == static_cast<Data::Species>(s)) {
+      } else if (set.species == static_cast<PKMN::Data::Species>(s)) {
         std::swap(set, team[0]);
         return;
       }
@@ -223,10 +205,10 @@ void apply_index_to_team(auto &team, auto s, auto m) {
     assert(false);
   } else {
     for (auto &set : team) {
-      if (set.species == static_cast<Data::Species>(s)) {
+      if (set.species == static_cast<PKMN::Data::Species>(s)) {
         for (auto &move : set.moves) {
-          if (move == Data::Move::None) {
-            move = static_cast<Data::Move>(m);
+          if (move == PKMN::Data::Move::None) {
+            move = static_cast<PKMN::Data::Move>(m);
             return;
           }
         }
