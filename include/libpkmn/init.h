@@ -43,7 +43,8 @@ static_assert(compute_stat(100, false) == 298);
 static_assert(compute_stat(250, true) == 703);
 static_assert(compute_stat(5, false) == 108);
 
-//
+// The actual PKMN::Boost struct is awkward becuase it uses i4, so we define a
+// helper struct
 struct Boosts {
   int atk;
   int def;

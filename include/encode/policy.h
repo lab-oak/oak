@@ -50,11 +50,11 @@ consteval auto get_dim_labels() {
   };
   auto index = 0;
   for (auto i = 0; i < 164; ++i) {
-    copy(Data::MOVE_CHAR_ARRAY[i + 1], result[index + i]);
+    copy(PKMN::Data::MOVE_CHAR_ARRAY[i + 1], result[index + i]);
   }
   index += 164;
   for (auto i = 0; i < 151; ++i) {
-    copy(Data::SPECIES_CHAR_ARRAY[i + 1], result[index + i]);
+    copy(PKMN::Data::SPECIES_CHAR_ARRAY[i + 1], result[index + i]);
   }
   return result;
 }

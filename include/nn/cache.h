@@ -2,18 +2,22 @@
 
 #include <encode/battle-key.h>
 #include <encode/battle.h>
-#include <encode/team.h>
 #include <libpkmn/data/status.h>
 #include <nn/cache.h>
 
 namespace NN {
 
-using Data::Status;
+using PKMN::Data::Status;
 
 template <typename T, int dim = 39> struct PokemonCache {
 
+  // Encode does not have a dimension for no status
   static constexpr auto n_status = Encode::Status::n_dim + 1;
+  // We only encode whether the move has pp, so 2^4 for the moveset
   static constexpr auto n_pp = 16;
+  // For a stored pokemon, the move pp and status features are the only ones
+  // that can change over the course of the game (hp is not a part of the input
+  // to the pokemon embedding)
   static constexpr uint8_t n_embeddings = n_status * n_pp;
 
   // all status consditions that dont use sleep duration

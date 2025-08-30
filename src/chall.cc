@@ -1,7 +1,3 @@
-#include <data/teams.h>
-#include <libpkmn/data/strings.h>
-#include <libpkmn/pkmn.h>
-#include <libpkmn/strings.h>
 #include <util/parse.h>
 #include <util/policy.h>
 #include <util/random.h>
@@ -10,12 +6,6 @@
 #include <csignal>
 #include <iostream>
 #include <vector>
-
-using Strings::string_to_move;
-using Strings::string_to_species;
-
-using Obs = std::array<uint8_t, 16>;
-using Node = Tree::Node<Exp3::JointBandit, Obs>;
 
 bool search_flag = true;
 
@@ -80,8 +70,8 @@ int main(int argc, char **argv) {
 
   while (!pkmn_result_type(battle_data.result)) {
     std::cout << "\nBattle:" << std::endl;
-    std::cout << Strings::battle_data_to_string(battle_data.battle,
-                                                battle_data.durations);
+    std::cout << PKMN::battle_data_to_string(battle_data.battle,
+                                             battle_data.durations);
     const auto [p1_choices, p2_choices] =
         PKMN::choices(battle_data.battle, battle_data.result);
     const auto [p1_labels, p2_labels] =
@@ -157,8 +147,8 @@ int main(int argc, char **argv) {
   }
 
   std::cout << "\nBattle:" << std::endl;
-  std::cout << Strings::battle_data_to_string(battle_data.battle,
-                                              battle_data.durations);
+  std::cout << PKMN::battle_data_to_string(battle_data.battle,
+                                           battle_data.durations);
   std::cout << "Score: " << PKMN::score(battle_data.result) << std::endl;
 
   return 0;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <libpkmn/layout.h>
+#include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
-#include <search/mcts.h>
 
 #include <string>
 #include <vector>
@@ -34,7 +34,7 @@ auto parse_set(const auto &words) {
 
   PKMN::Init::Pokemon set{};
 
-  set.species = Strings::string_to_species(words[0]);
+  set.species = PKMN::string_to_species(words[0]);
 
   auto n_moves = 0;
 
@@ -48,10 +48,10 @@ auto parse_set(const auto &words) {
       uint8_t pp = 0xFF;
       // try/catch is necessary since some sets don't have 4 moves
       // and omitting bad moves is a simple way to make search more effective
-      Data::Move m;
+      PKMN::Data::Move m;
       bool move_parse_success = true;
       try {
-        m = Strings::string_to_move(move);
+        m = PKMN::string_to_move(move);
       } catch (...) {
         move_parse_success = false;
       }
@@ -73,7 +73,7 @@ auto parse_set(const auto &words) {
       continue;
     }
 
-    using Data::Status;
+    using PKMN::Data::Status;
     auto lower = word;
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](auto c) { return std::tolower(c); });
@@ -101,7 +101,7 @@ auto parse_set(const auto &words) {
                                  "rest (must be [1, 3]): " +
                                  std::to_string(hidden));
       }
-      set.status = Data::rest(hidden);
+      set.status = PKMN::Data::rest(hidden);
     }
 
     if (lower.starts_with("lvl")) {
@@ -120,7 +120,7 @@ PKMN::Duration parse_duration(const auto &words) {
 
 // struct alignas(1) ActivePokemon {
 //   Stats stats;
-//   Data::Species species;
+//   PKMN::Data::Species species;
 //   uint8_t types;
 //   Boosts boosts;
 //   Volatiles volatiles;
@@ -136,37 +136,47 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
   active.types = pokemon.types;
   active.moves = pokemon.moves;
 
-  Init::Boosts boosts{};
   PKMN::Stats stats{};
   auto &vol = active.volatiles;
 
   for (const auto &word : words) {
 
-    using Data::Status;
+    using PKMN::Data::Status;
     auto lower = word;
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](auto c) { return std::tolower(c); });
 
     // stats
+    const auto read_stat = [](const auto &word) -> uint16_t {
+      uint16_t x = std::stoul(word.substr(4));
+      assert(x <= 999);
+      return x;
+    };
+    const auto read_boost = [](const auto &word) -> int8_t {
+      int8_t x = std::stoi(word.substr(3));
+      assert(x < 7 && x > -7);
+      return x;
+    };
+
     if (lower.starts_with("atk=")) {
-      stats.atk = std::stoul(lower.substr(4));
+      stats.atk = read_stat(lower);
     } else if (lower.starts_with("atk")) {
-      boosts.atk = std::stoi(lower.substr(3));
+      active.boosts.set_atk(read_boost(lower));
     }
     if (lower.starts_with("def=")) {
-      stats.def = std::stoul(lower.substr(4));
+      stats.def = read_stat(lower);
     } else if (lower.starts_with("def")) {
-      boosts.def = std::stoi(lower.substr(3));
+      active.boosts.set_def(read_boost(lower));
     }
     if (lower.starts_with("spe=")) {
-      stats.spe = std::stoul(lower.substr(4));
+      stats.spe = read_stat(lower);
     } else if (lower.starts_with("spe")) {
-      boosts.spe = std::stoi(lower.substr(3));
+      active.boosts.set_spe(read_boost(lower));
     }
     if (lower.starts_with("spc=")) {
-      stats.spc = std::stoul(lower.substr(4));
+      stats.spc = read_stat(lower);
     } else if (lower.starts_with("spc")) {
-      boosts.spc = std::stoi(lower.substr(3));
+      active.boosts.set_spc(read_boost(lower));
     }
 
     // volatliles
@@ -192,7 +202,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
         word = word.substr(0, word.size() - 1);
       }
       if (word.starts_with(start)) {
-        const auto s = split(lower, ':');
+        const auto s = split(word, ':');
         if (s.size() >= 2) {
           x = std::stoi(s[1]);
         }
@@ -205,21 +215,23 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
       vol.set_confusion(true);
       duration.set_confusion(conf);
     }
-    if (const auto disable = parse_split(lower, "(disable"); disable >= 0) {
-      vol.set_disable(true);
-      duration.set_disable(disable);
+    // if (const auto disable = parse_split(lower, "(disable"); disable >= 0) {
+    //   vol.set_disable(true);
+    //   duration.set_disable(disable);
+    // }
+    if (const auto thrashing = parse_split(lower, "(trash"); thrashing >= 0) {
+      vol.set_thrashing(true);
+      duration.set_attacking(thrashing);
     }
-    if (const auto trashing = parse_split(lower, "(trash"); trashing >= 0) {
-      vol.set_trashing(true);
-      duration.set_attacking(disable);
-    }
-    if (const auto trashing = parse_split(lower, "(petal"); trashing >= 0) {
-      vol.set_trashing(true);
-      duration.set_attacking(disable);
+    if (const auto thrashing = parse_split(lower, "(petal"); thrashing >= 0) {
+      vol.set_thrashing(true);
+      duration.set_attacking(thrashing);
     }
   }
 
-  Init::apply_boosts(active, boosts);
+  // apply boosts first then overwrite with explicit stats to accomodate stat
+  // modifcation glitch
+  PKMN::Init::apply_boosts(active, active.boosts);
   if (stats.atk) {
     active.stats.atk = stats.atk;
   }
@@ -233,7 +245,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     active.stats.spc = stats.spc;
   }
 
-  return active;
+  return {active, duration};
 }
 
 auto parse_side(const std::string &side_string)
@@ -254,8 +266,8 @@ auto parse_side(const std::string &side_string)
   auto side = PKMN::Init::init_side(sets);
 
   const auto active_words = split(set_strings[0], ' ');
-  side.active = parse_active(side.pokemon[0], active_words);
-  auto duration = parse_duration(active_words);
+  auto [active, duration] = parse_active(side.pokemon[0], active_words);
+  side.active = active;
   PKMN::Init::init_sleeps(sets, duration);
   return {side, duration};
 }

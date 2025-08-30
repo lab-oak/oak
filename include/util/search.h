@@ -88,7 +88,7 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
                                       std::pair<pkmn_gen1_battle,
                                                 pkmn_gen1_chance_durations>>) {
     battle_data.battle = input.first;
-    battle_data.duration = input.second;
+    battle_data.durations = input.second;
     battle_data.result = PKMN::result(input);
   } else if constexpr (std::is_same_v<input_t, BattleData>) {
     battle_data = input;
