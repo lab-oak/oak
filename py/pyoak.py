@@ -1,4 +1,4 @@
-from frame import Frame
+from frame import BattleFrame
 
 import ctypes
 import os
@@ -174,9 +174,9 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
     return result
 
 
-# convert bytes object into Frames
-def get_frames(data: bytes, frame_count: int) -> Frame:
-    frames = Frame(frame_count)
+# convert bytes object into BattleFrames
+def get_frames(data: bytes, frame_count: int) -> BattleFrame:
+    frames = BattleFrame(frame_count)
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
@@ -207,7 +207,7 @@ class BuildTrajectory:
         )
 
 
-class EncodedFrame:
+class BattleFrame:
     def __init__(self, size):
         self.size = size
 
@@ -271,15 +271,15 @@ class EncodedFrame:
         )
 
 
-# convert bytes object into Frames
-def get_encoded_frames(data: bytes, frame_count: int) -> EncodedFrame:
-    encoded_frames = EncodedFrame(frame_count)
+# convert bytes object into BattleFrames
+def get_encoded_frames(data: bytes, frame_count: int) -> BattleFrame:
+    encoded_frames = BattleFrame(frame_count)
     args = (ctypes.c_char_p(data),) + encoded_frames.raw_pointers(0)
     lib.uncompress_and_encode_training_frames(*args)
     return encoded_frames
 
 
-# convert bytes object into Frames
+# convert bytes object into BattleFrames
 def read_build_trajectories(path) -> BuildTrajectory:
     buffer_size = int(os.path.getsize(path) / 128)
     path_bytes = path.encode("utf-8")
@@ -294,7 +294,7 @@ def encode_buffers(
     paths: list[str],
     threads: int,
     max_count: int,
-    encoded_frame_input: EncodedFrame,
+    encoded_frame_input: BattleFrame,
     start_index: int = 0,
     write_prob: float = 1,
 ):

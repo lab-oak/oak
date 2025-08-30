@@ -39,10 +39,5 @@ auto rollout(auto &network, const auto &team) {
 
   while (std::any_of(helpers.begin(), helpers.end(),
                      [](const auto &s) { return !s.complete(); })) {
-
-
-    
-    
-
   }
 }

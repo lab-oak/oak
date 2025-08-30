@@ -181,7 +181,7 @@ This is not a program but rather a library of functions that can be used in a Py
 
 The functions are exposed to python in [this](include/pyoak/py) module. The functions are one-to-one with the underlying C++ implementations [here](src/pyoak.cc).
 
-The data structures `Frame` (raw training data for battling), `EncodedFrame` (where battle bytes are converted into tensors), and `BuildTrajectory` are mirrored in Python as well. The python versions are 'batched' and the data is stored as Numpy arrays so they work with `Pytorch` without any further conversion.
+The data structures `BattleFrame` (raw training data for battling), `BattleFrame` (where battle bytes are converted into tensors), and `BuildTrajectory` are mirrored in Python as well. The python versions are 'batched' and the data is stored as Numpy arrays so they work with `Pytorch` without any further conversion.
 
 This library allows users to view and manipulate training data without any C++ programming knowledge. If you can follow a Medium article you can train a RBY neural network.
 

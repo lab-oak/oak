@@ -8,54 +8,47 @@ namespace Train {
 
 namespace TeamBuilding {
 
-using PKMN::Data::Species;
 using PKMN::Data::Move;
+using PKMN::Data::Species;
 
-struct Action {
-    Species species;
-    Move move;
-    uint swap = 0;
+struct BasicAction {
+  uint lead;
+  uint slot;
+  uint move_slot;
+  Species species;
+  Move move;
 };
 
-void apply_action(auto &team, Action action) {
-  const auto [s, m] = action;
-  if (action.swap) {
-    std::swap(team[action.swap], team[0]);
+using Action = std::vector<BasicAction>;
+
+// this can turn any team into any other team. It is up to the team building
+// formulation to define what diffs are allowed.
+void apply_basic_action(auto &team, const BasicAction &action) {
+  if (lead) {
+    std::swap(team[0], team[lead]);
     return;
   }
-  assert(s != Species::None);
-  if (m == Move::None) {
-    for (auto &set : team) {
-      if (set.species == PKMN::Data::Species::None) {
-        set.species = s;
-        return;
-      }
-    }
-    throw std::runtime_error{
-        std::format("Can't apply species {} to team", PKMN::species_string(s))};
-
+  auto &set = team[slot];
+  if (move_slot) {
+    set[move_slot - 1] = move;
+    return;
   } else {
-    for (auto &set : team) {
-      if (set.species == static_cast<PKMN::Data::Species>(s)) {
-        for (auto &move : set.moves) {
-          if (move == Move::None) {
-            move = m;
-            return;
-          }
-        }
-      }
-    }
-    throw std::runtime_error{
-        std::format("Can't apply {} to {}, species not found",
-                    PKMN::move_string(m), PKMN::species_string(s))};
+    set.species = species;
+    return;
   }
 }
 
-struct BuildTrajectory {
+void apply_action(auto &team, const Action &action) {
+  for (const auto &basic : action) {
+    apply_basic_action(team, basic);
+  }
+}
+
+struct Trajectory {
 
   struct Update {
     std::vector<Action> legal_moves;
-    Action selected;
+    uint index;
     float probability;
   };
 
@@ -68,6 +61,6 @@ struct BuildTrajectory {
   float score;
 };
 
-}
+} // namespace TeamBuilding
 
 }; // namespace Train

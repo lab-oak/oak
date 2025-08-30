@@ -1,12 +1,12 @@
 #include <encode/battle.h>
 #include <encode/build-trajectory.h>
-#include <encode/encoded-frame.h>
+#include <encode/encoded-battle-frame.h>
 #include <encode/policy.h>
 #include <encode/team.h>
 #include <nn/params.h>
+#include <train/battle-frame.h>
 #include <train/build-trajectory.h>
-#include <train/compressed-frame.h>
-#include <train/frame.h>
+#include <train/compressed-battle-frame.h>
 #include <util/debug-log.h>
 
 #include <atomic>
@@ -134,23 +134,23 @@ extern "C" void uncompress_training_frames(
     float *p2_empirical, float *p2_nash, float *empirical_value,
     float *nash_value, float *score) {
 
-  Train::CompressedFrames compressed_frames{};
+  Train::CompressedBattleFrames compressed_frames{};
   compressed_frames.read(data);
 
-  Train::FrameInput input{.m = m,
-                          .n = n,
-                          .battle = battle,
-                          .durations = durations,
-                          .result = result,
-                          .p1_choices = p1_choices,
-                          .p2_choices = p2_choices,
-                          .p1_empirical = p1_empirical,
-                          .p1_nash = p1_nash,
-                          .p2_empirical = p2_empirical,
-                          .p2_nash = p2_nash,
-                          .empirical_value = empirical_value,
-                          .nash_value = nash_value,
-                          .score = score};
+  Train::BattleFrameInput input{.m = m,
+                                .n = n,
+                                .battle = battle,
+                                .durations = durations,
+                                .result = result,
+                                .p1_choices = p1_choices,
+                                .p2_choices = p2_choices,
+                                .p1_empirical = p1_empirical,
+                                .p1_nash = p1_nash,
+                                .p2_empirical = p2_empirical,
+                                .p2_nash = p2_nash,
+                                .empirical_value = empirical_value,
+                                .nash_value = nash_value,
+                                .score = score};
 
   const auto frames = compressed_frames.uncompress();
   for (const auto frame : frames) {
@@ -164,27 +164,27 @@ extern "C" void uncompress_and_encode_training_frames(
     float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
     float *empirical_value, float *nash_value, float *score) {
 
-  Train::CompressedFrames compressed_frames{};
+  Train::CompressedBattleFrames compressed_frames{};
   compressed_frames.read(data);
 
-  Encode::EncodedFrameInput input{.m = m,
-                                  .n = n,
-                                  .p1_choice_indices = p1_choice_indices,
-                                  .p2_choice_indices = p2_choice_indices,
-                                  .pokemon = pokemon,
-                                  .active = active,
-                                  .hp = hp,
-                                  .p1_empirical = p1_empirical,
-                                  .p1_nash = p1_nash,
-                                  .p2_empirical = p2_empirical,
-                                  .p2_nash = p2_nash,
-                                  .empirical_value = empirical_value,
-                                  .nash_value = nash_value,
-                                  .score = score};
+  Encode::BattleFrameInput input{.m = m,
+                                 .n = n,
+                                 .p1_choice_indices = p1_choice_indices,
+                                 .p2_choice_indices = p2_choice_indices,
+                                 .pokemon = pokemon,
+                                 .active = active,
+                                 .hp = hp,
+                                 .p1_empirical = p1_empirical,
+                                 .p1_nash = p1_nash,
+                                 .p2_empirical = p2_empirical,
+                                 .p2_nash = p2_nash,
+                                 .empirical_value = empirical_value,
+                                 .nash_value = nash_value,
+                                 .score = score};
 
   const auto frames = compressed_frames.uncompress();
   for (const auto frame : frames) {
-    Encode::EncodedFrame encoded{frame};
+    Encode::BattleFrame encoded{frame};
     input.write(encoded, frame.target);
   }
 }
@@ -235,20 +235,20 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     return -1;
   }
 
-  Train::FrameInput input{.m = m,
-                          .n = n,
-                          .battle = battle,
-                          .durations = durations,
-                          .result = result,
-                          .p1_choices = p1_choices,
-                          .p2_choices = p2_choices,
-                          .p1_empirical = p1_empirical,
-                          .p1_nash = p1_nash,
-                          .p2_empirical = p2_empirical,
-                          .p2_nash = p2_nash,
-                          .empirical_value = empirical_value,
-                          .nash_value = nash_value,
-                          .score = score};
+  Train::BattleFrameInput input{.m = m,
+                                .n = n,
+                                .battle = battle,
+                                .durations = durations,
+                                .result = result,
+                                .p1_choices = p1_choices,
+                                .p2_choices = p2_choices,
+                                .p1_empirical = p1_empirical,
+                                .p1_nash = p1_nash,
+                                .p2_empirical = p2_empirical,
+                                .p2_nash = p2_nash,
+                                .empirical_value = empirical_value,
+                                .nash_value = nash_value,
+                                .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
   for (const auto *x : ptrs) {
@@ -275,7 +275,7 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::CompressedFrames battle_frames{};
+    Train::CompressedBattleFrames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -306,20 +306,20 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
                              float *p2_nash, float *empirical_value,
                              float *nash_value, float *score) {
 
-  Encode::EncodedFrameInput input{.m = m,
-                                  .n = n,
-                                  .p1_choice_indices = p1_choice_indices,
-                                  .p2_choice_indices = p2_choice_indices,
-                                  .pokemon = pokemon,
-                                  .active = active,
-                                  .hp = hp,
-                                  .p1_empirical = p1_empirical,
-                                  .p1_nash = p1_nash,
-                                  .p2_empirical = p2_empirical,
-                                  .p2_nash = p2_nash,
-                                  .empirical_value = empirical_value,
-                                  .nash_value = nash_value,
-                                  .score = score};
+  Encode::BattleFrameInput input{.m = m,
+                                 .n = n,
+                                 .p1_choice_indices = p1_choice_indices,
+                                 .p2_choice_indices = p2_choice_indices,
+                                 .pokemon = pokemon,
+                                 .active = active,
+                                 .hp = hp,
+                                 .p1_empirical = p1_empirical,
+                                 .p1_nash = p1_nash,
+                                 .p2_empirical = p2_empirical,
+                                 .p2_nash = p2_nash,
+                                 .empirical_value = empirical_value,
+                                 .nash_value = nash_value,
+                                 .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
   for (const auto *x : ptrs) {
@@ -352,7 +352,7 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::CompressedFrames battle_frames{};
+    Train::CompressedBattleFrames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -361,7 +361,7 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
       if (r >= write_prob) {
         continue;
       }
-      Encode::EncodedFrame encoded{frame};
+      Encode::BattleFrame encoded{frame};
       input.write(encoded, frame.target);
       if (++count == max_count) {
         return count;
@@ -381,20 +381,20 @@ extern "C" size_t encode_buffer_multithread(
     float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
     float *empirical_value, float *nash_value, float *score) {
 
-  const Encode::EncodedFrameInput input{.m = m,
-                                        .n = n,
-                                        .p1_choice_indices = p1_choice_indices,
-                                        .p2_choice_indices = p2_choice_indices,
-                                        .pokemon = pokemon,
-                                        .active = active,
-                                        .hp = hp,
-                                        .p1_empirical = p1_empirical,
-                                        .p1_nash = p1_nash,
-                                        .p2_empirical = p2_empirical,
-                                        .p2_nash = p2_nash,
-                                        .empirical_value = empirical_value,
-                                        .nash_value = nash_value,
-                                        .score = score};
+  const Encode::BattleFrameInput input{.m = m,
+                                       .n = n,
+                                       .p1_choice_indices = p1_choice_indices,
+                                       .p2_choice_indices = p2_choice_indices,
+                                       .pokemon = pokemon,
+                                       .active = active,
+                                       .hp = hp,
+                                       .p1_empirical = p1_empirical,
+                                       .p1_nash = p1_nash,
+                                       .p2_empirical = p2_empirical,
+                                       .p2_nash = p2_nash,
+                                       .empirical_value = empirical_value,
+                                       .nash_value = nash_value,
+                                       .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
   for (const auto *x : ptrs) {
@@ -439,7 +439,7 @@ extern "C" size_t encode_buffer_multithread(
         char *buf = buffer.data();
         file.read(buf, offset);
         // parse buffer to compressed
-        Train::CompressedFrames battle_frames{};
+        Train::CompressedBattleFrames battle_frames{};
         battle_frames.read(buf);
 
         // uncompress
@@ -456,7 +456,7 @@ extern "C" size_t encode_buffer_multithread(
             return;
           }
           auto input_correct = input.index(cur);
-          Encode::EncodedFrame encoded{frame};
+          Encode::BattleFrame encoded{frame};
           input_correct.write(encoded, frame.target);
         }
 

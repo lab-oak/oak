@@ -5,7 +5,7 @@
 namespace Train {
 
 // Everything needed to train a value/policy net
-struct Frame {
+struct BattleFrame {
   uint8_t m, n;
   pkmn_gen1_battle battle;
   pkmn_gen1_chance_durations durations;
@@ -15,7 +15,7 @@ struct Frame {
   Target target;
 };
 
-struct FrameInput {
+struct BattleFrameInput {
   uint8_t *m;
   uint8_t *n;
   uint8_t *battle;
@@ -31,7 +31,7 @@ struct FrameInput {
   float *nash_value;
   float *score;
 
-  void write(const Frame &frame) {
+  void write(const BattleFrame &frame) {
     *m++ = frame.m;
     *n++ = frame.n;
     std::memcpy(battle, frame.battle.bytes, sizeof(pkmn_gen1_battle));

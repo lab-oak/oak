@@ -2,12 +2,12 @@
 
 #include <encode/battle.h>
 #include <encode/policy.h>
-#include <train/frame.h>
+#include <train/battle-frame.h>
 #include <train/target.h>
 
 namespace Encode {
 
-struct EncodedFrame {
+struct BattleFrame {
   uint8_t m, n;
 
   std::array<std::array<std::array<float, Pokemon::n_dim>, 5>, 2> pokemon;
@@ -17,8 +17,8 @@ struct EncodedFrame {
   std::array<int64_t, 9> p1_choice_indices;
   std::array<int64_t, 9> p2_choice_indices;
 
-  EncodedFrame() = default;
-  EncodedFrame(const Train::Frame &frame)
+  BattleFrame() = default;
+  BattleFrame(const Train::BattleFrame &frame)
       : pokemon{}, active{}, hp{}, p1_choice_indices{}, p2_choice_indices{} {
 
     const auto &battle = View::ref(frame.battle);
@@ -50,7 +50,7 @@ struct EncodedFrame {
   }
 };
 
-struct EncodedFrameInput {
+struct BattleFrameInput {
   uint8_t *m;
   uint8_t *n;
 
@@ -69,7 +69,7 @@ struct EncodedFrameInput {
   float *nash_value;
   float *score;
 
-  EncodedFrameInput index(auto i) const {
+  BattleFrameInput index(auto i) const {
     auto copy = *this;
     copy.m += i;
     copy.n += i;
@@ -88,7 +88,7 @@ struct EncodedFrameInput {
     return copy;
   }
 
-  void write(const EncodedFrame &frame, const Train::Target &target) {
+  void write(const BattleFrame &frame, const Train::Target &target) {
     *m++ = frame.m;
     *n++ = frame.n;
 

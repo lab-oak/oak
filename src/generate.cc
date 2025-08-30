@@ -1,9 +1,9 @@
 #include <format/teams.h>
 #include <nn/build-network.h>
 #include <nn/network.h>
+#include <train/battle-frame.h>
 #include <train/build-trajectory.h>
-#include <train/compressed-frame.h>
-#include <train/frame.h>
+#include <train/compressed-battle-frame.h>
 #include <util/parse.h>
 #include <util/policy.h>
 #include <util/random.h>
@@ -472,7 +472,7 @@ void generate(uint64_t seed) {
     auto options = PKMN::options();
     battle_data.result = PKMN::result();
 
-    Train::CompressedFrames training_frames{battle_data.battle};
+    Train::CompressedBattleFrames training_frames{battle_data.battle};
 
     auto agent = RuntimeOptions::agent;
     auto t1_agent = RuntimeOptions::t1_agent;
