@@ -91,8 +91,8 @@ struct MCTS {
     const auto prepare_and_run_iteration = [this, &bandit_params, &node, &input,
                                             &model]() -> float {
       auto copy = input;
-      auto *rng = reinterpret_cast<uint64_t *>(copy.battle.bytes +
-                                               Layout::Offsets::Battle::rng);
+      auto *rng = reinterpret_cast<uint64_t *>(
+          copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
       rng[0] = model.device.uniform_64();
       chance_options.durations = copy.durations;
       apply_durations(copy.battle, copy.durations);
@@ -260,7 +260,8 @@ struct MCTS {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       } else {
         // last two bytes of battle rng
-        const auto *rand = battle.bytes + Layout::Offsets::Battle::rng + 6;
+        const auto *rand =
+            battle.bytes + PKMN::Layout::Offsets::Battle::rng + 6;
         auto *over = this->calc_options.overrides.bytes;
         if constexpr (Options::rolls_same) {
           over[0] = roll_byte<Options::root_rolls>(rand[0]);
@@ -295,9 +296,9 @@ struct MCTS {
                                choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c2 = choices[outcome.p2.index];
 
-      print(
-          "P1: " + PKMN::side_choice_string(battle.bytes, c1) + " P2: " +
-          PKMN::side_choice_string(battle.bytes + Layout::Sizes::Side, c2));
+      print("P1: " + PKMN::side_choice_string(battle.bytes, c1) + " P2: " +
+            PKMN::side_choice_string(battle.bytes + PKMN::Layout::Sizes::Side,
+                                     c2));
 
       battle_options_set();
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
@@ -346,16 +347,16 @@ struct MCTS {
             // TODO move Encode::Policy stuff outside mcts
             // const auto &b = View::ref(input.battle);
             // const auto m = pkmn_gen1_battle_choices(
-            //     &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
-            //     PKMN_GEN1_MAX_CHOICES);
+            //     &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+            //     choices.data(), PKMN_GEN1_MAX_CHOICES);
             // std::array<uint16_t, 9> p1_choice_indices;
             // for (auto i = 0; i < m; ++i) {
             //   p1_choice_indices[i] =
             //       Encode::Policy::get_index(b.sides[0], choices[i]);
             // }
             // const auto n = pkmn_gen1_battle_choices(
-            //     &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
-            //     PKMN_GEN1_MAX_CHOICES);
+            //     &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+            //     choices.data(), PKMN_GEN1_MAX_CHOICES);
             // std::array<uint16_t, 9> p2_choice_indices;
             // for (auto i = 0; i < n; ++i) {
             //   p2_choice_indices[i] =

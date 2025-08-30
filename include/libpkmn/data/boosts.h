@@ -6,6 +6,7 @@
 namespace PKMN {
 
 namespace Data {
+
 constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
     std::array<uint8_t, 2>{25, 100}, // -6
     {28, 100},                       // -5
@@ -21,6 +22,7 @@ constexpr std::array<std::array<uint8_t, 2>, 13> boosts{
     {35, 10},                        // +5
     {4, 1}                           // +6
 };
-};
+
+} // namespace Data
 
 } // namespace PKMN

@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+namespace PKMN {
+
 namespace RNG {
 
 inline void next(uint64_t &seed) noexcept {
@@ -9,3 +11,5 @@ inline void next(uint64_t &seed) noexcept {
 }
 
 } // namespace RNG
+
+} // namespace PKMN

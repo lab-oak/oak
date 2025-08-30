@@ -23,7 +23,8 @@ int benchmark(int argc, char **argv) {
   const auto durations = PKMN::durations();
   BattleData battle_data{battle, durations};
 
-  FastModel model{battle_data.battle.bytes + Layout::Offsets::Battle::rng};
+  FastModel model{battle_data.battle.bytes +
+                  PKMN::Layout::Offsets::Battle::rng};
 
   MCTS search{};
   int exp = 20;

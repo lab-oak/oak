@@ -77,8 +77,22 @@ struct Agent {
   }
 };
 
-auto run(BattleData &battle_data, Nodes &nodes, Agent &agent,
-         MCTS::Output output = {}) {
+auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
+
+  BattleData battle_data{};
+  using input_t = std::remove_cv<decltype(input)>::type;
+  if constexpr (std::is_same_v<input_t, pkmn_gen1_battle>) {
+    battle_data.battle = input;
+    battle_data.result = PKMN::result(input);
+  } else if constexpr (std::is_same_v<input_t,
+                                      std::pair<pkmn_gen1_battle,
+                                                pkmn_gen1_chance_durations>>) {
+    battle_data.battle = input.first;
+    battle_data.duration = input.second;
+    battle_data.result = PKMN::result(input);
+  } else if constexpr (std::is_same_v<input_t, BattleData>) {
+    battle_data = input;
+  }
 
   const auto run_2 = [&](auto dur, auto &model) {
     MCTS search{};

@@ -11,6 +11,8 @@
 #include <cstddef>
 #include <type_traits>
 
+namespace PKMN {
+
 namespace Init {
 
 using PKMN::Data::Move;
@@ -41,13 +43,12 @@ static_assert(compute_stat(100, false) == 298);
 static_assert(compute_stat(250, true) == 703);
 static_assert(compute_stat(5, false) == 108);
 
+//
 struct Boosts {
   int atk;
   int def;
   int spe;
   int spc;
-
-  bool operator==(const Boosts &) const noexcept = default;
 };
 
 constexpr uint16_t boost(uint16_t stat, int b) {
@@ -59,18 +60,30 @@ void apply_boosts(PKMN::ActivePokemon &active, const auto &boosts) {
   if constexpr (requires { boosts.atk; }) {
     active.stats.atk = boost(active.stats.atk, boosts.atk);
     active.boosts.set_atk(boosts.atk);
+  } else if constexpr (requires { boosts.atk(); }) {
+    active.stats.atk = boost(active.stats.atk, boosts.atk());
+    active.boosts.set_atk(boosts.atk());
   }
   if constexpr (requires { boosts.def; }) {
     active.stats.def = boost(active.stats.def, boosts.def);
     active.boosts.set_def(boosts.def);
+  } else if constexpr (requires { boosts.def(); }) {
+    active.stats.def = boost(active.stats.def, boosts.def());
+    active.boosts.set_def(boosts.def());
   }
   if constexpr (requires { boosts.spe; }) {
     active.stats.spe = boost(active.stats.spe, boosts.spe);
     active.boosts.set_spe(boosts.spe);
+  } else if constexpr (requires { boosts.spe(); }) {
+    active.stats.spe = boost(active.stats.spe, boosts.spe());
+    active.boosts.set_spe(boosts.spe());
   }
   if constexpr (requires { boosts.spc; }) {
     active.stats.spc = boost(active.stats.spc, boosts.spc);
     active.boosts.set_spc(boosts.spc);
+  } else if constexpr (requires { boosts.spc(); }) {
+    active.stats.spc = boost(active.stats.spc, boosts.spc());
+    active.boosts.set_spc(boosts.spc());
   }
 }
 
@@ -99,11 +112,11 @@ constexpr PKMN::Pokemon init_pokemon(const auto &set) {
   for (auto m = 0; m < 4; ++m) {
     if constexpr (std::is_convertible_v<decltype(set.moves[0]), Move>) {
       pokemon.moves[m].id = static_cast<Move>(set.moves[m]);
-      pokemon.moves[m].pp = get_max_pp(pokemon.moves[m].id);
+      pokemon.moves[m].pp = max_pp(pokemon.moves[m].id);
     } else {
       pokemon.moves[m] = set.moves[m];
       pokemon.moves[m].pp =
-          std::min(set.moves[m].pp, get_max_pp(pokemon.moves[m].id));
+          std::min(set.moves[m].pp, max_pp(pokemon.moves[m].id));
     }
   }
 
@@ -134,7 +147,7 @@ constexpr PKMN::Side init_side(const auto &sets) {
   PKMN::Side side{};
   for (auto i = 0; i < sets.size(); ++i) {
     const auto pokemon = init_pokemon(sets[i]);
-    if (pokemon.hp) {
+    if ((i == 0) || pokemon.hp) {
       side.order[i] = i + 1;
     }
     side.pokemon[i] = pokemon;
@@ -142,20 +155,17 @@ constexpr PKMN::Side init_side(const auto &sets) {
   return side;
 }
 
-// constexpr void init_duration(const auto &party, PKMN::Duration &duration) {
-//   if constexpr (requires { party.pokemon; }) {
-//     init_party(party.pokemon, duration);
-//   }
-//   const auto n = party.size();
-//   assert(n <= 6);
-//   for (auto i = 0; i < n; ++i) {
-//     const auto &pokemon = party[i];
-//     if constexpr (requires { pokemon.sleeps; }) {
-//       if (is_sleep(pokemon.status) && !self(pokemon.status)) {
-//         duration.set_sleep(i, pokemon.sleeps);
-//       }
-//     }
-//   }
-// }
+void init_sleeps(const auto &sets, PKMN::Duration &duration) {
+  for (auto i = 0; i < sets.size(); ++i) {
+    const auto &set = sets[i];
+    if constexpr (requires { set.sleeps; }) {
+      if (is_sleep(set.status) && !self(set.status)) {
+        duration.set_sleep(i, set.sleeps);
+      }
+    }
+  }
+}
 
 } // namespace Init
+
+} // namespace PKMN

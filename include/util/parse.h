@@ -30,11 +30,11 @@ std::vector<std::string> split(const std::string &input, const char delim) {
 }
 
 // convert vector of strings to a set
-PKMN::PokemonInit parse_set(const auto &words) {
+auto parse_set(const auto &words) {
 
-  PKMN::PokemonInit pokemon{};
+  PKMN::Init::Pokemon set{};
 
-  pokemon.species = Strings::string_to_species(words[0]);
+  set.species = Strings::string_to_species(words[0]);
 
   auto n_moves = 0;
 
@@ -57,11 +57,11 @@ PKMN::PokemonInit parse_set(const auto &words) {
       }
 
       if (move_parse_success) {
-        pokemon.moves[n_moves] = m;
+        set.moves[n_moves] = m;
         if (move_pp.size() > 1) {
           pp = std::min(255UL, std::stoul(move_pp[1]));
         }
-        pokemon.pp[n_moves] = pp;
+        set.pp[n_moves] = pp;
         ++n_moves;
         continue;
       }
@@ -69,7 +69,7 @@ PKMN::PokemonInit parse_set(const auto &words) {
 
     if (word.find('%') != std::string::npos) {
       const auto percent = std::stoll(split(word, '%')[0]);
-      pokemon.hp = percent / 100.0;
+      set.hp = percent / 100.0;
       continue;
     }
 
@@ -78,69 +78,98 @@ PKMN::PokemonInit parse_set(const auto &words) {
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](auto c) { return std::tolower(c); });
     if (lower == "par") {
-      pokemon.status = Status::Paralysis;
+      set.status = Status::Paralysis;
     } else if (lower == "frz") {
-      pokemon.status = Status::Freeze;
+      set.status = Status::Freeze;
     } else if (lower == "psn") {
-      pokemon.status = Status::Poison;
+      set.status = Status::Poison;
     } else if (lower == "brn") {
-      pokemon.status = Status::Burn;
+      set.status = Status::Burn;
     } else if (lower.starts_with("slp")) {
       const auto sleeps_client = std::stoul(lower.substr(3));
       if (sleeps_client >= 7) {
         throw std::runtime_error(
-            "parse_pokemon(): Invalid turns slept (must be [0, 6]): " +
+            "parse_set(): Invalid turns slept (must be [0, 6]): " +
             std::to_string(sleeps_client));
       }
-      pokemon.status = Status::Sleep7;
-      pokemon.sleeps = sleeps_client + 1;
+      set.status = Status::Sleep7;
+      set.sleeps = sleeps_client + 1;
     } else if (lower.starts_with("rst")) {
       const auto hidden = std::stoul(lower.substr(3));
       if (hidden > 3 || hidden == 0) {
-        throw std::runtime_error("parse_pokemon(): Invalid sleep duration for "
+        throw std::runtime_error("parse_set(): Invalid sleep duration for "
                                  "rest (must be [1, 3]): " +
                                  std::to_string(hidden));
       }
-      pokemon.status = Data::rest(hidden);
-    }
-
-    if (lower.starts_with("atk=")) {
-      pokemon.stats.atk = std::stoul(lower.substr(4));
-    } else if (lower.starts_with("atk")) {
-      pokemon.boosts.atk = std::stoi(lower.substr(3));
-    }
-    if (lower.starts_with("def=")) {
-      pokemon.stats.def = std::stoul(lower.substr(4));
-    } else if (lower.starts_with("def")) {
-      pokemon.boosts.def = std::stoi(lower.substr(3));
-    }
-    if (lower.starts_with("spe=")) {
-      pokemon.stats.spe = std::stoul(lower.substr(4));
-    } else if (lower.starts_with("spe")) {
-      pokemon.boosts.spe = std::stoi(lower.substr(3));
-    }
-    if (lower.starts_with("spc=")) {
-      pokemon.stats.spc = std::stoul(lower.substr(4));
-    } else if (lower.starts_with("spc")) {
-      pokemon.boosts.spc = std::stoi(lower.substr(3));
+      set.status = Data::rest(hidden);
     }
 
     if (lower.starts_with("lvl")) {
-      pokemon.level = std::stoul(lower.substr(3));
+      set.level = std::stoul(lower.substr(3));
     }
   }
 
-  return pokemon;
+  return set;
 }
 
-PKMN::Volatiles parse_volatiles(const auto &words) {
-  PKMN::Volatiles vol{};
+PKMN::Duration parse_duration(const auto &words) {
+  PKMN::Duration duration{};
+
+  return duration;
+}
+
+// struct alignas(1) ActivePokemon {
+//   Stats stats;
+//   Data::Species species;
+//   uint8_t types;
+//   Boosts boosts;
+//   Volatiles volatiles;
+//   std::array<MoveSlot, 4> moves;
+// };
+
+auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
+    -> std::pair<PKMN::ActivePokemon, PKMN::Duration> {
+  PKMN::ActivePokemon active{};
+  PKMN::Duration duration{};
+  active.stats = pokemon.stats;
+  active.species = pokemon.species;
+  active.types = pokemon.types;
+  active.moves = pokemon.moves;
+
+  Init::Boosts boosts{};
+  PKMN::Stats stats{};
+  auto &vol = active.volatiles;
 
   for (const auto &word : words) {
+
+    using Data::Status;
     auto lower = word;
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](auto c) { return std::tolower(c); });
 
+    // stats
+    if (lower.starts_with("atk=")) {
+      stats.atk = std::stoul(lower.substr(4));
+    } else if (lower.starts_with("atk")) {
+      boosts.atk = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("def=")) {
+      stats.def = std::stoul(lower.substr(4));
+    } else if (lower.starts_with("def")) {
+      boosts.def = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("spe=")) {
+      stats.spe = std::stoul(lower.substr(4));
+    } else if (lower.starts_with("spe")) {
+      boosts.spe = std::stoi(lower.substr(3));
+    }
+    if (lower.starts_with("spc=")) {
+      stats.spc = std::stoul(lower.substr(4));
+    } else if (lower.starts_with("spc")) {
+      boosts.spc = std::stoi(lower.substr(3));
+    }
+
+    // volatliles
     if (lower == "(leech-seed)" || lower == "(leechseed)" ||
         lower == "(leech)") {
       vol.set_leech_seed(true);
@@ -157,50 +186,78 @@ PKMN::Volatiles parse_volatiles(const auto &words) {
       vol.set_reflect(true);
     }
 
-    const auto read_n = [](const auto &lower, const auto &prefix) {
-      return std::stoul(
-          lower.substr(prefix.size(), lower.size() - 1 - lower.size()));
+    const auto parse_split = [](auto word, const auto start) -> int {
+      int x = -1;
+      if (word.back() == ')') {
+        word = word.substr(0, word.size() - 1);
+      }
+      if (word.starts_with(start)) {
+        const auto s = split(lower, ':');
+        if (s.size() >= 2) {
+          x = std::stoi(s[1]);
+        }
+      }
+      return x;
     };
 
-    // // TODO check durations so its matches client (like sleep dur does now)
-    // static std::vector<std::string> confusion_prefixes{"(conf:",
-    // "(confusion:"}; for (const auto &prefix : confusion_prefixes) {
-    //   if (lower.starts_with(prefix)) {
-    //     const auto n = read_n(lower, prefix);
-    //     vol.set_confusion(true);
-    //   }
-    // }
+    // confusion, disable, attacking, binding
+    if (const auto conf = parse_split(lower, "(conf"); conf >= 0) {
+      vol.set_confusion(true);
+      duration.set_confusion(conf);
+    }
+    if (const auto disable = parse_split(lower, "(disable"); disable >= 0) {
+      vol.set_disable(true);
+      duration.set_disable(disable);
+    }
+    if (const auto trashing = parse_split(lower, "(trash"); trashing >= 0) {
+      vol.set_trashing(true);
+      duration.set_attacking(disable);
+    }
+    if (const auto trashing = parse_split(lower, "(petal"); trashing >= 0) {
+      vol.set_trashing(true);
+      duration.set_attacking(disable);
+    }
   }
-  return vol;
-}
 
-auto parse_active(PKMN::Pokemon &pokemon, const auto &words) {
-  PKMN::ActivePokemon active{};
-  active.species = pokemon.species;
-  active.moves = pokemon.moves;
-  active.stats = pokemon.stats;
-  active.volatiles = parse_volatiles(words);
+  Init::apply_boosts(active, boosts);
+  if (stats.atk) {
+    active.stats.atk = stats.atk;
+  }
+  if (stats.def) {
+    active.stats.def = stats.def;
+  }
+  if (stats.spe) {
+    active.stats.spe = stats.spe;
+  }
+  if (stats.spc) {
+    active.stats.spc = stats.spc;
+  }
+
+  return active;
 }
 
 auto parse_side(const std::string &side_string)
-    -> std::pair<std::array<PKMN::PokemonInit, 6>, PKMN::Volatiles> {
+    -> std::pair<PKMN::Side, PKMN::Duration> {
   const auto set_strings = split(side_string, ';');
-  if (set_strings.size() > 6) {
-    throw std::runtime_error(
-        "parse_side(): too many sets (delineated by \';\')");
+  const auto n_sets = set_strings.size();
+  if (n_sets == 0 || n_sets > 6) {
+    throw std::runtime_error("parse_side(): " + std::to_string(n_sets) +
+                             " set given. [1, 6] required.");
   }
-  if (set_strings.size() == 0) {
-    throw std::runtime_error("parse_side(): side requires at least one set");
-  }
-  std::array<PKMN::PokemonInit, 6> side{};
-  std::transform(set_strings.begin(), set_strings.end(), side.begin(),
+  std::vector<PKMN::Init::Pokemon> sets;
+  sets.resize(n_sets);
+  std::transform(set_strings.begin(), set_strings.end(), sets.begin(),
                  [](const auto &string) {
                    const auto words = split(string, ' ');
                    return parse_set(words);
                  });
+  auto side = PKMN::Init::init_side(sets);
+
   const auto active_words = split(set_strings[0], ' ');
-  const auto volatiles = parse_volatiles(active_words);
-  return {side, volatiles};
+  side.active = parse_active(side.pokemon[0], active_words);
+  auto duration = parse_duration(active_words);
+  PKMN::Init::init_sleeps(sets, duration);
+  return {side, duration};
 }
 
 std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>
@@ -210,14 +267,16 @@ parse_battle(const std::string &battle_string, uint64_t seed = 0x123456) {
     throw std::runtime_error(
         "parse_battle(): must have two sides, delineated by \'|\'");
   }
-  const auto [p1, p1_vol] = parse_side(side_strings[0]);
-  const auto [p2, p2_vol] = parse_side(side_strings[1]);
-  auto battle = PKMN::battle(p1, p2, seed);
-  auto &b = View::ref(battle);
-  const auto durations = PKMN::durations(p1, p2);
-  b.sides[0].active.volatiles = p1_vol;
-  b.sides[1].active.volatiles = p2_vol;
-  return {battle, durations};
+  const auto [p1, p1_dur] = parse_side(side_strings[0]);
+  const auto [p2, p2_dur] = parse_side(side_strings[1]);
+  auto battle = PKMN::Battle{};
+  auto durations = PKMN::Durations{};
+  battle.sides[0] = p1;
+  battle.sides[1] = p2;
+  durations.get(0) = p1_dur;
+  durations.get(1) = p2_dur;
+  return {std::bit_cast<pkmn_gen1_battle>(battle),
+          std::bit_cast<pkmn_gen1_chance_durations>(durations)};
 }
 
 } // namespace Parse

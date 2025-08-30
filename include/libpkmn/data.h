@@ -24,8 +24,6 @@ struct alignas(1) Stats {
   uint16_t def;
   uint16_t spe;
   uint16_t spc;
-
-  bool operator==(const Stats &) const noexcept = default;
 };
 
 struct alignas(1) MoveSlot {
@@ -245,13 +243,33 @@ struct alignas(1) Duration {
     return (data >> (3 * slot)) & 0b111;
   }
   void set_sleep(auto slot, uint8_t sleeps) noexcept {
-    const uint32_t mask = 0b111 << (3 * slot);
-    data = (data & ~mask) | ((sleeps & 0b111) << (3 * slot));
+    const uint32_t mask = 0b111u << (3 * slot);
+    data = (data & ~mask) | ((sleeps & 0b111u) << (3 * slot));
   }
+
   uint8_t confusion() const noexcept { return (data >> 18) & 0b111; }
+  void set_confusion(uint8_t v) noexcept {
+    const uint32_t mask = 0b111u << 18;
+    data = (data & ~mask) | ((v & 0b111u) << 18);
+  }
+
   uint8_t disable() const noexcept { return (data >> 21) & 0b1111; }
+  void set_disable(uint8_t v) noexcept {
+    const uint32_t mask = 0b1111u << 21;
+    data = (data & ~mask) | ((v & 0b1111u) << 21);
+  }
+
   uint8_t attacking() const noexcept { return (data >> 25) & 0b111; }
+  void set_attacking(uint8_t v) noexcept {
+    const uint32_t mask = 0b111u << 25;
+    data = (data & ~mask) | ((v & 0b111u) << 25);
+  }
+
   uint8_t binding() const noexcept { return (data >> 28) & 0b111; }
+  void set_binding(uint8_t v) noexcept {
+    const uint32_t mask = 0b111u << 28;
+    data = (data & ~mask) | ((v & 0b111u) << 28);
+  }
 };
 
 struct alignas(1) Durations {

@@ -15,17 +15,17 @@
 #include <libpkmn/data/strings.h>
 #include <libpkmn/layout.h>
 
-constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
-                                               int slot = 1) {
-  const auto index = side[(Layout::Offsets::Side::order - 1) + slot] - 1;
-  return side + 24 * index;
-}
-
 namespace PKMN {
 
 using PKMN::Data::Move;
 using PKMN::Data::Species;
 using PKMN::Data::Status;
+
+constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
+                                               int slot = 1) {
+  const auto index = side[(Layout::Offsets::Side::order - 1) + slot] - 1;
+  return side + 24 * index;
+}
 
 std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
   const auto choice_type = choice & 3;
@@ -321,4 +321,4 @@ Move string_to_move(const std::string &str) {
   }
 }
 
-}  // namespace PKMN
+} // namespace PKMN

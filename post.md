@@ -4,21 +4,24 @@ This project deserves some context. It would be nice to first describe, as quick
 
 ## Chess
 
-Chess is king, baby. It was the the motivator for basically every invention in computer search. 
+Basically every innovation in computer play has been made with chess in mind. 
 AlphaBeta/Monte Carlo Tree Search (MCTS) were developed and optimized specifically to attack this game, and many other techniques and wisdoms were made too.
 
-By the late 90s computer engines were unquestionaly stronger than the best players. This was achieved by writing superfast AlphaBeta implementations and finely tuning a crude value estimation function.
-Chess and AB are a match made in heaven, and this is largely responsible for superhuman strength. The value estimation was a fast hueristic that basically added up piece values and various stretegic scores.
+By the late 90s computer engines were unquestionaly stronger than the best players. This was achieved by writing superfast AlphaBeta implementations and finely tuning a simple value estimation function.
 
-This approach plateaud for a while and it was understood that you could never beat a computer but also that engines could not understand certain quiet positions. They could not understand long term strategy.
+Chess and AB are a match made in heaven, and this is really the core reason for success. On the contrary, the value estimation was a crude hueristic that basically added up piece values and various stretegic scores. This approach was dominant but stagnant and it was understood that while you could never beat a computer, they also did not understand quiet, strategic positions.
 
-AlphaZero and later neural network searches fixed this problem and overtook conventional engines.
-They took the opposite approach: slower search but a more complex value estimation.
-Today the best engines combine these approaches with small but powerful neural networks that run on CPU instead of GPU. The best players can't beat their phones.
+AlphaZero and subsequenct neural network methods overcame this plataeu.
+They used a slower but more sophisticated evaluation paired with a different kind of search algorithm. These networks were also trained with reinforment learning and later manual iteration; they were not polluted by human biases. 
+
+The top engine today is a version of Stockfish that combines the these two approaches. AlphaBeta has returned but now powerered by a small neural network that can perform millions of evaluations per second on even a phone's processor.
+
 
 ## Pokemon
 
-Picture a sad Durant holding a bindle.
+The state of computer play in Pokemon is disheartening.
+
+
 
 Pokemon doesnt have many examples what could be called an engine. The majority of projects don't use search at all; They give you a probabiliy distribution over your legal moves. This is a fundamentally weaker tool than a search engine that can run indefinitely. They have been limited to "top X on Y ladder".
 
@@ -60,10 +63,18 @@ Oak is a code library and a collection of programs that tries to address all the
 
 - Everything is fast. The base simulator 
 
+- Data generation and training are easy to do and customize
 
+- Dataa sharing is easy.
 
- The scope of what Oak do is vast and I've already written a tutorial and documentatino on the github repo.
+The project is avaiable here as source code.
 
-- There project is available as source code only. It is basically trivial to build on up-to-date Linux machines
+https://github.com/lab-oak/oak/
 
-- I am poo and pee
+The project is very easy to build on Linux systems with only the standard development tools, `CMake` and a Zig compiler as requirements. Windows is not currently supported but it *should* be simple to get working.
+
+The code repository has a thorough tutorial that covers training battle and team building networks from scratch. It is even done on the 1v1 case so that normal conputers can generate millions of training examples in a matter of hours.
+
+The code base and its design choices are documented and easy to modify. Novice programmers can tweak the search algorithm, neural network architecure, etc without hassle.
+
+Thank you for reading. I will check this thread for a little while to answer questions. Assistance with installation/operation/contribution will be offered on the [issues](https://github.com/lab-oak/oak/issues) page.

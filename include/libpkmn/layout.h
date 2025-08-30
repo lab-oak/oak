@@ -1,5 +1,7 @@
 #pragma once
 
+namespace PKMN {
+
 namespace Layout {
 
 namespace Sizes {
@@ -124,12 +126,14 @@ constexpr auto attacking = 25;
 constexpr auto binding = 28;
 } // namespace Duration
 
-namespace Damage {
-constexpr auto base = 0;
-constexpr auto final = 2;
-constexpr auto capped = 4;
-} // namespace Damage
+// namespace Damage {
+// constexpr auto base = 0;
+// constexpr auto final = 2;
+// constexpr auto capped = 4;
+// } // namespace Damage
 
 } // namespace Offsets
 
 } // namespace Layout
+
+} // namespace PKMN
