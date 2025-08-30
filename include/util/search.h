@@ -80,7 +80,7 @@ struct Agent {
 auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
 
   BattleData battle_data{};
-  using input_t = std::remove_cv<decltype(input)>::type;
+  using input_t = std::remove_cvref_t<decltype(input)>;
   if constexpr (std::is_same_v<input_t, pkmn_gen1_battle>) {
     battle_data.battle = input;
     battle_data.result = PKMN::result(input);
@@ -92,6 +92,8 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
     battle_data.result = PKMN::result(input);
   } else if constexpr (std::is_same_v<input_t, BattleData>) {
     battle_data = input;
+  } else {
+    assert(false);
   }
 
   const auto run_2 = [&](auto dur, auto &model) {
