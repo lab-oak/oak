@@ -39,11 +39,16 @@ constexpr auto move_pool_size(const auto species) noexcept {
   return MOVE_POOL_SIZES[static_cast<uint8_t>(species)];
 }
 
+// we add 1 to the largest move pool so that move pools are always None
+// terminated. this has the benefit of making std::remove_if valid (for team
+// generation)
 constexpr auto max_move_pool_size =
-    *std::max_element(MOVE_POOL_SIZES.begin(), MOVE_POOL_SIZES.end());
+    *std::max_element(MOVE_POOL_SIZES.begin(), MOVE_POOL_SIZES.end()) + 1;
+
+using MovePool = std::array<PKMN::Data::Move, max_move_pool_size>;
 
 consteval auto get_move_pools_flat() {
-  std::array<std::array<PKMN::Data::Move, max_move_pool_size>, 152> list{};
+  std::array<MovePool, 152> list{};
   for (auto i = 0; i <= 151; ++i) {
     auto index = 0;
     for (uint8_t m = 0; m < 166; ++m) {

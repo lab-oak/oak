@@ -3,7 +3,7 @@
 #pragma once
 
 #include <search/joint.h>
-#include <util/softmax.h>
+#include <search/util/softmax.h>
 
 #include <algorithm>
 #include <array>

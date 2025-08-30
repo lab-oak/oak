@@ -351,7 +351,7 @@ auto generate_team(mt19937 &device)
     -> std::tuple<std::vector<PKMN::Set>, int, Train::BuildTrajectory> {
   using namespace RuntimeOptions::TeamGen;
 
-  const auto index = device.random_int(Teams::teams.size());
+  const auto index = device.random_int(Format::OU::teams.size());
   const auto base_team = RuntimeData::teams[index];
   std::vector<PKMN::Set> team{base_team.begin(),
                               base_team.begin() + max_pokemon};
@@ -676,7 +676,8 @@ void setup() {
       throw std::runtime_error{"Could not parse teams"};
     }
   } else {
-    teams = std::vector<PKMN::Team>(Teams::teams.begin(), Teams::teams.end());
+    teams = std::vector<PKMN::Team>(Format::OU::teams.begin(),
+                                    Format::OU::teams.end());
     RuntimeData::matchup_matrix.resize(teams.size());
   }
 

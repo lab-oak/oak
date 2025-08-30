@@ -12,8 +12,8 @@ struct FastModel {
 
 int benchmark(int argc, char **argv) {
 
-  auto p1 = Teams::benchmark_teams[0];
-  auto p2 = Teams::benchmark_teams[1];
+  auto p1 = Format::OU::benchmark_teams[0];
+  auto p2 = Format::OU::benchmark_teams[1];
 
   const uint64_t seed = 1111111;
 
@@ -48,7 +48,7 @@ int benchmark(int argc, char **argv) {
   using Node = Tree::Node<Exp3::JointBandit, MCTS::Obs>;
   Node node{};
   const auto output =
-      search.run(iterations, bandit_params, node, battle_data, model);
+      search.run(iterations, bandit_params, node, model, battle_data);
 
   std::cout << output.duration.count() << " ms." << std::endl;
 

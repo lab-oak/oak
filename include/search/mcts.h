@@ -5,7 +5,6 @@
 #include <search/durations.h>
 #include <search/tree.h>
 #include <util/random.h>
-#include <util/softmax.h>
 
 #include <chrono>
 #include <iostream>
@@ -68,10 +67,11 @@ struct MCTS {
   using Obs = std::array<uint8_t, 16>;
 
   template <typename Options = Options<>>
-  Output run(const auto dur, const auto &bandit_params, auto &node,
-             const auto &input, auto &model, Output output = {}) {
+  Output run(const auto dur, const auto &bandit_params, auto &node, auto &model,
+             const BattleData &input, Output output = {}) {
 
     *this = {};
+    // currently commented out because we DO need policy inference at the root
     // if the node is not already init then a value estimate is wasted on the
     // first iteration
     // if (!node.is_init()) {

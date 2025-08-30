@@ -88,54 +88,6 @@ void write(const auto &team, float *const t) {
   }
 }
 
-[[nodiscard]] bool write_policy_mask(const auto &team, float *const t) {
-  bool needs_species = false;
-  bool complete = true;
-  for (const auto &set : team) {
-    if (static_cast<bool>(set.species)) {
-      auto n_moves = 0;
-      for (const auto move : set.moves) {
-        n_moves += static_cast<bool>(move);
-      }
-      if (n_moves <
-          std::min(PKMN::Data::move_pool_size(set.species), (uint8_t)4)) {
-        complete = false;
-        for (const auto move : move_pool(set.species)) {
-          if (!static_cast<bool>(move)) {
-            break;
-          }
-          t[species_move_table(set.species, move)] = 1.0;
-        }
-        for (const auto move : set.moves) {
-          if (static_cast<bool>(move)) {
-            t[species_move_table(set.species, move)] = 0.0;
-          }
-        }
-      }
-    } else {
-      needs_species = true;
-      complete = false;
-    }
-  }
-  if (needs_species) {
-    for (int i = 1; i <= 149; ++i) {
-      t[species_move_table(i, 0)] = 1.0;
-    }
-    for (const auto &set : team) {
-      if (static_cast<bool>(set.species)) {
-        t[species_move_table(set.species, 0)] = 0.0;
-      }
-    }
-  }
-  if (complete) {
-    for (const auto &set : team) {
-      t[species_move_table(set.species, 0)] = 1.0;
-    }
-  }
-
-  return complete;
-}
-
 void write_policy_mask_flat(const auto &team, auto *t) {
   auto *t0 = t;
   assert(t0);
@@ -186,35 +138,6 @@ void write_policy_mask_flat(const auto &team, auto *t) {
         continue;
       }
       *t++ = species_move_table(i, 0);
-    }
-  }
-}
-
-void apply_index_to_team(auto &team, auto s, auto m) {
-  if (!m) {
-    for (auto &set : team) {
-      if (set.species == PKMN::Data::Species::None) {
-        set.species = static_cast<PKMN::Data::Species>(s);
-        return;
-      } else if (set.species == static_cast<PKMN::Data::Species>(s)) {
-        std::swap(set, team[0]);
-        return;
-      }
-    }
-    // assert(false, "Cant add species to set/set active");
-    assert(false);
-  } else {
-    for (auto &set : team) {
-      if (set.species == static_cast<PKMN::Data::Species>(s)) {
-        for (auto &move : set.moves) {
-          if (move == PKMN::Data::Move::None) {
-            move = static_cast<PKMN::Data::Move>(m);
-            return;
-          }
-        }
-        // assert(false, "Cant add move to species");
-        assert(false);
-      }
     }
   }
 }

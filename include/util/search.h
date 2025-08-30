@@ -119,22 +119,22 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
     if (lower.starts_with("exp3-")) {
       const float gamma = std::stof(lower.substr(5));
       Exp3::Bandit::Params params{gamma};
-      return search.run(dur, params, get(nodes.exp3), battle_data, model,
+      return search.run(dur, params, get(nodes.exp3), model, battle_data,
                         output);
     } else if (lower.starts_with("ucb-")) {
       const float c = std::stof(lower.substr(4));
       UCB::Bandit::Params params{c};
-      return search.run(dur, params, get(nodes.ucb), battle_data, model,
+      return search.run(dur, params, get(nodes.ucb), model, battle_data,
                         output);
     } else if (lower.starts_with("pexp3-")) {
       const float gamma = std::stof(lower.substr(6));
       PExp3::Bandit::Params params{gamma};
-      return search.run(dur, params, get(nodes.pexp3), battle_data, model,
+      return search.run(dur, params, get(nodes.pexp3), model, battle_data,
                         output);
     } else if (lower.starts_with("pucb-")) {
       const float c = std::stof(lower.substr(5));
       PUCB::Bandit::Params params{c};
-      return search.run(dur, params, get(nodes.pucb), battle_data, model,
+      return search.run(dur, params, get(nodes.pucb), model, battle_data,
                         output);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + lower);
