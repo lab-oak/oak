@@ -6,7 +6,7 @@ namespace Train {
 
 namespace Battle {
 
-  struct Frame {
+struct Frame {
   uint8_t m, n;
   pkmn_gen1_battle battle;
   pkmn_gen1_chance_durations durations;
@@ -68,6 +68,6 @@ struct FrameInput {
   }
 };
 
-}
+} // namespace Battle
 
 } // namespace Train

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <encode/battle.h>
-#include <encode/policy.h>
-#include <train/battle-frame.h>
+#include <encode/battle/battle.h>
+#include <encode/battle/policy.h>
+#include <train/battle/frame.h>
 #include <train/target.h>
 
 namespace Encode {

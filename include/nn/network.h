@@ -1,6 +1,6 @@
 #pragma once
 
-#include <encode/battle.h>
+#include <encode/battle/battle.h>
 #include <libpkmn/data.h>
 #include <nn/cache.h>
 #include <nn/params.h>

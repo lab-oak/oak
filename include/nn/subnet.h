@@ -1,6 +1,6 @@
 #pragma once
 
-#include <encode/policy.h>
+#include <encode/battle/policy.h>
 #include <nn/affine.h>
 
 namespace NN {

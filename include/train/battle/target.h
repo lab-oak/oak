@@ -17,6 +17,6 @@ struct Target {
   float score;
 };
 
-}
+} // namespace Battle
 
 } // namespace Train

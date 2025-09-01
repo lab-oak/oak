@@ -1,7 +1,7 @@
-#include <format/teams.h>
+#include <format/OU/teams.h>
 #include <nn/build-network.h>
 #include <nn/network.h>
-#include <train/battle-frame.h>
+#include <train/battle/frame.h>
 #include <train/build-trajectory.h>
 #include <train/compressed-battle-frame.h>
 #include <util/parse.h>

@@ -1,10 +1,10 @@
-#include <encode/battle.h>
+#include <encode/battle/battle.h>
+#include <encode/battle/policy.h>
 #include <encode/build-trajectory.h>
 #include <encode/encoded-battle-frame.h>
-#include <encode/policy.h>
 #include <encode/team.h>
 #include <nn/params.h>
-#include <train/battle-frame.h>
+#include <train/battle/frame.h>
 #include <train/build-trajectory.h>
 #include <train/compressed-battle-frame.h>
 #include <util/debug-log.h>

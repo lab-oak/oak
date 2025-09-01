@@ -1,7 +1,7 @@
 #pragma once
 
-#include <encode/battle-key.h>
-#include <encode/battle.h>
+#include <encode/battle/battle.h>
+#include <encode/battle/key.h>
 #include <libpkmn/data/status.h>
 #include <nn/cache.h>
 

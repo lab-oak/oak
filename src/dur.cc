@@ -1,4 +1,4 @@
-#include <format/teams.h>
+#include <format/OU/teams.h>
 #include <libpkmn/data/strings.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>

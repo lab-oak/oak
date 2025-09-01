@@ -4,6 +4,8 @@
 
 namespace Format {
 
+namespace Cart {
+
 constexpr std::array<std::array<bool, 166>, 152> LEARNSETS = {
     // None
     std::array<bool, 166>{},
@@ -2726,4 +2728,5 @@ constexpr std::array<std::array<bool, 166>, 152> LEARNSETS = {
         false, false, false, true,  true,  false, false, false, true,  true,
         false, false, false, true,  false, false, true,  true,  false, false,
         false, true,  false, false, true,  false}};
+} // namespace Cart
 } // namespace Format

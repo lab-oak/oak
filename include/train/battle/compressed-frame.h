@@ -1,7 +1,7 @@
 #pragma once
 
 #include <libpkmn/pkmn.h>
-#include <train/battle-frame.h>
+#include <train/battle/frame.h>
 
 #include <istream>
 
