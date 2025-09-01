@@ -5,6 +5,8 @@
 
 namespace Train {
 
+namespace Battle {
+
 struct Target {
   std::array<float, 9> p1_empirical;
   std::array<float, 9> p1_nash;
@@ -14,5 +16,7 @@ struct Target {
   float nash_value;
   float score;
 };
+
+}
 
 } // namespace Train

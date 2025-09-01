@@ -7,37 +7,52 @@
 
 // Rollout battle network
 
-auto rollout(auto &network, const auto &team) {
+auto softmax(auto &x) {
+  auto y = x;
+  return y;
+}
 
-  Train::BuildTrajectory trajectory;
+[[nodiscard]] auto rollout_without_reward(auto &device, auto &network,
+                                          const auto &team) {
+  using namespace Train::TeamBuilding;
 
-  trajectory.initial = {team.begin(), team.end()};
+  Trajectory trajectory{};
+  trajectory.initial = team;
 
-  const auto n = team.size();
+  auto input = Encode::Team::write(team);
+  std::array<float, Encode::Team::n_dim> logits;
 
-  struct Helper {
-    bool needs_species{};
-    uint move_index{};
-    uint max_moves{};
-    Format::MovePool move_pool;
+  auto actions = Encode::Team::get_fill_actions(team);
 
-    Helper(const auto &set)
-        : needs_species{!static_cast<bool>(set.species)},
-          max_moves{Format::move_pool_size(set.species)},
-          move_index{
-              std::count_if(set.moves.begin(), set.moves.end(),
-                            [](auto m) { return static_cast<bool>(m.id); })},
-          move_pool{Format::move_pool(set.species)} {}
+  while (!actions.empty()) {
 
-    bool complete() const { return !needs_species && move_index >= max_moves; }
-  };
+    // get action indices
+    std::vector<int> indices;
+    std::transform(
+        actions.begin(), actions.end(), std::back_inserter(indices),
+        [](auto action) { return Encode::Team::action_index(action); });
 
-  std::vector<Helper> helpers{};
-  helpers.resize(n);
-  std::transform(team.begin(), team.end(), helpers.begin(),
-                 [](const auto &set) { return set; });
+    // ignore value output, only used in learning
+    const auto _ = network.propagate(input.data(), logits.data());
 
-  while (std::any_of(helpers.begin(), helpers.end(),
-                     [](const auto &s) { return !s.complete(); })) {
+    // get legal logits, softmax, sample action, apply
+    std::vector<float> legal_logits;
+    std::transform(indices.begin(), indices.end(),
+                   std::back_inserter(legal_logits),
+                   [&logits](int index) { return logits[i]; });
+    const auto policy = softmax(legal_logits);
+    const auto index = device.sample_pdf(policy);
+    const auto acion = actions[index];
+    apply_action(team, action);
+
+    trajectory.updates.emplace_back({actions, index, policy[index]});
+
+    actions = Encode::Team::get_fill_actions(team);
   }
+
+  actions = Encode::Team::get_switch_actions();
+
+  trajectory.terminal = team;
+
+  return trajectory;
 }

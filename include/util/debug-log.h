@@ -16,10 +16,10 @@ template <size_t log_size = 64> struct DebugLog {
   static constexpr auto frame_size = log_size + PKMN_GEN1_BATTLE_SIZE + 3;
 
   using Header = std::array<uint8_t, header_size>;
-  using BattleFrame = std::array<uint8_t, frame_size>;
+  using Battle::Frame = std::array<uint8_t, frame_size>;
 
   Header header;
-  std::vector<BattleFrame> frames;
+  std::vector<Battle::Frame> frames;
 
   void set_header(const pkmn_gen1_battle &battle) {
     header[0] = 1;

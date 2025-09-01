@@ -2,7 +2,7 @@ import numpy as np
 import ctypes
 
 
-class BattleFrame:
+class Battle::Frame:
     def __init__(self, size: int):
         self.size = size
 

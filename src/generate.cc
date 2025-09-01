@@ -472,7 +472,7 @@ void generate(uint64_t seed) {
     auto options = PKMN::options();
     battle_data.result = PKMN::result();
 
-    Train::CompressedBattleFrames training_frames{battle_data.battle};
+    Train::CompressedBattle::Frames training_frames{battle_data.battle};
 
     auto agent = RuntimeOptions::agent;
     auto t1_agent = RuntimeOptions::t1_agent;

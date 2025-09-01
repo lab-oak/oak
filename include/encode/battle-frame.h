@@ -7,7 +7,7 @@
 
 namespace Encode {
 
-struct BattleFrame {
+struct Battle::Frame {
   uint8_t m, n;
 
   std::array<std::array<std::array<float, Pokemon::n_dim>, 5>, 2> pokemon;
@@ -17,8 +17,8 @@ struct BattleFrame {
   std::array<int64_t, 9> p1_choice_indices;
   std::array<int64_t, 9> p2_choice_indices;
 
-  BattleFrame() = default;
-  BattleFrame(const Train::BattleFrame &frame)
+  Battle::Frame() = default;
+  Battle::Frame(const Train::Battle::Frame &frame)
       : pokemon{}, active{}, hp{}, p1_choice_indices{}, p2_choice_indices{} {
 
     const auto &battle = View::ref(frame.battle);
@@ -50,7 +50,7 @@ struct BattleFrame {
   }
 };
 
-struct BattleFrameInput {
+struct Battle::FrameInput {
   uint8_t *m;
   uint8_t *n;
 
@@ -69,7 +69,7 @@ struct BattleFrameInput {
   float *nash_value;
   float *score;
 
-  BattleFrameInput index(auto i) const {
+  Battle::FrameInput index(auto i) const {
     auto copy = *this;
     copy.m += i;
     copy.n += i;
@@ -88,7 +88,7 @@ struct BattleFrameInput {
     return copy;
   }
 
-  void write(const BattleFrame &frame, const Train::Target &target) {
+  void write(const Battle::Frame &frame, const Train::Target &target) {
     *m++ = frame.m;
     *n++ = frame.n;
 

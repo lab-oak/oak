@@ -32,7 +32,7 @@ constexpr out_type uncompress_probs(in_type x) {
 }
 
 template <typename policy_type = uint16_t, typename value_type = uint16_t>
-struct CompressedBattleFramesImpl {
+struct CompressedBattle::FramesImpl {
 
   struct Update {
     // rolling out
@@ -143,8 +143,9 @@ struct CompressedBattleFramesImpl {
   pkmn_result result;
   std::vector<Update> updates;
 
-  CompressedBattleFramesImpl() = default;
-  CompressedBattleFramesImpl(const pkmn_gen1_battle &battle) : battle{battle} {}
+  CompressedBattle::FramesImpl() = default;
+  CompressedBattle::FramesImpl(const pkmn_gen1_battle &battle)
+      : battle{battle} {}
 
   auto n_bytes() const {
     auto n =
@@ -190,17 +191,17 @@ struct CompressedBattleFramesImpl {
     return true;
   }
 
-  std::vector<BattleFrame> uncompress() const {
+  std::vector<Battle::Frame> uncompress() const {
     pkmn_gen1_battle b = this->battle;
     auto options = PKMN::options();
     pkmn_result result{80};
 
-    std::vector<BattleFrame> frames;
+    std::vector<Battle::Frame> frames;
     frames.reserve(updates.size());
 
     for (const auto &update : updates) {
       frames.emplace_back();
-      BattleFrame &frame = frames.back();
+      Battle::Frame &frame = frames.back();
       frame.m = update.m;
       frame.n = update.n;
 
@@ -237,6 +238,6 @@ struct CompressedBattleFramesImpl {
   }
 };
 
-using CompressedBattleFrames = CompressedBattleFramesImpl<>;
+using CompressedBattle::Frames = CompressedBattle::FramesImpl<>;
 
 }; // namespace Train
