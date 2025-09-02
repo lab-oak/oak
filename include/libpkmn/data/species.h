@@ -929,6 +929,20 @@ constexpr std::array<SpeciesData, 151> SPECIES_DATA{
         {Type::Psychic, Type::Psychic},
     }};
 
+consteval auto get_all_species() {
+  std::array<Species, 152> all_species{};
+  for (auto i = 0; i < 152; ++i) {
+    all_species[i] = static_cast<Species>(i);
+  }
+  return all_species;
+}
+
+constexpr auto all_species = get_all_species();
+
+constexpr auto species(const auto s) noexcept {
+  return static_cast<Species>(s);
+}
+
 constexpr auto get_species_data(Species species) noexcept {
   return SPECIES_DATA[static_cast<uint8_t>(species) - 1];
 }

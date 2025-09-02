@@ -1,7 +1,7 @@
 #include <format/OU/teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
-#include <nn/network.h>
+#include <nn/battle/network.h>
 #include <train/compressed-battle-frame.h>
 #include <util/policy.h>
 #include <util/random.h>

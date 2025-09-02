@@ -1,9 +1,9 @@
 #include <format/OU/teams.h>
-#include <nn/build-network.h>
-#include <nn/network.h>
+#include <nn/battle/network.h>
+#include <nn/build/network.h>
+#include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
-#include <train/build-trajectory.h>
-#include <train/compressed-battle-frame.h>
+#include <train/build/trajectory.h>
 #include <util/parse.h>
 #include <util/policy.h>
 #include <util/random.h>

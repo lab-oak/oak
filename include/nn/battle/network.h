@@ -2,11 +2,106 @@
 
 #include <encode/battle/battle.h>
 #include <libpkmn/data.h>
-#include <nn/cache.h>
+#include <nn/battle/cache.h>
 #include <nn/params.h>
 #include <nn/subnet.h>
+#include <util/random.h>
 
 namespace NN {
+
+namespace Battle {
+
+template <int in_dim, int hidden_dim, int value_hidden_dim,
+          int policy_hidden_dim, int policy_out_dim>
+struct MainNet {
+
+  Affine<in_dim, hidden_dim> fc0;
+  Affine<hidden_dim, value_hidden_dim> value_fc1;
+  Affine<value_hidden_dim, 1, false> value_fc2;
+  Affine<hidden_dim, policy_hidden_dim> policy1_fc1;
+  Affine<policy_hidden_dim, policy_out_dim, false> policy1_fc2;
+  Affine<hidden_dim, policy_hidden_dim> policy2_fc1;
+  Affine<policy_hidden_dim, policy_out_dim, false> policy2_fc2;
+
+  bool operator==(const MainNet &) const = default;
+
+  void initialize(auto &device) {
+    fc0.initialize(device);
+    value_fc1.initialize(device);
+    value_fc2.initialize(device);
+    policy1_fc1.initialize(device);
+    policy1_fc2.initialize(device);
+    policy2_fc1.initialize(device);
+    policy2_fc2.initialize(device);
+  }
+
+  bool read_parameters(std::istream &stream) {
+    return fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
+           value_fc2.read_parameters(stream) &&
+           policy1_fc1.read_parameters(stream) &&
+           policy1_fc2.read_parameters(stream) &&
+           policy2_fc1.read_parameters(stream) &&
+           policy2_fc2.read_parameters(stream);
+  }
+
+  bool write_parameters(std::ostream &stream) {
+    return fc0.write_parameters(stream) && value_fc1.write_parameters(stream) &&
+           value_fc2.write_parameters(stream) &&
+           policy1_fc1.write_parameters(stream) &&
+           policy1_fc2.write_parameters(stream) &&
+           policy2_fc1.write_parameters(stream) &&
+           policy2_fc2.write_parameters(stream);
+  }
+
+  // TODO for now main does not do policy out, thats done by full net
+  float propagate(const float *input_data) const {
+    static thread_local float buffer0[hidden_dim];
+    static thread_local float value_buffer1[value_hidden_dim];
+    static thread_local float value_buffer2[1];
+    fc0.propagate(input_data, buffer0);
+    value_fc1.propagate(buffer0, value_buffer1);
+    value_fc2.propagate(value_buffer1, value_buffer2);
+    return 1 / (1 + std::exp(-value_buffer2[0]));
+  }
+
+  float propagate(const float *input_data, const auto m, const auto n,
+                  const auto *p1_choice_index, const auto *p2_choice_index,
+                  float *p1, float *p2) const {
+    static thread_local float buffer0[hidden_dim];
+    static thread_local float value_buffer1[value_hidden_dim];
+    static thread_local float value_buffer2[1];
+    static thread_local float policy1_buffer1[policy_hidden_dim];
+    static thread_local float policy2_buffer1[policy_hidden_dim];
+
+    fc0.propagate(input_data, buffer0);
+    value_fc1.propagate(buffer0, value_buffer1);
+    value_fc2.propagate(value_buffer1, value_buffer2);
+    policy1_fc1.propagate(buffer0, policy1_buffer1);
+    policy2_fc1.propagate(buffer0, policy2_buffer1);
+
+    for (auto i = 0; i < m; ++i) {
+      const auto p1_c = p1_choice_index[i];
+      assert(p1_c < Encode::Policy::n_dim);
+      const float logit =
+          policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              policy1_buffer1, value_hidden_dim)) +
+          policy1_fc2.biases[p1_c];
+      p1[i] = logit;
+    }
+
+    for (auto i = 0; i < n; ++i) {
+      const auto p2_c = p2_choice_index[i];
+      assert(p2_c < Encode::Policy::n_dim);
+      const float logit =
+          policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              policy2_buffer1, value_hidden_dim)) +
+          policy2_fc2.biases[p2_c];
+      p2[i] = logit;
+    }
+
+    return 1 / (1 + std::exp(-value_buffer2[0]));
+  }
+};
 
 struct Network {
   using PokemonNet =
@@ -14,7 +109,6 @@ struct Network {
   using ActiveNet =
       EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
 
-  mt19937 device;
   PokemonNet pokemon_net;
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
       pokemon_cache;
@@ -23,9 +117,7 @@ struct Network {
           policy_out_dim>
       main_net;
 
-  Network()
-      : device{std::random_device{}()}, pokemon_net{}, active_net{},
-        main_net{} {}
+  Network() : pokemon_net{}, active_net{}, main_net{} {}
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
@@ -33,6 +125,7 @@ struct Network {
   }
 
   void initialize() {
+    mt19937 device{std::random_device{}()};
     pokemon_net.initialize(device);
     active_net.initialize(device);
     main_net.initialize(device);
@@ -127,6 +220,24 @@ struct Network {
     return value;
   }
 
+  void foo(const pkmn_gen1_battle &b, const auto &p1_choices,
+           const auto &p2_choices) {
+    const auto &battle = View::ref(b);
+
+    std::array<uint16_t, 9> p1_choice_indices;
+    std::array<uint16_t, 9> p2_choice_indices;
+
+    for (auto i = 0; i < m; ++i) {
+      p1_choice_indices[i] =
+          Encode::Policy::get_index(b.sides[0], p1_choices[i]);
+    }
+
+    for (auto i = 0; i < n; ++i) {
+      p2_choice_indices[i] =
+          Encode::Policy::get_index(b.sides[1], p2_choices[i]);
+    }
+  }
+
   float inference(const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d, const auto m,
                   const auto n, const auto *p1_choice_index,
@@ -159,5 +270,7 @@ struct Network {
     }
   }
 };
+
+} // namespace Battle
 
 } // namespace NN

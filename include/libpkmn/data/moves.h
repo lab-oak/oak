@@ -1777,6 +1777,18 @@ static constexpr std::array<uint8_t, 165> PP{
 
 static_assert(sizeof(Move) == 1);
 
+consteval auto get_all_moves() {
+  std::array<Move, 166> all_moves{};
+  for (auto i = 0; i < 166; ++i) {
+    all_moves[i] = static_cast<Move>(i);
+  }
+  return all_moves;
+}
+
+constexpr auto all_moves = get_all_moves();
+
+constexpr auto move(const auto m) noexcept { return static_cast<Move>(m); }
+
 constexpr auto move_data(const auto move) noexcept {
   return MOVE_DATA[static_cast<uint8_t>(move) - 1];
 }

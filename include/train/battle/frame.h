@@ -1,6 +1,6 @@
 #pragma once
 
-#include <train/target.h>
+#include <train/battle/target.h>
 
 namespace Train {
 

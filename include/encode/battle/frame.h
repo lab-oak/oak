@@ -3,7 +3,7 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/policy.h>
 #include <train/battle/frame.h>
-#include <train/target.h>
+#include <train/battle/target.h>
 
 namespace Encode {
 

@@ -2,8 +2,8 @@
 
 /*
 
-Sytactic sugar over the raw tables. Also improves performance w.r.t. scanning (e.g. writing TrjaectoryInput)
-since the movesets are sparse.
+Sytactic sugar over the raw tables. Also improves performance w.r.t. scanning
+(e.g. writing TrjaectoryInput) since the movesets are sparse.
 
 */
 
@@ -23,27 +23,39 @@ template <LearnsetTable ls> consteval auto get_move_pool_sizes() {
   return move_pool_sizes;
 }
 
-template <LearnsetTable ls>
-consteval auto get_max_move_pool_size() {
+template <LearnsetTable ls> consteval auto get_max_move_pool_size() {
   constexpr auto size = get_move_pool_sizes<ls>();
   constexpr auto max = *std::max_element(size.begin(), size.end());
   return max;
 }
 
 template <LearnsetTable ls> consteval auto get_move_pools_flat() {
-
-  constexpr max = get_max_move_pool_size<ls>();
+  constexpr auto max = get_max_move_pool_size<ls>();
   using MovePool = std::array<PKMN::Data::Move, max>;
   std::array<MovePool, 152> list{};
   for (auto i = 0; i < 152; ++i) {
     auto index = 0;
     for (uint8_t m = 0; m < 166; ++m) {
-      if (MOVE_POOLS[i][m]) {
+      if (ls[i][m]) {
         list[i][index++] = static_cast<PKMN::Data::Move>(m);
       }
     }
   }
   return list;
 }
+
+template <LearnsetTable LEARNSETS> struct MovePool {
+  static constexpr auto sizes = get_move_pool_sizes<LEARNSETS>();
+  static constexpr auto pools = get_move_pools_flat<LEARNSETS>();
+  static constexpr auto max_size = get_max_move_pool_size<LEARNSETS>();
+  using MovePool = std::array<PKMN::Data::Move, max_size>;
+  static constexpr auto size(const auto species) {
+    return sizes[static_cast<uint8_t>(species)];
+  }
+  template <typename T>
+  static constexpr const auto &operator(const T species)() {
+    return pools[static_cast<uint8_t>(species)];
+  }
+};
 
 } // namespace Format

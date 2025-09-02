@@ -12,6 +12,7 @@ auto softmax(auto &x) {
   return y;
 }
 
+template <typename MovePool>
 [[nodiscard]] auto rollout_without_reward(auto &device, auto &network,
                                           const auto &team) {
   using namespace Train::TeamBuilding;

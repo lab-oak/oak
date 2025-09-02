@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nn/network.h>
+#include <nn/battle/network.h>
 #include <search/bandit/exp3-policy.h>
 #include <search/bandit/exp3.h>
 #include <search/bandit/ucb-policy.h>

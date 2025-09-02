@@ -3,7 +3,7 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/key.h>
 #include <libpkmn/data/status.h>
-#include <nn/cache.h>
+#include <nn/battle/cache.h>
 
 namespace NN {
 
@@ -43,7 +43,7 @@ template <typename T, int dim = 39> struct PokemonCache {
       const auto get_entry = [&pokemon_net, &pokemon, this](const auto sleep) {
         std::array<float, Encode::Pokemon::n_dim> input{};
         Encode::Pokemon::write(pokemon, sleep, input.data());
-        const auto key = Encode::pokemon_key(pokemon, sleep);
+        const auto key = Encode::Battle::pokemon_key(pokemon, sleep);
         pokemon_net.propagate(input.data(), this->embeddings[key].data());
       };
 
@@ -62,7 +62,7 @@ template <typename T, int dim = 39> struct PokemonCache {
   }
 
   const T *get(const auto &pokemon, const auto sleep) const {
-    const auto key = Encode::pokemon_key(pokemon, sleep);
+    const auto key = Encode::Battle::pokemon_key(pokemon, sleep);
     return embeddings[key].data();
   }
 };

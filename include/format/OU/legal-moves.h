@@ -1,6 +1,6 @@
 #pragma once
 
-#include <format/cart-legal.h>
+#include <format/legal-moves.h>
 
 /*
 Banned pokemon should have their movesets nullified for compatilibity with the
@@ -22,12 +22,8 @@ consteval auto apply_bans() {
     move_pool[static_cast<uint8_t>(Minimize)] = false;
     move_pool[static_cast<uint8_t>(DoubleTeam)] = false;
   }
-  for (auto &flag : LEARNSETS[150]) {
-    flag = false;
-  }
-  for (auto &flag : LEARNSETS[151]) {
-    flag = false;
-  }
+  LEARNSETS_OU_LEGAL[150] = {};
+  LEARNSETS_OU_LEGAL[151] = {};
   return LEARNSETS_OU_LEGAL;
 }
 
