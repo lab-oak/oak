@@ -136,26 +136,39 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     Default = 0,
     WithTeam = 1,
   };
-
   struct Header {
     Version format;
     uint8_t score;
     uint16_t eval;
   };
-
-  Header header;
   struct Update {
     uint16_t action;
     uint16_t probability;
+    
+    Update = default;
+
+    Update(int a, float p) {
+      assert(a >= 0);
+      action = a;
+      probability = (float)std::numeric_limits<uint16_t>::max() * p;
+      if (p != 0 && probability == 0) {
+        probability = 1;
+      }
+    }
   };
+
+  Header header;
   std::array<Update, 31> updates;
   PKMN::Team opp;
 
-  CompressedTrajectory(const Train::Build::Trajectory &trajectory) {
+  CompressedTrajectory(const Train::Build::Trajectory &trajectory)
+      : header{}, updates{}, opp{} {
     using PKMN::Data::Move;
     using PKMN::Data::Species;
     auto i = 0;
     assert(trajectory.initial.size() <= 6);
+
+    // encode initial team
     for (const auto &set : trajectory.initial) {
       if (set.species != Species::None) {
         updates[i++] =
@@ -170,9 +183,20 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     }
     assert(i + trajectory.updates.size() <= 31);
 
+    // encode the updates
     std::transform(trajectory.updates.begin(), trajectory.updates.end() - 1,
-                   updates.begin() + i,
-                   [](const auto &update) { return Update{}; });
+                   updates.begin() + i, [](const auto &update) {
+                     const auto &action = update.legal_moves[update.index];
+                     return Update{Tensorizer<F>::species_move_table(
+                                       action[0].species, action[0].move),
+                                   action.probability};
+                   });
+
+    // fill the rest
+
+    // select lead
+
+    // rewards
   }
 
   void write(char *data) const {}

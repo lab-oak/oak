@@ -27,9 +27,9 @@ template <typename F = Format::OU> struct Actions {
     using Train::Build::Action;
     using Train::Build::BasicAction;
 
-    std::vector<Action> actions;
-    // actions.reserve(max_actions);
+    std::vector<Action> actions{};
 
+    // add a unique pokemon to the first empty slot
     auto empty_slot =
         std::find_if(team.begin(), team.end(), [](const auto &set) {
           return set.species == Species::None;
@@ -40,30 +40,32 @@ template <typename F = Format::OU> struct Actions {
       for (const auto &set : team) {
         ls_end = std::remove(ls.begin(), ls_end, set.species);
       }
-      for (auto it = ls.begin(); it != ls_end; ++it) {
-        actions.emplace_back(Action{BasicAction{
-            0, std::distance(team.begin(), empty_slot), 0, *it, Move::None}});
-      }
+      std::transform(ls.begin(), ls_end, std::back_inserter(actions),
+                     [&empty_slot](const auto species) {
+                       return Action{BasicAction{
+                           0, std::distance(team.begin(), empty_slot), 0,
+                           species, Move::None}};
+                     });
     }
 
-    for (auto i = 0; i < team.size(); ++i) {
-      const auto &set = team[i];
+    for (const auto &set : team) {
+      // add a unique move to the first empty move slot
       if (set.species != Species::None) {
         auto empty = std::find(set.moves.begin(), set.moves.end(), Move::None);
-
         if (empty != set.moves.end()) {
           auto move_pool = F::move_pool(set.species);
           const auto start = move_pool.begin();
           auto end = start + F::move_pool_size(set.species);
-          for (auto j = 0; j < set.moves.size(); ++j) {
-            const auto move = set.moves[j];
-            if (move == Move::None && start != end) {
-              end = std::remove(start, end, move);
-            }
+          for (const auto move : set.moves) {
+            end = std::remove(start, end, move);
           }
-          actions.emplace_back(
-              Action{BasicAction{0, i, std::distance(set.moves.begin(), empty),
-                                 set.species, Move::None}});
+          std::transform(start, end, std::back_inserter(actions),
+                         [&team, &set, &empty](const auto move) {
+                           return Action{BasicAction{
+                               0, std::distance(&team[0], &set),
+                               std::distance(set.moves.begin(), empty),
+                               set.species, move}};
+                         });
         }
       }
     }
@@ -71,8 +73,24 @@ template <typename F = Format::OU> struct Actions {
     return actions;
   }
 
-  static std::vector<Train::Build::Action> get_lead_actions() { return {}; }
+  static auto get_lead_actions(const auto &team) {
+    using PKMN::Data::Move;
+    using PKMN::Data::Species;
+    using Train::Build::Action;
+    using Train::Build::BasicAction;
+
+    std::vector<Train::Build::Action> actions{};
+    for (auto i = 1; i < team.size(); ++i) {
+      const auto &set = team[i];
+      if (set.species != Species::None) {
+        actions.emplace_back(
+            Action{BasicAction{i, 0, 0, set.species, Move::None}});
+      }
+    }
+    return actions;
+  }
 };
+
 } // namespace Build
 
 } // namespace Encode
