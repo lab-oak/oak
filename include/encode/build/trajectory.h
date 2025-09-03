@@ -145,7 +145,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     uint16_t action;
     uint16_t probability;
     
-    Update = default;
+    Update() = default;
 
     Update(int a, float p) {
       assert(a >= 0);

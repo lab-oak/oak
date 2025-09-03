@@ -7,12 +7,14 @@
 
 namespace NN {
 
+namespace Battle {
+
 using PKMN::Data::Status;
 
 template <typename T, int dim = 39> struct PokemonCache {
 
   // Encode does not have a dimension for no status
-  static constexpr auto n_status = Encode::Status::n_dim + 1;
+  static constexpr auto n_status = Encode::Battle::Status::n_dim + 1;
   // We only encode whether the move has pp, so 2^4 for the moveset
   static constexpr auto n_pp = 16;
   // For a stored pokemon, the move pp and status features are the only ones
@@ -41,8 +43,8 @@ template <typename T, int dim = 39> struct PokemonCache {
       }
 
       const auto get_entry = [&pokemon_net, &pokemon, this](const auto sleep) {
-        std::array<float, Encode::Pokemon::n_dim> input{};
-        Encode::Pokemon::write(pokemon, sleep, input.data());
+        std::array<float, Encode::Battle::Pokemon::n_dim> input{};
+        Encode::Battle::Pokemon::write(pokemon, sleep, input.data());
         const auto key = Encode::Battle::pokemon_key(pokemon, sleep);
         pokemon_net.propagate(input.data(), this->embeddings[key].data());
       };
@@ -66,5 +68,7 @@ template <typename T, int dim = 39> struct PokemonCache {
     return embeddings[key].data();
   }
 };
+
+}
 
 } // namespace NN

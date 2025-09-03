@@ -21,9 +21,9 @@ policy_hidden_dim = ctypes.c_int.in_dll(lib, "policy_hidden_dim").value
 policy_out_dim = ctypes.c_int.in_dll(lib, "policy_out_dim").value
 
 # build net hyperparams
-builder_policy_hidden_dim = ctypes.c_int.in_dll(lib, "builder_policy_hidden_dim").value
-builder_value_hidden_dim = ctypes.c_int.in_dll(lib, "builder_value_hidden_dim").value
-builder_max_actions = ctypes.c_int.in_dll(lib, "builder_max_actions").value
+build_policy_hidden_dim = ctypes.c_int.in_dll(lib, "build_policy_hidden_dim").value
+build_value_hidden_dim = ctypes.c_int.in_dll(lib, "build_value_hidden_dim").value
+build_max_actions = ctypes.c_int.in_dll(lib, "build_max_actions").value
 
 species_move_list_size = ctypes.c_int.in_dll(lib, "species_move_list_size").value
 species_move_list_raw = ctypes.POINTER(ctypes.c_int).in_dll(
@@ -187,7 +187,7 @@ class BuildTrajectory:
         self.size = size
 
         self.actions = np.zeros((size, 31, 1), dtype=np.int64)
-        self.mask = np.zeros((size, 31, builder_max_actions), dtype=np.int64)
+        self.mask = np.zeros((size, 31, build_max_actions), dtype=np.int64)
         self.policy = np.zeros((size, 31, 1), dtype=np.float32)
         self.eval = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)

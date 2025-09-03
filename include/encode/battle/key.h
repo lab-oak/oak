@@ -65,7 +65,7 @@ static_assert(check_pp_byte());
 uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
   uint8_t key = pp_byte(std::bit_cast<uint64_t>(pokemon.moves));
   if (static_cast<bool>(pokemon.status)) {
-    key |= (Encode::Status::get_status_index(pokemon.status, sleep) + 1) << 4;
+    key |= (Status::get_status_index(pokemon.status, sleep) + 1) << 4;
   }
   return key;
 }

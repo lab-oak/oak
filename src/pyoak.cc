@@ -25,17 +25,19 @@ constexpr auto dim_labels_to_c(const auto &data) {
   return ptrs;
 }
 
-const auto move_names_ptrs = dim_labels_to_c(Data::MOVE_CHAR_ARRAY);
-const auto species_names_ptrs = dim_labels_to_c(Data::SPECIES_CHAR_ARRAY);
+const auto move_names_ptrs = dim_labels_to_c(PKMN::Data::MOVE_CHAR_ARRAY);
+const auto species_names_ptrs = dim_labels_to_c(PKMN::Data::SPECIES_CHAR_ARRAY);
 extern "C" const char *const *move_names = move_names_ptrs.data();
 extern "C" const char *const *species_names = species_names_ptrs.data();
 
-extern "C" const auto species_move_list_size = static_cast<int>(Build::);
+using Tensorizer = Encode::Build::Tensorizer<>;
+
+extern "C" const auto species_move_list_size = static_cast<int>(Tensorizer::species_move_list_size);
 
 consteval auto get_species_move_list_py() {
   std::array<int, species_move_list_size * 2> result{};
   for (auto i = 0; i < species_move_list_size; ++i) {
-    const auto pair = Encode::Team::SPECIES_MOVE_LIST[i];
+    const auto pair = Tensorizer::species_move_list(i);
     result[2 * i] = static_cast<int>(pair.first);
     result[2 * i + 1] = static_cast<int>(pair.second);
   }
@@ -47,8 +49,8 @@ const auto species_move_list_py = get_species_move_list_py();
 extern "C" const int *species_move_list_ptrs = species_move_list_py.data();
 
 const auto pokemon_dim_label_ptrs =
-    dim_labels_to_c(Encode::Pokemon::dim_labels);
-const auto active_dim_label_ptrs = dim_labels_to_c(Encode::Active::dim_labels);
+    dim_labels_to_c(Encode::Battle::Pokemon::dim_labels);
+const auto active_dim_label_ptrs = dim_labels_to_c(Encode::Battle::Active::dim_labels);
 const auto policy_dim_label_ptrs = dim_labels_to_c(Encode::Policy::dim_labels);
 
 extern "C" const char *const *pokemon_dim_labels =
@@ -56,23 +58,23 @@ extern "C" const char *const *pokemon_dim_labels =
 extern "C" const char *const *active_dim_labels = active_dim_label_ptrs.data();
 extern "C" const char *const *policy_dim_labels = policy_dim_label_ptrs.data();
 
-extern "C" const int pokemon_in_dim = Encode::Pokemon::n_dim;
-extern "C" const int active_in_dim = Encode::Active::n_dim;
+extern "C" const int pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
+extern "C" const int active_in_dim = Encode::Battle::Active::n_dim;
 
-extern "C" const int pokemon_hidden_dim = NN::pokemon_hidden_dim;
-extern "C" const int pokemon_out_dim = NN::pokemon_out_dim;
-extern "C" const int active_hidden_dim = NN::active_hidden_dim;
-extern "C" const int active_out_dim = NN::active_out_dim;
-extern "C" const int side_out_dim = NN::side_out_dim;
-extern "C" const int hidden_dim = NN::hidden_dim;
-extern "C" const int value_hidden_dim = NN::value_hidden_dim;
-extern "C" const int policy_hidden_dim = NN::policy_hidden_dim;
-extern "C" const int policy_out_dim = NN::policy_out_dim;
+extern "C" const int pokemon_hidden_dim = NN::Battle::pokemon_hidden_dim;
+extern "C" const int pokemon_out_dim = NN::Battle::pokemon_out_dim;
+extern "C" const int active_hidden_dim = NN::Battle::active_hidden_dim;
+extern "C" const int active_out_dim = NN::Battle::active_out_dim;
+extern "C" const int side_out_dim = NN::Battle::side_out_dim;
+extern "C" const int hidden_dim = NN::Battle::hidden_dim;
+extern "C" const int value_hidden_dim = NN::Battle::value_hidden_dim;
+extern "C" const int policy_hidden_dim = NN::Battle::policy_hidden_dim;
+extern "C" const int policy_out_dim = NN::Battle::policy_out_dim;
 
-extern "C" const int builder_policy_hidden_dim = NN::builder_policy_hidden_dim;
-extern "C" const int builder_value_hidden_dim = NN::builder_value_hidden_dim;
+extern "C" const int build_policy_hidden_dim = NN::Build::policy_hidden_dim;
+extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;
 // input and output dim for policy net due to encoding
-extern "C" const int builder_max_actions = Encode::Team::max_actions;
+extern "C" const int build_max_actions = Tensorizer::max_actions;
 
 extern "C" int get_compressed_battles_helper(const char *path, char *out_data,
                                              uint16_t *offsets,
@@ -130,7 +132,7 @@ extern "C" void uncompress_training_frames(
     float *p2_empirical, float *p2_nash, float *empirical_value,
     float *nash_value, float *score) {
 
-  Train::Battle::CompressedFrames::Frames compressed_frames{};
+  Train::Battle::CompressedFrames compressed_frames{};
   compressed_frames.read(data);
 
   Train::Battle::FrameInput input{.m = m,
@@ -160,7 +162,7 @@ extern "C" void uncompress_and_encode_training_frames(
     float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
     float *empirical_value, float *nash_value, float *score) {
 
-  Train::Battle::CompressedFrames::Frames compressed_frames{};
+  Train::Battle::CompressedFrames compressed_frames{};
   compressed_frames.read(data);
 
   Encode::Battle::FrameInput input{.m = m,
@@ -271,7 +273,7 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::Battle::CompressedFrames::Frames battle_frames{};
+    Train::Battle::CompressedFrames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -348,7 +350,7 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::Battle::CompressedFrames::Frames battle_frames{};
+    Train::Battle::CompressedFrames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -435,7 +437,7 @@ extern "C" size_t encode_buffer_multithread(
         char *buf = buffer.data();
         file.read(buf, offset);
         // parse buffer to compressed
-        Train::Battle::CompressedFrames::Frames battle_frames{};
+        Train::Battle::CompressedFrames battle_frames{};
         battle_frames.read(buf);
 
         // uncompress

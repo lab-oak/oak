@@ -9,6 +9,8 @@
 
 namespace Encode {
 
+namespace Battle {
+
 using PKMN::Data::Move;
 using PKMN::Data::Species;
 using PKMN::Data::Type;
@@ -361,5 +363,7 @@ consteval auto get_dim_labels() {
 constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Active
+
+}
 
 } // namespace Encode

@@ -7,7 +7,9 @@
 
 namespace Encode {
 
-struct Battle::Frame {
+struct Battle {
+
+struct Frame {
   uint8_t m, n;
 
   std::array<std::array<std::array<float, Pokemon::n_dim>, 5>, 2> pokemon;
@@ -17,8 +19,8 @@ struct Battle::Frame {
   std::array<int64_t, 9> p1_choice_indices;
   std::array<int64_t, 9> p2_choice_indices;
 
-  Battle::Frame() = default;
-  Battle::Frame(const Train::Battle::Frame &frame)
+  Frame() = default;
+  Frame(const Train::Battle::Frame &frame)
       : pokemon{}, active{}, hp{}, p1_choice_indices{}, p2_choice_indices{} {
 
     const auto &battle = View::ref(frame.battle);
@@ -28,13 +30,13 @@ struct Battle::Frame {
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
       hp[s][0] = (float)stored.hp / stored.stats.hp;
-      Encode::Active::write(stored, side.active, duration, active[s][0].data());
+      Encode::Battle::Active::write(stored, side.active, duration, active[s][0].data());
 
       for (auto slot = 2; slot <= 6; ++slot) {
         const auto &poke = side.get(slot);
         const auto sleep = duration.sleep(slot - 1);
         hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
-        Encode::Pokemon::write(poke, sleep, pokemon[s][slot - 2].data());
+        Encode::Battle::Pokemon::write(poke, sleep, pokemon[s][slot - 2].data());
       }
     }
     m = frame.m;
@@ -50,7 +52,7 @@ struct Battle::Frame {
   }
 };
 
-struct Battle::FrameInput {
+struct FrameInput {
   uint8_t *m;
   uint8_t *n;
 
@@ -69,7 +71,7 @@ struct Battle::FrameInput {
   float *nash_value;
   float *score;
 
-  Battle::FrameInput index(auto i) const {
+  FrameInput index(auto i) const {
     auto copy = *this;
     copy.m += i;
     copy.n += i;
@@ -134,5 +136,7 @@ struct Battle::FrameInput {
     *score++ = target.score;
   }
 };
+
+}
 
 } // namespace Encode

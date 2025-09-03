@@ -19,6 +19,8 @@ are legal, so we don't have to compute the entire logit layer.
 
 namespace Encode {
 
+namespace Battle {
+
 namespace Policy {
 
 // all moves besides struggle, all pokemon. No None.
@@ -76,5 +78,7 @@ consteval auto get_dim_labels() {
 constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Policy
+
+}
 
 } // namespace Encode

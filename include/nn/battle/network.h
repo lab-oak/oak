@@ -81,7 +81,7 @@ struct MainNet {
 
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];
-      assert(p1_c < Encode::Policy::n_dim);
+      assert(p1_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
               policy1_buffer1, value_hidden_dim)) +
@@ -91,7 +91,7 @@ struct MainNet {
 
     for (auto i = 0; i < n; ++i) {
       const auto p2_c = p2_choice_index[i];
-      assert(p2_c < Encode::Policy::n_dim);
+      assert(p2_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
               policy2_buffer1, value_hidden_dim)) +
@@ -105,9 +105,9 @@ struct MainNet {
 
 struct Network {
   using PokemonNet =
-      EmbeddingNet<Encode::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
+      EmbeddingNet<Encode::Battle::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
   using ActiveNet =
-      EmbeddingNet<Encode::Active::n_dim, active_hidden_dim, active_out_dim>;
+      EmbeddingNet<Encode::Battle::Active::n_dim, active_hidden_dim, active_out_dim>;
 
   PokemonNet pokemon_net;
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
@@ -172,8 +172,8 @@ struct Network {
 
   void write_main(float main_input[2][256], const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
-    static thread_local float pokemon_input[2][5][Encode::Pokemon::n_dim];
-    static thread_local float active_input[2][1][Encode::Active::n_dim];
+    static thread_local float pokemon_input[2][5][Encode::Battle::Pokemon::n_dim];
+    static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
     const auto &battle = View::ref(b);
     const auto &durations = View::ref(d);
@@ -183,10 +183,10 @@ struct Network {
       const auto &stored = side.stored();
 
       if (stored.hp == 0) {
-        std::fill(main_input[s], main_input[s] + (Encode::Active::n_dim + 1),
+        std::fill(main_input[s], main_input[s] + (Encode::Battle::Active::n_dim + 1),
                   0);
       } else {
-        Encode::Active::write(stored, side.active, duration,
+        Encode::Battle::Active::write(stored, side.active, duration,
                               active_input[s][0]);
         active_net.propagate(active_input[s][0], main_input[s] + 1);
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
@@ -230,12 +230,12 @@ struct Network {
 
     // for (auto i = 0; i < m; ++i) {
     //   p1_choice_indices[i] =
-    //       Encode::Policy::get_index(b.sides[0], p1_choices[i]);
+    //       Encode::Battle::Policy::get_index(b.sides[0], p1_choices[i]);
     // }
 
     // for (auto i = 0; i < n; ++i) {
     //   p2_choice_indices[i] =
-    //       Encode::Policy::get_index(b.sides[1], p2_choices[i]);
+    //       Encode::Battle::Policy::get_index(b.sides[1], p2_choices[i]);
     // }
   }
 

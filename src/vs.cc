@@ -1,8 +1,8 @@
-#include <format/OU/teams.h>
+#include <teams/ou-sample-teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
 #include <nn/battle/network.h>
-#include <train/compressed-battle-frame.h>
+#include <train/battle/compressed-frame.h>
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
@@ -62,7 +62,7 @@ void thread_fn(uint64_t seed) {
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) {
     const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
-    if (!p1_agent.empty() && p1_agent.network_path != "mc") {
+    if (!p1_agent.network_path.empty() && p1_agent.network_path != "mc") {
       p1_agent.network.emplace();
       std::ifstream file{std::filesystem::path{p1_agent.network_path}};
       if (file.fail() || !p1_agent.network.value().read_parameters(file)) {
@@ -71,7 +71,7 @@ void thread_fn(uint64_t seed) {
       }
       p1_agent.network.value().fill_cache(battle);
     }
-    if (!p2_agent.empty() && p2_agent.network_path != "mc") {
+    if (!p2_agent.network_path.empty() && p2_agent.network_path != "mc") {
       p2_agent.network.emplace();
       std::ifstream file{std::filesystem::path{p2_agent.network_path}};
       if (file.fail() || !p2_agent.network.value().read_parameters(file)) {
@@ -104,6 +104,7 @@ void thread_fn(uint64_t seed) {
         int p1_early_stop = 0;
         int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
+          RuntimeSearch::Nodes nodes{};
           p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
@@ -111,10 +112,8 @@ void thread_fn(uint64_t seed) {
                                         p1_output.p1_nash, p1_policy_options);
         }
         if (p2_choices.size() > 1) {
-          p2_output = RuntimeSearch::run(battle_data, p2_search_options.count,
-                                         p2_search_options.count_mode,
-                                         p2_search_options.bandit_name,
-                                         p2_search_options.battle_network_path);
+          RuntimeSearch::Nodes nodes{};
+          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
@@ -149,13 +148,13 @@ void thread_fn(uint64_t seed) {
       RuntimeData::n.fetch_add(1);
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
-      return;
+      return MCTS::Output{};
     }
   };
 
   while (true) {
-    const auto p1_team = Teams::teams[device.random_int(Teams::teams.size())];
-    const auto p2_team = Teams::teams[device.random_int(Teams::teams.size())];
+    const auto p1_team = Teams::ou_sample_teams[device.random_int(Teams::ou_sample_teams.size())];
+    const auto p2_team = Teams::ou_sample_teams[device.random_int(Teams::ou_sample_teams.size())];
 
     play(p1_team, p2_team);
     play(p2_team, p1_team);
@@ -192,41 +191,39 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
-  if (argc < 11) {
-    std::cerr << "Side: count mode bandit-name net-path policy-mode.\n Input "
+  if (argc < 9) {
+    std::cerr << "Side: search-time bandit-name network-path policy-mode.\n Input "
                  "(Side) p1, "
                  "(Side) p2."
               << std::endl;
     return 1;
   }
 
-  p1_search_options.count = std::atoll(argv[1]);
-  p1_search_options.count_mode = argv[2][0];
-  p1_search_options.bandit_name = std::string{argv[3]};
-  p1_search_options.battle_network_path = std::string(argv[4]);
-  p1_policy_options.policy_mode = argv[5][0];
+  p1_agent.search_time = std::string(argv[1]);
+  p1_agent.bandit_name = std::string{argv[2]};
+  p1_agent.network_path = std::string(argv[3]);
+  p1_policy_options.mode = argv[4][0];
 
-  p2_search_options.count = std::atoll(argv[6]);
-  p2_search_options.count_mode = argv[7][0];
-  p2_search_options.bandit_name = std::string{argv[8]};
-  p2_search_options.battle_network_path = std::string(argv[9]);
-  p2_policy_options.policy_mode = argv[10][0];
+  p2_agent.search_time = std::string(argv[5]);
+  p2_agent.bandit_name = std::string{argv[6]};
+  p2_agent.network_path = std::string(argv[7]);
+  p2_policy_options.mode = argv[8][0];
 
-  std::cout << "P1: " << p1_search_options.to_string() << ' '
-            << p1_policy_options.to_string() << std::endl;
-  std::cout << "P2: " << p2_search_options.to_string() << ' '
-            << p2_policy_options.to_string() << std::endl;
+  // std::cout << "P1: " << p1_agent.to_string() << ' '
+  //           << p1_policy_options.to_string() << std::endl;
+  // std::cout << "P2: " << p2_agent.to_string() << ' '
+  //           << p2_policy_options.to_string() << std::endl;
 
   size_t threads = 1;
   size_t seed = std::random_device{}();
+  if (argc > 9) {
+    threads = std::atoll(argv[9]);
+  }
+  if (argc > 10) {
+    print_prob = std::atof(argv[10]);
+  }
   if (argc > 11) {
-    threads = std::atoll(argv[11]);
-  }
-  if (argc > 12) {
-    print_prob = std::atof(argv[12]);
-  }
-  if (argc > 13) {
-    seed = std::atoll(argv[13]);
+    seed = std::atoll(argv[11]);
   }
 
   std::cout << "threads: " << threads << std::endl;
