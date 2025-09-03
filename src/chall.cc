@@ -15,7 +15,7 @@ void handle_suspend(int signal) {
 
 MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
   auto [battle, durations] = Parse::parse_battle(line, seed);
-  apply_durations(battle, durations);
+  MCTS::apply_durations(battle, durations);
   return {battle, durations, PKMN::result(battle)};
 }
 
@@ -65,8 +65,6 @@ int main(int argc, char **argv) {
   pkmn_gen1_chance_options chance_options{};
   chance_options.durations = battle_data.durations;
   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
-
-  apply_durations(battle_data.battle, battle_data.durations);
 
   while (!pkmn_result_type(battle_data.result)) {
     std::cout << "\nBattle:" << std::endl;

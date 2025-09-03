@@ -62,9 +62,9 @@ struct Agent {
   std::optional<NN::Battle::Network> network;
   bool *flag;
 
-  bool is_monte_carlo() const {
-    return network_path.empty() || network_path == "mc" ||
-           network_path == "montecarlo" || network_path == "monte-carlo";
+  bool uses_network() const {
+    return !network_path.empty() && network_path != "mc" &&
+           network_path != "montecarlo" && network_path != "monte-carlo";
   }
 
   bool read_network_parameters() {
@@ -144,15 +144,15 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
 
   // get model
   const auto search_1 = [&](const auto dur) {
-    if (agent.is_monte_carlo()) {
-      MCTS::MonteCarlo model{std::random_device{}()};
-      return run_2(dur, model);
-    } else {
+    if (agent.uses_network()) {
       if (!agent.network.has_value()) {
         agent.read_network_parameters();
         agent.network.value().fill_cache(battle_data.battle);
       }
       return run_2(dur, agent.network.value());
+    } else {
+      MCTS::MonteCarlo model{std::random_device{}()};
+      return run_2(dur, model);
     }
   };
 

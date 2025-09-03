@@ -1,13 +1,10 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/policy.h>
-#include <encode/build-trajectory.h>
-#include <encode/encoded-battle-frame.h>
-#include <encode/team.h>
+#include <encode/build/trajectory.h>
 #include <nn/params.h>
+#include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
-#include <train/build-trajectory.h>
-#include <train/compressed-battle-frame.h>
-#include <util/debug-log.h>
+#include <train/build/trajectory.h>
 
 #include <atomic>
 #include <bit>
@@ -33,8 +30,7 @@ const auto species_names_ptrs = dim_labels_to_c(Data::SPECIES_CHAR_ARRAY);
 extern "C" const char *const *move_names = move_names_ptrs.data();
 extern "C" const char *const *species_names = species_names_ptrs.data();
 
-extern "C" const auto species_move_list_size =
-    static_cast<int>(Encode::Team::species_move_list_size);
+extern "C" const auto species_move_list_size = static_cast<int>(Build::);
 
 consteval auto get_species_move_list_py() {
   std::array<int, species_move_list_size * 2> result{};

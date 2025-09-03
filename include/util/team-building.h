@@ -24,10 +24,10 @@ auto softmax(auto &x) {
   trajectory.initial = team;
   trajectory.terminal = team;
 
-  auto input = Encode::Build::OUFormatter::write(team);
-  std::array<float, Encode::Build::OUFormatter::n_dim> logits;
+  auto input = Encode::Build::OUTensorizer::write(team);
+  std::array<float, Encode::Build::OUTensorizer::n_dim> logits;
 
-  auto actions = Encode::Build::OUFormatter::get_singleton_additions(team);
+  auto actions = Encode::Build::OUTensorizer::get_singleton_additions(team);
 
   while (!actions.empty()) {
 
@@ -35,7 +35,7 @@ auto softmax(auto &x) {
     std::vector<int> indices;
     std::transform(
         actions.begin(), actions.end(), std::back_inserter(indices),
-        [](auto action) { return Encode::Build::OUFormatter::action_index(action); });
+        [](auto action) { return Encode::Build::OUTensorizer::action_index(action); });
 
     network.propagate(input.data(), logits.data());
 
@@ -51,10 +51,10 @@ auto softmax(auto &x) {
 
     trajectory.updates.emplace_back(Trajectory::Update{actions, index, policy[index]});
 
-    actions = Encode::Build::OUFormatter::get_singleton_additions(trajectory.terminal);
+    actions = Encode::Build::OUTensorizer::get_singleton_additions(trajectory.terminal);
   }
 
-  // actions = Encode::Build::OUFormatter::get_switch_actions();
+  // actions = Encode::Build::OUTensorizer::get_switch_actions();
 
   return trajectory;
 }

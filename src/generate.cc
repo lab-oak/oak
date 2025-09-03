@@ -344,7 +344,7 @@ std::atomic<size_t> frame_counter{};
 std::atomic<size_t> traj_counter{};
 std::atomic<size_t> update_counter{};
 std::atomic<size_t> update_with_node_counter{};
-std::vector<PKMN::Team> teams;
+std::vector<std::vector<PKMN::Set>> teams;
 MatchupMatrix matchup_matrix;
 }; // namespace RuntimeData
 
@@ -474,11 +474,9 @@ void generate(uint64_t seed) {
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto battle_options = PKMN::options();
+    const auto result = PKMN::update(battle, 0, 0, battle_options);
 
-    MCTS::BattleData battle_data{battle, PKMN::durations(),
-                                 PKMN::result(battle)};
-    auto options = PKMN::options();
-    battle_data.result = PKMN::result();
+    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
 
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
@@ -488,7 +486,7 @@ void generate(uint64_t seed) {
 
     // if the std::optional<NN::Network> is not set then the params/cache will
     // be loaded/filled before every turn.
-    if (!agent.is_monte_carlo()) {
+    if (agent.uses_network()) {
       agent.read_network_parameters();
       agent.network.value().fill_cache(battle_data.battle);
     }
@@ -667,26 +665,45 @@ void setup() {
     }
     args_file << runtime_arg_string();
   }
+
   // get teams
   using RuntimeData::teams;
   if (!RuntimeOptions::TeamGen::teams_path.empty()) {
-    // TODO
-    // std::ifstream file{RuntimeOptions::TeamGen::teams_path};
-    // while (true) {
-    //   std::string line{};
-    //   std::getline(file, line);
-    //   if (line.empty()) {
-    //     break;
-    //   }
-    //   const auto [side, volatiles] = Parse::parse_side(line);
-    //   teams.push_back(side);
-    // }
-    // if (teams.size() == 0) {
-    //   throw std::runtime_error{"Could not parse teams"};
-    // }
+    // read teams file
+    const auto side_to_team = [](const PKMN::Side &side) {
+      std::vector<PKMN::Set> team{};
+      for (const auto &pokemon : side.pokemon) {
+        if (pokemon.species != PKMN::Data::Species::None) {
+          PKMN::Set set{};
+          set.species = pokemon.species;
+          std::transform(pokemon.moves.begin(), pokemon.moves.end(),
+                         set.moves.begin(),
+                         [](const auto ms) { return ms.id; });
+          team.emplace_back(set);
+        }
+      }
+      return team;
+    };
+    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+    while (true) {
+      std::string line{};
+      std::getline(file, line);
+      if (line.empty()) {
+        break;
+      }
+      const auto [side, _] = Parse::parse_side(line);
+      teams.push_back(side_to_team(side));
+    }
+    if (teams.size() == 0) {
+      throw std::runtime_error{"Could not parse teams"};
+    }
   } else {
-    teams = std::vector<PKMN::Team>(Format::Data::teams.begin(),
-                                    Format::Data::teams.end());
+    // use sample teams
+    std::transform(Format::Data::teams.begin(), Format::Data::teams.end(),
+                   std::back_inserter(teams), [](const auto &team) {
+                     std::vector<PKMN::Set> t{team.begin(), team.end()};
+                     return t;
+                   });
     RuntimeData::matchup_matrix.resize(teams.size());
   }
 
@@ -710,7 +727,7 @@ void setup() {
 }
 
 void cleanup() {
-  std::cout << "Sample Team Matchup Info" << std::endl;
+  std::cout << "Matchup Matrix:" << std::endl;
   for (auto i = 0; i < RuntimeData::matchup_matrix.n_teams; ++i) {
     for (auto j = 0; j < i; ++j) {
       std::cout << i << ' ' << j << ": ";

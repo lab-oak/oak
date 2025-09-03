@@ -2,6 +2,8 @@
 
 #include <libpkmn/data.h>
 
+namespace MCTS {
+
 void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
 
   static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
@@ -36,6 +38,7 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
       vol.set_disable_left(static_cast<uint8_t>((battle.rng % max) + 1));
     }
     if (const auto attacking = duration.attacking()) {
+      // bide and thrashing have same logic
       // just leave as separate if blocks for now
       if (vol.bide()) {
         if (attacking == 3) {
@@ -73,3 +76,5 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
     }
   }
 }
+
+} // namespace MCTS

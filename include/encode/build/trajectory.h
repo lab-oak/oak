@@ -1,7 +1,7 @@
 #pragma once
 
 #include <format/OU/legal-moves.h>
-#include <format/move-pool.h>
+#include <format/util.h>
 #include <train/build/trajectory.h>
 
 namespace Encode {
@@ -11,9 +11,7 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
-template <typename F> struct Formatter {
-
-  using MovePool = Format::MovePool<F>;
+template <typename F> struct Tensorizer {
 
   static consteval auto get_species_move_list_size() {
     auto size = 0;
@@ -26,22 +24,7 @@ template <typename F> struct Formatter {
     return size;
   }
 
-  static constexpr auto get_legal_species() {
-    constexpr auto n_species = std::count_if(
-        PKMN::Data::all_species.begin(), PKMN::Data::all_species.end(),
-        [](const auto species) { return MovePool::size(species) > 0; });
-    std::array<Species, n_species> legal_species{};
-    auto it = legal_species.begin();
-    for (const auto species : legal_species) {
-      if (MovePool::size(species) > 0) {
-        *it++ = species;
-      }
-    }
-    return legal_species;
-  }
-
   static constexpr auto species_move_list_size{get_species_move_list_size()};
-  static constexpr auto legal_species{get_legal_species()};
 
   static consteval auto get_species_move_data() {
     std::array<std::array<int, PKMN::Data::all_moves.size()>,
@@ -135,60 +118,9 @@ template <typename F> struct Formatter {
     }
     return input;
   }
-
-  static std::vector<Action> get_singleton_additions(const auto &team) {
-    using PKMN::Data::Move;
-    using PKMN::Data::Species;
-    std::vector<Action> actions;
-    actions.reserve(max_actions);
-
-    auto empty_slot =
-        std::find_if(team.begin(), team.end(), [](const auto &set) {
-          return set.species == Species::None;
-        });
-    if (empty_slot != team.end()) {
-      auto ls = legal_species;
-      auto ls_end = ls.end();
-      for (const auto &set : team) {
-        ls_end = std::remove(ls.begin(), ls_end, set.species);
-      }
-      for (auto it = ls.begin(); it != ls_end; ++it) {
-        actions.emplace_back(Action{BasicAction{
-            0, std::distance(team.begin(), empty_slot), 0, *it, Move::None}});
-      }
-    }
-
-    for (auto i = 0; i < team.size(); ++i) {
-      const auto &set = team[i];
-      if (set.species != Species::None) {
-        auto empty = std::find(set.moves.begin(), set.moves.end(), Move::None);
-
-        if (empty != set.moves.end()) {
-          auto move_pool = MovePool::get(set.species);
-          const auto start = move_pool.begin();
-          auto end = start + MovePool::size(set.species);
-          for (auto j = 0; j < set.moves.size(); ++j) {
-            const auto move = set.moves[j];
-            if (move == Move::None && start != end) {
-              end = std::remove(start, end, move);
-            }
-          }
-          actions.emplace_back(
-              Action{BasicAction{0, i, std::distance(set.moves.begin(), empty),
-                                 set.species, Move::None}});
-        }
-      }
-    }
-
-    return actions;
-  }
-
-  static std::vector<Action> get_lead_actions() { return {}; }
 };
 
-using OUFormatter = Formatter<Format::OU>;
-
-struct CompressedTrajectory {
+template <typename F = Format::OU> struct CompressedTrajectory {
 
   enum class Version : std::underlying_type_t<std::byte> {
     Default = 0,
@@ -217,11 +149,11 @@ struct CompressedTrajectory {
     for (const auto &set : trajectory.initial) {
       if (set.species != Species::None) {
         updates[i++] =
-            Update{OUFormatter::species_move_table(set.species, 0), 0};
+            Update{OUTensorizer::species_move_table(set.species, 0), 0};
         for (const auto m : set.moves) {
           if (m != Move::None) {
             updates[i++] =
-                Update{OUFormatter::species_move_table(set.species, m), 0};
+                Update{OUTensorizer::species_move_table(set.species, m), 0};
           }
         }
       }
@@ -257,10 +189,7 @@ struct TrajectoryInput {
 
   void write(const CompressedTrajectory &traj) {
 
-    struct Helper {
-      Species species;
-      std::remove_cvref_t<decltype(OUFormatter::MovePool::get(0).end())> end;
-    };
+    struct Helper {};
   }
 };
 
