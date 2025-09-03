@@ -1,7 +1,7 @@
-#include <format/OU/teams.h>
 #include <search/bandit/exp3.h>
 #include <search/mcts.h>
 #include <search/tree.h>
+#include <teams/benchmark-teams.h>
 #include <util/random.h>
 
 struct FastModel {
@@ -12,8 +12,8 @@ struct FastModel {
 
 int benchmark(int argc, char **argv) {
 
-  auto p1 = Format::Data::benchmark_teams[0];
-  auto p2 = Format::Data::benchmark_teams[1];
+  auto p1 = Teams::benchmark_teams[0];
+  auto p2 = Teams::benchmark_teams[1];
 
   const uint64_t seed = 1111111;
 

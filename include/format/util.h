@@ -32,15 +32,19 @@ template <typename LS> consteval auto get_max_move_pool_size() {
 
 template <typename LS> consteval auto get_move_pools() {
   using PKMN::Data::all_moves;
+  using PKMN::Data::all_species;
   using PKMN::Data::Move;
 
-  std::array<Move, get_max_move_pool_size<LS>()> move_pools{};
-  std::transform(move_pools.begin(), move_pools.end(), move_pools.begin(),
-                 [](const auto &empty_pool) {
+  std::array<std::array<Move, get_max_move_pool_size<LS>()>, all_species.size()>
+      move_pools{};
+  std::transform(all_species.begin(), all_species.end(), move_pools.begin(),
+                 move_pools.begin(),
+                 [](const auto species, const auto &empty_pool) {
                    auto pool = empty_pool;
+                   const auto flat = LS::data[static_cast<uint8_t>(species)];
                    std::copy_if(all_moves.begin(), all_moves.end(),
-                                pool.begin(), [](const auto move) {
-                                  return LS::data[static_cast<uint>()];
+                                pool.begin(), [&flat](const auto move) {
+                                  return flat[static_cast<uint8_t>(move)];
                                 });
                    return pool;
                  });
@@ -58,15 +62,22 @@ template <typename LS> consteval auto get_legal_species() {
   using PKMN::Data::Species;
   const auto sizes = get_move_pool_sizes<LS>();
   std::array<Species, get_n_legal_species<LS>()> legal_species{};
-  std::copy_if(
-      all_species.begin(), all_species.end(), legal_species.begin(),
-      [](const auto species) { sizes[static_cast<uint8_t>(species)] > 0; });
+  std::copy_if(all_species.begin(), all_species.end(), legal_species.begin(),
+               [&sizes](const auto species) {
+                 return sizes[static_cast<uint8_t>(species)] > 0;
+               });
   return legal_species;
 }
 
 template <typename LS> struct FormatImpl {
-
-  static constexpr auto move_pools{get_move_pools<LS>()};
+  static constexpr auto MOVE_POOLS{get_move_pools<LS>()};
+  static constexpr auto MOVE_POOL_SIZES{get_move_pool_sizes<LS>()};
+  static constexpr const auto &move_pool(const auto species) {
+    return MOVE_POOLS[static_cast<uint8_t>(species)];
+  }
+  static constexpr auto move_pool_size(const auto species) {
+    return MOVE_POOL_SIZES[static_cast<uint8_t>(species)];
+  }
   static constexpr auto legal_species{get_legal_species<LS>()};
 };
 

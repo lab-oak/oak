@@ -1,8 +1,18 @@
 #pragma once
 
-#include <format/OU/legal-moves.h>
+#include <encode/build/actions.h>
+#include <format/OU/data.h>
 #include <format/util.h>
 #include <train/build/trajectory.h>
+
+/*
+
+Here is where we define a tensor encoding and associated storage for build
+trajectories in the game we defined in actions.h
+
+The actions (singleton additions) are encoded as u16s
+
+*/
 
 namespace Encode {
 
@@ -11,14 +21,14 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
-template <typename F> struct Tensorizer {
+template <typename F = Format::OU> struct Tensorizer {
 
   static consteval auto get_species_move_list_size() {
     auto size = 0;
     for (const auto species : PKMN::Data::all_species) {
-      const auto &move_pool{MovePool::get(species)};
-      size += MovePool::size(species) > 0;
-      size += MovePool::size(species);
+      const auto &move_pool{F::move_pool(species)};
+      size += F::move_pool_size(species) > 0;
+      size += F::move_pool_size(species);
     }
 
     return size;
@@ -44,10 +54,10 @@ template <typename F> struct Tensorizer {
       list[index] = {s, m};
       ++index;
     };
-    for (const auto species : legal_species) {
+    for (const auto species : F::legal_species) {
       go(species, 0);
-      for (auto i = 0; i < MovePool::size(species); ++i) {
-        go(species, MovePool::get(species)[i]);
+      for (auto i = 0; i < F::move_pool_size(species); ++i) {
+        go(species, F::move_pool(species)[i]);
       }
     }
 
@@ -56,16 +66,16 @@ template <typename F> struct Tensorizer {
 
   // max number of actions when rolling out the build network
   template <size_t team_size = 6> static consteval int get_max_actions() {
-    static_assert(legal_species.size() >= MovePool::max_size,
-                  "This method of tightly bounding the max number of legal "
-                  "team building actions likely doesn't work");
+    // static_assert(legal_species.size() >= MovePool::max_size,
+    //               "This method of tightly bounding the max number of legal "
+    //               "team building actions likely doesn't work");
     int n = 0;
-    auto sizes = MovePool::sizes;
+    auto sizes = F::MOVE_POOL_SIZES;
     std::sort(sizes.begin(), sizes.end(), std::greater<uint8_t>());
     for (auto i = 0; i < team_size - 1; ++i) {
       n += (int)sizes[i];
     }
-    n += legal_species.size() - (team_size - 1);
+    n += F::legal_species.size() - (team_size - 1);
     return n;
   }
 
@@ -149,11 +159,11 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     for (const auto &set : trajectory.initial) {
       if (set.species != Species::None) {
         updates[i++] =
-            Update{OUTensorizer::species_move_table(set.species, 0), 0};
+            Update{Tensorizer<F>::species_move_table(set.species, 0), 0};
         for (const auto m : set.moves) {
           if (m != Move::None) {
             updates[i++] =
-                Update{OUTensorizer::species_move_table(set.species, m), 0};
+                Update{Tensorizer<F>::species_move_table(set.species, m), 0};
           }
         }
       }
@@ -187,7 +197,8 @@ struct TrajectoryInput {
   float *eval;
   float *score;
 
-  void write(const CompressedTrajectory &traj) {
+  template <typename F = Format::OU>
+  void write(const CompressedTrajectory<> &traj) {
 
     struct Helper {};
   }

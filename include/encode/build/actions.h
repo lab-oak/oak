@@ -1,17 +1,34 @@
 #pragma once
 
 #include <format/OU/data.h>
+#include <train/build/trajectory.h>
+
+/*
+
+Here we define what actions are legal in a given 'format' (i.e. Smogon standard
+tiers)
+
+Here is where we enforce species clause and use the format data to know which
+pokemon are legal and what their moves are
+
+*/
 
 namespace Encode {
 
 namespace Build {
 
 template <typename F = Format::OU> struct Actions {
-  static std::vector<Action> get_singleton_additions(const auto &team) {
+
+  static std::vector<Train::Build::Action>
+  get_singleton_additions(const auto &team) {
+
     using PKMN::Data::Move;
     using PKMN::Data::Species;
+    using Train::Build::Action;
+    using Train::Build::BasicAction;
+
     std::vector<Action> actions;
-    actions.reserve(max_actions);
+    // actions.reserve(max_actions);
 
     auto empty_slot =
         std::find_if(team.begin(), team.end(), [](const auto &set) {
@@ -35,9 +52,9 @@ template <typename F = Format::OU> struct Actions {
         auto empty = std::find(set.moves.begin(), set.moves.end(), Move::None);
 
         if (empty != set.moves.end()) {
-          auto move_pool = MovePool::get(set.species);
+          auto move_pool = F::move_pool(set.species);
           const auto start = move_pool.begin();
-          auto end = start + MovePool::size(set.species);
+          auto end = start + F::move_pool_size(set.species);
           for (auto j = 0; j < set.moves.size(); ++j) {
             const auto move = set.moves[j];
             if (move == Move::None && start != end) {
@@ -54,7 +71,7 @@ template <typename F = Format::OU> struct Actions {
     return actions;
   }
 
-  static std::vector<Action> get_lead_actions() { return {}; }
+  static std::vector<Train::Build::Action> get_lead_actions() { return {}; }
 };
 } // namespace Build
 

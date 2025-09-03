@@ -1,6 +1,6 @@
-#include <format/OU/teams.h>
 #include <nn/battle/network.h>
 #include <nn/build/network.h>
+#include <teams/ou-sample-teams.h>
 #include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
 #include <train/build/trajectory.h>
@@ -699,7 +699,7 @@ void setup() {
     }
   } else {
     // use sample teams
-    std::transform(Format::Data::teams.begin(), Format::Data::teams.end(),
+    std::transform(Teams::ou_sample_teams.begin(), Teams::ou_sample_teams.end(),
                    std::back_inserter(teams), [](const auto &team) {
                      std::vector<PKMN::Set> t{team.begin(), team.end()};
                      return t;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <format/legal-moves.h>
+#include <format/Cart/data.h>
 
 /*
 Banned pokemon should have their movesets nullified for compatilibity with the

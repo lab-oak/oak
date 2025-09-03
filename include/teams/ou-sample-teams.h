@@ -5,16 +5,14 @@
 #include <libpkmn/data/species.h>
 #include <libpkmn/pkmn.h>
 
-namespace Format {
-
-namespace Data {
+namespace Teams {
 
 using enum PKMN::Data::Move;
 using PKMN::Set;
 using PKMN::Team;
 using PKMN::Data::Species;
 
-constexpr std::array<Team, 16> teams{
+constexpr std::array<Team, 16> ou_sample_teams{
     Team{
         Set{Species::Starmie, {Surf, Thunderbolt, ThunderWave, Recover}},
         Set{Species::Exeggutor, {SleepPowder, Psychic, StunSpore, Explosion}},
@@ -160,6 +158,4 @@ constexpr std::array<Team, 2> benchmark_teams{
          Set{Species::Tauros, {Blizzard, BodySlam, Earthquake, HyperBeam}}},
 };
 
-} // namespace Data
-
-} // namespace Format
+} // namespace Teams

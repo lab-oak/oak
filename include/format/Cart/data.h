@@ -1,5 +1,7 @@
 #pragma once
 
+#include <format/util.h>
+
 #include <array>
 
 namespace Learnset {
@@ -7,7 +9,7 @@ namespace Learnset {
 // these structs cannot encode move conflicts. This is all we use for now, so we
 // ignore move conflicts
 using Data = std::array<std::array<bool, PKMN::Data::all_moves.size()>,
-                        PKMN : Data::all_species.size()>;
+                        PKMN::Data::all_species.size()>;
 
 // TODO some format the mimics Showdowns move conflict storage for easy
 // conversion
@@ -2741,3 +2743,7 @@ struct Cart {
 };
 
 } // namespace Learnset
+
+namespace Format {
+using Cart = FormatImpl<Learnset::Cart>;
+}

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <encode/build/trajectory.h>
-#include <format/OU/legal-moves.h>
+#include <format/OU/data.h>
 #include <nn/params.h>
 #include <nn/subnet.h>
 #include <train/build/trajectory.h>
@@ -10,7 +10,7 @@ namespace NN {
 
 struct BuildNetwork {
 
-  using T = Encode::Build::Formatter<Format::OU>;
+  using T = Encode::Build::Tensorizer<Format::OU>;
 
   EmbeddingNet<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true, false>
       policy_net;
