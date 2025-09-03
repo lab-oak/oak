@@ -1,4 +1,4 @@
-build/
+/build/
 libpkmn-showdown.a
 *.battle
 *.build
