@@ -36,10 +36,10 @@ consteval bool check_pp_byte() {
   std::array<int, 16> keys{};
 
   for (auto m = 0; m < 16; ++m) {
-    auto a = m & 1;
-    auto b = m & 2;
-    auto c = m & 4;
-    auto d = m & 8;
+    const uint8_t a = m & 1;
+    const uint8_t b = m & 2;
+    const uint8_t c = m & 4;
+    const uint8_t d = m & 8;
     std::array<uint8_t, 8> moves{0, a, 0, b, 0, c, 0, d};
     auto v = std::bit_cast<uint64_t>(moves);
     auto key = pp_byte(v);

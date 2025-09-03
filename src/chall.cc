@@ -13,7 +13,7 @@ void handle_suspend(int signal) {
   search_flag = false;
 }
 
-BattleData parse_input(const std::string &line, uint64_t seed) {
+MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
   auto [battle, durations] = Parse::parse_battle(line, seed);
   apply_durations(battle, durations);
   return {battle, durations, PKMN::result(battle)};
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   std::signal(SIGTSTP, handle_suspend);
 
   mt19937 device{std::random_device{}()};
-  BattleData battle_data;
+  MCTS::BattleData battle_data;
   while (true) {
     std::string line;
     std::cout << "Input: battle-string" << std::endl;

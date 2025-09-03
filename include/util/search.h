@@ -59,7 +59,7 @@ struct Agent {
   std::string bandit_name;
   std::string network_path;
   // valid if already loaded/cache set
-  std::optional<NN::Network> network;
+  std::optional<NN::Battle::Network> network;
   bool *flag;
 
   bool is_monte_carlo() const {
@@ -79,7 +79,7 @@ struct Agent {
 
 auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
 
-  BattleData battle_data{};
+  MCTS::BattleData battle_data{};
   using input_t = std::remove_cvref_t<decltype(input)>;
   if constexpr (std::is_same_v<input_t, pkmn_gen1_battle>) {
     battle_data.battle = input;
@@ -90,14 +90,14 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
     battle_data.battle = input.first;
     battle_data.durations = input.second;
     battle_data.result = PKMN::result(input);
-  } else if constexpr (std::is_same_v<input_t, BattleData>) {
+  } else if constexpr (std::is_same_v<input_t, MCTS::BattleData>) {
     battle_data = input;
   } else {
     assert(false);
   }
 
   const auto run_2 = [&](auto dur, auto &model) {
-    MCTS search{};
+    MCTS::Search search{};
     const auto &lower = agent.bandit_name;
     // std::transform(lower.begin(), lower.end(), lower.begin(),
     //                [](auto c) { return std::tolower(c); });
@@ -145,7 +145,7 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
   // get model
   const auto search_1 = [&](const auto dur) {
     if (agent.is_monte_carlo()) {
-      MonteCarlo::Model model{std::random_device{}()};
+      MCTS::MonteCarlo model{std::random_device{}()};
       return run_2(dur, model);
     } else {
       if (!agent.network.has_value()) {

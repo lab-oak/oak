@@ -8,6 +8,7 @@
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
+#include <util/team-building.h>
 
 #include <atomic>
 #include <csignal>
@@ -347,11 +348,10 @@ std::vector<PKMN::Team> teams;
 MatchupMatrix matchup_matrix;
 }; // namespace RuntimeData
 
-auto generate_team(mt19937 &device)
-    -> std::tuple<std::vector<PKMN::Set>, int, Train::BuildTrajectory> {
+auto generate_team(mt19937 &device, const auto index)
+    -> Train::Build::Trajectory {
   using namespace RuntimeOptions::TeamGen;
 
-  const auto index = device.random_int(Format::OU::teams.size());
   const auto base_team = RuntimeData::teams[index];
   std::vector<PKMN::Set> team{base_team.begin(),
                               base_team.begin() + max_pokemon};
@@ -367,7 +367,7 @@ auto generate_team(mt19937 &device)
         for (auto m = 0; m < 4; ++m) {
           const auto rm = device.uniform();
           if (rm < move_delete_prob) {
-            pokemon.moves[m] = Data::Move::None;
+            pokemon.moves[m] = PKMN::Data::Move::None;
           }
         }
       }
@@ -375,7 +375,9 @@ auto generate_team(mt19937 &device)
   }
 
   if (team == original_team) {
-    return {team, index, {}};
+    Train::Build::Trajectory trajectory{};
+    trajectory.initial = trajectory.terminal = original_team;
+    return trajectory;
   } else {
     const auto team_string = [](const auto &team) {
       std::stringstream ss{};
@@ -390,14 +392,15 @@ auto generate_team(mt19937 &device)
     };
     print("Team " + std::to_string(index) + " modified:");
     print(team_string(team));
+    // loading each time allows the network params to be updated at runtime
     NN::BuildNetwork build_network{};
     std::ifstream file{RuntimeOptions::TeamGen::network_path};
     if (!build_network.read_parameters(file)) {
       throw std::runtime_error{"cant read build net params"};
     }
-    const auto traj = NN::rollout_build_network(team, build_network, device);
-    print(team_string(team));
-    return {team, -1, traj};
+    const auto trajectory =
+        TeamBuilding::rollout_build_network(device, build_network, team);
+    return trajectory;
   }
 }
 
@@ -411,7 +414,7 @@ void generate(uint64_t seed) {
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
   // These are generated slowly so a vector is fine
-  std::vector<Train::BuildTrajectory> build_buffer{};
+  std::vector<Train::Build::Trajectory> build_buffer{};
 
   const auto save_battle_buffer_to_disk = [&buffer, thread_frame_buffer_size,
                                            &frame_buffer_write_index]() {
@@ -442,7 +445,7 @@ void generate(uint64_t seed) {
     const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
       const size_t bytes_to_write =
-          build_buffer.size() * sizeof(Train::BuildTrajectory);
+          build_buffer.size() * sizeof(Train::Build::Trajectory);
       const ssize_t written = write(fd, build_buffer.data(), bytes_to_write);
       print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
       print("build buffer - bytes written: " + std::to_string(written));
@@ -460,19 +463,24 @@ void generate(uint64_t seed) {
 
   while (true) {
 
-    auto [p1_team, p1_team_index, p1_build_traj] = generate_team(device);
-    auto [p2_team, p2_team_index, p2_build_traj] = generate_team(device);
+    const auto p1_team_index = device.random_int(RuntimeData::teams.size());
+    const auto p2_team_index = device.random_int(RuntimeData::teams.size());
+    auto p1_build_traj = generate_team(device, p1_team_index);
+    auto p2_build_traj = generate_team(device, p2_team_index);
+    const auto &p1_team = p1_build_traj.terminal;
+    const auto &p2_team = p2_build_traj.terminal;
+    const bool p1_built = (p1_build_traj.initial != p1_team);
+    const bool p2_built = (p2_build_traj.initial != p2_team);
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto battle_options = PKMN::options();
-    const auto durations = PKMN::durations(p1_team, p2_team);
-    apply_durations(battle, durations);
 
-    BattleData battle_data{battle, durations, PKMN::result(battle)};
+    MCTS::BattleData battle_data{battle, PKMN::durations(),
+                                 PKMN::result(battle)};
     auto options = PKMN::options();
     battle_data.result = PKMN::result();
 
-    Train::CompressedBattle::Frames training_frames{battle_data.battle};
+    Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
     auto agent = RuntimeOptions::agent;
     auto t1_agent = RuntimeOptions::t1_agent;
@@ -501,8 +509,8 @@ void generate(uint64_t seed) {
           return;
         }
 
-        print(Strings::battle_data_to_string(battle_data.battle,
-                                             battle_data.durations));
+        print(PKMN::battle_data_to_string(battle_data.battle,
+                                          battle_data.durations));
 
         const auto output = RuntimeSearch::run(
             battle_data, nodes, (updates == 0) ? t1_agent : agent);
@@ -551,15 +559,15 @@ void generate(uint64_t seed) {
     if (p1_team_index == -1) {
       p1_build_traj.score =
           static_cast<uint16_t>(2 * PKMN::score(battle_data.result));
-      p1_build_traj.eval = training_frames.updates.front().empirical_value;
+      p1_build_traj.value = training_frames.updates.front().empirical_value;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
     if (p2_team_index == -1) {
       p2_build_traj.score =
           static_cast<uint16_t>(2 * (1 - PKMN::score(battle_data.result)));
-      p2_build_traj.eval = std::numeric_limits<uint16_t>::max() -
-                           training_frames.updates.front().empirical_value;
+      p2_build_traj.value = std::numeric_limits<uint16_t>::max() -
+                            training_frames.updates.front().empirical_value;
       build_buffer.push_back(p2_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
@@ -662,19 +670,20 @@ void setup() {
   // get teams
   using RuntimeData::teams;
   if (!RuntimeOptions::TeamGen::teams_path.empty()) {
-    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
-    while (true) {
-      std::string line{};
-      std::getline(file, line);
-      if (line.empty()) {
-        break;
-      }
-      const auto [side, volatiles] = Parse::parse_side(line);
-      teams.push_back(side);
-    }
-    if (teams.size() == 0) {
-      throw std::runtime_error{"Could not parse teams"};
-    }
+    // TODO
+    // std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+    // while (true) {
+    //   std::string line{};
+    //   std::getline(file, line);
+    //   if (line.empty()) {
+    //     break;
+    //   }
+    //   const auto [side, volatiles] = Parse::parse_side(line);
+    //   teams.push_back(side);
+    // }
+    // if (teams.size() == 0) {
+    //   throw std::runtime_error{"Could not parse teams"};
+    // }
   } else {
     teams = std::vector<PKMN::Team>(Format::OU::teams.begin(),
                                     Format::OU::teams.end());

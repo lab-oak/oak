@@ -12,19 +12,40 @@
 
 #include "../extern/lrsnash/src/lib.h"
 
+namespace MCTS {
+
 struct BattleData {
   pkmn_gen1_battle battle;
   pkmn_gen1_chance_durations durations;
   pkmn_result result;
 };
 
-namespace MonteCarlo {
-struct Model {
+struct MonteCarlo {
   mt19937 device;
 };
-} // namespace MonteCarlo
 
-struct MCTS {
+// strategies, value estimate, etc. All info the search produces
+struct Output {
+  uint m;
+  uint n;
+  size_t iterations;
+  double total_value;
+  double empirical_value;
+  double nash_value;
+  std::array<pkmn_choice, 9> p1_choices;
+  std::array<pkmn_choice, 9> p2_choices;
+  std::array<double, 9> p1_empirical;
+  std::array<double, 9> p2_empirical;
+  std::array<double, 9> p1_nash;
+  std::array<double, 9> p2_nash;
+  std::array<std::array<size_t, 9>, 9> visit_matrix;
+  std::array<std::array<double, 9>, 9> value_matrix;
+  std::chrono::milliseconds duration;
+};
+
+using Obs = std::array<uint8_t, 16>;
+
+struct Search {
 
   template <bool _root_matrix = true, size_t _root_rolls = 3,
             size_t _other_rolls = 1, bool _debug_print = false>
@@ -45,30 +66,9 @@ struct MCTS {
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;
 
-  // strategies, value estimate, etc. All info the search produces
-  struct Output {
-    uint m;
-    uint n;
-    size_t iterations;
-    double total_value;
-    double empirical_value;
-    double nash_value;
-    std::array<pkmn_choice, 9> p1_choices;
-    std::array<pkmn_choice, 9> p2_choices;
-    std::array<double, 9> p1_empirical;
-    std::array<double, 9> p2_empirical;
-    std::array<double, 9> p1_nash;
-    std::array<double, 9> p2_nash;
-    std::array<std::array<size_t, 9>, 9> visit_matrix;
-    std::array<std::array<double, 9>, 9> value_matrix;
-    std::chrono::milliseconds duration;
-  };
-
-  using Obs = std::array<uint8_t, 16>;
-
   template <typename Options = Options<>>
   Output run(const auto dur, const auto &bandit_params, auto &node, auto &model,
-             const BattleData &input, Output output = {}) {
+             const MCTS::BattleData &input, Output output = {}) {
 
     *this = {};
     // currently commented out because we DO need policy inference at the root
@@ -344,7 +344,7 @@ struct MCTS {
           if constexpr (requires {
                           node.stats().init_priors(nullptr, nullptr);
                         }) {
-            (void);
+            // TODO
           } else {
             const auto m = pkmn_gen1_battle_choices(
                 &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
@@ -484,3 +484,5 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     std::cout << '\n';
   }
 }
+
+} // namespace MCTS

@@ -7,6 +7,8 @@
 
 namespace Train {
 
+namespace Battle {
+
 template <typename in_type, typename out_type>
 constexpr out_type compress_probs(in_type x) {
   if constexpr (std::is_integral_v<out_type>) {
@@ -32,7 +34,7 @@ constexpr out_type uncompress_probs(in_type x) {
 }
 
 template <typename policy_type = uint16_t, typename value_type = uint16_t>
-struct CompressedBattle::FramesImpl {
+struct CompressedFramesImpl {
 
   struct Update {
     // rolling out
@@ -143,9 +145,8 @@ struct CompressedBattle::FramesImpl {
   pkmn_result result;
   std::vector<Update> updates;
 
-  CompressedBattle::FramesImpl() = default;
-  CompressedBattle::FramesImpl(const pkmn_gen1_battle &battle)
-      : battle{battle} {}
+  CompressedFramesImpl() = default;
+  CompressedFramesImpl(const pkmn_gen1_battle &battle) : battle{battle} {}
 
   auto n_bytes() const {
     auto n =
@@ -207,9 +208,9 @@ struct CompressedBattle::FramesImpl {
 
       const auto [p1_choices, p2_choices] = PKMN::choices(b, result);
 
-      std::memcpy(frame.battle.bytes, b.bytes, Layout::Sizes::Battle);
+      std::memcpy(frame.battle.bytes, b.bytes, PKMN::Layout::Sizes::Battle);
       std::memcpy(frame.durations.bytes, PKMN::durations(options).bytes,
-                  Layout::Sizes::Durations);
+                  PKMN::Layout::Sizes::Durations);
       frame.result = result;
       for (int i = 0; i < update.m; ++i) {
         frame.target.p1_empirical[i] =
@@ -238,6 +239,8 @@ struct CompressedBattle::FramesImpl {
   }
 };
 
-using CompressedBattle::Frames = CompressedBattle::FramesImpl<>;
+using CompressedFrames = CompressedFramesImpl<>;
+
+} // namespace Battle
 
 }; // namespace Train

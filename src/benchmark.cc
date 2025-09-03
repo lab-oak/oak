@@ -21,12 +21,12 @@ int benchmark(int argc, char **argv) {
   auto options = PKMN::options();
   const auto _ = PKMN::update(battle, 0, 0, options);
   const auto durations = PKMN::durations();
-  BattleData battle_data{battle, durations};
+  MCTS::BattleData battle_data{battle, durations};
 
   FastModel model{battle_data.battle.bytes +
                   PKMN::Layout::Offsets::Battle::rng};
 
-  MCTS search{};
+  MCTS::Search search{};
   int exp = 20;
   std::string bandit_name{"exp3-0.03"};
   std::string network_path{"mc"};

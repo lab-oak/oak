@@ -116,6 +116,7 @@ struct Network {
   MainNet<2 * side_out_dim, hidden_dim, value_hidden_dim, policy_hidden_dim,
           policy_out_dim>
       main_net;
+  mt19937 device;
 
   Network() : pokemon_net{}, active_net{}, main_net{} {}
 
@@ -222,20 +223,20 @@ struct Network {
 
   void foo(const pkmn_gen1_battle &b, const auto &p1_choices,
            const auto &p2_choices) {
-    const auto &battle = View::ref(b);
+    // const auto &battle = View::ref(b);
 
-    std::array<uint16_t, 9> p1_choice_indices;
-    std::array<uint16_t, 9> p2_choice_indices;
+    // std::array<uint16_t, 9> p1_choice_indices;
+    // std::array<uint16_t, 9> p2_choice_indices;
 
-    for (auto i = 0; i < m; ++i) {
-      p1_choice_indices[i] =
-          Encode::Policy::get_index(b.sides[0], p1_choices[i]);
-    }
+    // for (auto i = 0; i < m; ++i) {
+    //   p1_choice_indices[i] =
+    //       Encode::Policy::get_index(b.sides[0], p1_choices[i]);
+    // }
 
-    for (auto i = 0; i < n; ++i) {
-      p2_choice_indices[i] =
-          Encode::Policy::get_index(b.sides[1], p2_choices[i]);
-    }
+    // for (auto i = 0; i < n; ++i) {
+    //   p2_choice_indices[i] =
+    //       Encode::Policy::get_index(b.sides[1], p2_choices[i]);
+    // }
   }
 
   float inference(const pkmn_gen1_battle &b,

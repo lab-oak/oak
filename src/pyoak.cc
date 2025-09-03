@@ -134,7 +134,7 @@ extern "C" void uncompress_training_frames(
     float *p2_empirical, float *p2_nash, float *empirical_value,
     float *nash_value, float *score) {
 
-  Train::CompressedBattle::Frames compressed_frames{};
+  Train::Battle::CompressedFrames::Frames compressed_frames{};
   compressed_frames.read(data);
 
   Train::Battle::FrameInput input{.m = m,
@@ -164,7 +164,7 @@ extern "C" void uncompress_and_encode_training_frames(
     float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
     float *empirical_value, float *nash_value, float *score) {
 
-  Train::CompressedBattle::Frames compressed_frames{};
+  Train::Battle::CompressedFrames::Frames compressed_frames{};
   compressed_frames.read(data);
 
   Encode::Battle::FrameInput input{.m = m,
@@ -275,7 +275,7 @@ extern "C" int read_buffer_to_frames(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::CompressedBattle::Frames battle_frames{};
+    Train::Battle::CompressedFrames::Frames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -352,7 +352,7 @@ extern "C" int encode_buffer(const char *path, size_t max_count,
     buffer.clear();
     char *buf = buffer.data();
     file.read(buf, offset);
-    Train::CompressedBattle::Frames battle_frames{};
+    Train::Battle::CompressedFrames::Frames battle_frames{};
     battle_frames.read(buf);
 
     const auto frames = battle_frames.uncompress();
@@ -439,7 +439,7 @@ extern "C" size_t encode_buffer_multithread(
         char *buf = buffer.data();
         file.read(buf, offset);
         // parse buffer to compressed
-        Train::CompressedBattle::Frames battle_frames{};
+        Train::Battle::CompressedFrames::Frames battle_frames{};
         battle_frames.read(buf);
 
         // uncompress

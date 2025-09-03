@@ -82,7 +82,7 @@ void thread_fn(uint64_t seed) {
     }
 
     const auto durations = PKMN::durations();
-    BattleData battle_data{battle, durations, PKMN::result()};
+    MCTS::BattleData battle_data{battle, durations, PKMN::result()};
     auto battle_options = PKMN::options();
     bool early_stop = false;
 
