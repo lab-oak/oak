@@ -22,6 +22,7 @@ auto softmax(auto &x) {
 
   Trajectory trajectory{};
   trajectory.initial = team;
+  trajectory.terminal = team;
 
   auto input = Encode::Build::OUFormatter::write(team);
   std::array<float, Encode::Build::OUFormatter::n_dim> logits;
@@ -46,16 +47,14 @@ auto softmax(auto &x) {
     const auto policy = softmax(legal_logits);
     const auto index = device.sample_pdf(policy);
     const auto action = actions[index];
-    apply_action(team, action);
+    apply_action(trajectory.terminal, action);
 
     trajectory.updates.emplace_back(Trajectory::Update{actions, index, policy[index]});
 
-    actions = Encode::Build::OUFormatter::get_singleton_additions(team);
+    actions = Encode::Build::OUFormatter::get_singleton_additions(trajectory.terminal);
   }
 
   // actions = Encode::Build::OUFormatter::get_switch_actions();
-
-  trajectory.terminal = team;
 
   return trajectory;
 }

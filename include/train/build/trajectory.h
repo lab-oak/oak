@@ -50,7 +50,7 @@ void apply_basic_action(auto &team, const BasicAction &action) {
   }
   auto &set = team[action.slot];
   if (action.move_slot) {
-    set[action.move_slot - 1] = action.move;
+    set.moves[action.move_slot - 1] = action.move;
     return;
   } else {
     set.species = action.species;

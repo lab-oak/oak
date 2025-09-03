@@ -11,9 +11,9 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
-template <Format::LearnsetTable LEARNSETS> struct Formatter {
+template <typename F> struct Formatter {
 
-  using MovePool = Format::MovePool<LEARNSETS>;
+  using MovePool = Format::MovePool<F>;
 
   static consteval auto get_species_move_list_size() {
     auto size = 0;
@@ -49,9 +49,12 @@ template <Format::LearnsetTable LEARNSETS> struct Formatter {
         table{};
     std::array<std::pair<uint8_t, uint8_t>, species_move_list_size> list{};
 
-    std::fill(table.begin(), table.end(), -1);
+    std::array<int, PKMN::Data::all_moves.size()> invalid{};
+    std::fill(invalid.begin(), invalid.end(), -1);
+    std::fill(table.begin(), table.end(), invalid);
+
     uint16_t index = 0;
-    const auto go = [&index](auto species, auto move) {
+    const auto go = [&index, &table, &list](auto species, auto move) {
       const auto s = static_cast<uint8_t>(species);
       const auto m = static_cast<uint8_t>(move);
       table[s][m] = index;
@@ -59,9 +62,9 @@ template <Format::LearnsetTable LEARNSETS> struct Formatter {
       ++index;
     };
     for (const auto species : legal_species) {
-      go(s, 0);
+      go(species, 0);
       for (auto i = 0; i < MovePool::size(species); ++i) {
-        go(s, MovePool::get(species)[i]);
+        go(species, MovePool::get(species)[i]);
       }
     }
 
@@ -69,7 +72,7 @@ template <Format::LearnsetTable LEARNSETS> struct Formatter {
   }
 
   // max number of actions when rolling out the build network
-  static consteval int get_max_actions(const auto team_size = 6) {
+  template <size_t team_size = 6> static consteval int get_max_actions() {
     static_assert(legal_species.size() >= MovePool::max_size,
                   "This method of tightly bounding the max number of legal "
                   "team building actions likely doesn't work");
@@ -83,10 +86,8 @@ template <Format::LearnsetTable LEARNSETS> struct Formatter {
     return n;
   }
 
-public:
   static constexpr auto n_dim{species_move_list_size};
-  static constexpr auto legal_species{get_legal_species()};
-  static constexpr int max_actions{get_max_actions()};
+  static constexpr int max_actions{get_max_actions<>()};
   static constexpr auto SPECIES_MOVE_DATA{get_species_move_data()};
   static constexpr auto SPECIES_MOVE_TABLE{SPECIES_MOVE_DATA.first};
   static constexpr auto SPECIES_MOVE_LIST{SPECIES_MOVE_DATA.second};
@@ -141,27 +142,25 @@ public:
     std::vector<Action> actions;
     actions.reserve(max_actions);
 
-    bool need_species =
-        std::any_of(team.begin(), team.end(), [](const auto &set) {
+    auto empty_slot =
+        std::find_if(team.begin(), team.end(), [](const auto &set) {
           return set.species == Species::None;
         });
-    auto ls = legal_species;
-    auto ls_end = ls.end();
-    if (need_species) {
+    if (empty_slot != team.end()) {
+      auto ls = legal_species;
+      auto ls_end = ls.end();
       for (const auto &set : team) {
         ls_end = std::remove(ls.begin(), ls_end, set.species);
       }
       for (auto it = ls.begin(); it != ls_end; ++it) {
-        actions.emplace_back(Action{})
+        actions.emplace_back(Action{BasicAction{
+            0, std::distance(team.begin(), empty_slot), 0, *it, Move::None}});
       }
     }
 
     for (auto i = 0; i < team.size(); ++i) {
       const auto &set = team[i];
       if (set.species != Species::None) {
-        species_end =
-            std::remove(legal_species.begin(), species_end, set.species);
-
         auto empty = std::find(set.moves.begin(), set.moves.end(), Move::None);
 
         if (empty != set.moves.end()) {
@@ -171,10 +170,12 @@ public:
           for (auto j = 0; j < set.moves.size(); ++j) {
             const auto move = set.moves[j];
             if (move == Move::None && start != end) {
-              end = std::remove(start, end, move.id);
+              end = std::remove(start, end, move);
             }
           }
-          actions.emplace_back(Action{BasicAction{}});
+          actions.emplace_back(
+              Action{BasicAction{0, i, std::distance(set.moves.begin(), empty),
+                                 set.species, Move::None}});
         }
       }
     }
@@ -182,10 +183,10 @@ public:
     return actions;
   }
 
-  static std::vector<Action> get_lead_actions()
+  static std::vector<Action> get_lead_actions() { return {}; }
 };
 
-using OUFormatter = Formatter<Format::OU::LEARNSETS>;
+using OUFormatter = Formatter<Format::OU>;
 
 struct CompressedTrajectory {
 
@@ -228,9 +229,8 @@ struct CompressedTrajectory {
     assert(i + trajectory.updates.size() <= 31);
 
     std::transform(trajectory.updates.begin(), trajectory.updates.end() - 1,
-                   updates.begin() + i, [](const auto &update) {
-                     return Train::Build::Trajectory::Update{};
-                   });
+                   updates.begin() + i,
+                   [](const auto &update) { return Update{}; });
   }
 
   void write(char *data) const {}

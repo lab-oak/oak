@@ -12,16 +12,16 @@ struct FastModel {
 
 int benchmark(int argc, char **argv) {
 
-  auto p1 = Format::OU::benchmark_teams[0];
-  auto p2 = Format::OU::benchmark_teams[1];
+  auto p1 = Format::Data::benchmark_teams[0];
+  auto p2 = Format::Data::benchmark_teams[1];
 
   const uint64_t seed = 1111111;
 
   auto battle = PKMN::battle(p1, p2, seed);
   auto options = PKMN::options();
-  const auto _ = PKMN::update(battle, 0, 0, options);
+  const auto result = PKMN::update(battle, 0, 0, options);
   const auto durations = PKMN::durations();
-  MCTS::BattleData battle_data{battle, durations};
+  MCTS::BattleData battle_data{battle, durations, result};
 
   FastModel model{battle_data.battle.bytes +
                   PKMN::Layout::Offsets::Battle::rng};

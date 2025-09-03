@@ -62,7 +62,8 @@ struct Search {
   pkmn_gen1_battle_options options;
   pkmn_gen1_chance_options chance_options;
   pkmn_gen1_calc_options calc_options;
-  std::array<pkmn_choice, 9> choices;
+  std::array<pkmn_choice, 9> p1_choices;
+  std::array<pkmn_choice, 9> p2_choices;
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;
 
@@ -290,11 +291,11 @@ struct Search {
 
       node.stats().select(device, bandit_params, outcome);
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
-                               choices.data(), PKMN_GEN1_MAX_CHOICES);
-      const auto c1 = choices[outcome.p1.index];
+                               p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+      const auto c1 = p1_choices[outcome.p1.index];
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
-                               choices.data(), PKMN_GEN1_MAX_CHOICES);
-      const auto c2 = choices[outcome.p2.index];
+                               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+      const auto c2 = p2_choices[outcome.p2.index];
 
       print("P1: " + PKMN::side_choice_string(battle.bytes, c1) + " P2: " +
             PKMN::side_choice_string(battle.bytes + PKMN::Layout::Sizes::Side,
@@ -347,11 +348,11 @@ struct Search {
             // TODO
           } else {
             const auto m = pkmn_gen1_battle_choices(
-                &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), choices.data(),
-                PKMN_GEN1_MAX_CHOICES);
+                &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+                p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
             const auto n = pkmn_gen1_battle_choices(
-                &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
-                PKMN_GEN1_MAX_CHOICES);
+                &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+                p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
             node.stats().init(m, n);
             const float value = model.inference(
                 input.battle,
@@ -385,28 +386,28 @@ struct Search {
 
     auto seed = device.uniform_64();
     auto m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
-                                      pkmn_result_p1(result), choices.data(),
+                                      pkmn_result_p1(result), p1_choices.data(),
                                       PKMN_GEN1_MAX_CHOICES);
-    auto c1 = choices[seed % m];
+    auto c1 = p1_choices[seed % m];
     auto n = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P2,
-                                      pkmn_result_p2(result), choices.data(),
+                                      pkmn_result_p2(result), p2_choices.data(),
                                       PKMN_GEN1_MAX_CHOICES);
     seed >>= 32;
-    auto c2 = choices[seed % n];
+    auto c2 = p2_choices[seed % n];
     pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
     result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
     stats.init(m, n);
     while (!pkmn_result_type(result)) {
       seed = device.uniform_64();
       m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
-                                   pkmn_result_p1(result), choices.data(),
+                                   pkmn_result_p1(result), p1_choices.data(),
                                    PKMN_GEN1_MAX_CHOICES);
-      c1 = choices[seed % m];
+      c1 = p1_choices[seed % m];
       n = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P2,
-                                   pkmn_result_p2(result), choices.data(),
+                                   pkmn_result_p2(result), p2_choices.data(),
                                    PKMN_GEN1_MAX_CHOICES);
       seed >>= 32;
-      c2 = choices[seed % n];
+      c2 = p2_choices[seed % n];
       pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
     }

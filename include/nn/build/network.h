@@ -10,7 +10,7 @@ namespace NN {
 
 struct BuildNetwork {
 
-  using T = Encode::Build::Formatter<Format::OU::LEARNSETS>;
+  using T = Encode::Build::Formatter<Format::OU>;
 
   EmbeddingNet<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true, false>
       policy_net;

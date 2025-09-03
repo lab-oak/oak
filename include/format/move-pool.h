@@ -15,18 +15,13 @@ namespace Format {
 
 constexpr int n_species = PKMN::Data::all_species.size();
 constexpr int n_moves = PKMN::Data::all_moves.size();
-using LearnsetTable = std::array<std::array<bool, n_moves>, n_species>;
 using PKMN::Data::Move;
 
-// struct Data {
-//   LearnsetTable learnset;
-// };
-
-template <LearnsetTable ls> consteval auto get_move_pool_sizes() {
+template <typename F> consteval auto get_move_pool_sizes() {
   std::array<uint8_t, n_species> move_pool_sizes{};
   for (auto species = 0; species < n_species; ++species) {
     auto size = 0;
-    for (auto m : ls[species]) {
+    for (auto m : F::LEARNSETS[species]) {
       size += m;
     }
     move_pool_sizes[species] = size;
@@ -34,20 +29,20 @@ template <LearnsetTable ls> consteval auto get_move_pool_sizes() {
   return move_pool_sizes;
 }
 
-template <LearnsetTable ls> consteval auto get_max_move_pool_size() {
-  constexpr auto size = get_move_pool_sizes<ls>();
+template <typename F> consteval auto get_max_move_pool_size() {
+  constexpr auto size = get_move_pool_sizes<F>();
   constexpr auto max = *std::max_element(size.begin(), size.end());
   return max;
 }
 
-template <LearnsetTable ls> consteval auto get_move_pools_flat() {
-  constexpr auto max = get_max_move_pool_size<ls>();
+template <typename F> consteval auto get_move_pools_flat() {
+  constexpr auto max = get_max_move_pool_size<F>();
   using Pool = std::array<Move, max>;
   std::array<Pool, n_species> list{};
   for (auto i = 0; i < n_species; ++i) {
     auto index = 0;
     for (auto m = 0; m < n_moves; ++m) {
-      if (ls[i][m]) {
+      if (F::LEARNSETS[i][m]) {
         list[i][index++] = static_cast<Move>(m);
       }
     }
@@ -55,14 +50,14 @@ template <LearnsetTable ls> consteval auto get_move_pools_flat() {
   return list;
 }
 
-template <LearnsetTable LEARNSETS> struct MovePool {
-  static constexpr auto sizes = get_move_pool_sizes<LEARNSETS>();
-  static constexpr auto pools = get_move_pools_flat<LEARNSETS>();
-  static constexpr auto max_size = get_max_move_pool_size<LEARNSETS>();
+template <typename F> struct MovePool {
+  static constexpr auto sizes = get_move_pool_sizes<F>();
+  static constexpr auto pools = get_move_pools_flat<F>();
+  static constexpr auto max_size = get_max_move_pool_size<F>();
   static constexpr auto size(const auto species) {
     return sizes[static_cast<uint8_t>(species)];
   }
-  template <typename T> static constexpr const auto &get(const T species) {
+  static constexpr const auto &get(const auto species) {
     return pools[static_cast<uint8_t>(species)];
   }
 };

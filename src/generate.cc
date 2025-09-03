@@ -382,9 +382,9 @@ auto generate_team(mt19937 &device, const auto index)
     const auto team_string = [](const auto &team) {
       std::stringstream ss{};
       for (const auto &set : team) {
-        ss << species_string(set.species) << ": ";
+        ss << PKMN::species_string(set.species) << ": ";
         for (const auto moveid : set.moves) {
-          ss << move_string(moveid) << ' ';
+          ss << PKMN::move_string(moveid) << ' ';
         }
         ss << '\n';
       }
@@ -685,8 +685,8 @@ void setup() {
     //   throw std::runtime_error{"Could not parse teams"};
     // }
   } else {
-    teams = std::vector<PKMN::Team>(Format::OU::teams.begin(),
-                                    Format::OU::teams.end());
+    teams = std::vector<PKMN::Team>(Format::Data::teams.begin(),
+                                    Format::Data::teams.end());
     RuntimeData::matchup_matrix.resize(teams.size());
   }
 
