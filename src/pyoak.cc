@@ -11,7 +11,6 @@
 #include <bit>
 #include <cstdint>
 #include <fstream>
-#include <iostream>
 #include <random>
 #include <thread>
 #include <vector>
@@ -492,10 +491,10 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
   }
 
   Encode::Build::TrajectoryInput input{.action = action,
-                                     .mask = mask,
-                                     .policy = policy,
-                                     .eval = eval,
-                                     .score = score};
+                                       .mask = mask,
+                                       .policy = policy,
+                                       .eval = eval,
+                                       .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 5>>(input);
   for (const auto *x : ptrs) {
@@ -509,19 +508,19 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
   int count = 0;
 
   // while (true) {
-    // Train::BuildTrajectory traj;
-    // file.read(reinterpret_cast<char *>(&traj), sizeof());
-    // if (file.gcount() < sizeof(Train::BuildTrajectory)) {
-    //   std::cerr << "bad build trajectory read" << std::endl;
-    //   return -1;
-    // }
+  // Train::BuildTrajectory traj;
+  // file.read(reinterpret_cast<char *>(&traj), sizeof());
+  // if (file.gcount() < sizeof(Train::BuildTrajectory)) {
+  //   std::cerr << "bad build trajectory read" << std::endl;
+  //   return -1;
+  // }
 
-    // input.write(traj);
-    // ++count;
+  // input.write(traj);
+  // ++count;
 
-    // if (file.peek() == EOF) {
-    //   return count;
-    // }
+  // if (file.peek() == EOF) {
+  //   return count;
+  // }
   // }
   return -1;
 }

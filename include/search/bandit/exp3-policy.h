@@ -41,8 +41,8 @@ struct Bandit {
 
   bool is_init() const noexcept { return k; }
 
-  void init_priors(const float *priors) noexcept {
-    std::memcpy(this->priors.data(), priors, k * sizeof(float));
+  void softmax_logits(const float *logits) noexcept {
+    softmax(this->priors.data(), logits, k);
   }
 
   void select(auto &device, const Params &params,

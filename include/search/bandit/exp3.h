@@ -53,7 +53,9 @@ struct Bandit {
                      [eta, &params](const float value) {
                        return params.one_minus_gamma * value + eta;
                      });
-      // TODO policy has eta as prob for invalid actions
+      // TODO policy has eta as prob for invalid actions/
+      // this was causing the only search code bug I can remember
+      // the std::min fixes it for now
       outcome.index = std::min(device.sample_pdf(policy), k - 1);
       outcome.prob = policy[outcome.index];
     }

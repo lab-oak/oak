@@ -72,20 +72,30 @@ struct Search {
              const MCTS::BattleData &input, Output output = {}) {
 
     *this = {};
-    // currently commented out because we DO need policy inference at the root
-    // if the node is not already init then a value estimate is wasted on the
-    // first iteration
-    // if (!node.is_init()) {
-    //   auto m = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P1,
-    //                                     pkmn_result_p1(input.result),
-    //                                     choices.data(),
-    //                                     PKMN_GEN1_MAX_CHOICES);
-    //   auto n = pkmn_gen1_battle_choices(&input.battle, PKMN_PLAYER_P2,
-    //                                     pkmn_result_p2(input.result),
-    //                                     choices.data(),
-    //                                     PKMN_GEN1_MAX_CHOICES);
-    //   node.init(m, n);
-    // }
+
+    if (!node.is_init()) {
+      auto m = pkmn_gen1_battle_choices(
+          &input.battle, PKMN_PLAYER_P1, pkmn_result_p1(input.result),
+          p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+      auto n = pkmn_gen1_battle_choices(
+          &input.battle, PKMN_PLAYER_P2, pkmn_result_p2(input.result),
+          p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+      node.init(m, n);
+      if constexpr (requires {
+                      node.stats().softmax_logits(nullptr, nullptr);
+                      model.inference(
+                          input.battle,
+                          *pkmn_gen1_battle_options_chance_durations(&options));
+                    }) {
+        static thread_local std::array<float, 9> p1_logits;
+        static thread_local std::array<float, 9> p2_logits;
+        const float value = model.inference(
+            input.battle, *pkmn_gen1_battle_options_chance_durations(&options),
+            m, n, p1_choices.data(), p2_choices.data(), p1_logits.data(),
+            p2_logits.data());
+        node.stats().softmax_logits(p1_logits.data(), p2_logits.data());
+      }
+    }
 
     // copy the state, do single mcts forward/backward, return player 1 leaf
     // value
@@ -268,7 +278,6 @@ struct Search {
           over[0] = roll_byte<Options::root_rolls>(rand[0]);
           over[8] = roll_byte<Options::root_rolls>(rand[1]);
         } else {
-
           if (depth == 0) {
             over[0] = roll_byte<Options::root_rolls>(rand[0]);
             over[8] = roll_byte<Options::root_rolls>(rand[1]);
@@ -330,35 +339,34 @@ struct Search {
       [[likely]] {
         print("Initializing node");
         // model is a net
+        float value;
         if constexpr (requires {
                         model.inference(input.battle, input.durations);
                       }) {
-
-          if constexpr (requires { model.defer(input.battle); }) {
-            // use monte carlo anyway when mon count is low enough?
-            if (model.defer(input.battle)) {
-              return init_stats_and_rollout(node.stats(), device, battle,
-                                            result);
-            }
-          }
-
+          const auto m = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+              p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          const auto n = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+              p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          node.stats().init(m, n);
           if constexpr (requires {
-                          node.stats().init_priors(nullptr, nullptr);
+                          node.stats().softmax_logits(nullptr, nullptr);
                         }) {
-            // TODO
+            static thread_local std::array<float, 9> p1_logits;
+            static thread_local std::array<float, 9> p2_logits;
+            value = model.inference(
+                input.battle,
+                *pkmn_gen1_battle_options_chance_durations(&options), m, n,
+                p1_choices.data(), p2_choices.data(), p1_logits.data(),
+                p2_logits.data());
+            node.stats().softmax_logits(p1_logits.data(), p2_logits.data());
           } else {
-            const auto m = pkmn_gen1_battle_choices(
-                &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
-                p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
-            const auto n = pkmn_gen1_battle_choices(
-                &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
-                p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-            node.stats().init(m, n);
-            const float value = model.inference(
+            value = model.inference(
                 input.battle,
                 *pkmn_gen1_battle_options_chance_durations(&options));
-            return {value, 1 - value};
           }
+          return {value, 1 - value};
         } else {
           // model is monte-carlo
           return init_stats_and_rollout(node.stats(), device, battle, result);

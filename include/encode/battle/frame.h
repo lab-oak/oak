@@ -44,12 +44,12 @@ struct Frame {
     m = frame.m;
     n = frame.n;
     for (auto i = 0; i < frame.m; ++i) {
-      p1_choice_indices[i] =
-          Encode::Battle::Policy::get_index(battle.sides[0], frame.p1_choices[i]);
+      p1_choice_indices[i] = Encode::Battle::Policy::get_index(
+          battle.sides[0], frame.p1_choices[i]);
     }
     for (auto i = 0; i < frame.n; ++i) {
-      p2_choice_indices[i] =
-          Encode::Battle::Policy::get_index(battle.sides[1], frame.p2_choices[i]);
+      p2_choice_indices[i] = Encode::Battle::Policy::get_index(
+          battle.sides[1], frame.p2_choices[i]);
     }
   }
 };

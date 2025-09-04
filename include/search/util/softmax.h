@@ -2,10 +2,10 @@
 
 #include <cmath>
 
-void softmax(auto *output, const auto *logits, auto k, float eta = 1) {
+void softmax(auto *output, const auto *logits, auto k) {
   float sum = 0;
   for (auto i = 0; i < k; ++i) {
-    const float y = std::exp(logits[i] * eta);
+    const float y = std::exp(logits[i]);
     output[i] = y;
     sum += y;
   }
