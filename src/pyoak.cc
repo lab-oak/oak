@@ -1,4 +1,5 @@
 #include <encode/battle/battle.h>
+#include <encode/battle/frame.h>
 #include <encode/battle/policy.h>
 #include <encode/build/trajectory.h>
 #include <nn/params.h>
@@ -53,7 +54,8 @@ const auto pokemon_dim_label_ptrs =
     dim_labels_to_c(Encode::Battle::Pokemon::dim_labels);
 const auto active_dim_label_ptrs =
     dim_labels_to_c(Encode::Battle::Active::dim_labels);
-const auto policy_dim_label_ptrs = dim_labels_to_c(Encode::Policy::dim_labels);
+const auto policy_dim_label_ptrs =
+    dim_labels_to_c(Encode::Battle::Policy::dim_labels);
 
 extern "C" const char *const *pokemon_dim_labels =
     pokemon_dim_label_ptrs.data();
@@ -489,13 +491,13 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
     return -1;
   }
 
-  Encode::BuildTrajectoryInput input{.action = action,
+  Encode::Build::TrajectoryInput input{.action = action,
                                      .mask = mask,
                                      .policy = policy,
                                      .eval = eval,
-                                     .score = score..size = size};
+                                     .score = score};
 
-  const auto ptrs = std::bit_cast<std::array<void *, 6>>(input);
+  const auto ptrs = std::bit_cast<std::array<void *, 5>>(input);
   for (const auto *x : ptrs) {
     if (!x) {
       std::cerr << "read_build_trajectories: null pointer in input"
@@ -505,22 +507,21 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
   }
 
   int count = 0;
-  constexpr auto size = sizeof(Train::BuildTrajectory);
 
-  while (true) {
-    Train::BuildTrajectory traj;
-    file.read(reinterpret_cast<char *>(&traj), size);
-    if (file.gcount() < size) {
-      std::cerr << "bad build trajectory read" << std::endl;
-      return -1;
-    }
+  // while (true) {
+    // Train::BuildTrajectory traj;
+    // file.read(reinterpret_cast<char *>(&traj), sizeof());
+    // if (file.gcount() < sizeof(Train::BuildTrajectory)) {
+    //   std::cerr << "bad build trajectory read" << std::endl;
+    //   return -1;
+    // }
 
-    input.write(traj);
-    ++count;
+    // input.write(traj);
+    // ++count;
 
-    if (file.peek() == EOF) {
-      return count;
-    }
-  }
+    // if (file.peek() == EOF) {
+    //   return count;
+    // }
+  // }
   return -1;
 }
