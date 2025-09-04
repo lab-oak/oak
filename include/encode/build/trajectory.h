@@ -20,6 +20,7 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
+#pragma pack(push, 1)
 template <typename F = Format::OU> struct CompressedTrajectory {
 
   enum class Format : std::underlying_type_t<std::byte> {
@@ -27,7 +28,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     WithTeam = 1,
   };
   struct Header {
-    Format format;
+    Format format{0};
     uint8_t score;
     uint16_t value;
   };
@@ -64,7 +65,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     assert(trajectory.initial.size() <= 6);
 
     if (trajectory.opponent.has_value()) {
-      header.format == Format::WithTeam;
+      header.format = Format::WithTeam;
       const auto &opp = trajectory.opponent.value();
       std::copy(opp.begin(), opp.end(), opponent.begin());
     }
@@ -91,18 +92,20 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     assert(i + trajectory.updates.size() <= 31);
 
     // encode the updates
+    assert(trajectory.updates.size() > 0);
     std::transform(trajectory.updates.begin(), trajectory.updates.end(),
                    updates.begin() + i, [](const auto &update) {
                      const auto &action = update.legal_moves[update.index];
+                     assert(action.size() == 1);
                      return Update{Tensorizer<F>::species_move_table(
                                        action[0].species, action[0].move),
                                    update.probability};
                    });
 
     // fill the rest, not necessary even
-    for (; i < 31; ++i) {
-      updates[i] = {};
-    }
+    // for (; i < 31; ++i) {
+    //   updates[i] = {};
+    // }
   }
 
   void write(char *data) const {
@@ -129,6 +132,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     }
   }
 };
+#pragma pack(pop)
 
 struct TrajectoryInput {
   int64_t *action;
@@ -140,6 +144,7 @@ struct TrajectoryInput {
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
+
     struct MaskCache {
       uint8_t species;
       int n_moves;
@@ -156,8 +161,12 @@ struct TrajectoryInput {
             end(move_pool.begin() + F::move_pool_size(species)) {}
     };
 
-    static thread_local std::array<MaskCache, 6> caches;
+    std::array<MaskCache, 6> caches{};
     int n_sets = 0;
+
+    // std::array<uint16_t, 6> 
+    // get max pokemon
+    // this way we can tell when to stop 
 
     *value++ = traj.header.value / den;
     if (traj.header.score ==
@@ -183,15 +192,21 @@ struct TrajectoryInput {
       *policy++ = update.probability / den;
 
       if (!done) {
-        const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
         if (started) {
           *action = update.action;
-          for (auto j = 0; j < n_sets; ++j) {
-            const auto &cache = caches[j];
-            // TODO write caches
+          auto mask_temp = mask;
+          if (n_moves < 4) {
+            for (auto j = 0; j < n_sets; ++j) {
+              const auto &cache = caches[j];
+              for (auto it = cache.move_pool.begin(), it != cache.end; ++it) {
+                *mask_temp++ =
+                    Tensorizer<F>::species_move_table(cache.species, *it);
+              }
+            }
           }
         }
 
+        const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
         if (m == 0) {
           const bool lead = std::any_of(
               caches.begin(), caches.begin() + n_sets,
@@ -203,9 +218,12 @@ struct TrajectoryInput {
             ++n_sets;
           }
         } else {
-          auto &cache = *std::find_if(
+
+          auto it = std::find_if(
               caches.begin(), caches.begin() + n_sets,
               [s](const auto &cache) { return cache.species == s; });
+          assert(it != caches.end());
+          auto &cache = *it;
           ++cache.n_moves;
           assert(cache.end != cache.move_pool.begin());
           cache.end = std::remove(cache.move_pool.begin(), cache.end,

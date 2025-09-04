@@ -29,7 +29,14 @@ def read_build_trajectories():
 
     print(build_trajectories.size)
 
-    for i in range(min(2, build_trajectories.size)):
+    print(build_trajectories.actions[0])
+    print(build_trajectories.policy[0])
+    print(build_trajectories.value[0])
+
+
+    return
+
+    for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [

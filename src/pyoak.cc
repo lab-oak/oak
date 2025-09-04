@@ -515,7 +515,8 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
       std::cerr << "bad build trajectory read" << std::endl;
       return -1;
     }
-    if (static_cast<uint8_t>(traj.header.format) != 0) {
+    const auto format = static_cast<uint8_t>(traj.header.format);
+    if (format != 0) {
       std::cerr << "only NoTeam trajectories can be read this way" << std::endl;
       return -1;
     }
