@@ -237,13 +237,69 @@ struct TrajectoryInput {
   int64_t *action;
   int64_t *mask;
   float *policy;
-  float *eval;
+  float *value;
   float *score;
 
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
+    constexpr float den = std::numeric_limits<uint16_t>::max();
+    struct MaskCache {
+      uint8_t species;
+      std::remove_cvref_t<decltype(F::move_pool(0))> move_pool;
+      std::remove_cvref_t<decltype(F::move_pool(0).begin())> end;
 
-    struct Helper {};
+      MaskCache() = default;
+
+      MaskCache(const uint8_t species)
+          : species{static_cast<uint8_t>(species)},
+            move_pool{F::move_pool(species)},
+            end(move_pool.begin() + F::move_pool_size(species)) {}
+    };
+
+    static thread_local std::array<MaskCache, 6> caches;
+    int n_sets = 0;
+
+    *value++ = traj.value / den;
+    *score++ = traj.score / 2.0;
+
+    std::fill_n(action, 31, -1);
+    std::fill_n(mask, Tensorizer<F>::max_actions * 31, -1);
+    bool done = false;
+    bool started = false;
+    for (auto i = 0; i < 31; ++i) {
+      const auto &update = traj.updates[i];
+
+      if (update.probability > 0) {
+        started = true;
+      }
+      if (started && update.probability == 0) {
+        done = true;
+      }
+      *policy++ = update.probability / den;
+
+      if (started && !done) {
+        const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
+        assert(s != 0);
+        action = update.action;
+
+        for (auto j = 0; j < n_sets; ++j) {
+
+        }
+
+        if (m == 0) {
+          const bool lead =
+              std::any_of(caches.begin(), caches.begin() + n_sets,
+                          [s](const auto &cache) { return cache.species == s; });
+          if (lead) {
+            done = true;
+          } else {
+            caches[n_sets] = MaskCache{s};
+            ++n_sets;
+          }
+        }
+      }
+      ++action;
+    }
   }
 };
 
