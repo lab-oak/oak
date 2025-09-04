@@ -44,15 +44,14 @@ RuntimeSearch::Agent t1_agent;
 RuntimePolicy::Options policy_options{};
 
 namespace TeamGen {
-// required since an untrained random network can still act as the source of
-// randomness while also generating training data
 uint max_pokemon = 6;
 double skip_game_prob = 0;
 std::string teams_path = "";
 std::string network_path = "";
-double modify_team_prob = 0;
+double team_modify_prob = 0;
 double pokemon_delete_prob = 0;
 double move_delete_prob = 0;
+double battle_skip_prob = 0;
 }; // namespace TeamGen
 
 }; // namespace RuntimeOptions
@@ -139,8 +138,12 @@ auto generate_help_text() -> std::string {
      << "  Path to a directory of team files.\n\n";
   ss << "--build-network-path=" << TeamGen::network_path << '\n'
      << "  Path to the team-building evaluation network.\n\n";
-  ss << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n'
+  ss << "--team-modify-prob=" << TeamGen::team_modify_prob << '\n'
      << "  Probability of starting the team modification process.\n\n";
+  ss << "--battle-skip-prob=" << TeamGen::battle_skip_prob << '\n'
+     << "  If either player has a build trajectory, this prob is checked to "
+        "skip "
+        "playing the game and only use the turn 1 search.\n\n";
   ss << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n'
      << "  Probability of deleting an entire set during modification.\n\n";
   ss << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n'
@@ -215,12 +218,14 @@ bool parse_options(int argc, char **argv) {
       TeamGen::teams_path = arg.substr(8);
     } else if (arg.starts_with("--build-network-path=")) {
       TeamGen::network_path = arg.substr(21);
-    } else if (arg.starts_with("--modify-team-prob=")) {
-      TeamGen::modify_team_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--team-modify-prob=")) {
+      TeamGen::team_modify_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--pokemon-delete-prob=")) {
       TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
     } else if (arg.starts_with("--move-delete-prob=")) {
       TeamGen::move_delete_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--battle-skip-prob=")) {
+      TeamGen::battle_skip_prob = std::stod(arg.substr(19));
     } else {
       std::swap(a, b);
     }
@@ -279,7 +284,7 @@ auto runtime_arg_string() -> std::string {
   out << "--max-pokemon=" << TeamGen::max_pokemon << '\n';
   out << "--teams=" << TeamGen::teams_path << '\n';
   out << "--build-network-path=" << TeamGen::network_path << '\n';
-  out << "--modify-team-prob=" << TeamGen::modify_team_prob << '\n';
+  out << "--team-modify-prob=" << TeamGen::team_modify_prob << '\n';
   out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
   out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
 
@@ -339,12 +344,15 @@ bool suspended = false;
 std::string start_datetime = std::format(
     "{:%F-%T}",
     std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+// filenames
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
+// global sums
 std::atomic<size_t> frame_counter{};
 std::atomic<size_t> traj_counter{};
 std::atomic<size_t> update_counter{};
 std::atomic<size_t> update_with_node_counter{};
+// teams
 std::vector<std::vector<PKMN::Set>> teams;
 MatchupMatrix matchup_matrix;
 }; // namespace RuntimeData
@@ -359,7 +367,7 @@ auto generate_team(mt19937 &device, const auto index)
   const auto original_team = team;
 
   const auto r = device.uniform();
-  if (r < modify_team_prob) {
+  if (r < team_modify_prob) {
     for (auto &pokemon : team) {
       const auto r = device.uniform();
       if (r < pokemon_delete_prob) {
@@ -437,9 +445,12 @@ void generate(uint64_t seed) {
     if (fd >= 0) {
       const size_t bytes_to_write =
           build_buffer.size() *
-          (sizeof(Encode::Build::CompressedTrajectory<>::header) +
-           sizeof(Encode::Build::CompressedTrajectory<>::updates));
-      const ssize_t written = write(fd, build_buffer.data(), bytes_to_write);
+          (Encode::Build::CompressedTrajectory<>::size_no_team);
+      ssize_t written = 0;
+      for (const auto &trajectory : build_buffer) {
+        const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
+        written += write(fd, &traj, decltype(traj)::size_no_team);
+      }
       print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
       print("build buffer - bytes written: " + std::to_string(written));
       close(fd);
@@ -464,6 +475,12 @@ void generate(uint64_t seed) {
     const auto &p2_team = p2_build_traj.terminal;
     const bool p1_built = (p1_build_traj.updates.size() > 0);
     const bool p2_built = (p2_build_traj.updates.size() > 0);
+
+    bool skip_battle = false;
+    if ((p1_built || p2_built) &&
+        device.uniform() < RuntimeOptions::TeamGen::battle_skip_prob) {
+      skip_battle = true;
+    }
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto battle_options = PKMN::options();
@@ -513,9 +530,11 @@ void generate(uint64_t seed) {
                                RuntimeOptions::policy_options);
         const auto p1_choice = output.p1_choices[p1_index];
         const auto p2_choice = output.p2_choices[p2_index];
-
-        // update train data
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
+        // here so we can use the update to store the empirical value
+        if (skip_battle) {
+          break;
+        }
 
         // update battle, durations, result (state info)
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
@@ -542,41 +561,43 @@ void generate(uint64_t seed) {
       continue;
     }
 
+    if (!skip_battle) {
+      // battle
+      training_frames.result = battle_data.result;
+
+      const auto n_bytes_frames = training_frames.n_bytes();
+      training_frames.write(buffer + frame_buffer_write_index);
+      frame_buffer_write_index += n_bytes_frames;
+      // data
+      if (RuntimeData::frame_counter.fetch_add(training_frames.updates.size()) >
+          RuntimeOptions::max_frames) {
+        RuntimeData::terminated = true;
+      }
+      if (frame_buffer_write_index >= training_frames_target_size) {
+        save_battle_buffer_to_disk();
+      }
+      //
+      p1_build_traj.score = PKMN::score(battle_data.result);
+      p2_build_traj.score = 1 - PKMN::score(battle_data.result);
+    }
+
     // build
     if (!p1_built && !p2_built) {
       RuntimeData::matchup_matrix.update(p1_team_index, p2_team_index,
                                          PKMN::score(battle_data.result));
     }
     if (p1_built) {
-      p1_build_traj.score = PKMN::score(battle_data.result);
       p1_build_traj.value = 1 - training_frames.updates.front().empirical_value;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
-    if (p2_team_index == -1) {
-      p2_build_traj.score = 1 - PKMN::score(battle_data.result);
+    if (p2_built) {
       p2_build_traj.value = 1 - training_frames.updates.front().empirical_value;
       build_buffer.push_back(p2_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
-
-    // battle
-    training_frames.result = battle_data.result;
-    const auto n_bytes_frames = training_frames.n_bytes();
-    training_frames.write(buffer + frame_buffer_write_index);
-    frame_buffer_write_index += n_bytes_frames;
-
-    // data
-    if (RuntimeData::frame_counter.fetch_add(training_frames.updates.size()) >
-        RuntimeOptions::max_frames) {
-      RuntimeData::terminated = true;
-    }
-
     if (build_buffer.size() >= RuntimeOptions::max_build_traj) {
       save_build_buffer_to_disk();
-    }
-    if (frame_buffer_write_index >= training_frames_target_size) {
-      save_battle_buffer_to_disk();
     }
   }
 }
@@ -596,7 +617,7 @@ void print_thread_fn() {
     std::cout << (frames_more - frames_done) /
                      (float)RuntimeOptions::print_interval_sec
               << " battle frames/sec." << std::endl;
-    if (RuntimeOptions::TeamGen::modify_team_prob > 0) {
+    if (RuntimeOptions::TeamGen::team_modify_prob > 0) {
       std::cout << (traj_more - traj_done) /
                        (float)RuntimeOptions::print_interval_sec
                 << " build traj./sec." << std::endl;
@@ -700,7 +721,7 @@ void setup() {
   // build network save/load
   {
     using namespace RuntimeOptions::TeamGen;
-    const bool may_build = (modify_team_prob > 0) &&
+    const bool may_build = (team_modify_prob > 0) &&
                            (pokemon_delete_prob > 0 || move_delete_prob > 0);
     if (may_build && network_path == "") {
       std::cout << "Build Network: No path provided, saving to work dir."

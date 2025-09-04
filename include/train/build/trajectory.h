@@ -82,7 +82,7 @@ struct Trajectory {
 
   std::optional<std::vector<PKMN::Set>> opponent;
   float value;
-  float score;
+  std::optional<float> score;
 };
 
 } // namespace Build

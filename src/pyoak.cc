@@ -11,6 +11,7 @@
 #include <bit>
 #include <cstdint>
 #include <fstream>
+#include <iostream>
 #include <random>
 #include <thread>
 #include <vector>
@@ -481,8 +482,7 @@ extern "C" size_t encode_buffer_multithread(
 
 extern "C" int read_build_trajectories(const char *path, int64_t *action,
                                        int64_t *mask, float *policy,
-                                       float *eval, float *score,
-                                       int64_t *size) {
+                                       float *value, float *score) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -493,7 +493,7 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
   Encode::Build::TrajectoryInput input{.action = action,
                                        .mask = mask,
                                        .policy = policy,
-                                       .eval = eval,
+                                       .value = value,
                                        .score = score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 5>>(input);
@@ -507,20 +507,25 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
 
   int count = 0;
 
-  // while (true) {
-  // Train::BuildTrajectory traj;
-  // file.read(reinterpret_cast<char *>(&traj), sizeof());
-  // if (file.gcount() < sizeof(Train::BuildTrajectory)) {
-  //   std::cerr << "bad build trajectory read" << std::endl;
-  //   return -1;
-  // }
+  while (true) {
+    Encode::Build::CompressedTrajectory<> traj;
+    file.read(reinterpret_cast<char *>(&traj),
+              Encode::Build::CompressedTrajectory<>::size_no_team);
+    if (file.gcount() < Encode::Build::CompressedTrajectory<>::size_no_team) {
+      std::cerr << "bad build trajectory read" << std::endl;
+      return -1;
+    }
+    if (static_cast<uint8_t>(traj.header.format) != 0) {
+      std::cerr << "only NoTeam trajectories can be read this way" << std::endl;
+      return -1;
+    }
 
-  // input.write(traj);
-  // ++count;
+    input.write(traj);
+    ++count;
 
-  // if (file.peek() == EOF) {
-  //   return count;
-  // }
-  // }
+    if (file.peek() == EOF) {
+      return count;
+    }
+  }
   return -1;
 }
