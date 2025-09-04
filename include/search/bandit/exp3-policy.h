@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 
 namespace PExp3 {
 

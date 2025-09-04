@@ -1,7 +1,7 @@
-#include <teams/ou-sample-teams.h>
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
 #include <nn/battle/network.h>
+#include <teams/ou-sample-teams.h>
 #include <train/battle/compressed-frame.h>
 #include <util/policy.h>
 #include <util/random.h>
@@ -153,8 +153,10 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    const auto p1_team = Teams::ou_sample_teams[device.random_int(Teams::ou_sample_teams.size())];
-    const auto p2_team = Teams::ou_sample_teams[device.random_int(Teams::ou_sample_teams.size())];
+    const auto p1_team = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
+    const auto p2_team = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
 
     play(p1_team, p2_team);
     play(p2_team, p1_team);
@@ -192,10 +194,11 @@ int main(int argc, char **argv) {
   std::signal(SIGTSTP, handle_suspend);
 
   if (argc < 9) {
-    std::cerr << "Side: search-time bandit-name network-path policy-mode.\n Input "
-                 "(Side) p1, "
-                 "(Side) p2."
-              << std::endl;
+    std::cerr
+        << "Side: search-time bandit-name network-path policy-mode.\n Input "
+           "(Side) p1, "
+           "(Side) p2."
+        << std::endl;
     return 1;
   }
 

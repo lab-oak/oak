@@ -364,6 +364,6 @@ constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Active
 
-}
+} // namespace Battle
 
 } // namespace Encode

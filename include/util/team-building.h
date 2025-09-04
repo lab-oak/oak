@@ -8,6 +8,18 @@
 
 namespace TeamBuilding {
 
+const auto team_string = [](const auto &team) {
+  std::stringstream ss{};
+  for (const auto &set : team) {
+    ss << PKMN::species_string(set.species) << ": ";
+    for (const auto moveid : set.moves) {
+      ss << PKMN::move_string(moveid) << ' ';
+    }
+    ss << '\n';
+  }
+  return ss.str();
+};
+
 auto softmax(auto &x) {
   auto y = x;
   std::transform(y.begin(), y.end(), y.begin(), [](const auto v){return std::exp(v);});
@@ -26,11 +38,9 @@ auto softmax(auto &x) {
 
   auto input = Encode::Build::Tensorizer<>::write(team);
   std::array<float, Encode::Build::Tensorizer<>::n_dim> logits;
-
   auto actions = Encode::Build::Actions<>::get_singleton_additions(team);
 
-  while (!actions.empty()) {
-
+  const auto go = [&](){
     // get action indices
     std::vector<int> indices;
     std::transform(
@@ -48,13 +58,19 @@ auto softmax(auto &x) {
     const auto index = device.sample_pdf(policy);
     const auto action = actions[index];
     apply_action(trajectory.terminal, action);
+    input[index] = 1.0;
 
     trajectory.updates.emplace_back(Trajectory::Update{actions, index, policy[index]});
+  };
 
+  while (!actions.empty()) {
+    go();
     actions = Encode::Build::Actions<>::get_singleton_additions(trajectory.terminal);
   }
-
-  // actions = Encode::Build::Tensorizer<>::get_switch_actions();
+  actions = Encode::Build::Actions<>::get_lead_actions(trajectory.terminal);
+  if (!actions.empty()) {
+    go();
+  }
 
   return trajectory;
 }

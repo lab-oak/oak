@@ -379,19 +379,8 @@ auto generate_team(mt19937 &device, const auto index)
     trajectory.initial = trajectory.terminal = original_team;
     return trajectory;
   } else {
-    const auto team_string = [](const auto &team) {
-      std::stringstream ss{};
-      for (const auto &set : team) {
-        ss << PKMN::species_string(set.species) << ": ";
-        for (const auto moveid : set.moves) {
-          ss << PKMN::move_string(moveid) << ' ';
-        }
-        ss << '\n';
-      }
-      return ss.str();
-    };
     print("Team " + std::to_string(index) + " modified:");
-    print(team_string(team));
+    print(TeamBuilding::team_string(team));
     // loading each time allows the network params to be updated at runtime
     NN::BuildNetwork build_network{};
     std::ifstream file{RuntimeOptions::TeamGen::network_path};

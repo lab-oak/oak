@@ -32,7 +32,8 @@ extern "C" const char *const *species_names = species_names_ptrs.data();
 
 using Tensorizer = Encode::Build::Tensorizer<>;
 
-extern "C" const auto species_move_list_size = static_cast<int>(Tensorizer::species_move_list_size);
+extern "C" const auto species_move_list_size =
+    static_cast<int>(Tensorizer::species_move_list_size);
 
 consteval auto get_species_move_list_py() {
   std::array<int, species_move_list_size * 2> result{};
@@ -50,7 +51,8 @@ extern "C" const int *species_move_list_ptrs = species_move_list_py.data();
 
 const auto pokemon_dim_label_ptrs =
     dim_labels_to_c(Encode::Battle::Pokemon::dim_labels);
-const auto active_dim_label_ptrs = dim_labels_to_c(Encode::Battle::Active::dim_labels);
+const auto active_dim_label_ptrs =
+    dim_labels_to_c(Encode::Battle::Active::dim_labels);
 const auto policy_dim_label_ptrs = dim_labels_to_c(Encode::Policy::dim_labels);
 
 extern "C" const char *const *pokemon_dim_labels =

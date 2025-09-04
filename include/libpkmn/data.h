@@ -291,25 +291,21 @@ static_assert(sizeof(Boosts) == 4);
 static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
 static_assert(sizeof(Durations) == Layout::Sizes::Durations);
 
-} // namespace PKMN
-
-namespace View {
-
-inline PKMN::Battle &ref(pkmn_gen1_battle &battle) noexcept {
+inline PKMN::Battle &view(pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<PKMN::Battle *>(&battle);
 }
 
-inline const PKMN::Battle &ref(const pkmn_gen1_battle &battle) noexcept {
+inline const PKMN::Battle &view(const pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<const PKMN::Battle *>(&battle);
 }
 
-inline PKMN::Durations &ref(pkmn_gen1_chance_durations &durations) noexcept {
+inline PKMN::Durations &view(pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<PKMN::Durations *>(&durations);
 }
 
 inline const PKMN::Durations &
-ref(const pkmn_gen1_chance_durations &durations) noexcept {
+view(const pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<const PKMN::Durations *>(&durations);
 }
 
-} // namespace View
+} // namespace PKMN

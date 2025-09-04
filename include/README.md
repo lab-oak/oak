@@ -27,7 +27,7 @@ move_string(151); // returns a string "Mew'.
 
 The composite data types of `libpkmn` such as `Battle`, `Side`, `Pokemon`, `ActivePokemon` are defined here.  This way members can be accessed directly; `pokemon.level` is much more clear and convenient than `battle.bytes[24 * i + 21]`.
 
-In the remaining code, these structs are only used as references, not constructed as is. We use the overloaded `View::ref(auto&)` function which gives us a 'view' into the underlying byte buffer.
+In the remaining code, these structs are only used as references, not constructed as is. We use the overloaded `PKMN::view(auto&)` function which gives us a 'view' into the underlying byte buffer.
 
 * layout.h
 

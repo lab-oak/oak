@@ -187,10 +187,10 @@ std::string volatiles_to_string(const PKMN::Volatiles &vol) {
 std::string battle_data_to_string(const pkmn_gen1_battle &battle,
                                   const pkmn_gen1_chance_durations &durations) {
   std::stringstream ss{};
-  const auto &b = View::ref(battle);
+  const auto &b = PKMN::view(battle);
   for (auto s = 0; s < 2; ++s) {
     const auto &side = b.sides[s];
-    const auto &duration = View::ref(durations).get(s);
+    const auto &duration = PKMN::view(durations).get(s);
     const auto &vol = side.active.volatiles;
 
     for (auto i = 0; i < 6; ++i) {

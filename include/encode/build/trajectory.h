@@ -116,9 +116,11 @@ template <typename F = Format::OU> struct Tensorizer {
   static std::array<float, n_dim> write(const auto &team) {
     std::array<float, n_dim> input{};
     const auto go = [&input](auto species, auto move) {
-      const auto index = species_move_table(species, move);
-      assert(index >= 0);
-      input[index] = 1.0;
+      if (species != PKMN::Data::Species::None) {
+        const auto index = species_move_table(species, move);
+        assert(index >= 0);
+        input[index] = 1.0;
+      }
     };
     for (const auto &set : team) {
       go(set.species, 0);
@@ -144,7 +146,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
   struct Update {
     uint16_t action;
     uint16_t probability;
-    
+
     Update() = default;
 
     Update(int a, float p) {
@@ -184,7 +186,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
     assert(i + trajectory.updates.size() <= 31);
 
     // encode the updates
-    std::transform(trajectory.updates.begin(), trajectory.updates.end() - 1,
+    std::transform(trajectory.updates.begin(), trajectory.updates.end(),
                    updates.begin() + i, [](const auto &update) {
                      const auto &action = update.legal_moves[update.index];
                      return Update{Tensorizer<F>::species_move_table(

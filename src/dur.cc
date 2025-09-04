@@ -52,13 +52,13 @@ pkmn_gen1_battle old_battle;
 pkmn_gen1_battle_options old_options;
 
 const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
-  const auto &battle = View::ref(b);
+  const auto &battle = PKMN::view(b);
   const pkmn_gen1_chance_durations &durations =
       *pkmn_gen1_battle_options_chance_durations(&options);
 
   for (auto s = 0; s < 2; ++s) {
     const auto &vol = battle.side(s).active().volatiles();
-    const auto &duration = View::ref(durations).get(s);
+    const auto &duration = PKMN::view(durations).get(s);
 
     if (vol.disable_move() != 0) {
       // This is all you have to change besides setting the first move in main

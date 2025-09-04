@@ -69,6 +69,6 @@ template <typename T, int dim = 39> struct PokemonCache {
   }
 };
 
-}
+} // namespace Battle
 
 } // namespace NN

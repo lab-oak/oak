@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #pragma pack(push, 1)
 template <typename Bandit> struct Joint {
   using Params = typename Bandit::Params;

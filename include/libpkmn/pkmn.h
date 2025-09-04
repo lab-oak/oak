@@ -45,7 +45,7 @@ pkmn_result result(Result result = Result::None, Choice p1 = Choice::Move,
 }
 
 pkmn_result result(const pkmn_gen1_battle &b) {
-  const auto &battle = View::ref(b);
+  const auto &battle = PKMN::view(b);
   const auto &p1 = battle.sides[0];
   const auto &p2 = battle.sides[1];
 

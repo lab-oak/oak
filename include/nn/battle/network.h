@@ -53,7 +53,6 @@ struct MainNet {
            policy2_fc2.write_parameters(stream);
   }
 
-  // TODO for now main does not do policy out, thats done by full net
   float propagate(const float *input_data) const {
     static thread_local float buffer0[hidden_dim];
     static thread_local float value_buffer1[value_hidden_dim];
@@ -104,10 +103,10 @@ struct MainNet {
 };
 
 struct Network {
-  using PokemonNet =
-      EmbeddingNet<Encode::Battle::Pokemon::n_dim, pokemon_hidden_dim, pokemon_out_dim>;
-  using ActiveNet =
-      EmbeddingNet<Encode::Battle::Active::n_dim, active_hidden_dim, active_out_dim>;
+  using PokemonNet = EmbeddingNet<Encode::Battle::Pokemon::n_dim,
+                                  pokemon_hidden_dim, pokemon_out_dim>;
+  using ActiveNet = EmbeddingNet<Encode::Battle::Active::n_dim,
+                                 active_hidden_dim, active_out_dim>;
 
   PokemonNet pokemon_net;
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
@@ -133,7 +132,7 @@ struct Network {
   }
 
   void fill_cache(const pkmn_gen1_battle &b) {
-    const auto &battle = View::ref(b);
+    const auto &battle = PKMN::view(b);
     for (auto s = 0; s < 2; ++s) {
       for (auto p = 0; p < 6; ++p) {
         pokemon_cache[s][p].fill(pokemon_net, battle.sides[s].pokemon[p]);
@@ -160,7 +159,7 @@ struct Network {
 
   // bool defer(const pkmn_gen1_battle &b) const {
   //   auto n_alive = 0;
-  //   const auto &battle = View::ref(b);
+  //   const auto &battle = PKMN::view(b);
   //   for (auto s = 0; s < 2; ++s) {
   //     const auto &side = battle.sides[s];
   //     for (const auto &pokemon : side.pokemon) {
@@ -172,22 +171,23 @@ struct Network {
 
   void write_main(float main_input[2][256], const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
-    static thread_local float pokemon_input[2][5][Encode::Battle::Pokemon::n_dim];
+    static thread_local float pokemon_input[2][5]
+                                           [Encode::Battle::Pokemon::n_dim];
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
-    const auto &battle = View::ref(b);
-    const auto &durations = View::ref(d);
+    const auto &battle = PKMN::view(b);
+    const auto &durations = PKMN::view(d);
     for (auto s = 0; s < 2; ++s) {
       const auto &side = battle.sides[s];
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
 
       if (stored.hp == 0) {
-        std::fill(main_input[s], main_input[s] + (Encode::Battle::Active::n_dim + 1),
-                  0);
+        std::fill(main_input[s],
+                  main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
       } else {
         Encode::Battle::Active::write(stored, side.active, duration,
-                              active_input[s][0]);
+                                      active_input[s][0]);
         active_net.propagate(active_input[s][0], main_input[s] + 1);
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
       }
@@ -223,7 +223,7 @@ struct Network {
 
   void foo(const pkmn_gen1_battle &b, const auto &p1_choices,
            const auto &p2_choices) {
-    // const auto &battle = View::ref(b);
+    // const auto &battle = PKMN::view(b);
 
     // std::array<uint16_t, 9> p1_choice_indices;
     // std::array<uint16_t, 9> p2_choice_indices;

@@ -79,6 +79,6 @@ constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Policy
 
-}
+} // namespace Battle
 
 } // namespace Encode

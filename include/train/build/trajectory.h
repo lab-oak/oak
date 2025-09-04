@@ -37,6 +37,12 @@ struct BasicAction {
   uint move_slot;
   Species species;
   Move move;
+
+  void print() const {
+    std::cout << lead << ' ' << slot << ' ' << move_slot << ' '
+              << PKMN::species_string(species) << ' ' << PKMN::move_string(move)
+              << std::endl;
+  }
 };
 
 using Action = std::vector<BasicAction>;
@@ -44,17 +50,15 @@ using Action = std::vector<BasicAction>;
 // this can turn any team into any other team. It is up to the team building
 // formulation to define what diffs are allowed.
 void apply_basic_action(auto &team, const BasicAction &action) {
-  if (action.lead) {
+  if (action.lead > 0) {
     std::swap(team[0], team[action.lead]);
-    return;
-  }
-  auto &set = team[action.slot];
-  if (action.move_slot) {
-    set.moves[action.move_slot - 1] = action.move;
-    return;
   } else {
-    set.species = action.species;
-    return;
+    auto &set = team[action.slot];
+    if (set.species != Species::None) {
+      set.moves[action.move_slot] = action.move;
+    } else {
+      set.species = action.species;
+    }
   }
 }
 

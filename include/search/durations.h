@@ -20,8 +20,8 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                               1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}};
 
-  auto &battle = View::ref(b);
-  const auto &durations = View::ref(d);
+  auto &battle = PKMN::view(b);
+  const auto &durations = PKMN::view(d);
   for (auto s = 0; s < 2; ++s) {
     auto &side = battle.sides[s];
     const auto &duration = durations.get(s);
