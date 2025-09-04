@@ -16,10 +16,9 @@ class BuildTrajectoryTorch:
         self.policy = torch.from_numpy(traj.policy).float().to(device)
         self.eval   = torch.from_numpy(traj.eval).float().to(device)
         self.score  = torch.from_numpy(traj.score).float().to(device)
-        self.team_size = torch.from_numpy(traj.team_size).long().to(device)
 
-class Battle::FrameTorch:
-    def __init__(self, encoded_frame: pyoak.Battle::Frame):
+class BattleFrameTorch:
+    def __init__(self, encoded_frame: pyoak.BattleFrame):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
         self.n = torch.from_numpy(encoded_frame.n)
@@ -281,7 +280,7 @@ class Network(torch.nn.Module):
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-    def inference(self, input: Battle::FrameTorch, output: OutputBuffers):
+    def inference(self, input: BattleFrameTorch, output: OutputBuffers):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])

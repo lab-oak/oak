@@ -157,18 +157,6 @@ struct Network {
     return 1 + active_out_dim + (i - 1) * (1 + pokemon_out_dim);
   }
 
-  // bool defer(const pkmn_gen1_battle &b) const {
-  //   auto n_alive = 0;
-  //   const auto &battle = PKMN::view(b);
-  //   for (auto s = 0; s < 2; ++s) {
-  //     const auto &side = battle.sides[s];
-  //     for (const auto &pokemon : side.pokemon) {
-  //       n_alive += (pokemon.hp > 0);
-  //     }
-  //   }
-  //   return (n_alive <= 4);
-  // }
-
   void write_main(float main_input[2][256], const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float pokemon_input[2][5]
@@ -219,24 +207,6 @@ struct Network {
     write_main(main_input, b, d);
     float value = main_net.propagate(main_input[0]);
     return value;
-  }
-
-  void foo(const pkmn_gen1_battle &b, const auto &p1_choices,
-           const auto &p2_choices) {
-    // const auto &battle = PKMN::view(b);
-
-    // std::array<uint16_t, 9> p1_choice_indices;
-    // std::array<uint16_t, 9> p2_choice_indices;
-
-    // for (auto i = 0; i < m; ++i) {
-    //   p1_choice_indices[i] =
-    //       Encode::Battle::Policy::get_index(b.sides[0], p1_choices[i]);
-    // }
-
-    // for (auto i = 0; i < n; ++i) {
-    //   p2_choice_indices[i] =
-    //       Encode::Battle::Policy::get_index(b.sides[1], p2_choices[i]);
-    // }
   }
 
   float inference(const pkmn_gen1_battle &b,

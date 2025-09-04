@@ -1,4 +1,4 @@
-from frame import Battle::Frame
+from frame import BattleFrame
 
 import ctypes
 import os
@@ -174,9 +174,9 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
     return result
 
 
-# convert bytes object into Battle::Frames
-def get_frames(data: bytes, frame_count: int) -> Battle::Frame:
-    frames = Battle::Frame(frame_count)
+# convert bytes object into BattleFrames
+def get_frames(data: bytes, frame_count: int) -> BattleFrame:
+    frames = BattleFrame(frame_count)
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
@@ -191,7 +191,6 @@ class BuildTrajectory:
         self.policy = np.zeros((size, 31, 1), dtype=np.float32)
         self.eval = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
-        self.team_size = np.zeros((size, 1), dtype=np.int64)
 
     def raw_pointers(self, i: int):
         def ptr(x, dtype):
@@ -203,11 +202,10 @@ class BuildTrajectory:
             ptr(self.policy, ctypes.c_float),
             ptr(self.eval, ctypes.c_float),
             ptr(self.score, ctypes.c_float),
-            ptr(self.team_size, ctypes.c_int64),
         )
 
 
-class Battle::Frame:
+class EncodedBattleFrame:
     def __init__(self, size):
         self.size = size
 
@@ -271,15 +269,15 @@ class Battle::Frame:
         )
 
 
-# convert bytes object into Battle::Frames
-def get_encoded_frames(data: bytes, frame_count: int) -> Battle::Frame:
-    encoded_frames = Battle::Frame(frame_count)
+# convert bytes object into BattleFrames
+def get_encoded_frames(data: bytes, frame_count: int) -> BattleFrame:
+    encoded_frames = BattleFrame(frame_count)
     args = (ctypes.c_char_p(data),) + encoded_frames.raw_pointers(0)
     lib.uncompress_and_encode_training_frames(*args)
     return encoded_frames
 
 
-# convert bytes object into Battle::Frames
+# convert bytes object into BattleFrames
 def read_build_trajectories(path) -> BuildTrajectory:
     buffer_size = int(os.path.getsize(path) / 128)
     path_bytes = path.encode("utf-8")
@@ -294,7 +292,7 @@ def encode_buffers(
     paths: list[str],
     threads: int,
     max_count: int,
-    encoded_frame_input: Battle::Frame,
+    encoded_frame_input: BattleFrame,
     start_index: int = 0,
     write_prob: float = 1,
 ):

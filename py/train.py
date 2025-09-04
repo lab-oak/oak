@@ -36,7 +36,7 @@ def masked_kl_div(logit, target):
 
 
 def loss(
-    input: net.Battle::FrameTorch, output: net.OutputBuffers, args, print_flag=False
+    input: net.BattleFrameTorch, output: net.OutputBuffers, args, print_flag=False
 ):
     size = min(input.size, output.size)
 
@@ -208,7 +208,7 @@ def main():
     print(f"{len(paths)} paths found")
 
     encoded_frames = pyoak.Battle::Frame(args.batch_size)
-    encoded_frames_torch = net.Battle::FrameTorch(encoded_frames)
+    encoded_frames_torch = net.BattleFrameTorch(encoded_frames)
     output_buffer = net.OutputBuffers(args.batch_size)
     network = net.Network().to(args.device)
     optimizer = Optimizer(network, args.lr)
