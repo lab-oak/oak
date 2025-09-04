@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <csignal>
+#include <mutex>
 #include <thread>
 
 #include <fcntl.h>
@@ -389,6 +390,7 @@ auto generate_team(mt19937 &device, const auto index)
     }
     const auto trajectory =
         TeamBuilding::rollout_build_network(device, build_network, team);
+    assert(trajectory.updates.size() > 0);
     return trajectory;
   }
 }
@@ -434,7 +436,9 @@ void generate(uint64_t seed) {
     const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
       const size_t bytes_to_write =
-          build_buffer.size() * sizeof(Train::Build::Trajectory);
+          build_buffer.size() *
+          (sizeof(Encode::Build::CompressedTrajectory<>::header) +
+           sizeof(Encode::Build::CompressedTrajectory<>::updates));
       const ssize_t written = write(fd, build_buffer.data(), bytes_to_write);
       print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
       print("build buffer - bytes written: " + std::to_string(written));
@@ -458,8 +462,8 @@ void generate(uint64_t seed) {
     auto p2_build_traj = generate_team(device, p2_team_index);
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
-    const bool p1_built = (p1_build_traj.initial != p1_team);
-    const bool p2_built = (p2_build_traj.initial != p2_team);
+    const bool p1_built = (p1_build_traj.updates.size() > 0);
+    const bool p2_built = (p2_build_traj.updates.size() > 0);
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto battle_options = PKMN::options();
@@ -539,22 +543,19 @@ void generate(uint64_t seed) {
     }
 
     // build
-    if ((p1_team_index >= 0) && (p2_team_index >= 0)) {
+    if (!p1_built && !p2_built) {
       RuntimeData::matchup_matrix.update(p1_team_index, p2_team_index,
                                          PKMN::score(battle_data.result));
     }
-    if (p1_team_index == -1) {
-      p1_build_traj.score =
-          static_cast<uint16_t>(2 * PKMN::score(battle_data.result));
-      p1_build_traj.value = training_frames.updates.front().empirical_value;
+    if (p1_built) {
+      p1_build_traj.score = PKMN::score(battle_data.result);
+      p1_build_traj.value = 1 - training_frames.updates.front().empirical_value;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
     if (p2_team_index == -1) {
-      p2_build_traj.score =
-          static_cast<uint16_t>(2 * (1 - PKMN::score(battle_data.result)));
-      p2_build_traj.value = std::numeric_limits<uint16_t>::max() -
-                            training_frames.updates.front().empirical_value;
+      p2_build_traj.score = 1 - PKMN::score(battle_data.result);
+      p2_build_traj.value = 1 - training_frames.updates.front().empirical_value;
       build_buffer.push_back(p2_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }

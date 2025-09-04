@@ -134,12 +134,12 @@ template <typename F = Format::OU> struct Tensorizer {
 
 template <typename F = Format::OU> struct CompressedTrajectory {
 
-  enum class Version : std::underlying_type_t<std::byte> {
-    Default = 0,
+  enum class Format : std::underlying_type_t<std::byte> {
+    NoTeam = 0,
     WithTeam = 1,
   };
   struct Header {
-    Version format;
+    Format format;
     uint8_t score;
     uint16_t eval;
   };
@@ -161,14 +161,22 @@ template <typename F = Format::OU> struct CompressedTrajectory {
 
   Header header;
   std::array<Update, 31> updates;
-  PKMN::Team opp;
+  PKMN::Team opponent;
 
   CompressedTrajectory(const Train::Build::Trajectory &trajectory)
-      : header{}, updates{}, opp{} {
+      : header{}, updates{}, opponent{} {
     using PKMN::Data::Move;
     using PKMN::Data::Species;
     auto i = 0;
     assert(trajectory.initial.size() <= 6);
+
+    if (trajectory.opponent.has_value()) {
+      header.format == Format::WithTeam;
+      const auto &opp = trajectory.opponent.value();
+      std::copy(opp.begin(), opp.end(), opponent.begin());
+    }
+    header.value = trajectory.value * std::numeric_limits<uint16_t>::max();
+    header.score = 2 * trajectory.score;
 
     // encode initial team
     for (const auto &set : trajectory.initial) {
@@ -191,27 +199,36 @@ template <typename F = Format::OU> struct CompressedTrajectory {
                      const auto &action = update.legal_moves[update.index];
                      return Update{Tensorizer<F>::species_move_table(
                                        action[0].species, action[0].move),
-                                   action.probability};
+                                   action[0].probability};
                    });
 
-    // fill the rest
-
-    // select lead
-
-    // rewards
+    // fill the rest, not necessary even
+    for (; i < 31; ++i) {
+      updates[i] = {};
+    }
   }
 
-  void write(char *data) const {}
+  void write(char *data) const {
+    auto index = 0;
+    std::memcpy(data + index, reinterpret_cast<const char *>(&header),
+                sizeof(header));
+    index += sizeof(header);
+    std::memcpy(data + index, reinterpret_cast<const char *>(&updates),
+                sizeof(updates));
+    if (header.format == Format::WithTeam) {
+      index += sizeof(updates);
+      std::memcpy(data + index, reinterpret_cast<const char *>(&opponent),
+                  sizeof(opponent));
+    }
+  }
 
   void read(char *data) {
     std::memcpy(reinterpret_cast<char *>(&header), data, sizeof(Header));
     data += sizeof(Header);
-    std::memcpy(reinterpret_cast<char *>(updates.data()), data,
-                31 * sizeof(Update));
-    data += sizeof(31 * sizeof(Update));
-    if (header.format == Version::WithTeam) {
-      std::memcpy(reinterpret_cast<char *>(opp.data()), data,
-                  sizeof(PKMN::Team));
+    std::memcpy(reinterpret_cast<char *>(&updates), data, sizeof(updates));
+    if (header.format == Format::WithTeam) {
+      data += sizeof(updates);
+      std::memcpy(reinterpret_cast<char *>(&opponent), data, sizeof(opponent));
     }
   }
 };
@@ -224,7 +241,7 @@ struct TrajectoryInput {
   float *score;
 
   template <typename F = Format::OU>
-  void write(const CompressedTrajectory<> &traj) {
+  void write(const CompressedTrajectory<F> &traj) {
 
     struct Helper {};
   }
