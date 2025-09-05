@@ -8,14 +8,16 @@ import struct
 
 import torch
 
+
 class BuildTrajectoryTorch:
     def __init__(self, traj: pyoak.BuildTrajectory, device="cpu"):
         self.size = traj.size
         self.actions = torch.from_numpy(traj.actions).long().to(device)
         self.mask = torch.from_numpy(traj.mask).long().to(device)
         self.policy = torch.from_numpy(traj.policy).float().to(device)
-        self.eval   = torch.from_numpy(traj.eval).float().to(device)
-        self.score  = torch.from_numpy(traj.score).float().to(device)
+        self.eval = torch.from_numpy(traj.eval).float().to(device)
+        self.score = torch.from_numpy(traj.score).float().to(device)
+
 
 class BattleFrameTorch:
     def __init__(self, encoded_frame: pyoak.BattleFrame):
@@ -128,6 +130,7 @@ class EmbeddingNet(nn.Module):
     def forward(self, x):
         return self.fc1(self.fc0(x))
 
+
 class BuildNet(nn.Module):
     def __init__(self, in_dim, policy_hidden_dim, value_hidden_dim):
         self.policy_net = EmbeddingNet(in_dim, policy_hidden_dim, in_dim, True, False)
@@ -143,6 +146,7 @@ class BuildNet(nn.Module):
 
     def forward(self, x):
         return self.policy_net.forward(x), self.value_net.forward(x)
+
 
 class MainNet(nn.Module):
     def __init__(
