@@ -1,4 +1,5 @@
 import torch
+import random
 
 b = 1
 T = 5
@@ -10,10 +11,11 @@ def get_actions():
     actions = torch.full((b, T, 1), -1, dtype=torch.int64)  # start all invalid
     policy = torch.zeros((b, T, 1))
     for i in range(b):
-        start = torch.randint(0, T - 1, (1,)).item()
-        done = torch.randint(start + 1, T, (1,)).item()  # done >= start
+        start = random.randint(0, T - 2)
+        done = random.randint(start + 1, T)
         actions[i, 0:done, 0] = torch.randint(0, N, (done,))
-        policy[i, start:done, 0] = torch.rand((done - start,))
+        eps = 10**-5
+        policy[i, start:done, 0] = eps + torch.rand((done - start,))
     return actions, policy
 
 
@@ -25,11 +27,13 @@ def get_state(actions):
     state = state[:, :, 1:]  # [b, T, N]
     return state
 
+
 def get_mask(state):
     masks = state.clone().detach()
     masks = torch.cat([torch.zeros(b, 1, N), state[:, :-1]], dim=1)
     masks = 1 - masks
     return masks
+
 
 # Random actions in [0, N), but allow -1 for invalid steps
 actions, policy = get_actions()
@@ -45,8 +49,8 @@ mask = torch.randint(0, N, (b, T, n_legal_actions), dtype=torch.int64)
 logits = torch.rand([b, T, N])  # [b, T, N]
 rewards = torch.rand([b, T, 1])  # [b, T, 1]
 
-valid_actions = (actions != -1)  # [b, T, 1]
-valid_choices = (policy > 0)
+valid_actions = actions != -1  # [b, T, 1]
+valid_choices = policy > 0
 valid_mask = torch.logical_and(valid_actions, valid_choices).float()
 
 # --- Log-probs over all actions ---
