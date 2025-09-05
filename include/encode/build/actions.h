@@ -1,6 +1,6 @@
 #pragma once
 
-#include <format/OU/data.h>
+#include <format/ou/data.h>
 #include <train/build/trajectory.h>
 
 /*

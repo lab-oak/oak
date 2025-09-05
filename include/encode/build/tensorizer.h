@@ -1,7 +1,7 @@
 #pragma once
 
 #include <encode/build/actions.h>
-#include <format/OU/data.h>
+#include <format/ou/data.h>
 #include <format/util.h>
 #include <train/build/trajectory.h>
 

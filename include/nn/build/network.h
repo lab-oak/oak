@@ -1,7 +1,7 @@
 #pragma once
 
 #include <encode/build/trajectory.h>
-#include <format/OU/data.h>
+#include <format/ou/data.h>
 #include <nn/params.h>
 #include <nn/subnet.h>
 #include <train/build/trajectory.h>

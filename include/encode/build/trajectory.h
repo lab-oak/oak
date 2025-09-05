@@ -2,8 +2,7 @@
 
 #include <encode/build/actions.h>
 #include <encode/build/tensorizer.h>
-#include <format/OU/data.h>
-#include <format/util.h>
+#include <format/ou/data.h>
 #include <train/build/trajectory.h>
 
 /*
@@ -194,7 +193,6 @@ struct TrajectoryInput {
         }
         if (can_add_species) {
           // copy avaiable mons to _mask
-          
         }
         _policy = update.policy / den;
 
