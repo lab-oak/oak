@@ -20,6 +20,7 @@ class BuildTrajectoryTorch:
         self.start = torch.from_numpy(traj.start).long().to(device)
         self.end = torch.from_numpy(traj.end).long().to(device)
 
+
 class BattleFrameTorch:
     def __init__(self, encoded_frame: pyoak.BattleFrame):
         self.size = encoded_frame.size

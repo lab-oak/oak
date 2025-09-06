@@ -207,7 +207,7 @@ def main():
     paths = find_battle_files(args.battle_dir)
     print(f"{len(paths)} paths found")
 
-    encoded_frames = pyoak.Battle::Frame(args.batch_size)
+    encoded_frames = pyoak.BattleFrame(args.batch_size)
     encoded_frames_torch = net.BattleFrameTorch(encoded_frames)
     output_buffer = net.OutputBuffers(args.batch_size)
     network = net.Network().to(args.device)

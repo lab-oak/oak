@@ -43,117 +43,12 @@ def read_build_trajectories():
 
         data = [(sm, p) for sm, p in zip(species_move_string, selection_probs) if p > 0]
         print(data)
-        print(build_trajectories.value[index])
-        print(build_trajectories.score[index])
-
-    import net
-    import torch
-
-    b, T, _ = build_trajectories.mask.shape
-    N = pyoak.species_move_list_size
-
-    traj = net.BuildTrajectoryTorch(build_trajectories)
-
-    valid_actions = traj.actions != -1  # [b, T, 1]
-    valid_choices = traj.policy > 0
-    valid_mask = torch.logical_and(valid_actions, valid_choices).float()
-
-    value_network = net.EmbeddingNet(
-        pyoak.species_move_list_size, 512, 1, True, False
-    )
-
-    policy_network = net.EmbeddingNet(
-        pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
-    )
-
-    def get_state(actions):
-        state = torch.zeros((b, T, N + 1), dtype=torch.float32)  # [b, T, N+1]
-        safe_actions = torch.from_numpy(actions + 1).long()
-        state = state.scatter(2, safe_actions, 1.0)
-        state = torch.cumsum(state, dim=1).clamp_max(1.0)
-        state = state[:, :-1, 1:]  # [b, T, N]
-        state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
-        return state
-
-    state = get_state(build_trajectories.actions)
-
-
-    values = torch.sigmoid(value_network.forward(state))
-    logits = policy_network.forward(state)
-
-    logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
-    actions_flat = traj.actions.view(-1)        # [(b*T)]
-    mask0_flat = traj.mask[:, :, 0].view(-1)   # [(b*T)]
-
-    # gather the values to swap
-    logits_a = logits_flat[torch.arange(b*T), actions_flat]
-    logits_m = logits_flat[torch.arange(b*T), mask0_flat]
-
-    # swap them
-    logits_flat[torch.arange(b*T), actions_flat] = logits_m
-    logits_flat[torch.arange(b*T), mask0_flat] = logits_a
-
-    # reshape back
-    logits = logits_flat.view(b, T, -1)
-
-    safe_actions = torch.clamp(traj.mask, min=0)
-    mask_logits = torch.gather(logits, 2, safe_actions)
-    mask_logits = torch.exp(mask_logits)
-    # mask_logits[invalid_mask] = 0
-    mask_logits[traj.mask == -1] = 0
-    # mask_probs = mask_logits / torch.sum(mask_logits, dim=2)
-    mask_probs = torch.nn.functional.normalize(mask_logits, dim=2)
-    p_actions = mask_probs[:, :, 0]
-    logp_actions = torch.log(p_actions).unsqueeze(-1) * valid_mask
-    old_logp_actions = torch.log(traj.policy) * valid_mask
-    logp_actions[torch.isnan(logp_actions)] = 1
-    old_logp_actions[torch.isnan(old_logp_actions)] = 1
-
-    value_weight = 1
-    r = value_weight * traj.value + (1 - value_weight) * traj.score
-
-    rewards = torch.zeros_like(logp_actions)
-    end_expanded = traj.end.unsqueeze(-1) - 1
-    rewards.scatter_(1, end_expanded, r.unsqueeze(-1))
-
-    # --- GAE ---
-    gamma, lam = 0.99, 0.95
-    next_values = torch.cat([values[:, 1:], torch.zeros_like(values[:, -1:])], dim=1)
-    deltas = rewards + gamma * next_values - values
-
-    advantages = []
-    advantage = torch.zeros((b, 1))
-    for t in reversed(range(T)):
-        # Only update advantage if step is valid
-        advantage = deltas[:, t, :] * valid_mask[:, t, :] + gamma * lam * advantage
-        advantages.insert(0, advantage)
-
-    gae = torch.stack(advantages, dim=1)  # [b, T, 1]
-    returns = gae + values
-
-    ratios = torch.exp(logp_actions - old_logp_actions)
-
-    clip_eps = 0.2
-    surr1 = ratios * gae
-    surr2 = torch.clamp(ratios, 1 - clip_eps, 1 + clip_eps) * gae
-    policy_loss = -(
-        torch.min(surr1, surr2) * valid_mask
-    ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    value_loss = (
-        ((returns - values) * valid_mask) ** 2
-    ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    # entropy = (
-    #     -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True) * valid_mask
-    # ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    loss = policy_loss + 0.5 * value_loss
-
-
-
-
-
+        print("actions", build_trajectories.actions[index,:5])
+        print("legal actions mask", build_trajectories.mask[index][:5,:20])
+        print("log probs", np.log(build_trajectories.policy[index, :5]))
+        print("value", build_trajectories.value[index])
+        print("score", build_trajectories.score[index])
+        print("start/end", np.concatenate([build_trajectories.start[index, :5], build_trajectories.end[index, :5]], axis=0))
 
 
 def create_set():
