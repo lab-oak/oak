@@ -15,9 +15,10 @@ class BuildTrajectoryTorch:
         self.actions = torch.from_numpy(traj.actions).long().to(device)
         self.mask = torch.from_numpy(traj.mask).long().to(device)
         self.policy = torch.from_numpy(traj.policy).float().to(device)
-        self.eval = torch.from_numpy(traj.eval).float().to(device)
+        self.value = torch.from_numpy(traj.value).float().to(device)
         self.score = torch.from_numpy(traj.score).float().to(device)
-
+        self.start = torch.from_numpy(traj.start).long().to(device)
+        self.end = torch.from_numpy(traj.end).long().to(device)
 
 class BattleFrameTorch:
     def __init__(self, encoded_frame: pyoak.BattleFrame):

@@ -139,6 +139,8 @@ struct TrajectoryInput {
   float *policy;
   float *value;
   float *score;
+  int64_t *start;
+  int64_t *end;
 
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
@@ -166,32 +168,32 @@ struct TrajectoryInput {
     bool done = false;
     bool started = false;
 
-    auto k = 1;
-
-    for (const auto &update : traj.updates) {
-
-      std::cout << update.action << ' ' << update.probability << std::endl;
+    for (auto i = 0; i < 31; ++i) {
+      const auto &update = traj.updates[i];
 
       int64_t _action = -1;
       std::array<int64_t, Tensorizer<F>::max_actions> _mask;
-      std::fill(_mask.begin(), _mask.end(), -k);
+      std::fill(_mask.begin(), _mask.end(), -1);
       float _policy = 0;
 
-      if (update.probability > 0) {
+      if (update.probability > 0 && !started) {
         started = true;
+        *start++ = i;
       }
-      if (started && update.probability == 0) {
+      if (started && update.probability == 0 && !done) {
         done = true;
+        *end++ = i;
       }
 
       if (!done) {
+        _action = update.action;
         if (started) {
           // set info for writing
-          _action = update.action;
+          _policy = update.probability / den;
           auto mask_index = 0;
           for (const auto &cache : caches) {
-            if ((cache.species != 0) && (true)) {
-              std::cout << cache.move_pool_size;
+            if ((cache.species != 0) &&
+                (cache.n_moves < std::min(4, cache.max_moves))) {
               std::transform(
                   cache.move_pool.begin(),
                   cache.move_pool.begin() + cache.move_pool_size,
@@ -214,7 +216,6 @@ struct TrajectoryInput {
                            });
             mask_index += available_species.size();
           }
-          _policy = update.probability / den;
         }
 
         // update stats
@@ -223,7 +224,6 @@ struct TrajectoryInput {
             std::find_if(caches.begin(), caches.begin() + n_cache,
                          [s](const auto &cache) { return cache.species == s; });
         if (m == 0) {
-          std::cout << "add: " << PKMN::species_string(s) << std::endl;
           // add species
           if (it == caches.begin() + n_cache) {
             caches[n_cache++] = MaskCache{s};
@@ -233,16 +233,16 @@ struct TrajectoryInput {
           }
         } else {
           // add move
-          assert(it != caches.end());
+          assert(it != (caches.begin() + n_cache));
           auto &cache = *it;
           auto &move_pool = cache.move_pool;
           auto x = std::find(move_pool.begin(),
                              move_pool.begin() + cache.move_pool_size,
                              static_cast<PKMN::Data::Move>(m));
-          if (x != move_pool.end()) {
+          if (x != (move_pool.begin() + cache.move_pool_size)) {
             std::swap(move_pool[cache.move_pool_size - 1], *x);
             --cache.move_pool_size;
-            +cache.n_moves;
+            ++cache.n_moves;
           } else {
             // we should not be able to add a move that is not present
             assert(false);
@@ -255,7 +255,10 @@ struct TrajectoryInput {
       std::copy(_mask.begin(), _mask.end(), mask);
       mask += Tensorizer<F>::max_actions;
       *policy++ = _policy;
-      ++k;
+    }
+
+    if (!done) {
+      *end++ = 31;
     }
 
     *value++ = traj.header.value / den;

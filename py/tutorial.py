@@ -27,58 +27,133 @@ def read_build_trajectories():
 
     assert build_trajectories.size > 0, f"No data found in {file}."
 
-    print(build_trajectories.size)
-
-    print(build_trajectories.actions[0])
-    print(build_trajectories.policy[0])
-    print(build_trajectories.value[0])
-
-
-    return
-
     for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [
-            pyoak.species_move_list[_] for _ in build_trajectories.actions[index].reshape(-1)
+            pyoak.species_move_list[_]
+            for _ in build_trajectories.actions[index].reshape(-1)
         ]
         species_move_string = [
             (pyoak.species_names[s], pyoak.move_names[m]) for s, m in species_move
         ]
-        selection_probs = [float(_) for _ in build_trajectories.policy[index].reshape(-1)]
+        selection_probs = [
+            float(_) for _ in build_trajectories.policy[index].reshape(-1)
+        ]
 
         data = [(sm, p) for sm, p in zip(species_move_string, selection_probs) if p > 0]
         print(data)
-        print(build_trajectories.eval[index])
+        print(build_trajectories.value[index])
         print(build_trajectories.score[index])
 
     import net
     import torch
 
-    network = net.EmbeddingNet(
+    b, T, _ = build_trajectories.mask.shape
+    N = pyoak.species_move_list_size
+
+    traj = net.BuildTrajectoryTorch(build_trajectories)
+
+    valid_actions = traj.actions != -1  # [b, T, 1]
+    valid_choices = traj.policy > 0
+    valid_mask = torch.logical_and(valid_actions, valid_choices).float()
+
+    value_network = net.EmbeddingNet(
+        pyoak.species_move_list_size, 512, 1, True, False
+    )
+
+    policy_network = net.EmbeddingNet(
         pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
     )
 
-    traj = net.BuildTrajectoryTorch(build_trajectories)
-    states = torch.zeros((traj.size, 31, pyoak.species_move_list_size), dtype=torch.float32)
+    def get_state(actions):
+        state = torch.zeros((b, T, N + 1), dtype=torch.float32)  # [b, T, N+1]
+        safe_actions = torch.from_numpy(actions + 1).long()
+        state = state.scatter(2, safe_actions, 1.0)
+        state = torch.cumsum(state, dim=1).clamp_max(1.0)
+        state = state[:, :-1, 1:]  # [b, T, N]
+        state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
+        return state
 
-    ones = torch.ones_like(traj.actions, dtype=torch.float32)
-    torch.set_printoptions(threshold=10_000)
-    print(traj.mask.shape)
-    # print(traj.mask[1, 0])
-    for b in range(31):
-        print(traj.mask[0, b])
+    state = get_state(build_trajectories.actions)
 
-    # states = torch.zeros([traj.size, 1, pyoak.species_move_list_size])
-    # print(states.shape, traj.actions.shape, ones.shape)
 
-    # for step in range(31):
+    values = torch.sigmoid(value_network.forward(state))
+    logits = policy_network.forward(state)
 
-    #     logits = network.forward(states)
+    logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
+    actions_flat = traj.actions.view(-1)        # [(b*T)]
+    mask0_flat = traj.mask[:, :, 0].view(-1)   # [(b*T)]
 
-    #     print(torch.sum(states[0]))
+    # gather the values to swap
+    logits_a = logits_flat[torch.arange(b*T), actions_flat]
+    logits_m = logits_flat[torch.arange(b*T), mask0_flat]
 
-    #     states = torch.scatter(states,-1, traj.actions[:, step : step + 1], ones)
+    # swap them
+    logits_flat[torch.arange(b*T), actions_flat] = logits_m
+    logits_flat[torch.arange(b*T), mask0_flat] = logits_a
+
+    # reshape back
+    logits = logits_flat.view(b, T, -1)
+
+    safe_actions = torch.clamp(traj.mask, min=0)
+    mask_logits = torch.gather(logits, 2, safe_actions)
+    mask_logits = torch.exp(mask_logits)
+    # mask_logits[invalid_mask] = 0
+    mask_logits[traj.mask == -1] = 0
+    # mask_probs = mask_logits / torch.sum(mask_logits, dim=2)
+    mask_probs = torch.nn.functional.normalize(mask_logits, dim=2)
+    p_actions = mask_probs[:, :, 0]
+    logp_actions = torch.log(p_actions).unsqueeze(-1) * valid_mask
+    old_logp_actions = torch.log(traj.policy) * valid_mask
+    logp_actions[torch.isnan(logp_actions)] = 1
+    old_logp_actions[torch.isnan(old_logp_actions)] = 1
+
+    value_weight = 1
+    r = value_weight * traj.value + (1 - value_weight) * traj.score
+
+    rewards = torch.zeros_like(logp_actions)
+    end_expanded = traj.end.unsqueeze(-1) - 1
+    rewards.scatter_(1, end_expanded, r.unsqueeze(-1))
+
+    # --- GAE ---
+    gamma, lam = 0.99, 0.95
+    next_values = torch.cat([values[:, 1:], torch.zeros_like(values[:, -1:])], dim=1)
+    deltas = rewards + gamma * next_values - values
+
+    advantages = []
+    advantage = torch.zeros((b, 1))
+    for t in reversed(range(T)):
+        # Only update advantage if step is valid
+        advantage = deltas[:, t, :] * valid_mask[:, t, :] + gamma * lam * advantage
+        advantages.insert(0, advantage)
+
+    gae = torch.stack(advantages, dim=1)  # [b, T, 1]
+    returns = gae + values
+
+    ratios = torch.exp(logp_actions - old_logp_actions)
+
+    clip_eps = 0.2
+    surr1 = ratios * gae
+    surr2 = torch.clamp(ratios, 1 - clip_eps, 1 + clip_eps) * gae
+    policy_loss = -(
+        torch.min(surr1, surr2) * valid_mask
+    ).sum() / valid_mask.sum().clamp_min(1.0)
+
+    value_loss = (
+        ((returns - values) * valid_mask) ** 2
+    ).sum() / valid_mask.sum().clamp_min(1.0)
+
+    # entropy = (
+    #     -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True) * valid_mask
+    # ).sum() / valid_mask.sum().clamp_min(1.0)
+
+    loss = policy_loss + 0.5 * value_loss
+
+
+
+
+
 
 
 def create_set():
@@ -89,7 +164,7 @@ def create_set():
         pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
     )
 
-    if (len(sys.argv) < 3):
+    if len(sys.argv) < 3:
         print("no build network path provided; using randomly initialized net")
     else:
         with open(sys.argv[2]) as params:
@@ -122,7 +197,7 @@ def create_set():
     n_moves = 0
     for index, pair in enumerate(pyoak.species_move_list):
         s, m = pair
-        if (s == species and m != 0):
+        if s == species and m != 0:
             n_moves += 1
             mask[index] = 1
 

@@ -191,6 +191,8 @@ class BuildTrajectory:
         self.policy = np.zeros((size, 31, 1), dtype=np.float32)
         self.value = np.zeros((size, 1), dtype=np.float32)
         self.score = np.zeros((size, 1), dtype=np.float32)
+        self.start = np.zeros((size, 1), dtype=np.int64)
+        self.end = np.zeros((size, 1), dtype=np.int64)
 
     def raw_pointers(self, i: int):
         def ptr(x, dtype):
@@ -202,6 +204,8 @@ class BuildTrajectory:
             ptr(self.policy, ctypes.c_float),
             ptr(self.value, ctypes.c_float),
             ptr(self.score, ctypes.c_float),
+            ptr(self.start, ctypes.c_int64),
+            ptr(self.end, ctypes.c_int64),
         )
 
 

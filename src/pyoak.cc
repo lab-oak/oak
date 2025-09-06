@@ -482,7 +482,8 @@ extern "C" size_t encode_buffer_multithread(
 
 extern "C" int read_build_trajectories(const char *path, int64_t *action,
                                        int64_t *mask, float *policy,
-                                       float *value, float *score) {
+                                       float *value, float *score,
+                                       int64_t *start, int64_t *end) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -494,9 +495,11 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
                                        .mask = mask,
                                        .policy = policy,
                                        .value = value,
-                                       .score = score};
+                                       .score = score,
+                                       .start = start,
+                                       .end = end};
 
-  const auto ptrs = std::bit_cast<std::array<void *, 5>>(input);
+  const auto ptrs = std::bit_cast<std::array<void *, 7>>(input);
   for (const auto *x : ptrs) {
     if (!x) {
       std::cerr << "read_build_trajectories: null pointer in input"
