@@ -210,7 +210,7 @@ def main():
     encoded_frames = pyoak.BattleFrame(args.batch_size)
     encoded_frames_torch = net.BattleFrameTorch(encoded_frames)
     output_buffer = net.OutputBuffers(args.batch_size)
-    network = net.Network().to(args.device)
+    network = net.BattleNetwork().to(args.device)
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):

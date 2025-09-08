@@ -133,11 +133,19 @@ class EmbeddingNet(nn.Module):
         return self.fc1(self.fc0(x))
 
 
-class BuildNet(nn.Module):
-    def __init__(self, in_dim, policy_hidden_dim, value_hidden_dim):
+class BuildNetwork(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.policy_net = EmbeddingNet(in_dim, policy_hidden_dim, in_dim, True, False)
-        self.value_net = EmbeddingNet(in_dim, value_hidden_dim, 1, True, False)
+        self.policy_net = EmbeddingNet(
+            pyoak.species_move_list_size,
+            pyoak.build_policy_hidden_dim,
+            pyoak.species_move_list_size,
+            True,
+            False,
+        )
+        self.value_net = EmbeddingNet(
+            pyoak.species_move_list_size, pyoak.build_value_hidden_dim, 1, True, False
+        )
 
     def read_parameters(self, f):
         self.policy_net.read_parameters(f)
@@ -217,10 +225,10 @@ class OutputBuffers:
     def __init__(self, size):
         self.size = size
         self.pokemon = torch.zeros(
-            (size, 2, 5, Network.pokemon_out_dim), dtype=torch.float32
+            (size, 2, 5, BattleNetwork.pokemon_out_dim), dtype=torch.float32
         )
         self.active = torch.zeros(
-            (size, 2, 1, Network.active_out_dim), dtype=torch.float32
+            (size, 2, 1, BattleNetwork.active_out_dim), dtype=torch.float32
         )
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
@@ -243,7 +251,7 @@ class OutputBuffers:
         self.p2_policy.detach_().zero_()
 
 
-class Network(torch.nn.Module):
+class BattleNetwork(torch.nn.Module):
     pokemon_hidden_dim = pyoak.pokemon_hidden_dim
     pokemon_out_dim = pyoak.pokemon_out_dim
     active_hidden_dim = pyoak.active_hidden_dim

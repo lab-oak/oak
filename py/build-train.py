@@ -33,7 +33,7 @@ def loss(values, logits, build_trajectories):
     traj = net.BuildTrajectoryTorch(build_trajectories)
 
     valid_actions = traj.actions != -1  # [b, T, 1]
-    valid_choices = traj.policy > 0
+    valid_choices = traj.policy > 0  # [b, T, 1]
     valid_mask = torch.logical_and(valid_actions, valid_choices).float()
 
     logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
@@ -124,24 +124,15 @@ def main():
     files = find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
-    value_network = net.EmbeddingNet(
-        pyoak.species_move_list_size, pyoak.build_policy_hidden_dim, 1, True, False
-    )
-    policy_network = net.EmbeddingNet(
-        pyoak.species_move_list_size,
-        pyoak.build_policy_hidden_dim,
-        pyoak.species_move_list_size,
-        True,
-        False,
-    )
+    network = net.BuildNetwork()
 
     with open("./build-network", "rb") as f:
-        policy_network.read_parameters(f)
+        network.read_parameters(f)
 
     optimizer = torch.optim.Adam(
-        list(value_network.parameters()) + list(policy_network.parameters()), lr=1e-2
+        network.parameters(), lr=1e-2
     )
-    steps = 300
+    steps = 50
 
     from random import sample
 
@@ -152,19 +143,16 @@ def main():
 
         state = get_state(build_trajectories.actions)
 
-        values = torch.sigmoid(value_network.forward(state))
-        logits = policy_network.forward(state)
-
+        logits, v = network.forward(state)
+        values = torch.sigmoid(v)
+        
         optimizer.zero_grad()
         l = loss(values, logits, build_trajectories)
         l.backward()
         optimizer.step()
 
-    with open("policy.net", "wb") as f:
-        policy_network.write_parameters(f)
-    with open("value.net", "wb") as f:
-        value_network.write_parameters(f)
-
+    with open("./build-network", "wb") as f:
+        network.write_parameters(f)
 
 if __name__ == "__main__":
     main()

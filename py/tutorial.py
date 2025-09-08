@@ -58,13 +58,45 @@ def read_build_trajectories():
                 axis=0,
             ),
         )
+    # print(build_trajectories.value)
 
+
+def show_species_probs():
+    import net
+    import torch
+    import math
+
+    network = net.BuildNetwork()
+
+    path = sys.argv[2]
+    with open(path, "rb") as file:
+        network.read_parameters(file)
+
+
+    weights = dict()
+
+    logits, _ = network.forward(torch.zeros((1, pyoak.species_move_list_size)))
+
+    for index, pair in enumerate(pyoak.species_move_list):
+        s, m = pair
+        if m != 0:
+            continue
+
+        name = pyoak.species_names[s]
+        weights[name] = math.exp(logits[0, index])
+
+    s = 0
+    for x in weights:
+        s += weights[x]
+    probs = {species : weights[species] / s for species in weights}
+    for x in probs:
+        print(x, probs[x])
 
 def create_set():
 
-    from net import BuildNet
+    from net import BuildNetwork
 
-    network = BuildNet(
+    network = BuildNetwork(
         pyoak.species_move_list_size,
         pyoak.build_policy_hidden_dim,
         pyoak.build_value_hidden_dim,
@@ -132,5 +164,8 @@ if __name__ == "__main__":
     elif key == "create-set":
         # recreates the build networking rollout code to create a single pokemon set
         create_set()
+    elif key == "show-species-probs":
+        # basic check that PPO works. We expect to see less ratata and more snorlax no matter what
+        show_species_probs()
     else:
         print("Invalid keyword. See TUTORIAL.md")
