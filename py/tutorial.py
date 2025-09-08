@@ -72,7 +72,6 @@ def show_species_probs():
     with open(path, "rb") as file:
         network.read_parameters(file)
 
-
     weights = dict()
 
     logits, _ = network.forward(torch.zeros((1, pyoak.species_move_list_size)))
@@ -88,9 +87,10 @@ def show_species_probs():
     s = 0
     for x in weights:
         s += weights[x]
-    probs = {species : weights[species] / s for species in weights}
+    probs = {species: weights[species] / s for species in weights}
     for x in probs:
         print(x, probs[x])
+
 
 def create_set():
 

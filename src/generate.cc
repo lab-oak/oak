@@ -643,21 +643,6 @@ void print_thread_fn() {
   }
 }
 
-void create_working_dir() {
-  const std::filesystem::path dir_path = RuntimeData::start_datetime;
-
-  std::error_code ec;
-  const bool created = std::filesystem::create_directory(dir_path, ec);
-  if (ec) {
-    std::cerr << "Error creating directory: " << ec.message() << '\n';
-  } else if (created) {
-    std::cout << "Created directory " << RuntimeData::start_datetime
-              << std::endl;
-  } else {
-    throw std::runtime_error("Could not create datetime dir.");
-  }
-}
-
 void setup() {
   // create working dir
   const std::filesystem::path working_dir = RuntimeData::start_datetime;

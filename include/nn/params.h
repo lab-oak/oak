@@ -21,8 +21,8 @@ static constexpr int policy_out_dim =
 } // namespace Battle
 
 namespace Build {
-static constexpr int policy_hidden_dim = 512;
-static constexpr int value_hidden_dim = 512;
+static constexpr int policy_hidden_dim = 64;
+static constexpr int value_hidden_dim = 64;
 } // namespace Build
 
 } // namespace NN
