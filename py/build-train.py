@@ -3,6 +3,7 @@ import torch
 import pyoak
 import os
 
+
 def find_data_files(root_dir, ext=".battle"):
     battle_files = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -12,15 +13,19 @@ def find_data_files(root_dir, ext=".battle"):
                 battle_files.append(full_path)
     return battle_files
 
+
 def get_state(actions):
     b, T, _ = actions.shape
-    state = torch.zeros((b, T, pyoak.species_move_list_size + 1), dtype=torch.float32)  # [b, T, N+1]
+    state = torch.zeros(
+        (b, T, pyoak.species_move_list_size + 1), dtype=torch.float32
+    )  # [b, T, N+1]
     safe_actions = torch.from_numpy(actions + 1).long()
     state = state.scatter(2, safe_actions, 1.0)
     state = torch.cumsum(state, dim=1).clamp_max(1.0)
     state = state[:, :-1, 1:]  # [b, T, N]
     state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
     return state
+
 
 def loss(values, logits, build_trajectories):
     b, T, _ = build_trajectories.mask.shape
@@ -30,19 +35,23 @@ def loss(values, logits, build_trajectories):
     valid_actions = traj.actions != -1  # [b, T, 1]
     valid_choices = traj.policy > 0
     valid_mask = torch.logical_and(valid_actions, valid_choices).float()
-    
+
     logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
-    actions_flat = traj.actions.view(-1)        # [(b*T)]
-    mask0_flat = traj.mask[:, :, 0].view(-1)    # [(b*T)]
+    actions_flat = torch.clamp(traj.actions.view(-1), min=0)  # [(b*T)]
+    mask0_flat = torch.clamp(traj.mask[:, :, 0].view(-1), min=0)  # [(b*T)]
 
     # gather the values to swap
-    logits_a = logits_flat[torch.arange(b*T), actions_flat]
-    logits_m = logits_flat[torch.arange(b*T), mask0_flat]
+    logits_a = logits_flat[torch.arange(b * T), actions_flat]
+    logits_m = logits_flat[torch.arange(b * T), mask0_flat]
 
     # swap them without in-place assignment
     swapped_logits = logits_flat.clone()
-    swapped_logits = swapped_logits.scatter(1, actions_flat.unsqueeze(1), logits_m.unsqueeze(1))
-    swapped_logits = swapped_logits.scatter(1, mask0_flat.unsqueeze(1), logits_a.unsqueeze(1))
+    swapped_logits = swapped_logits.scatter(
+        1, actions_flat.unsqueeze(1), logits_m.unsqueeze(1)
+    )
+    swapped_logits = swapped_logits.scatter(
+        1, mask0_flat.unsqueeze(1), logits_a.unsqueeze(1)
+    )
 
     # reshape back
     logits = swapped_logits.view(b, T, -1)
@@ -52,7 +61,9 @@ def loss(values, logits, build_trajectories):
     mask_logits = torch.exp(mask_logits)
 
     # zero out invalid mask entries (out-of-place)
-    mask_logits = torch.where(traj.mask == -1, torch.zeros_like(mask_logits), mask_logits)
+    mask_logits = torch.where(
+        traj.mask == -1, torch.zeros_like(mask_logits), mask_logits
+    )
 
     # normalize into probabilities
     mask_probs = torch.nn.functional.normalize(mask_logits, dim=2)
@@ -117,18 +128,25 @@ def main():
         pyoak.species_move_list_size, pyoak.build_policy_hidden_dim, 1, True, False
     )
     policy_network = net.EmbeddingNet(
-        pyoak.species_move_list_size, pyoak.build_policy_hidden_dim, pyoak.species_move_list_size, True, False
+        pyoak.species_move_list_size,
+        pyoak.build_policy_hidden_dim,
+        pyoak.species_move_list_size,
+        True,
+        False,
     )
+
+    with open("./build-network", "rb") as f:
+        policy_network.read_parameters(f)
 
     optimizer = torch.optim.Adam(
-        list(value_network.parameters()) + list(policy_network.parameters()), 
-        lr=1e-3
+        list(value_network.parameters()) + list(policy_network.parameters()), lr=1e-2
     )
-    steps = 500
+    steps = 300
 
     from random import sample
-    for _ in range(steps):
 
+    for _ in range(steps):
+        print(_)
         file = sample(files, 1)[0]
         build_trajectories = pyoak.read_build_trajectories(file)
 
@@ -142,8 +160,10 @@ def main():
         l.backward()
         optimizer.step()
 
-
-
+    with open("policy.net", "wb") as f:
+        policy_network.write_parameters(f)
+    with open("value.net", "wb") as f:
+        value_network.write_parameters(f)
 
 
 if __name__ == "__main__":

@@ -43,26 +43,37 @@ def read_build_trajectories():
 
         data = [(sm, p) for sm, p in zip(species_move_string, selection_probs) if p > 0]
         print(data)
-        print("actions", build_trajectories.actions[index,:5])
-        print("legal actions mask", build_trajectories.mask[index][:5,:20])
+        print("actions", build_trajectories.actions[index, :5])
+        print("legal actions mask", build_trajectories.mask[index][:5, :20])
         print("log probs", np.log(build_trajectories.policy[index, :5]))
         print("value", build_trajectories.value[index])
         print("score", build_trajectories.score[index])
-        print("start/end", np.concatenate([build_trajectories.start[index, :5], build_trajectories.end[index, :5]], axis=0))
+        print(
+            "start/end",
+            np.concatenate(
+                [
+                    build_trajectories.start[index, :5],
+                    build_trajectories.end[index, :5],
+                ],
+                axis=0,
+            ),
+        )
 
 
 def create_set():
 
-    from net import EmbeddingNet
+    from net import BuildNet
 
-    network = EmbeddingNet(
-        pyoak.species_move_list_size, 512, pyoak.species_move_list_size, True, False
+    network = BuildNet(
+        pyoak.species_move_list_size,
+        pyoak.build_policy_hidden_dim,
+        pyoak.build_value_hidden_dim,
     )
 
     if len(sys.argv) < 3:
         print("no build network path provided; using randomly initialized net")
     else:
-        with open(sys.argv[2]) as params:
+        with open(sys.argv[2], "rb") as params:
             network.read_parameters(params)
 
     import torch
@@ -79,6 +90,13 @@ def create_set():
     def sample_masked_logits(logits, mask):
         masked_logits = logits.masked_fill(mask == 0, float("-inf"))
         probs = torch.softmax(masked_logits, dim=-1)
+
+        for index, pair in enumerate(pyoak.species_move_list):
+            s, m = pair
+            if m == 0:
+                mask[index] = 1
+                print(pyoak.species_names[s], probs[index])
+        exit()
         sampled = torch.multinomial(probs, 1)
         return sampled
 

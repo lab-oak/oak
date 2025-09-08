@@ -475,6 +475,8 @@ void generate(uint64_t seed) {
     const auto &p2_team = p2_build_traj.terminal;
     const bool p1_built = (p1_build_traj.updates.size() > 0);
     const bool p2_built = (p2_build_traj.updates.size() > 0);
+    float p1_matchup = .5;
+    float p2_matchup = .5;
 
     bool skip_battle = false;
     if ((p1_built || p2_built) &&
@@ -522,6 +524,13 @@ void generate(uint64_t seed) {
 
         const auto output = RuntimeSearch::run(
             battle_data, nodes, (updates == 0) ? t1_agent : agent);
+        if (updates == 0) {
+          p1_matchup = output.empirical_value;
+          p2_matchup = 1 - output.empirical_value;
+          if (skip_battle) {
+            break;
+          }
+        }
         const auto p1_index =
             process_and_sample(device, output.p1_empirical, output.p1_nash,
                                RuntimeOptions::policy_options);
@@ -532,9 +541,6 @@ void generate(uint64_t seed) {
         const auto p2_choice = output.p2_choices[p2_index];
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
         // here so we can use the update to store the empirical value
-        if (skip_battle) {
-          break;
-        }
 
         // update battle, durations, result (state info)
         battle_data.result = PKMN::update(battle_data.battle, p1_choice,
@@ -587,12 +593,12 @@ void generate(uint64_t seed) {
                                          PKMN::score(battle_data.result));
     }
     if (p1_built) {
-      p1_build_traj.value = 1 - training_frames.updates.front().empirical_value;
+      p1_build_traj.value = p1_matchup;
       build_buffer.push_back(p1_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }
     if (p2_built) {
-      p2_build_traj.value = 1 - training_frames.updates.front().empirical_value;
+      p2_build_traj.value = p2_matchup;
       build_buffer.push_back(p2_build_traj);
       RuntimeData::traj_counter.fetch_add(1);
     }

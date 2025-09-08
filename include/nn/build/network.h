@@ -14,7 +14,7 @@ struct BuildNetwork {
 
   EmbeddingNet<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true, false>
       policy_net;
-  EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, T::n_dim, true, false>
+  EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, 1, true, false>
       value_net;
 
   void initialize(auto &device) {
@@ -33,11 +33,7 @@ struct BuildNetwork {
   }
 
   void propagate(const float *input_data, float *output_data) const {
-    static thread_local float hidden_layer[NN::Battle::policy_hidden_dim];
-    // static thread_local float value_out[1];
     policy_net.propagate(input_data, output_data);
-    // value_net.propagate(input_data, value_out);
-    // return value_out[0];
   }
 };
 

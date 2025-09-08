@@ -135,6 +135,7 @@ class EmbeddingNet(nn.Module):
 
 class BuildNet(nn.Module):
     def __init__(self, in_dim, policy_hidden_dim, value_hidden_dim):
+        super().__init__()
         self.policy_net = EmbeddingNet(in_dim, policy_hidden_dim, in_dim, True, False)
         self.value_net = EmbeddingNet(in_dim, value_hidden_dim, 1, True, False)
 

@@ -68,6 +68,7 @@ template <typename F = Format::OU> struct CompressedTrajectory {
       const auto &opp = trajectory.opponent.value();
       std::copy(opp.begin(), opp.end(), opponent.begin());
     }
+    assert(trajectory.value >= 0 && trajectory.value <= 1);
     header.value = trajectory.value * std::numeric_limits<uint16_t>::max();
     if (trajectory.score.has_value()) {
       header.score = 2 * trajectory.score.value();
@@ -100,11 +101,6 @@ template <typename F = Format::OU> struct CompressedTrajectory {
                                        action[0].species, action[0].move),
                                    update.probability};
                    });
-
-    // fill the rest, not necessary even
-    // for (; i < 31; ++i) {
-    //   updates[i] = {};
-    // }
   }
 
   void write(char *data) const {
@@ -216,6 +212,8 @@ struct TrajectoryInput {
                            });
             mask_index += available_species.size();
           }
+           // make the selected action the first one in the mask
+          std::swap(*_mask.begin(), *std::find(_mask.begin(), _mask.end(), update.action));
         }
 
         // update stats
