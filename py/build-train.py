@@ -25,14 +25,20 @@ def get_state(actions):
     state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
     return state
 
+
 class PPO:
     def __init__(self):
-        self.gamma = .99
-        self.lam = .95
-        self.clip_eps = .2
+        self.gamma = 0.99
+        self.lam = 0.95
+        self.clip_eps = 0.2
 
-def process_targets(network : net.BuildNetwork, traj : net.BuildTrajectoryTorch, ppo : PPO):
+
+def process_targets(
+    network: net.BuildNetwork, traj: net.BuildTrajectoryTorch, ppo: PPO
+):
     b, T, _ = traj.mask.shape
+    # only do up to max traj length
+    T = torch.max(traj.end).item()
 
     valid_actions = traj.actions != -1  # [b, T, 1]
     valid_choices = traj.policy > 0  # [b, T, 1]
@@ -40,7 +46,8 @@ def process_targets(network : net.BuildNetwork, traj : net.BuildTrajectoryTorch,
 
     state = get_state(traj.actions)
     valid_state = state[valid]
-    logits, value = network.forward(valid_state)
+    logits, v = network.forward(valid_state)
+    value = torch.sigmoid(v)
 
     # [v, 339]
     valid_mask = traj.mask[valid]
@@ -57,46 +64,43 @@ def process_targets(network : net.BuildNetwork, traj : net.BuildTrajectoryTorch,
     valid_ratio = torch.exp(valid_logp - valid_old_logp)
 
     # [b, T, 1]
-    ratio = torch.ones_like(traj.actions, dtype=torch.float)
+    ratio = torch.ones_like(traj.policy)
     ratio[valid] = valid_ratio
-    rewards = torch.zeros_like(traj.actions, dtype=torch.float).scatter(
+    rewards = torch.zeros_like(traj.policy).scatter(
         1, traj.end.unsqueeze(-1) - 1, traj.value.unsqueeze(-1)
     )
-
     value_full = torch.zeros_like(traj.policy)
     value_full[valid] = value
-    for x in value_full[:10]:
-        print(x)
-
-
-    return
-
-    # --- GAE ---
-    gamma, lam = 0.99, 0.95
-    next_values = torch.cat([values[:, 1:], torch.zeros_like(values[:, -1:])], dim=1)
-    deltas = rewards + gamma * next_values - values
+    next_value_full = torch.cat(
+        [value_full[:, 1:], torch.zeros_like(value_full[:, -1:])], dim=1
+    )
+    deltas = rewards + ppo.gamma * next_value_full - value_full
 
     advantages = []
-    advantage = torch.zeros((b, 1), device=values.device)
+    advantage = torch.zeros((b, 1))
     for t in reversed(range(T)):
         # Only update advantage if step is valid
-        advantage = deltas[:, t, :] * valid_mask[:, t, :] + gamma * lam * advantage
+        advantage = (
+            deltas[:, t, :] * valid[:, t].unsqueeze(-1)
+            + ppo.gamma * ppo.lam * advantage
+        )
         advantages.insert(0, advantage)
-
     gae = torch.stack(advantages, dim=1)  # [b, T, 1]
-    returns = gae + values
+    returns = gae + value_full
 
-    ratios = torch.exp(logp_actions - old_logp_actions)
-
-    clip_eps = 0.2
-    surr1 = ratios * gae
-    surr2 = torch.clamp(ratios, 1 - clip_eps, 1 + clip_eps) * gae
-    return (
-        torch.min(surr1, surr2)[valid_mask == 1],
-        returns[valid_mask == 1],
-        values[valid_mask == 1],
-        logp_actions[valid_mask == 1],
+    surr1 = ratio * gae
+    surr2 = torch.clamp(ratio, 1 - ppo.clip_eps, 1 + ppo.clip_eps) * gae
+    surr = torch.min(surr1, surr2)
+    logp = torch.ones_like(traj.policy)
+    logp[valid] = valid_logp
+    data = (
+        surr,
+        returns,
+        value_full,
+        logp,
     )
+    valid_data = tuple(x[valid] for x in data)
+    return valid_data
 
 
 def compute_loss_from_targets(surr, returns, values, logp_actions):
@@ -126,7 +130,7 @@ def main():
 
     optimizer = torch.optim.Adam(network.parameters(), lr=1e-2)
     steps = int(sys.argv[3])
-    batch_size = 2**12
+    batch_size = 2**14
     keep_prob = 1
 
     ppo = PPO()
@@ -134,7 +138,7 @@ def main():
     from random import sample
 
     for _ in range(steps):
-        print(_)
+        print("step:", _)
 
         targets = [torch.zeros((0,)) for _ in range(4)]
 
@@ -142,15 +146,16 @@ def main():
         while b < batch_size:
 
             file = sample(files, 1)[0]
-            traj = net.BuildTrajectoryTorch(pyoak.read_build_trajectories(file))
+            trajectories = pyoak.read_build_trajectories(file)
+            T = trajectories.end.max()
+            traj = net.BuildTrajectoryTorch(trajectories, n=T)
 
             new_targets = process_targets(network, traj, ppo)
-            exit()
             r = torch.rand(new_targets[0].shape)
-            new_targets = [t[r < keep_prob] for t in new_targets]
-            targets = [
+            new_targets = tuple(t[r < keep_prob] for t in new_targets)
+            targets = tuple(
                 torch.cat([old, new], dim=0) for old, new in zip(targets, new_targets)
-            ]
+            )
             b = targets[0].shape[0]
             print(b)
 

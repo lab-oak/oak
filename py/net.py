@@ -10,15 +10,17 @@ import torch
 
 
 class BuildTrajectoryTorch:
-    def __init__(self, traj: pyoak.BuildTrajectory, device="cpu"):
-        self.size = traj.size
-        self.actions = torch.from_numpy(traj.actions).long().to(device)
-        self.mask = torch.from_numpy(traj.mask).long().to(device)
-        self.policy = torch.from_numpy(traj.policy).float().to(device)
-        self.value = torch.from_numpy(traj.value).float().to(device)
-        self.score = torch.from_numpy(traj.score).float().to(device)
-        self.start = torch.from_numpy(traj.start).long().to(device)
-        self.end = torch.from_numpy(traj.end).long().to(device)
+    def __init__(self, traj: pyoak.BuildTrajectory, n=None, device="cpu"):
+        if n is None:
+            n = traj.size
+        self.size = n
+        self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
+        self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
+        self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
+        self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
+        self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
+        self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
+        self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
 
 
 class BattleFrameTorch:
