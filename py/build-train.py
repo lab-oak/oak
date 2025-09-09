@@ -19,70 +19,57 @@ def get_state(actions):
     state = torch.zeros(
         (b, T, pyoak.species_move_list_size + 1), dtype=torch.float32
     )  # [b, T, N+1]
-    safe_actions = torch.from_numpy(actions + 1).long()
-    state = state.scatter(2, safe_actions, 1.0)
+    state = state.scatter(2, actions + 1, 1.0)
     state = torch.cumsum(state, dim=1).clamp_max(1.0)
     state = state[:, :-1, 1:]  # [b, T, N]
     state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
     return state
 
+class PPO:
+    def __init__(self):
+        self.gamma = .99
+        self.lam = .95
+        self.clip_eps = .2
 
-def process_targets(values, logits, trajectories):
-    b, T, _ = trajectories.mask.shape
-
-    traj = net.BuildTrajectoryTorch(trajectories)
+def process_targets(network : net.BuildNetwork, traj : net.BuildTrajectoryTorch, ppo : PPO):
+    b, T, _ = traj.mask.shape
 
     valid_actions = traj.actions != -1  # [b, T, 1]
     valid_choices = traj.policy > 0  # [b, T, 1]
-    valid_mask = torch.logical_and(valid_actions, valid_choices).float()
+    valid = torch.logical_and(valid_actions, valid_choices).squeeze(-1)
 
-    logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
-    actions_flat = torch.clamp(traj.actions.view(-1), min=0)  # [(b*T)]
-    mask0_flat = torch.clamp(traj.mask[:, :, 0].view(-1), min=0)  # [(b*T)]
+    state = get_state(traj.actions)
+    valid_state = state[valid]
+    logits, value = network.forward(valid_state)
 
-    # gather the values to swap
-    logits_a = logits_flat[torch.arange(b * T), actions_flat]
-    logits_m = logits_flat[torch.arange(b * T), mask0_flat]
-
-    # swap them without in-place assignment
-    swapped_logits = logits_flat.clone()
-    swapped_logits = swapped_logits.scatter(
-        1, actions_flat.unsqueeze(1), logits_m.unsqueeze(1)
+    # [v, 339]
+    valid_mask = traj.mask[valid]
+    mask_weights = torch.where(
+        valid_mask >= 0,
+        torch.exp(torch.gather(logits, 1, torch.clamp(valid_mask, min=0))),
+        torch.zeros_like(valid_mask),
     )
-    swapped_logits = swapped_logits.scatter(
-        1, mask0_flat.unsqueeze(1), logits_a.unsqueeze(1)
-    )
+    mask_probs = torch.nn.functional.normalize(mask_weights, dim=1, p=1)
 
-    # reshape back
-    logits = swapped_logits.view(b, T, -1)
+    # [v, 1]
+    valid_logp = torch.log(mask_probs[:, 0]).unsqueeze(-1)
+    valid_old_logp = torch.log(traj.policy[valid])
+    valid_ratio = torch.exp(valid_logp - valid_old_logp)
 
-    safe_actions = torch.clamp(traj.mask, min=0)
-    mask_logits = torch.gather(logits, 2, safe_actions)
-    mask_logits = torch.exp(mask_logits)
-
-    # zero out invalid mask entries (out-of-place)
-    mask_logits = torch.where(
-        traj.mask == -1, torch.zeros_like(mask_logits), mask_logits
+    # [b, T, 1]
+    ratio = torch.ones_like(traj.actions, dtype=torch.float)
+    ratio[valid] = valid_ratio
+    rewards = torch.zeros_like(traj.actions, dtype=torch.float).scatter(
+        1, traj.end.unsqueeze(-1) - 1, traj.value.unsqueeze(-1)
     )
 
-    # normalize into probabilities
-    mask_probs = torch.nn.functional.normalize(mask_logits, dim=2)
-    p_actions = mask_probs[:, :, 0]
+    value_full = torch.zeros_like(traj.policy)
+    value_full[valid] = value
+    for x in value_full[:10]:
+        print(x)
 
-    logp_actions = torch.log(p_actions).unsqueeze(-1) * valid_mask
-    old_logp_actions = torch.log(traj.policy) * valid_mask
 
-    # replace NaNs safely
-    logp_actions = torch.nan_to_num(logp_actions, nan=1.0)
-    old_logp_actions = torch.nan_to_num(old_logp_actions, nan=1.0)
-
-    value_weight = 1
-    rewards_flat = value_weight * traj.value + (1 - value_weight) * traj.score
-    rewards = torch.zeros_like(logp_actions)
-    end_expanded = traj.end.unsqueeze(-1) - 1
-    rewards = rewards.scatter(
-        1, end_expanded, rewards_flat.unsqueeze(-1)
-    )  # out-of-place
+    return
 
     # --- GAE ---
     gamma, lam = 0.99, 0.95
@@ -123,112 +110,26 @@ def compute_loss_from_targets(surr, returns, values, logp_actions):
     return loss
 
 
-def loss(values, logits, build_trajectories):
-    b, T, _ = build_trajectories.mask.shape
-
-    traj = net.BuildTrajectoryTorch(build_trajectories)
-
-    valid_actions = traj.actions != -1  # [b, T, 1]
-    valid_choices = traj.policy > 0  # [b, T, 1]
-    valid_mask = torch.logical_and(valid_actions, valid_choices).float()
-
-    logits_flat = logits.view(-1, pyoak.species_move_list_size)  # [(b*T), N]
-    actions_flat = torch.clamp(traj.actions.view(-1), min=0)  # [(b*T)]
-    mask0_flat = torch.clamp(traj.mask[:, :, 0].view(-1), min=0)  # [(b*T)]
-
-    # gather the values to swap
-    logits_a = logits_flat[torch.arange(b * T), actions_flat]
-    logits_m = logits_flat[torch.arange(b * T), mask0_flat]
-
-    # swap them without in-place assignment
-    swapped_logits = logits_flat.clone()
-    swapped_logits = swapped_logits.scatter(
-        1, actions_flat.unsqueeze(1), logits_m.unsqueeze(1)
-    )
-    swapped_logits = swapped_logits.scatter(
-        1, mask0_flat.unsqueeze(1), logits_a.unsqueeze(1)
-    )
-
-    # reshape back
-    logits = swapped_logits.view(b, T, -1)
-
-    safe_actions = torch.clamp(traj.mask, min=0)
-    mask_logits = torch.gather(logits, 2, safe_actions)
-    mask_logits = torch.exp(mask_logits)
-
-    # zero out invalid mask entries (out-of-place)
-    mask_logits = torch.where(
-        traj.mask == -1, torch.zeros_like(mask_logits), mask_logits
-    )
-
-    # normalize into probabilities
-    mask_probs = torch.nn.functional.normalize(mask_logits, dim=2)
-    p_actions = mask_probs[:, :, 0]
-
-    logp_actions = torch.log(p_actions).unsqueeze(-1) * valid_mask
-    old_logp_actions = torch.log(traj.policy) * valid_mask
-
-    # replace NaNs safely
-    logp_actions = torch.nan_to_num(logp_actions, nan=1.0)
-    old_logp_actions = torch.nan_to_num(old_logp_actions, nan=1.0)
-
-    value_weight = 1
-    r = value_weight * traj.value + (1 - value_weight) * traj.score
-
-    rewards = torch.zeros_like(logp_actions)
-    end_expanded = traj.end.unsqueeze(-1) - 1
-    rewards = rewards.scatter(1, end_expanded, r.unsqueeze(-1))  # out-of-place
-
-    # --- GAE ---
-    gamma, lam = 0.99, 0.95
-    next_values = torch.cat([values[:, 1:], torch.zeros_like(values[:, -1:])], dim=1)
-    deltas = rewards + gamma * next_values - values
-
-    advantages = []
-    advantage = torch.zeros((b, 1), device=values.device)
-    for t in reversed(range(T)):
-        # Only update advantage if step is valid
-        advantage = deltas[:, t, :] * valid_mask[:, t, :] + gamma * lam * advantage
-        advantages.insert(0, advantage)
-
-    gae = torch.stack(advantages, dim=1)  # [b, T, 1]
-    returns = gae + values
-
-    ratios = torch.exp(logp_actions - old_logp_actions)
-
-    clip_eps = 0.2
-    surr1 = ratios * gae
-    surr2 = torch.clamp(ratios, 1 - clip_eps, 1 + clip_eps) * gae
-    policy_loss = -(
-        torch.min(surr1, surr2) * valid_mask
-    ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    value_loss = (
-        ((returns - values) * valid_mask) ** 2
-    ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    # entropy = (
-    #     -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True) * valid_mask
-    # ).sum() / valid_mask.sum().clamp_min(1.0)
-
-    loss = policy_loss + 0.5 * value_loss
-    return loss
-
-
 def main():
+    import sys
+
+    if len(sys.argv) < 4:
+        print("Input: in-net-path, out-net-path, steps")
 
     files = find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     network = net.BuildNetwork()
 
-    with open("./1/build-network", "rb") as f:
+    with open(sys.argv[1], "rb") as f:
         network.read_parameters(f)
 
     optimizer = torch.optim.Adam(network.parameters(), lr=1e-2)
-    steps = 100
+    steps = int(sys.argv[3])
     batch_size = 2**12
     keep_prob = 1
+
+    ppo = PPO()
 
     from random import sample
 
@@ -241,14 +142,10 @@ def main():
         while b < batch_size:
 
             file = sample(files, 1)[0]
-            build_trajectories = pyoak.read_build_trajectories(file)
+            traj = net.BuildTrajectoryTorch(pyoak.read_build_trajectories(file))
 
-            state = get_state(build_trajectories.actions)
-
-            logits, v = network.forward(state)
-            values = torch.sigmoid(v)
-
-            new_targets = process_targets(values, logits, build_trajectories)
+            new_targets = process_targets(network, traj, ppo)
+            exit()
             r = torch.rand(new_targets[0].shape)
             new_targets = [t[r < keep_prob] for t in new_targets]
             targets = [
@@ -262,7 +159,7 @@ def main():
         l.backward()
         optimizer.step()
 
-    with open("./build-network", "wb") as f:
+    with open(sys.argv[2], "wb") as f:
         network.write_parameters(f)
 
 
