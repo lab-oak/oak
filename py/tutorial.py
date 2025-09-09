@@ -96,11 +96,7 @@ def create_set():
 
     from net import BuildNetwork
 
-    network = BuildNetwork(
-        pyoak.species_move_list_size,
-        pyoak.build_policy_hidden_dim,
-        pyoak.build_value_hidden_dim,
-    )
+    network = BuildNetwork()
 
     if len(sys.argv) < 3:
         print("no build network path provided; using randomly initialized net")
@@ -122,17 +118,11 @@ def create_set():
     def sample_masked_logits(logits, mask):
         masked_logits = logits.masked_fill(mask == 0, float("-inf"))
         probs = torch.softmax(masked_logits, dim=-1)
-
-        for index, pair in enumerate(pyoak.species_move_list):
-            s, m = pair
-            if m == 0:
-                mask[index] = 1
-                print(pyoak.species_names[s], probs[index])
-        exit()
         sampled = torch.multinomial(probs, 1)
         return sampled
 
-    index = sample_masked_logits(network.forward(team), mask)
+    logits, _ = network.forward(team)
+    index = sample_masked_logits(logits, mask)
     species, _ = pyoak.species_move_list[index]
     print(pyoak.species_names[species])
     team[index] = 1
@@ -147,7 +137,7 @@ def create_set():
             mask[index] = 1
 
     for _ in range(min(4, n_moves)):
-        index = sample_masked_logits(network.forward(team), mask)
+        index = sample_masked_logits(network.forward(team)[0], mask)
         _, move = pyoak.species_move_list[index]
         print(pyoak.move_names[move])
         team[index] = 1

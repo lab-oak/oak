@@ -2,6 +2,7 @@ import net
 import torch
 import pyoak
 import os
+import argparse
 
 
 def find_data_files(root_dir, ext=".battle"):
@@ -105,66 +106,84 @@ def process_targets(
 
 def compute_loss_from_targets(surr, returns, values, logp_actions):
     policy_loss = -(surr).mean()
-
     value_loss = (((returns - values)) ** 2).mean()
-
     entropy = -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True).mean()
-
-    loss = policy_loss + 0.5 * value_loss
+    loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
     return loss
 
 
 def main():
-    import sys
+    parser = argparse.ArgumentParser(description="Train PPO on build trajectories.")
+    parser.add_argument("in_net", help="Path to input network file")
+    parser.add_argument("out_net", help="Path to output network file")
+    parser.add_argument("steps", type=int, help="Number of training steps")
+    parser.add_argument("--batch-size", type=int, default=2**9, help="Batch size")
+    parser.add_argument(
+        "--keep-prob", type=float, default=0.08, help="Keep probability"
+    )
+    parser.add_argument("--checkpoint", type=int, default=100, help="checkpoint")
 
-    if len(sys.argv) < 4:
-        print("Input: in-net-path, out-net-path, steps")
+    parser.add_argument(
+        "--lr", type=float, default=1e-2, help="Learning rate for Adam optimizer"
+    )
+    args = parser.parse_args()
 
     files = find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     network = net.BuildNetwork()
 
-    with open(sys.argv[1], "rb") as f:
+    with open(args.in_net, "rb") as f:
         network.read_parameters(f)
 
-    optimizer = torch.optim.Adam(network.parameters(), lr=1e-2)
-    steps = int(sys.argv[3])
-    batch_size = 2**14
-    keep_prob = 1
+    optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
+    steps = args.steps
+    batch_size = args.batch_size
+    keep_prob = args.keep_prob
 
     ppo = PPO()
-
     from random import sample
 
-    for _ in range(steps):
-        print("step:", _)
+    for step in range(steps):
+        print("step:", step)
 
-        targets = [torch.zeros((0,)) for _ in range(4)]
-
+        optimizer.zero_grad()
         b = 0
-        while b < batch_size:
 
+        while b < batch_size:
             file = sample(files, 1)[0]
             trajectories = pyoak.read_build_trajectories(file)
             T = trajectories.end.max()
             traj = net.BuildTrajectoryTorch(trajectories, n=T)
 
-            new_targets = process_targets(network, traj, ppo)
-            r = torch.rand(new_targets[0].shape)
-            new_targets = tuple(t[r < keep_prob] for t in new_targets)
-            targets = tuple(
-                torch.cat([old, new], dim=0) for old, new in zip(targets, new_targets)
+            surr, returns, values, logp = process_targets(network, traj, ppo)
+            r = torch.rand(surr.shape)
+            mask = r < keep_prob
+            surr, returns, values, logp = (
+                surr[mask],
+                returns[mask],
+                values[mask],
+                logp[mask],
             )
-            b = targets[0].shape[0]
+
+            if surr.numel() == 0:
+                continue
+
+            l = compute_loss_from_targets(surr, returns, values, logp)
+            l.backward()
+
+            b += surr.shape[0]
             print(b)
 
-        optimizer.zero_grad()
-        l = compute_loss_from_targets(*targets)
-        l.backward()
         optimizer.step()
 
-    with open(sys.argv[2], "wb") as f:
+        if (step % parser.checkpoint) == 0:
+            ckpt_path = os.path.join(f"{step}.net")
+            with open(ckpt_path, "wb") as f:
+                network.write_parameters(f)
+            print(f"Checkpoint saved at step {step}: {ckpt_path}")
+
+    with open(args.out_net, "wb") as f:
         network.write_parameters(f)
 
 
