@@ -5,19 +5,9 @@ import py_oak
 import numpy as np
 
 
-def find_data_files(root_dir, ext=".battle"):
-    battle_files = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.endswith(ext):
-                full_path = os.path.join(dirpath, filename)
-                battle_files.append(full_path)
-    return battle_files
-
-
 def read_build_trajectories():
 
-    files = find_data_files(".", ext=".build")
+    files = py_oak.find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
