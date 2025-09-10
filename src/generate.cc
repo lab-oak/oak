@@ -417,6 +417,9 @@ void generate(uint64_t seed) {
 
   const auto save_battle_buffer_to_disk = [&buffer, thread_frame_buffer_size,
                                            &frame_buffer_write_index]() {
+    if (frame_buffer_write_index == 0) {
+      return;
+    }
     const auto filename =
         std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
         ".battle";
@@ -435,6 +438,9 @@ void generate(uint64_t seed) {
   };
 
   const auto save_build_buffer_to_disk = [&build_buffer]() {
+    if (build_buffer.size() == 0) {
+      return;
+    }
     const auto filename =
         std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
         ".build";
