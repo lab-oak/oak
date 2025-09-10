@@ -312,3 +312,13 @@ def encode_buffers(
     ) + encoded_frame_input.raw_pointers(start_index)
     count = lib.encode_buffer_multithread(*args)
     return count
+
+
+def find_data_files(root_dir, ext=".battle"):
+    battle_files = []
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for filename in filenames:
+            if filename.endswith(ext):
+                full_path = os.path.join(dirpath, filename)
+                battle_files.append(full_path)
+    return battle_files

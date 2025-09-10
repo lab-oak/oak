@@ -102,24 +102,23 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def find_battle_files(root_dir):
-    battle_files = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.endswith(".battle"):
-                full_path = os.path.join(dirpath, filename)
-                battle_files.append(full_path)
-    return battle_files
-
-
 def main():
     parser = argparse.ArgumentParser(description="Train an Oak battle network.")
-    parser.add_argument("net_dir", help="Write directory for network weights")
     parser.add_argument(
-        "battle_dir",
+        "--in-place",
+        action="store_true",
+        dest="in_place",
+        help="Used for RL.",
+    )
+    parser.add_argument(
+        "--net-dir", default="", help="Write directory for network weights"
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=".",
         help="Read directory for battle files. All subdirectories are scanned.",
     )
-    parser.add_argument("batch_size", type=int, help="Batch size")
+    parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 
     # General training
     parser.add_argument(
@@ -189,23 +188,25 @@ def main():
 
     args = parser.parse_args()
 
-    # Seed setting
+    # Device
     if args.seed is not None:
         set_seed(args.seed)
-
-    # Device selection
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if os.path.exists(args.net_dir):
-        print(
-            f"Folder {args.net_dir} already exists. Please specify a new dir for work."
-        )
-        return
-    os.makedirs(args.net_dir, exist_ok=False)
+    working_dir = ""
+    if args.in_place:
+        assert args.net_path
+    else:
+        import datetime
 
-    paths = find_battle_files(args.battle_dir)
-    print(f"{len(paths)} paths found")
+        now = datetime.datetime.now()
+        working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
+        os.makedirs(working_dir, exist_ok=False)
+        print(f"Created working dir: {working_dir}")
+
+    data_files = pyoak.find_data_files(args.data_dir, ext=".battle")
+    print(f"{len(data_files)} files found")
 
     encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
     encoded_frames_torch = net.BattleFrameTorch(encoded_frames)
@@ -218,7 +219,7 @@ def main():
         output_buffer.clear()
 
         pyoak.encode_buffers(
-            paths,
+            data_files,
             args.threads,
             args.batch_size,
             encoded_frames,
@@ -241,16 +242,15 @@ def main():
 
         network.clamp_parameters()
 
-        if step % args.checkpoint == 0:
-            ckpt_path = os.path.join(args.net_dir, f"{step}.net")
+        if ((step + 1) % args.checkpoint) == 0:
+            ckpt_path = ""
+            if args.in_place:
+                ckpt_path = args.net_path
+            else:
+                ckpt_path = os.path.join(working_dir, f"{step + 1}.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
-            print(f"Checkpoint saved at step {step}: {ckpt_path}")
-
-    final_path = os.path.join(args.net_dir, f"{args.steps}.net")
-    with open(final_path, "wb") as f:
-        network.write_parameters(f)
-    print(f"Final network saved: {final_path}")
+            print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
 
 
 if __name__ == "__main__":

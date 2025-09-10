@@ -12,8 +12,8 @@ import torch
 class BuildTrajectoryTorch:
     def __init__(self, traj: pyoak.BuildTrajectory, n=None, device="cpu"):
         if n is None:
-            n = traj.size
-        self.size = n
+            n = 31
+        self.size = traj.size
         self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
         self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
         self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
@@ -21,6 +21,18 @@ class BuildTrajectoryTorch:
         self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
         self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
         self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
+
+    def sample(self, p=1):
+        r = torch.rand((self.size,)) < p
+        with torch.no_grad():
+            self.actions = self.actions[r].clone()
+            self.mask = self.mask[r].clone()
+            self.policy = self.policy[r].clone()
+            self.value = self.value[r].clone()
+            self.score = self.score[r].clone()
+            self.start = self.start[r].clone()
+            self.end = self.end[r].clone()
+        self.size = sum(r).item()
 
 
 class BattleFrameTorch:

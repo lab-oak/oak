@@ -1,20 +1,13 @@
-import net
-import torch
-import pyoak
 import os
+import torch
 import argparse
+import random
+
+import pyoak
+import net
 
 
-def find_data_files(root_dir, ext=".battle"):
-    battle_files = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.endswith(ext):
-                full_path = os.path.join(dirpath, filename)
-                battle_files.append(full_path)
-    return battle_files
-
-
+# Turn [b, T, 1] actions into [b, T, N] state
 def get_state(actions):
     b, T, _ = actions.shape
     state = torch.zeros(
@@ -106,43 +99,105 @@ def process_targets(
     return valid_data
 
 
-def compute_loss_from_targets(surr, returns, values, logp_actions, total, remaining):
+def compute_loss_from_targets(
+    surr, returns, values, logp_actions, total, remaining, entropy_weight=0.01
+) -> torch.Tensor:
     b = surr.shape[0]
     n = min(b, remaining)
     policy_loss = -(surr[:n]).mean()
     value_loss = (((returns - values)) ** 2)[:n].mean()
     entropy = -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True)[:n].mean()
-    loss = (n / total) * (policy_loss + 0.5 * value_loss - 0.01 * entropy)
+    loss = (n / total) * (policy_loss + 0.5 * value_loss - entropy_weight * entropy)
     return loss
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Train PPO on build trajectories.")
-    parser.add_argument("input", help="Path to input network file")
-    parser.add_argument("output", help="Path to output network file")
-    parser.add_argument("steps", type=int, help="Number of training steps")
-    parser.add_argument("--batch-size", type=int, default=2**9, help="Batch size")
-    parser.add_argument(
-        "--keep-prob", type=float, default=0.08, help="Keep probability"
-    )
-    parser.add_argument("--checkpoint", type=int, default=100, help="checkpoint")
+def set_seed(seed):
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
+
+def main():
+    parser = argparse.ArgumentParser(description="Train an Oak battle network.")
+
+    # Keep updating the same file so that `generate` can use an up to date network
     parser.add_argument(
-        "--lr", type=float, default=1e-2, help="Learning rate for Adam optimizer"
+        "--in-place",
+        action="store_true",
+        dest="in_place",
+        help="Used for RL.",
     )
     parser.add_argument(
-        "--data", type=str, default=".", help="Folder to scan for build files"
+        "--net-path", default="", help="Read directory for network weights"
     )
-    parser.add_argument("--value-weight", type=float, default=1.0)
+    parser.add_argument(
+        "--data-dir",
+        default=".",
+        help="Read directory for battle files. All subdirectories are scanned.",
+    )
+    parser.add_argument("--batch-size", type=int, help="Batch size")
+    parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
+    parser.add_argument(
+        "--checkpoint", type=int, default=100, help="Checkpoint interval (steps)"
+    )
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument(
+        "--keep-prob",
+        type=float,
+        default=1.0,
+        help=".",
+    )
+
+    # Learning
+    parser.add_argument(
+        "--value-weight",
+        type=float,
+        default=1.0,
+        help="Value vs Score weighting.",
+    )
+    parser.add_argument(
+        "--entropy-weight",
+        type=float,
+        default=0.01,
+    )
+
+    # Device
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed for determinism"
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help='"cpu" or "cuda". Defaults to CUDA if available.',
+    )
+
     args = parser.parse_args()
 
-    files = find_data_files(args.data, ext=".build")
-    assert len(files) > 0, "No build files found in cwd"
+    if args.seed is not None:
+        set_seed(args.seed)
+
+    if args.device is None:
+        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    working_dir = ""
+    if args.in_place:
+        assert args.net_path
+    else:
+        import datetime
+
+        now = datetime.datetime.now()
+        working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
+        os.makedirs(working_dir, exist_ok=False)
 
     network = net.BuildNetwork()
+    if args.net_path:
+        with open(args.net_path, "rb") as f:
+            network.read_parameters(f)
 
-    with open(args.input, "rb") as f:
-        network.read_parameters(f)
+    data_files = pyoak.find_data_files(args.data_dir, ext=".build")
+    print(f"{len(data_files)} data_files found")
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     steps = args.steps
@@ -158,19 +213,22 @@ def main():
         optimizer.zero_grad()
         b = 0
 
+        # break batches up by file to limit memory use
         while b < batch_size:
-            file = sample(files, 1)[0]
+            file = sample(data_files, 1)[0]
             trajectories = pyoak.read_build_trajectories(file)
+
             T = trajectories.end.max()
+            # here is where we trunacte the episode length for 1v1, etc
             traj = net.BuildTrajectoryTorch(trajectories, n=T)
 
             surr, returns, values, logp = process_targets(
                 network, traj, ppo, args.value_weight
             )
-            r = torch.rand(surr.shape)
-            mask = r < keep_prob
+
+            mask = torch.rand(surr.shape) < keep_prob
             surr, returns, values, logp = (
-                surr[mask],     
+                surr[mask],
                 returns[mask],
                 values[mask],
                 logp[mask],
@@ -179,22 +237,30 @@ def main():
             if surr.numel() == 0:
                 continue
 
-            l = compute_loss_from_targets(surr, returns, values, logp, batch_size, batch_size - b)
-            l.backward()
+            loss = compute_loss_from_targets(
+                surr,
+                returns,
+                values,
+                logp,
+                batch_size,
+                batch_size - b,
+                args.entropy_weight,
+            )
+            loss.backward()
 
             b += surr.shape[0]
-            print(b)
 
         optimizer.step()
 
-        if (step % args.checkpoint) == 0:
-            ckpt_path = os.path.join(f"{step}.net")
+        if ((step + 1) % args.checkpoint) == 0:
+            ckpt_path = ""
+            if args.in_place:
+                ckpt_path = args.net_path
+            else:
+                ckpt_path = os.path.join(working_dir, f"{step}.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step}: {ckpt_path}")
-
-    with open(args.output, "wb") as f:
-        network.write_parameters(f)
 
 
 if __name__ == "__main__":
