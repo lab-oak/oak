@@ -68,7 +68,7 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import py.torch_oak as torch_oak
+    import torch_oak
     import torch
     import math
 
@@ -101,7 +101,7 @@ def show_species_probs():
 
 def create_set():
 
-    from py.torch_oak import BuildNetwork
+    from torch_oak import BuildNetwork
 
     network = BuildNetwork()
 

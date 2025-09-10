@@ -7,3 +7,5 @@ libpkmn-showdown.a
 *.log
 *.net
 *.pyc
+build-network
+battle-network

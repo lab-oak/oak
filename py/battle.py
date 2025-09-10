@@ -6,14 +6,94 @@ import random
 import py_oak
 import torch_oak
 
+parser = argparse.ArgumentParser(description="Train an Oak battle network.")
+parser.add_argument(
+    "--in-place",
+    action="store_true",
+    dest="in_place",
+    help="Used for RL.",
+)
+parser.add_argument("--net-path", default="", help="Read directory for network weights")
+parser.add_argument(
+    "--data-dir",
+    default=".",
+    help="Read directory for battle files. All subdirectories are scanned.",
+)
+parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 
-def print_tensors(obj):
-    for name, value in vars(obj).items():
-        if isinstance(value, torch.Tensor):
-            print(
-                f"{name}: shape={tuple(value.shape)}, dtype={value.dtype}, device={value.device}"
-            )
-            print(value)
+# General training
+parser.add_argument(
+    "--threads", type=int, default=1, help="Number of threads for data loading"
+)
+parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
+parser.add_argument(
+    "--checkpoint", type=int, default=500, help="Checkpoint interval (steps)"
+)
+parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+parser.add_argument(
+    "--write-prob",
+    type=float,
+    default=1 / 100,
+    help="Write probability for encode_buffers. A lower value means less correlated samples.",
+)
+
+# Loss weighting
+parser.add_argument(
+    "--w-nash",
+    type=float,
+    default=0.0,
+    help="Weight for Nash value in value target",
+)
+parser.add_argument(
+    "--w-empirical",
+    type=float,
+    default=1.0,
+    help="Weight for empirical value in value target",
+)
+parser.add_argument(
+    "--w-score", type=float, default=0.0, help="Weight for score in value target"
+)
+parser.add_argument(
+    "--w-nash-p",
+    type=float,
+    default=0.0,
+    help="Weight for Nash in policy target (empirical = 1 - this)",
+)
+
+# Policy loss toggle
+parser.add_argument(
+    "--no-policy-loss",
+    action="store_true",
+    dest="no_policy_loss",
+    help="Disable policy loss computation",
+)
+
+# Hardware and reproducibility
+parser.add_argument(
+    "--seed", type=int, default=None, help="Random seed for determinism"
+)
+parser.add_argument(
+    "--device",
+    type=str,
+    default=None,
+    help='"cpu" or "cuda". Defaults to CUDA if available.',
+)
+
+# Debug / printing
+parser.add_argument(
+    "--print-window",
+    type=int,
+    default=5,
+    help="Number of samples to print for debug output",
+)
+parser.add_argument(
+    "--data-window",
+    type=int,
+    default=0,
+    help="Only use the n-most recent files for freshness",
+)
+
+args = parser.parse_args()
 
 
 # TODO accept other optims as arg
@@ -44,15 +124,21 @@ def loss(
     size = min(input.size, output.size)
 
     # Value target
+    w_nash = args.w_nash
+    w_empirical = args.w_empirical
+    w_score = args.w_score
+
+    assert (w_nash + w_empirical + w_score) == 1, "value target weights don't sum to 1"
     value_target = (
-        args.w_nash * input.nash_value[:size]
-        + args.w_empirical * input.empirical_value[:size]
-        + args.w_score * input.score[:size]
+        w_nash * input.nash_value[:size]
+        + w_empirical * input.empirical_value[:size]
+        + w_score * input.score[:size]
     )
 
     # Policy target
     w_nash_p = args.w_nash_p
     w_empirical_p = 1 - w_nash_p
+    assert (w_nash_p + w_empirical_p) == 1
 
     p1_policy_target = (
         w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
@@ -61,17 +147,12 @@ def loss(
         w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
     )
 
-    # Loss
-    value_loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
+    loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
 
-    if args.no_policy_loss:
-        p1_loss = torch.tensor(0.0, device=value_loss.device)
-        p2_loss = torch.tensor(0.0, device=value_loss.device)
-    else:
-        p1_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
-        p2_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
-
-    total_loss = value_loss + p1_loss + p2_loss
+    if not args.no_policy_loss:
+        p1_policy_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
+        p2_policy_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
+        loss += p1_policy_loss + p2_policy_loss
 
     if print_flag:
         window = args.print_window
@@ -88,14 +169,17 @@ def loss(
             )
         )
         if not args.no_policy_loss:
+            print("P1 policy inference/target")
             x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
                 window, 1, 9
             )
             y = p1_policy_target[:window].view(window, 1, 9)
             print(torch.cat([x, y], dim=1))
-        print(f"loss: v:{value_loss.mean()}, p1:{p1_loss}, p2:{p2_loss}")
+            print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
 
-    return total_loss
+        print(f"loss: v:{loss.mean()}")
+
+    return loss
 
 
 def set_seed(seed):
@@ -106,97 +190,6 @@ def set_seed(seed):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train an Oak battle network.")
-    parser.add_argument(
-        "--in-place",
-        action="store_true",
-        dest="in_place",
-        help="Used for RL.",
-    )
-    parser.add_argument(
-        "--net-dir", default="", help="Write directory for network weights"
-    )
-    parser.add_argument(
-        "--data-dir",
-        default=".",
-        help="Read directory for battle files. All subdirectories are scanned.",
-    )
-    parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
-
-    # General training
-    parser.add_argument(
-        "--threads", type=int, default=1, help="Number of threads for data loading"
-    )
-    parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
-    parser.add_argument(
-        "--checkpoint", type=int, default=500, help="Checkpoint interval (steps)"
-    )
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument(
-        "--write-prob",
-        type=float,
-        default=1 / 100,
-        help="Write probability for encode_buffers. A lower value means less correlated samples.",
-    )
-
-    # Loss weighting
-    parser.add_argument(
-        "--w-nash",
-        type=float,
-        default=0.0,
-        help="Weight for Nash value in value target",
-    )
-    parser.add_argument(
-        "--w-empirical",
-        type=float,
-        default=1.0,
-        help="Weight for empirical value in value target",
-    )
-    parser.add_argument(
-        "--w-score", type=float, default=0.0, help="Weight for score in value target"
-    )
-    parser.add_argument(
-        "--w-nash-p",
-        type=float,
-        default=1.0,
-        help="Weight for Nash in policy target (empirical = 1 - this)",
-    )
-
-    # Policy loss toggle
-    parser.add_argument(
-        "--no-policy-loss",
-        action="store_true",
-        dest="no_policy_loss",
-        help="Disable policy loss computation",
-    )
-
-    # Hardware and reproducibility
-    parser.add_argument(
-        "--seed", type=int, default=None, help="Random seed for determinism"
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default=None,
-        help='"cpu" or "cuda". Defaults to CUDA if available.',
-    )
-
-    # Debug / printing
-    parser.add_argument(
-        "--print-window",
-        type=int,
-        default=5,
-        help="Number of samples to print for debug output",
-    )
-    parser.add_argument(
-        "--data-window",
-        type=int,
-        default=0,
-        help="Only use the n-most recent files for freshness",
-    )
-
-    args = parser.parse_args()
-
     # Device
     if args.seed is not None:
         set_seed(args.seed)
@@ -212,15 +205,28 @@ def main():
         now = datetime.datetime.now()
         working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
-        print(f"Created working dir: {working_dir}")
+
+    network = torch_oak.BattleNetwork()
+    if args.net_path:
+        with open(args.net_path, "rb") as f:
+            network.read_parameters(f)
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
-    print(f"{len(data_files)} files found")
+    print("Saving base network in working dir.")
+    with open(os.path.join(working_dir, "battle-network"), "wb") as f:
+        network.write_parameters(f)
+
+    if len(data_files) == 0:
+        print(
+            f"No .battle files found in {args.data_dir}. Run ./build/generate with appropriate options to make them."
+        )
+        exit()
+    else:
+        print(f"{len(data_files)} data_files found")
 
     encoded_frames = py_oak.EncodedBattleFrame(args.batch_size)
     encoded_frames_torch = torch_oak.BattleFrame(encoded_frames)
     output_buffer = torch_oak.OutputBuffers(args.batch_size)
-    network = torch_oak.BattleNetwork().to(args.device)
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):

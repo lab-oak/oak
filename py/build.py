@@ -4,7 +4,71 @@ import argparse
 import random
 
 import py_oak
-import py.torch_oak as torch_oak
+import torch_oak
+
+parser = argparse.ArgumentParser(description="Train an Oak build network with PPO.")
+# Keep updating the same file so that `generate` can use an up to date network
+parser.add_argument(
+    "--in-place",
+    action="store_true",
+    dest="in_place",
+    help="Used for RL.",
+)
+parser.add_argument("--net-path", default="", help="Read directory for network weights")
+parser.add_argument(
+    "--data-dir",
+    default=".",
+    help="Read directory for battle files. All subdirectories are scanned.",
+)
+parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
+parser.add_argument(
+    "--checkpoint", type=int, default=100, help="Checkpoint interval (steps)"
+)
+parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+parser.add_argument(
+    "--keep-prob",
+    type=float,
+    default=1.0,
+    help=".",
+)
+
+# Learning
+parser.add_argument(
+    "--batch-size",
+    type=int,
+    default=2**10,
+)
+parser.add_argument(
+    "--value-weight",
+    type=float,
+    default=1.0,
+    help="Value vs Score weighting.",
+)
+parser.add_argument(
+    "--entropy-weight",
+    type=float,
+    default=0.01,
+)
+
+parser.add_argument(
+    "--data-window",
+    type=int,
+    default=0,
+    help="Only use the n-most recent files for freshness",
+)
+
+# Device
+parser.add_argument(
+    "--seed", type=int, default=None, help="Random seed for determinism"
+)
+parser.add_argument(
+    "--device",
+    type=str,
+    default=None,
+    help='"cpu" or "cuda". Defaults to CUDA if available.',
+)
+
+args = parser.parse_args()
 
 
 # Turn [b, T, 1] actions into [b, T, N] state
@@ -63,7 +127,7 @@ def process_targets(
     # [b, T, 1]
     ratio = torch.ones_like(traj.policy)
     ratio[valid] = valid_ratio
-    score_weight = 1 - value_weight
+    score_weight = 1 - args.value_weight
     r = value_weight * traj.value + score_weight * traj.score
     rewards = torch.zeros_like(traj.policy).scatter(
         1, traj.end.unsqueeze(-1) - 1, r.unsqueeze(-1)
@@ -122,68 +186,6 @@ def set_seed(seed):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train an Oak battle network.")
-
-    # Keep updating the same file so that `generate` can use an up to date network
-    parser.add_argument(
-        "--in-place",
-        action="store_true",
-        dest="in_place",
-        help="Used for RL.",
-    )
-    parser.add_argument(
-        "--net-path", default="", help="Read directory for network weights"
-    )
-    parser.add_argument(
-        "--data-dir",
-        default=".",
-        help="Read directory for battle files. All subdirectories are scanned.",
-    )
-    parser.add_argument("--batch-size", type=int, help="Batch size")
-    parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
-    parser.add_argument(
-        "--checkpoint", type=int, default=100, help="Checkpoint interval (steps)"
-    )
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument(
-        "--keep-prob",
-        type=float,
-        default=1.0,
-        help=".",
-    )
-
-    # Learning
-    parser.add_argument(
-        "--value-weight",
-        type=float,
-        default=1.0,
-        help="Value vs Score weighting.",
-    )
-    parser.add_argument(
-        "--entropy-weight",
-        type=float,
-        default=0.01,
-    )
-
-    parser.add_argument(
-        "--data-window",
-        type=int,
-        default=0,
-        help="Only use the n-most recent files for freshness",
-    )
-
-    # Device
-    parser.add_argument(
-        "--seed", type=int, default=None, help="Random seed for determinism"
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default=None,
-        help='"cpu" or "cuda". Defaults to CUDA if available.',
-    )
-
-    args = parser.parse_args()
 
     if args.seed is not None:
         set_seed(args.seed)
@@ -207,7 +209,17 @@ def main():
             network.read_parameters(f)
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".build")
-    print(f"{len(data_files)} data_files found")
+    print("Saving base network in working dir.")
+    with open(os.path.join(working_dir, "build-network"), "wb") as f:
+        network.write_parameters(f)
+
+    if len(data_files) == 0:
+        print(
+            f"No .build files found in {args.data_dir}. Run ./build/generate with appropriate options to make them."
+        )
+        exit()
+    else:
+        print(f"{len(data_files)} data_files found")
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     steps = args.steps
