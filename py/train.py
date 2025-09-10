@@ -185,6 +185,12 @@ def main():
         default=5,
         help="Number of samples to print for debug output",
     )
+    parser.add_argument(
+        "--data-window",
+        type=int,
+        default=0,
+        help="Only use the n-most recent files for freshness"
+    )
 
     args = parser.parse_args()
 
@@ -215,6 +221,9 @@ def main():
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):
+        data_files = pyoak.find_data_files(args.data_dir, ext=".battle")
+        if args.data_window > 0:
+            data_files = data_files[:args.data_window]
         encoded_frames.clear()
         output_buffer.clear()
 

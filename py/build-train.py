@@ -162,6 +162,13 @@ def main():
         default=0.01,
     )
 
+    parser.add_argument(
+        "--data-window",
+        type=int,
+        default=0,
+        help="Only use the n-most recent files for freshness"
+    )
+
     # Device
     parser.add_argument(
         "--seed", type=int, default=None, help="Random seed for determinism"
@@ -208,8 +215,11 @@ def main():
     from random import sample
 
     for step in range(steps):
-        print("step:", step)
+        data_files = pyoak.find_data_files(args.data_dir, ext=".build")
+        if args.data_window > 0:
+            data_files = data_files[:args.data_window]
 
+        print("step:", step)
         optimizer.zero_grad()
         b = 0
 
@@ -233,8 +243,8 @@ def main():
                 values[mask],
                 logp[mask],
             )
-
             if surr.numel() == 0:
+                print("empty targets after sampling, probably a small buffer")
                 continue
 
             loss = compute_loss_from_targets(
