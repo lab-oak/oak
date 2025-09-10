@@ -16,10 +16,10 @@ template <size_t log_size = 64> struct DebugLog {
   static constexpr auto frame_size = log_size + PKMN_GEN1_BATTLE_SIZE + 3;
 
   using Header = std::array<uint8_t, header_size>;
-  using Battle::Frame = std::array<uint8_t, frame_size>;
+  using Frame = std::array<uint8_t, frame_size>;
 
   Header header;
-  std::vector<Battle::Frame> frames;
+  std::vector<Frame> frames;
 
   void set_header(const pkmn_gen1_battle &battle) {
     header[0] = 1;
@@ -52,7 +52,7 @@ template <size_t log_size = 64> struct DebugLog {
   void save_data_to_path(std::string path = "") const {
     if (path.empty()) {
       const auto *battle_rng_bytes =
-          frames.front().data() + Layout::Offsets::Battle::rng;
+          frames.front().data() + PKMN::Layout::Offsets::Battle::rng;
       const auto *seed = std::bit_cast<const uint64_t *>(battle_rng_bytes);
       path = (std::filesystem::current_path() / "logs" / std::to_string(*seed))
                  .string();

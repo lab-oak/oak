@@ -1,7 +1,7 @@
-#include <format/ou/teams.h>
 #include <libpkmn/data/strings.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
+#include <teams/ou-sample-teams.h>
 #include <util/debug-log.h>
 #include <util/parse.h>
 #include <util/policy.h>
@@ -47,7 +47,7 @@ pkmn_result rollout_and_exec(auto &device, pkmn_gen1_battle &battle,
 using Key = std::pair<int, int>;
 std::map<Key, size_t> map{};
 
-std::array<std::array<PKMN::Set, 6>, 16> teams = Teams::teams;
+std::array<std::array<PKMN::Set, 6>, 16> teams = Teams::ou_sample_teams;
 pkmn_gen1_battle old_battle;
 pkmn_gen1_battle_options old_options;
 

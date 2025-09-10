@@ -22,14 +22,16 @@ const auto team_string = [](const auto &team) {
 
 auto softmax(auto &x) {
   auto y = x;
-  std::transform(y.begin(), y.end(), y.begin(), [](const auto v){return std::exp(v);});
+  std::transform(y.begin(), y.end(), y.begin(),
+                 [](const auto v) { return std::exp(v); });
   const auto sum = std::accumulate(y.begin(), y.end(), 0.0);
-  std::transform(y.begin(), y.end(), y.begin(), [sum](const auto v){return v / sum;});
+  std::transform(y.begin(), y.end(), y.begin(),
+                 [sum](const auto v) { return v / sum; });
   return y;
 }
 
 [[nodiscard]] auto rollout_build_network(auto &device, auto &network,
-                                          const auto &team) {
+                                         const auto &team) {
   using namespace Train::Build;
 
   Trajectory trajectory{};
@@ -40,12 +42,13 @@ auto softmax(auto &x) {
   std::array<float, Encode::Build::Tensorizer<>::n_dim> logits;
   auto actions = Encode::Build::Actions<>::get_singleton_additions(team);
 
-  const auto go = [&](){
+  const auto go = [&]() {
     // get action indices
     std::vector<int> indices;
-    std::transform(
-        actions.begin(), actions.end(), std::back_inserter(indices),
-        [](auto action) { return Encode::Build::Tensorizer<>::action_index(action); });
+    std::transform(actions.begin(), actions.end(), std::back_inserter(indices),
+                   [](auto action) {
+                     return Encode::Build::Tensorizer<>::action_index(action);
+                   });
 
     network.propagate(input.data(), logits.data());
 
@@ -60,12 +63,14 @@ auto softmax(auto &x) {
     apply_action(trajectory.terminal, action);
     input[index] = 1.0;
 
-    trajectory.updates.emplace_back(Trajectory::Update{actions, index, policy[index]});
+    trajectory.updates.emplace_back(
+        Trajectory::Update{actions, index, policy[index]});
   };
 
   while (!actions.empty()) {
     go();
-    actions = Encode::Build::Actions<>::get_singleton_additions(trajectory.terminal);
+    actions =
+        Encode::Build::Actions<>::get_singleton_additions(trajectory.terminal);
   }
   actions = Encode::Build::Actions<>::get_lead_actions(trajectory.terminal);
   if (!actions.empty()) {
@@ -75,4 +80,4 @@ auto softmax(auto &x) {
   return trajectory;
 }
 
-}
+} // namespace TeamBuilding

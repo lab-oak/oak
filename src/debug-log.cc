@@ -1,17 +1,17 @@
 #include <util/random.h>
 
-#include <format/ou/teams.h>
+#include <teams/ou-sample-teams.h>
 #include <util/debug-log.h>
 
 #include <iostream>
 
 int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
   constexpr size_t log_size{128};
-  using Teams::teams;
+  using Teams::ou_sample_teams;
 
   if (argc != 4) {
-    std::cout << "Usage: provide two sample team indices [0 - " << teams.size()
-              << "] and a u64 seed.\n"
+    std::cout << "Usage: provide two sample team indices [0 - "
+              << ou_sample_teams.size() << "] and a u64 seed.\n"
               << "Debug log is piped via stdout e.g.:\n"
               << "\t./build/debug-log 0 1 123456 | "
                  "./extern/engine/src/bin/pkmn-debug "
@@ -24,16 +24,16 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
   auto p2 = std::atoll(argv[2]);
   uint64_t seed = std::atoll(argv[3]);
 
-  if (p1 >= teams.size()) {
+  if (p1 >= ou_sample_teams.size()) {
     std::cerr << "Invalid index for p1 team." << std::endl;
     return 1;
   }
-  if (p2 >= teams.size()) {
+  if (p2 >= ou_sample_teams.size()) {
     std::cerr << "Invalid index for p2 team." << std::endl;
     return 1;
   }
 
-  auto battle = PKMN::battle(teams[p1], teams[p2], seed);
+  auto battle = PKMN::battle(ou_sample_teams[p1], ou_sample_teams[p2], seed);
   pkmn_gen1_battle_options options{};
   std::array<pkmn_choice, 9> choices{};
 
