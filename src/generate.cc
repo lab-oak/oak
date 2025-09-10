@@ -391,7 +391,7 @@ auto generate_team(mt19937 &device, const auto index)
     print("Team " + std::to_string(index) + " modified:");
     print(TeamBuilding::team_string(team));
     // loading each time allows the network params to be updated at runtime
-    NN::BuildNetwork build_network{};
+    NN::Build::Network build_network{};
     std::ifstream file{RuntimeOptions::TeamGen::network_path};
     if (!build_network.read_parameters(file)) {
       throw std::runtime_error{"cant read build net params"};
@@ -721,7 +721,7 @@ void setup() {
       network_path = new_path.string();
       std::ofstream stream{new_path, std::ios::binary};
       mt19937 device{RuntimeOptions::seed};
-      NN::BuildNetwork build_network{};
+      NN::Build::Network build_network{};
       build_network.initialize(device);
       build_network.write_parameters(stream);
     }

@@ -24,7 +24,7 @@ class BuildTrajectoryTorch:
 
 
 class BattleFrameTorch:
-    def __init__(self, encoded_frame: pyoak.BattleFrame):
+    def __init__(self, encoded_frame: pyoak.EncodedBattleFrame):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
         self.n = torch.from_numpy(encoded_frame.n)

@@ -8,14 +8,15 @@
 
 namespace NN {
 
-struct BuildNetwork {
+namespace Build {
+
+struct Network {
 
   using T = Encode::Build::Tensorizer<Format::OU>;
 
   EmbeddingNet<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true, false>
       policy_net;
-  EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, 1, true, false>
-      value_net;
+  EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, 1, true, false> value_net;
 
   void initialize(auto &device) {
     policy_net.initialize(device);
@@ -36,5 +37,7 @@ struct BuildNetwork {
     policy_net.propagate(input_data, output_data);
   }
 };
+
+} // namespace Build
 
 }; // namespace NN

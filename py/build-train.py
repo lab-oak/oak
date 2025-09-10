@@ -35,7 +35,7 @@ class PPO:
 
 
 def process_targets(
-    network: net.BuildNetwork, traj: net.BuildTrajectoryTorch, ppo: PPO
+    network: net.BuildNetwork, traj: net.BuildTrajectoryTorch, ppo: PPO, value_weight=1
 ):
     b, T, _ = traj.mask.shape
     # only do up to max traj length
@@ -67,8 +67,10 @@ def process_targets(
     # [b, T, 1]
     ratio = torch.ones_like(traj.policy)
     ratio[valid] = valid_ratio
+    score_weight = 1 - value_weight
+    r = value_weight * traj.value + score_weight * traj.score
     rewards = torch.zeros_like(traj.policy).scatter(
-        1, traj.end.unsqueeze(-1) - 1, traj.value.unsqueeze(-1)
+        1, traj.end.unsqueeze(-1) - 1, r.unsqueeze(-1)
     )
     value_full = torch.zeros_like(traj.policy)
     value_full[valid] = value
@@ -104,18 +106,20 @@ def process_targets(
     return valid_data
 
 
-def compute_loss_from_targets(surr, returns, values, logp_actions):
-    policy_loss = -(surr).mean()
-    value_loss = (((returns - values)) ** 2).mean()
-    entropy = -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True).mean()
-    loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
+def compute_loss_from_targets(surr, returns, values, logp_actions, total, remaining):
+    b = surr.shape[0]
+    n = min(b, remaining)
+    policy_loss = -(surr[:n]).mean()
+    value_loss = (((returns - values)) ** 2)[:n].mean()
+    entropy = -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True)[:n].mean()
+    loss = (n / total) * (policy_loss + 0.5 * value_loss - 0.01 * entropy)
     return loss
 
 
 def main():
     parser = argparse.ArgumentParser(description="Train PPO on build trajectories.")
-    parser.add_argument("in_net", help="Path to input network file")
-    parser.add_argument("out_net", help="Path to output network file")
+    parser.add_argument("input", help="Path to input network file")
+    parser.add_argument("output", help="Path to output network file")
     parser.add_argument("steps", type=int, help="Number of training steps")
     parser.add_argument("--batch-size", type=int, default=2**9, help="Batch size")
     parser.add_argument(
@@ -126,14 +130,18 @@ def main():
     parser.add_argument(
         "--lr", type=float, default=1e-2, help="Learning rate for Adam optimizer"
     )
+    parser.add_argument(
+        "--data", type=str, default=".", help="Folder to scan for build files"
+    )
+    parser.add_argument("--value-weight", type=float, default=1.0)
     args = parser.parse_args()
 
-    files = find_data_files(".", ext=".build")
+    files = find_data_files(args.data, ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     network = net.BuildNetwork()
 
-    with open(args.in_net, "rb") as f:
+    with open(args.input, "rb") as f:
         network.read_parameters(f)
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
@@ -156,11 +164,13 @@ def main():
             T = trajectories.end.max()
             traj = net.BuildTrajectoryTorch(trajectories, n=T)
 
-            surr, returns, values, logp = process_targets(network, traj, ppo)
+            surr, returns, values, logp = process_targets(
+                network, traj, ppo, args.value_weight
+            )
             r = torch.rand(surr.shape)
             mask = r < keep_prob
             surr, returns, values, logp = (
-                surr[mask],
+                surr[mask],     
                 returns[mask],
                 values[mask],
                 logp[mask],
@@ -169,7 +179,7 @@ def main():
             if surr.numel() == 0:
                 continue
 
-            l = compute_loss_from_targets(surr, returns, values, logp)
+            l = compute_loss_from_targets(surr, returns, values, logp, batch_size, batch_size - b)
             l.backward()
 
             b += surr.shape[0]
@@ -177,13 +187,13 @@ def main():
 
         optimizer.step()
 
-        if (step % parser.checkpoint) == 0:
+        if (step % args.checkpoint) == 0:
             ckpt_path = os.path.join(f"{step}.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step}: {ckpt_path}")
 
-    with open(args.out_net, "wb") as f:
+    with open(args.output, "wb") as f:
         network.write_parameters(f)
 
 

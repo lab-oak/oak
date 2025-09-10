@@ -29,14 +29,14 @@ struct Frame {
       const auto &side = battle.sides[s];
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
-      hp[s][0] = (float)stored.hp / stored.stats.hp;
+      hp[s][0] = stored.stats.hp ? (float)stored.hp / stored.stats.hp : 0.0f;
       Encode::Battle::Active::write(stored, side.active, duration,
                                     active[s][0].data());
 
       for (auto slot = 2; slot <= 6; ++slot) {
         const auto &poke = side.get(slot);
         const auto sleep = duration.sleep(slot - 1);
-        hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
+        hp[s][slot - 1] = poke.stats.hp ? (float)poke.hp / poke.stats.hp : 0.0f;
         Encode::Battle::Pokemon::write(poke, sleep,
                                        pokemon[s][slot - 2].data());
       }

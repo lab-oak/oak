@@ -6,6 +6,7 @@
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
+#include <util/team-building.h>
 
 #include <atomic>
 #include <cmath>
@@ -60,32 +61,31 @@ RuntimePolicy::Options p2_policy_options{};
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
 
-  const auto play = [&](const auto &p1_team, const auto &p2_team) {
-    const auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
-    if (!p1_agent.network_path.empty() && p1_agent.network_path != "mc") {
-      p1_agent.network.emplace();
-      std::ifstream file{std::filesystem::path{p1_agent.network_path}};
-      if (file.fail() || !p1_agent.network.value().read_parameters(file)) {
-        throw std::runtime_error("Could not read p1 network params.");
-        return MCTS::Output{};
-      }
-      p1_agent.network.value().fill_cache(battle);
+  auto build_network = NN::Build::Network{};
+  std::ifstream file{std::filesystem::path{"./4/build-network"}};
+  const bool success = build_network.read_parameters(file);
+  if (!success) {
+    throw std::runtime_error{"Can't read build network."};
+  }
+
+  const auto play = [&](const auto &p1_team, const auto &p2_team) -> void {
+    auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    auto options = PKMN::options();
+    const auto result = PKMN::update(battle, 0, 0, options);
+    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
+
+    auto p1_agent_local = p1_agent;
+    auto p2_agent_local = p2_agent;
+    if (p1_agent_local.uses_network()) {
+      p1_agent_local.read_network_parameters();
+      p1_agent_local.network.value().fill_cache(battle);
     }
-    if (!p2_agent.network_path.empty() && p2_agent.network_path != "mc") {
-      p2_agent.network.emplace();
-      std::ifstream file{std::filesystem::path{p2_agent.network_path}};
-      if (file.fail() || !p2_agent.network.value().read_parameters(file)) {
-        throw std::runtime_error("Could not read p1 network params.");
-        return MCTS::Output{};
-      }
-      p2_agent.network.value().fill_cache(battle);
+    if (p2_agent_local.uses_network()) {
+      p2_agent_local.read_network_parameters();
+      p2_agent_local.network.value().fill_cache(battle);
     }
 
-    const auto durations = PKMN::durations();
-    MCTS::BattleData battle_data{battle, durations, PKMN::result()};
-    auto battle_options = PKMN::options();
     bool early_stop = false;
-
     size_t updates = 0;
     try {
       // playout game
@@ -105,7 +105,7 @@ void thread_fn(uint64_t seed) {
         int p2_early_stop = 0;
         if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
+          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent_local);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
@@ -113,7 +113,7 @@ void thread_fn(uint64_t seed) {
         }
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
+          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent_local);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
@@ -134,10 +134,11 @@ void thread_fn(uint64_t seed) {
         if (device.uniform() < print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
+          print(PKMN::battle_data_to_string(battle_data.battle, battle_data.durations));
         }
-        battle_data.result = PKMN::update(battle_data.battle, p1_choice,
-                                          p2_choice, battle_options);
-        battle_data.durations = PKMN::durations(battle_options);
+        battle_data.result =
+            PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
+        battle_data.durations = PKMN::durations(options);
         ++updates;
       }
 
@@ -148,23 +149,33 @@ void thread_fn(uint64_t seed) {
       RuntimeData::n.fetch_add(1);
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
-      return MCTS::Output{};
     }
   };
 
   while (true) {
-    const auto p1_team = Teams::ou_sample_teams[device.random_int(
-        Teams::ou_sample_teams.size())];
-    const auto p2_team = Teams::ou_sample_teams[device.random_int(
-        Teams::ou_sample_teams.size())];
+    // const auto p1 = Teams::ou_sample_teams[device.random_int(
+    //     Teams::ou_sample_teams.size())];
+    // const auto p2 = Teams::ou_sample_teams[device.random_int(
+    //     Teams::ou_sample_teams.size())];
 
-    play(p1_team, p2_team);
-    play(p2_team, p1_team);
+    std::vector<PKMN::Set> base{};
+    base.emplace_back();
+    const auto traj1 =
+        TeamBuilding::rollout_build_network(device, build_network, base);
+    const auto traj2 =
+        TeamBuilding::rollout_build_network(device, build_network, base);
+    const auto p1 = traj1.terminal;
+    const auto p2 = traj2.terminal;
+
+    play(p1, p2);
+    play(p2, p1);
 
     if (RuntimeData::terminated) {
       return;
     }
   }
+
+  return;
 }
 
 void progress_thread_fn(int sec) {

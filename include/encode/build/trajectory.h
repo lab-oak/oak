@@ -212,8 +212,9 @@ struct TrajectoryInput {
                            });
             mask_index += available_species.size();
           }
-           // make the selected action the first one in the mask
-          std::swap(*_mask.begin(), *std::find(_mask.begin(), _mask.end(), update.action));
+          // make the selected action the first one in the mask
+          std::swap(*_mask.begin(),
+                    *std::find(_mask.begin(), _mask.end(), update.action));
         }
 
         // update stats
