@@ -6,4 +6,5 @@ clang-format -i \
     include/nn/*.h include/nn/battle/*.h include/nn/build/*.h \
     include/encode/battle/*.h include/encode/build/*.h \
     include/format/*.h include/format/cart/*.h include/format/ou/*.h \
-    include/teams/*.h
+    include/teams/*.h \
+    include/util/*.h

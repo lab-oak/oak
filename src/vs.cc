@@ -134,7 +134,8 @@ void thread_fn(uint64_t seed) {
         if (device.uniform() < print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
-          print(PKMN::battle_data_to_string(battle_data.battle, battle_data.durations));
+          print(PKMN::battle_data_to_string(battle_data.battle,
+                                            battle_data.durations));
         }
         battle_data.result =
             PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
