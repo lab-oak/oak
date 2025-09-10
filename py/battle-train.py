@@ -3,8 +3,8 @@ import torch
 import argparse
 import random
 
-import pyoak
-import net
+import py_oak
+import torch_oak
 
 
 def print_tensors(obj):
@@ -36,7 +36,10 @@ def masked_kl_div(logit, target):
 
 
 def loss(
-    input: net.BattleFrameTorch, output: net.OutputBuffers, args, print_flag=False
+    input: torch_oak.BattleFrame,
+    output: torch_oak.OutputBuffers,
+    args,
+    print_flag=False,
 ):
     size = min(input.size, output.size)
 
@@ -189,7 +192,7 @@ def main():
         "--data-window",
         type=int,
         default=0,
-        help="Only use the n-most recent files for freshness"
+        help="Only use the n-most recent files for freshness",
     )
 
     args = parser.parse_args()
@@ -211,23 +214,23 @@ def main():
         os.makedirs(working_dir, exist_ok=False)
         print(f"Created working dir: {working_dir}")
 
-    data_files = pyoak.find_data_files(args.data_dir, ext=".battle")
+    data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
     print(f"{len(data_files)} files found")
 
-    encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = net.BattleFrameTorch(encoded_frames)
-    output_buffer = net.OutputBuffers(args.batch_size)
-    network = net.BattleNetwork().to(args.device)
+    encoded_frames = py_oak.EncodedBattleFrame(args.batch_size)
+    encoded_frames_torch = torch_oak.BattleFrame(encoded_frames)
+    output_buffer = torch_oak.OutputBuffers(args.batch_size)
+    network = torch_oak.BattleNetwork().to(args.device)
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):
-        data_files = pyoak.find_data_files(args.data_dir, ext=".battle")
+        data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
         if args.data_window > 0:
-            data_files = data_files[:args.data_window]
+            data_files = data_files[: args.data_window]
         encoded_frames.clear()
         output_buffer.clear()
 
-        pyoak.encode_buffers(
+        py_oak.encode_buffers(
             data_files,
             args.threads,
             args.batch_size,

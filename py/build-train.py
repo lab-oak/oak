@@ -3,15 +3,15 @@ import torch
 import argparse
 import random
 
-import pyoak
-import net
+import py_oak
+import py.torch_oak as torch_oak
 
 
 # Turn [b, T, 1] actions into [b, T, N] state
 def get_state(actions):
     b, T, _ = actions.shape
     state = torch.zeros(
-        (b, T, pyoak.species_move_list_size + 1), dtype=torch.float32
+        (b, T, py_oak.species_move_list_size + 1), dtype=torch.float32
     )  # [b, T, N+1]
     state = state.scatter(2, actions + 1, 1.0)
     state = torch.cumsum(state, dim=1).clamp_max(1.0)
@@ -28,7 +28,10 @@ class PPO:
 
 
 def process_targets(
-    network: net.BuildNetwork, traj: net.BuildTrajectoryTorch, ppo: PPO, value_weight=1
+    network: torch_oak.BuildNetwork,
+    traj: torch_oak.BuildTrajectoryTorch,
+    ppo: PPO,
+    value_weight=1,
 ):
     b, T, _ = traj.mask.shape
     # only do up to max traj length
@@ -166,7 +169,7 @@ def main():
         "--data-window",
         type=int,
         default=0,
-        help="Only use the n-most recent files for freshness"
+        help="Only use the n-most recent files for freshness",
     )
 
     # Device
@@ -198,12 +201,12 @@ def main():
         working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
 
-    network = net.BuildNetwork()
+    network = torch_oak.BuildNetwork()
     if args.net_path:
         with open(args.net_path, "rb") as f:
             network.read_parameters(f)
 
-    data_files = pyoak.find_data_files(args.data_dir, ext=".build")
+    data_files = py_oak.find_data_files(args.data_dir, ext=".build")
     print(f"{len(data_files)} data_files found")
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
@@ -215,9 +218,9 @@ def main():
     from random import sample
 
     for step in range(steps):
-        data_files = pyoak.find_data_files(args.data_dir, ext=".build")
+        data_files = py_oak.find_data_files(args.data_dir, ext=".build")
         if args.data_window > 0:
-            data_files = data_files[:args.data_window]
+            data_files = data_files[: args.data_window]
 
         print("step:", step)
         optimizer.zero_grad()
@@ -226,11 +229,11 @@ def main():
         # break batches up by file to limit memory use
         while b < batch_size:
             file = sample(data_files, 1)[0]
-            trajectories = pyoak.read_build_trajectories(file)
+            trajectories = py_oak.read_build_trajectories(file)
 
             T = trajectories.end.max()
             # here is where we trunacte the episode length for 1v1, etc
-            traj = net.BuildTrajectoryTorch(trajectories, n=T)
+            traj = torch_oak.BuildTrajectoryTorch(trajectories, n=T)
 
             surr, returns, values, logp = process_targets(
                 network, traj, ppo, args.value_weight

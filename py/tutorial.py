@@ -1,7 +1,7 @@
 import sys
 import os
 
-import pyoak
+import py_oak
 import numpy as np
 
 
@@ -23,7 +23,7 @@ def read_build_trajectories():
     from random import sample
 
     file = sample(files, 1)[0]
-    build_trajectories = pyoak.read_build_trajectories(file)
+    build_trajectories = py_oak.read_build_trajectories(file)
 
     assert build_trajectories.size > 0, f"No data found in {file}."
 
@@ -31,16 +31,16 @@ def read_build_trajectories():
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [
-            pyoak.species_move_list[_]
+            py_oak.species_move_list[_]
             for _ in build_trajectories.actions[index].reshape(-1)
         ]
         names = []
         for sm in species_move:
             s, m = sm
             if m == 0:
-                names.append(pyoak.species_names[s])
+                names.append(py_oak.species_names[s])
             else:
-                names.append(pyoak.move_names[m])
+                names.append(py_oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
@@ -68,11 +68,11 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import net
+    import py.torch_oak as torch_oak
     import torch
     import math
 
-    network = net.BuildNetwork()
+    network = torch_oak.BuildNetwork()
 
     path = sys.argv[2]
     with open(path, "rb") as file:
@@ -80,14 +80,14 @@ def show_species_probs():
 
     weights = dict()
 
-    logits, _ = network.forward(torch.zeros((1, pyoak.species_move_list_size)))
+    logits, _ = network.forward(torch.zeros((1, py_oak.species_move_list_size)))
 
-    for index, pair in enumerate(pyoak.species_move_list):
+    for index, pair in enumerate(py_oak.species_move_list):
         s, m = pair
         if m != 0:
             continue
 
-        name = pyoak.species_names[s]
+        name = py_oak.species_names[s]
         weights[name] = math.exp(logits[0, index])
 
     s = 0
@@ -101,7 +101,7 @@ def show_species_probs():
 
 def create_set():
 
-    from net import BuildNetwork
+    from py.torch_oak import BuildNetwork
 
     network = BuildNetwork()
 
@@ -118,11 +118,11 @@ def create_set():
     import torch
 
     for _ in range(n):
-        team = torch.zeros([pyoak.species_move_list_size])
+        team = torch.zeros([py_oak.species_move_list_size])
 
         # create mask for choosing the first species
-        mask = torch.zeros([pyoak.species_move_list_size])
-        for index, pair in enumerate(pyoak.species_move_list):
+        mask = torch.zeros([py_oak.species_move_list_size])
+        for index, pair in enumerate(py_oak.species_move_list):
             s, m = pair
             if m == 0:
                 mask[index] = 1
@@ -135,14 +135,14 @@ def create_set():
 
         logits, _ = network.forward(team)
         index, p = sample_masked_logits(logits, mask)
-        species, _ = pyoak.species_move_list[index]
-        print(f"{pyoak.species_names[species]} : {p}%")
+        species, _ = py_oak.species_move_list[index]
+        print(f"{py_oak.species_names[species]} : {p}%")
         team[index] = 1
 
         # reset mask and fill with legal moves
         mask.zero_()
         n_moves = 0
-        for index, pair in enumerate(pyoak.species_move_list):
+        for index, pair in enumerate(py_oak.species_move_list):
             s, m = pair
             if s == species and m != 0:
                 n_moves += 1
@@ -150,8 +150,8 @@ def create_set():
 
         for _ in range(min(4, n_moves)):
             index, p = sample_masked_logits(network.forward(team)[0], mask)
-            _, move = pyoak.species_move_list[index]
-            print(f"    {pyoak.move_names[move]} : {p}%")
+            _, move = py_oak.species_move_list[index]
+            print(f"    {py_oak.move_names[move]} : {p}%")
             team[index] = 1
             mask[index] = 0
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pyoak
+import py_oak
 
 import struct
 
@@ -10,7 +10,7 @@ import torch
 
 
 class BuildTrajectoryTorch:
-    def __init__(self, traj: pyoak.BuildTrajectory, n=None, device="cpu"):
+    def __init__(self, traj: py_oak.BuildTrajectory, n=None, device="cpu"):
         if n is None:
             n = 31
         self.size = traj.size
@@ -35,8 +35,8 @@ class BuildTrajectoryTorch:
         self.size = sum(r).item()
 
 
-class BattleFrameTorch:
-    def __init__(self, encoded_frame: pyoak.EncodedBattleFrame):
+class BattleFrame:
+    def __init__(self, encoded_frame: py_oak.EncodedBattleFrame):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
         self.n = torch.from_numpy(encoded_frame.n)
@@ -55,7 +55,9 @@ class BattleFrameTorch:
 
     def permute_pokemon(self):
         perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
-        perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, pyoak.pokemon_in_dim)
+        perms_expanded = perms[:, None, :, None].expand(
+            -1, 2, -1, py_oak.pokemon_in_dim
+        )
         torch.gather(self.pokemon, dim=2, index=perms_expanded)
 
     def permute_sides(self, prob=0.5):
@@ -151,14 +153,14 @@ class BuildNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.policy_net = EmbeddingNet(
-            pyoak.species_move_list_size,
-            pyoak.build_policy_hidden_dim,
-            pyoak.species_move_list_size,
+            py_oak.species_move_list_size,
+            py_oak.build_policy_hidden_dim,
+            py_oak.species_move_list_size,
             True,
             False,
         )
         self.value_net = EmbeddingNet(
-            pyoak.species_move_list_size, pyoak.build_value_hidden_dim, 1, True, False
+            py_oak.species_move_list_size, py_oak.build_value_hidden_dim, 1, True, False
         )
 
     def read_parameters(self, f):
@@ -247,8 +249,8 @@ class OutputBuffers:
         self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
         # last dim in neg inf to supply logit for invalid actions
-        self.p1_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
-        self.p2_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
+        self.p1_policy_logit = torch.zeros(size, py_oak.policy_out_dim + 1)
+        self.p2_policy_logit = torch.zeros(size, py_oak.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -266,17 +268,17 @@ class OutputBuffers:
 
 
 class BattleNetwork(torch.nn.Module):
-    pokemon_hidden_dim = pyoak.pokemon_hidden_dim
-    pokemon_out_dim = pyoak.pokemon_out_dim
-    active_hidden_dim = pyoak.active_hidden_dim
-    active_out_dim = pyoak.active_out_dim
-    side_out_dim = pyoak.side_out_dim
-    hidden_dim = pyoak.hidden_dim
-    value_hidden_dim = pyoak.value_hidden_dim
-    policy_hidden_dim = pyoak.policy_hidden_dim
-    policy_out_dim = pyoak.policy_out_dim
-    pokemon_in_dim = pyoak.pokemon_in_dim
-    active_in_dim = pyoak.active_in_dim
+    pokemon_hidden_dim = py_oak.pokemon_hidden_dim
+    pokemon_out_dim = py_oak.pokemon_out_dim
+    active_hidden_dim = py_oak.active_hidden_dim
+    active_out_dim = py_oak.active_out_dim
+    side_out_dim = py_oak.side_out_dim
+    hidden_dim = py_oak.hidden_dim
+    value_hidden_dim = py_oak.value_hidden_dim
+    policy_hidden_dim = py_oak.policy_hidden_dim
+    policy_out_dim = py_oak.policy_out_dim
+    pokemon_in_dim = py_oak.pokemon_in_dim
+    active_in_dim = py_oak.active_in_dim
 
     def __init__(self):
         super().__init__()
@@ -309,7 +311,7 @@ class BattleNetwork(torch.nn.Module):
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-    def inference(self, input: BattleFrameTorch, output: OutputBuffers):
+    def inference(self, input: BattleFrame, output: OutputBuffers):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])

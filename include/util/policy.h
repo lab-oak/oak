@@ -10,8 +10,8 @@ struct Options {
 
   std::string to_string() const {
     std::stringstream ss{};
-    ss << " mode: " << mode;
-    ss << "temp: " << temp;
+    ss << "mode: " << mode;
+    ss << " temp: " << temp;
     ss << " min-prob: " << min_prob;
     return ss.str();
   }
