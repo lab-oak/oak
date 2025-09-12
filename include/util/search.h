@@ -67,13 +67,32 @@ struct Agent {
            network_path != "montecarlo" && network_path != "monte-carlo";
   }
 
-  bool read_network_parameters() {
+  void read_network_parameters() {
     network.emplace();
     std::ifstream file{std::filesystem::path{network_path}};
     if (file.fail() || !network.value().read_parameters(file)) {
-      return false;
+      network = std::nullopt;
+      throw std::runtime_error{"Agent could not read network parameters at: " +
+                               network_path};
     }
-    return true;
+  }
+
+  std::string to_string() const {
+    std::stringstream ss{};
+    ss << "search_time: ";
+    if (flag) {
+      ss << "(flag)";
+    } else {
+      ss << search_time;
+    }
+    ss << " bandit_name: " << bandit_name;
+    ss << " network_path: ";
+    if (uses_network()) {
+      ss << network_path;
+    } else {
+      ss << "(monte-carlo)";
+    }
+    return ss.str();
   }
 };
 

@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
     std::cerr
         << "Side: search-time bandit-name network-path policy-mode.\n Input "
            "(Side) p1, "
-           "(Side) p2."
+           "(Side) p2. [threads=1] [print-prob=.01] [seed]"
         << std::endl;
     return 1;
   }
@@ -226,10 +226,10 @@ int main(int argc, char **argv) {
   p2_agent.network_path = std::string(argv[7]);
   p2_policy_options.mode = argv[8][0];
 
-  // std::cout << "P1: " << p1_agent.to_string() << ' '
-  //           << p1_policy_options.to_string() << std::endl;
-  // std::cout << "P2: " << p2_agent.to_string() << ' '
-  //           << p2_policy_options.to_string() << std::endl;
+  std::cout << "P1: " << p1_agent.to_string() << ' '
+            << p1_policy_options.to_string() << std::endl;
+  std::cout << "P2: " << p2_agent.to_string() << ' '
+            << p2_policy_options.to_string() << std::endl;
 
   size_t threads = 1;
   size_t seed = std::random_device{}();
@@ -244,6 +244,8 @@ int main(int argc, char **argv) {
   }
 
   std::cout << "threads: " << threads << std::endl;
+  std::cout << "print_prob: " << print_prob << std::endl;
+  std::cout << "seed: " << seed << std::endl;
 
   mt19937 device{seed};
 
