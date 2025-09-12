@@ -11,7 +11,7 @@ namespace Util {
 template <typename F, bool debug_log = true>
 pkmn_result rollout_and_exec(auto &device, pkmn_gen1_battle &battle,
                              pkmn_gen1_battle_options &options, F func) {
-  auto result = PKMN::update(battle, 0, 0, options);
+  auto result = PKMN::result(battle);
   std::array<pkmn_choice, 9> choices;
   while (!pkmn_result_type(result)) {
 
@@ -75,6 +75,7 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
 };
 
 int main(int argc, char **argv) {
+  using enum PKMN::Data::Move;
 
   if (argc < 2) {
     std::cerr << "Input: num-trials" << std::endl;
@@ -83,18 +84,20 @@ int main(int argc, char **argv) {
 
   for (auto &team : teams) {
     for (auto &set : team) {
-      using enum PKMN::Data::Move;
       set.moves[0] = ConfuseRay;
     }
   }
 
-  mt19937 device{2323423344634};
+  mt19937 device{std::random_device{}()};
 
   for (auto i = 0; i < std::atoll(argv[1]); ++i) {
+    std::array<uint8_t, 64> buf{};
+    pkmn_gen1_log_options log_options{buf.data(), 64};
     auto battle =
-        PKMN::battle(teams[i % 16], teams[(i + 1) % 16], device.uniform_64());
-
-    pkmn_gen1_battle_options options{};
+        PKMN::battle(teams[device.uniform_64() % 16],
+                     teams[device.uniform_64() % 16], device.uniform_64());
+    auto options = PKMN::options(log_options);
+    auto result = PKMN::update(battle, 0, 0, options);
     Util::rollout_and_exec(device, battle, options, F);
   }
 

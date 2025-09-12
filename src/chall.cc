@@ -47,6 +47,7 @@ int main(int argc, char **argv) {
 
   mt19937 device{std::random_device{}()};
   MCTS::BattleData battle_data;
+
   while (true) {
     std::string line;
     std::cout << "Input: battle-string" << std::endl;

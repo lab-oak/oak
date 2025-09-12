@@ -9,6 +9,28 @@
 
 namespace PKMN {
 
+namespace Options {
+
+#ifdef LOG
+constexpr bool log = true;
+#else
+constexpr bool log = false;
+#endif
+
+#ifdef CHANCE
+constexpr bool chance = true;
+#else
+constexpr bool chance = false;
+#endif
+
+#ifdef CALC
+constexpr bool calc = true;
+#else
+constexpr bool calc = false;
+#endif
+
+}; // namespace Options
+
 struct Set {
   Data::Species species;
   std::array<Data::Move, 4> moves;
@@ -94,7 +116,19 @@ constexpr auto battle(const auto &p1, const auto &p2,
 
 constexpr pkmn_gen1_chance_durations durations() { return {}; }
 
+#ifdef LOG
+constexpr pkmn_gen1_battle_options options(pkmn_gen1_log_options &log_options) {
+  if (!log_options.buf) {
+    throw std::runtime_error{
+        "Trying to initialize options when the log has null buffer."};
+  }
+  pkmn_gen1_battle_options options{};
+  pkmn_gen1_battle_options_set(&options, &log_options, nullptr, nullptr);
+  return options;
+}
+#else
 constexpr pkmn_gen1_battle_options options() { return {}; }
+#endif
 
 auto &durations(pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
@@ -108,8 +142,7 @@ void set(pkmn_gen1_battle_options &options) {
   return pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
 }
 
-[[nodiscard]] pkmn_result update(pkmn_gen1_battle &battle, const auto c1,
-                                 const auto c2,
+[[nodiscard]] pkmn_result update(auto &b, const auto c1, const auto c2,
                                  pkmn_gen1_battle_options &options) {
   const auto get_choice = [](const auto c, const uint8_t *side) -> pkmn_choice {
     using Choice = std::remove_cv<decltype(c)>::type;
@@ -137,6 +170,10 @@ void set(pkmn_gen1_battle_options &options) {
       assert(false);
     }
   };
+  auto &battle = *std::bit_cast<pkmn_gen1_battle *>(&b);
+  if constexpr (Options::log) {
+    // TODO libpkmn does not support checking that the buffer is not null
+  }
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
   return pkmn_gen1_battle_update(
       &battle, get_choice(c1, battle.bytes),

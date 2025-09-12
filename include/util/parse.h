@@ -29,7 +29,7 @@ std::vector<std::string> split(const std::string &input, const char delim) {
   return result;
 }
 
-// convert vector of strings to a set
+// convert vector of strings to a pokemon/durations initializer
 auto parse_set(const auto &words) {
 
   PKMN::Init::Pokemon set{};
@@ -67,16 +67,19 @@ auto parse_set(const auto &words) {
       }
     }
 
-    if (word.find('%') != std::string::npos) {
-      const auto percent = std::stoll(split(word, '%')[0]);
-      set.hp = percent / 100.0;
-      continue;
-    }
-
     using PKMN::Data::Status;
     auto lower = word;
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](auto c) { return std::tolower(c); });
+
+    if (lower.ends_with('%')) {
+      const auto percent = std::stoll(lower.substr(0, lower.size() - 1));
+      set.hp = percent / 100.0;
+    } else if (lower.ends_with("hp")) {
+      const auto raw = std::stoll(lower.substr(0, lower.size() - 2));
+      set.hp = raw;
+    }
+
     if (lower == "par") {
       set.status = Status::Paralysis;
     } else if (lower == "frz") {
@@ -188,7 +191,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
       vol.set_reflect(true);
     }
 
-    const auto parse_split = [](auto word, const auto start) -> int {
+    const auto parse_colon_split = [](auto word, const auto start) -> int {
       int x = -1;
       if (word.back() == ')') {
         word = word.substr(0, word.size() - 1);
@@ -204,25 +207,33 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
 
     // durations
 
-    if (const auto conf = parse_split(lower, "(conf"); conf >= 0) {
+    if (const auto conf = parse_colon_split(lower, "(conf"); conf >= 0) {
+      if (conf == 0 || conf > 5) {
+        throw std::runtime_error{
+            "parse_active(): Confusion duration must be [1, 5] (1 means "
+            "confused after moving, 5 means due to snap out.)"};
+      }
       vol.set_confusion(true);
       duration.set_confusion(conf);
     }
-    // if (const auto disable = parse_split(lower, "(disable"); disable >= 0) {
+    // if (const auto disable = parse_colon_split(lower, "(disable"); disable >=
+    // 0) {
     //   vol.set_disable(true);
     //   duration.set_disable(disable);
     // }
-    if (const auto thrashing = parse_split(lower, "(trash"); thrashing >= 0) {
+    if (const auto thrashing = parse_colon_split(lower, "(trash");
+        thrashing >= 0) {
       vol.set_thrashing(true);
       duration.set_attacking(thrashing);
     }
-    if (const auto thrashing = parse_split(lower, "(petal"); thrashing >= 0) {
+    if (const auto thrashing = parse_colon_split(lower, "(petal");
+        thrashing >= 0) {
       vol.set_thrashing(true);
       duration.set_attacking(thrashing);
     }
-    if (const auto binding = parse_split(lower, "(bind"); binding >= 0) {
+    if (const auto binding = parse_colon_split(lower, "(bind"); binding >= 0) {
     }
-    if (const auto binding = parse_split(lower, "(wrap"); binding >= 0) {
+    if (const auto binding = parse_colon_split(lower, "(wrap"); binding >= 0) {
     }
   }
 
@@ -266,10 +277,6 @@ auto parse_side(const std::string &side_string)
   auto [active, duration] = parse_active(side.pokemon[0], active_words);
   side.active = active;
   PKMN::Init::init_sleeps(sets, duration);
-  for (auto i = 0; i < 6; ++i) {
-    std::cout << (int)side.order[i];
-  }
-  std::cout << std::endl;
   return {side, duration};
 }
 
