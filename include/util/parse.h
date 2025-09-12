@@ -124,12 +124,8 @@ auto parse_set(const auto &words) {
 
 auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     -> std::pair<PKMN::ActivePokemon, PKMN::Duration> {
-  PKMN::ActivePokemon active{};
   PKMN::Duration duration{};
-  active.stats = pokemon.stats;
-  active.species = pokemon.species;
-  active.types = pokemon.types;
-  active.moves = pokemon.moves;
+  PKMN::ActivePokemon active = PKMN::switch_in(pokemon);
 
   PKMN::Stats stats{};
   auto &vol = active.volatiles;

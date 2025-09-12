@@ -72,7 +72,7 @@ auto softmax(auto &x) {
     actions =
         Encode::Build::Actions<>::get_singleton_additions(trajectory.terminal);
   }
-  actions = Encode::Build::Actions<>::get_lead_actions(trajectory.terminal);
+  actions = Encode::Build::Actions<>::get_lead_swaps(trajectory.terminal);
   if (!actions.empty()) {
     go();
   }

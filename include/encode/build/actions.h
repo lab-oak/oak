@@ -29,7 +29,6 @@ template <typename F = Format::OU> struct Actions {
 
     std::vector<Action> actions{};
 
-    // add a unique pokemon to the first empty slot
     auto empty_slot =
         std::find_if(team.begin(), team.end(), [](const auto &set) {
           return set.species == Species::None;
@@ -40,6 +39,7 @@ template <typename F = Format::OU> struct Actions {
       for (const auto &set : team) {
         ls_end = std::remove(ls.begin(), ls_end, set.species);
       }
+      // Actions: add a unique pokemon to the first empty slot
       std::transform(ls.begin(), ls_end, std::back_inserter(actions),
                      [&team, &empty_slot](const auto species) {
                        return Action{BasicAction{
@@ -49,7 +49,7 @@ template <typename F = Format::OU> struct Actions {
     }
 
     for (const auto &set : team) {
-      // add a unique move to the first empty move slot
+      // Actions: add a unique move to the first empty move slot
       if (set.species != Species::None) {
         auto empty = std::find(set.moves.begin(), set.moves.end(), Move::None);
         if (empty != set.moves.end()) {
@@ -73,7 +73,7 @@ template <typename F = Format::OU> struct Actions {
     return actions;
   }
 
-  static auto get_lead_actions(const auto &team) {
+  static auto get_lead_swaps(const auto &team) {
     using PKMN::Data::Move;
     using PKMN::Data::Species;
     using Train::Build::Action;

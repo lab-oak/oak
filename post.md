@@ -29,7 +29,7 @@ Now that the game is perfect info, we can take advantage of the scalable and gen
 
 [HEADING=3]Fast Simulator[/HEADING]
 Most projects use Pokemon-Showdown as the base simulator since it is open source and the de facto implementation of the game. Unfortunately they are doomed from the start since PS is orders of magnitude too slow for anything serious.
-This project uses `libpkmn` which 1000x faster than PS and also matches it's behaviour exactly. Depending on the eval, we are able to perform a million mcts iterations in only a few seconds.
+This project uses `libpkmn` which 1000x faster than PS and also matches its behaviour exactly. Depending on the eval, we are able to perform a million mcts iterations in only a few seconds.
 Oak implements 
 
 

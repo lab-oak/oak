@@ -308,4 +308,17 @@ view(const pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<const PKMN::Durations *>(&durations);
 }
 
+constexpr inline auto cast(const pkmn_gen1_battle &battle) noexcept {
+  return std::bit_cast<PKMN::Battle>(battle);
+}
+
+constexpr inline auto switch_in(const Pokemon &pokemon) noexcept {
+  ActivePokemon active{};
+  active.stats = pokemon.stats;
+  active.species = pokemon.species;
+  active.types = pokemon.types;
+  active.moves = pokemon.moves;
+  return active;
+}
+
 } // namespace PKMN

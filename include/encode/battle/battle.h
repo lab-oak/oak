@@ -3,6 +3,7 @@
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
 #include <libpkmn/pkmn.h>
+#include <teams/ou-sample-teams.h>
 
 #include <array>
 #include <cassert>
@@ -19,13 +20,23 @@ namespace Stats {
 constexpr float max_stat_value = 999;
 constexpr float max_hp_value = 706;
 constexpr auto n_dim = 5;
-float *write(const PKMN::Stats &stats, float *t) {
+constexpr float *write(const PKMN::Stats &stats, float *t) {
   t[0] = stats.hp / max_hp_value;
   t[1] = stats.atk / max_stat_value;
   t[2] = stats.def / max_stat_value;
   t[3] = stats.spe / max_stat_value;
   t[4] = stats.spc / max_stat_value;
   return t + n_dim;
+}
+
+constexpr auto read(const float *t) {
+  PKMN::Stats stats{};
+  stats.hp = t[0] * max_hp_value;
+  stats.atk = t[1] * max_stat_value;
+  stats.def = t[2] * max_stat_value;
+  stats.spe = t[3] * max_stat_value;
+  stats.spc = t[4] * max_stat_value;
+  return stats;
 }
 
 consteval auto dim_labels() {
@@ -36,13 +47,25 @@ consteval auto dim_labels() {
 
 namespace MoveSlots {
 constexpr auto n_dim = static_cast<uint8_t>(Move::Struggle) - 1;
-float *write(const std::array<PKMN::MoveSlot, 4> &move_slots, float *t) {
+constexpr float *write(const std::array<PKMN::MoveSlot, 4> &move_slots,
+                       float *t) {
   for (const auto [id, pp] : move_slots) {
     if (id != Move::Struggle && id != Move::None) {
       t[static_cast<uint8_t>(id) - 1] = static_cast<bool>(pp);
     }
   }
   return t + n_dim;
+}
+
+constexpr auto read(const float *t) {
+  std::array<PKMN::MoveSlot, 4> move_slots{};
+  auto s = 0;
+  for (uint8_t i = 0; i < n_dim; ++i) {
+    if (t[i] > 0) {
+      move_slots[s++] = {static_cast<PKMN::Data::Move>(i + 1), 1};
+    }
+  }
+  return move_slots;
 }
 
 consteval auto dim_labels() {
@@ -95,7 +118,7 @@ static_assert(get_status_index(PKMN::Data::Status::Rest1, 3) == 13);
 // counter
 constexpr auto n_dim = 14;
 
-float *write(const auto status, const auto sleep, float *t) {
+constexpr float *write(const auto status, const auto sleep, float *t) {
   if (static_cast<bool>(status)) {
     t[get_status_index(status, sleep)] = 1;
   }
@@ -111,9 +134,12 @@ consteval auto dim_labels() {
 
 namespace Types {
 constexpr auto n_dim = 15;
-float *write(const auto types, float *t) {
-  t[types % 16] = 1;
-  t[types / 16] = 1;
+constexpr float *write(const uint8_t types, float *t) {
+  const uint8_t type_1 = types % 16;
+  const uint8_t type_2 = types % 16;
+  assert(type_1 < n_dim && type_2 < n_dim);
+  t[type_1] = 1;
+  t[type_2] = 1;
   return t + n_dim;
 }
 } // namespace Types
@@ -122,7 +148,7 @@ namespace Pokemon {
 constexpr auto n_dim =
     Stats::n_dim + MoveSlots::n_dim + Status::n_dim + Types::n_dim;
 
-void write(const PKMN::Pokemon &pokemon, auto sleep, float *t) {
+constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *t) {
   t = Stats::write(pokemon.stats, t);
   t = MoveSlots::write(pokemon.moves, t);
   t = Status::write(pokemon.status, sleep, t);
@@ -164,7 +190,7 @@ namespace Boosts {
 constexpr auto n_dim = 6;
 constexpr float scale = 1 / 4.0;
 constexpr float scale_acceva = 1 / 3.0;
-float *write(const PKMN::ActivePokemon &active, float *t) {
+constexpr float *write(const PKMN::ActivePokemon &active, float *t) {
   const auto get_multiplier = [](auto index) -> float {
     const auto x = PKMN::Data::boosts[index + 6];
     return (float)x[0] / x[1];
@@ -187,7 +213,7 @@ consteval auto dim_labels() {
 
 namespace Volatiles {
 constexpr auto n_dim = 19;
-float *write(const PKMN::Volatiles &vol, float *t) {
+constexpr float *write(const PKMN::Volatiles &vol, float *t) {
 
   constexpr float chansey_sub = 706 / 4 + 1;
 
@@ -235,7 +261,7 @@ constexpr auto n_attacking = 3; // bide = thrashing
 constexpr auto n_binding = 4;
 constexpr auto n_dim = n_confusion + n_disable + n_attacking + n_binding;
 
-float *write(const PKMN::Duration &duration, float *t) {
+constexpr float *write(const PKMN::Duration &duration, float *t) {
   if (const auto confusion = duration.confusion()) {
     assert(confusion <= n_confusion);
     t[confusion - 1] = 1;
@@ -298,8 +324,9 @@ constexpr auto n_dim = Stats::n_dim + Types::n_dim + Boosts::n_dim +
                        Volatiles::n_dim + MoveSlots::n_dim + Duration::n_dim +
                        Pokemon::n_dim;
 
-void write(const PKMN::Pokemon &pokemon, const PKMN::ActivePokemon &active,
-           const PKMN::Duration &duration, float *t) {
+constexpr void write(const PKMN::Pokemon &pokemon,
+                     const PKMN::ActivePokemon &active,
+                     const PKMN::Duration &duration, float *t) {
   t = Stats::write(active.stats, t);
   t = Types::write(active.types, t);
   t = Boosts::write(active, t);
@@ -363,6 +390,17 @@ consteval auto get_dim_labels() {
 constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Active
+
+// TODO comptime checks that encoding is working as intended
+consteval bool check() {
+  const auto &teams = Teams::ou_sample_teams;
+  auto battle_0 = PKMN::battle(teams[0], teams[1]);
+  auto options = PKMN::options();
+  // const auto _ = PKMN::update(battle_0, 0, 0, options);
+  return (PKMN::cast(battle_0).turn == 0);
+}
+
+static_assert(check());
 
 } // namespace Battle
 

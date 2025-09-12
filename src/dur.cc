@@ -1,19 +1,10 @@
-#include <libpkmn/data/strings.h>
 #include <libpkmn/pkmn.h>
 #include <libpkmn/strings.h>
 #include <teams/ou-sample-teams.h>
-#include <util/debug-log.h>
-#include <util/parse.h>
-#include <util/policy.h>
 #include <util/random.h>
-#include <util/search.h>
 
-#include <csignal>
 #include <iostream>
-#include <limits>
 #include <map>
-#include <type_traits>
-#include <vector>
 
 namespace Util {
 
@@ -47,7 +38,7 @@ pkmn_result rollout_and_exec(auto &device, pkmn_gen1_battle &battle,
 using Key = std::pair<int, int>;
 std::map<Key, size_t> map{};
 
-std::array<std::array<PKMN::Set, 6>, 16> teams = Teams::ou_sample_teams;
+auto teams = Teams::ou_sample_teams;
 pkmn_gen1_battle old_battle;
 pkmn_gen1_battle_options old_options;
 
@@ -57,13 +48,13 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
       *pkmn_gen1_battle_options_chance_durations(&options);
 
   for (auto s = 0; s < 2; ++s) {
-    const auto &vol = battle.side(s).active().volatiles();
+    const auto &vol = battle.sides[s].active.volatiles;
     const auto &duration = PKMN::view(durations).get(s);
 
-    if (vol.disable_move() != 0) {
+    if (vol.confusion() != 0) {
       // This is all you have to change besides setting the first move in main
-      const auto set = static_cast<int>(vol.disable_left());
-      const auto seen = static_cast<int>(duration.disable());
+      const auto set = static_cast<int>(vol.confusion_left());
+      const auto seen = static_cast<int>(duration.confusion());
       std::pair<int, int> key{seen, set};
       map[key] += 1;
 
@@ -71,9 +62,9 @@ const auto F = [&map, &old_battle, &old_options](auto b, auto options) {
         const pkmn_gen1_chance_durations &old_durations =
             *pkmn_gen1_battle_options_chance_durations(&old_options);
         std::cout << "START" << std::endl;
-        std::cout << Strings::battle_data_to_string(old_battle, old_durations);
+        std::cout << PKMN::battle_data_to_string(old_battle, old_durations);
         std::cout << "________" << std::endl;
-        std::cout << Strings::battle_data_to_string(b, durations);
+        std::cout << PKMN::battle_data_to_string(b, durations);
         std::cout << "END" << std::endl;
       }
     }
@@ -92,7 +83,8 @@ int main(int argc, char **argv) {
 
   for (auto &team : teams) {
     for (auto &set : team) {
-      set.moves[0] = Data::Move::Disable;
+      using enum PKMN::Data::Move;
+      set.moves[0] = ConfuseRay;
     }
   }
 
@@ -117,15 +109,13 @@ int main(int argc, char **argv) {
   }
 
   for (const auto [key, value] : total) {
-    std::cout << key << std::endl;
-    float sum = 0;
+    std::cout << "Duration: " << key << std::endl;
+    std::cout << "Hidden:   ";
+    const auto sum = std::accumulate(value.begin(), value.end(), 0);
     for (auto i : value) {
-      // std::cout << i << ' ';
-      sum += i;
+      std::cout << i / (float)sum << ' ';
     }
-    for (auto i : value) {
-      std::cout << i / sum << ' ';
-    }
+    std::cout << " Total: " << sum;
     std::cout << std::endl;
   }
 
