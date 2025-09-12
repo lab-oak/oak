@@ -8,3 +8,4 @@ libpkmn-showdown.a
 *.pyc
 build-network
 battle-network
+args

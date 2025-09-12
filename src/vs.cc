@@ -61,12 +61,13 @@ RuntimePolicy::Options p2_policy_options{};
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
 
-  auto build_network = NN::Build::Network{};
-  std::ifstream file{std::filesystem::path{"./4/build-network"}};
-  const bool success = build_network.read_parameters(file);
-  if (!success) {
-    throw std::runtime_error{"Can't read build network."};
-  }
+  // 1v1
+  // auto build_network = NN::Build::Network{};
+  // std::ifstream file{std::filesystem::path{"./4/build-network"}};
+  // const bool success = build_network.read_parameters(file);
+  // if (!success) {
+  //   throw std::runtime_error{"Can't read build network."};
+  // }
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) -> void {
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
@@ -154,19 +155,20 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    // const auto p1 = Teams::ou_sample_teams[device.random_int(
-    //     Teams::ou_sample_teams.size())];
-    // const auto p2 = Teams::ou_sample_teams[device.random_int(
-    //     Teams::ou_sample_teams.size())];
+    const auto p1 = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
+    const auto p2 = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
 
-    std::vector<PKMN::Set> base{};
-    base.emplace_back();
-    const auto traj1 =
-        TeamBuilding::rollout_build_network(device, build_network, base);
-    const auto traj2 =
-        TeamBuilding::rollout_build_network(device, build_network, base);
-    const auto p1 = traj1.terminal;
-    const auto p2 = traj2.terminal;
+    // 1v1
+    // std::vector<PKMN::Set> base{};
+    // base.emplace_back();
+    // const auto traj1 =
+    //     TeamBuilding::rollout_build_network(device, build_network, base);
+    // const auto traj2 =
+    //     TeamBuilding::rollout_build_network(device, build_network, base);
+    // const auto p1 = traj1.terminal;
+    // const auto p2 = traj2.terminal;
 
     play(p1, p2);
     play(p2, p1);
