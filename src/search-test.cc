@@ -17,7 +17,6 @@ struct Test {
   float error = small;
   RuntimeSearch::Agent agent = default_agent;
 
-  // Call after aggregate initialization
   void operator()() {
     auto battle_data = parse_input(position, std::random_device{}());
     auto options = PKMN::options();

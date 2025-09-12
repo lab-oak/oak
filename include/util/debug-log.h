@@ -1,15 +1,14 @@
 #pragma once
 
+#include <libpkmn/layout.h>
+#include <libpkmn/pkmn.h>
+
 #include <array>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
-
-#include <pkmn.h>
-
-#include <libpkmn/layout.h>
 
 template <size_t log_size = 64> struct DebugLog {
   static constexpr auto header_size = 8 + PKMN_GEN1_BATTLE_SIZE;
@@ -30,17 +29,18 @@ template <size_t log_size = 64> struct DebugLog {
     std::memcpy(header.data() + 8, battle.bytes, PKMN_GEN1_BATTLE_SIZE);
   }
 
-  pkmn_result update(pkmn_gen1_battle &battle, const pkmn_choice c1,
-                     const pkmn_choice c2, pkmn_gen1_battle_options &options) {
+  pkmn_result update(auto &battle, const auto c1, const auto c2,
+                     auto &options) {
 
     frames.emplace_back();
     auto *frame_data = frames.back().data();
     pkmn_gen1_log_options log_options{frame_data, log_size};
     pkmn_gen1_battle_options_set(&options, &log_options, nullptr, nullptr);
-    const auto result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
+    const auto result = PKMN::update(battle, c1, c2, options);
 
     frame_data += log_size;
-    std::memcpy(frame_data, battle.bytes, PKMN_GEN1_BATTLE_SIZE);
+    std::memcpy(frame_data, std::bit_cast<pkmn_gen1_battle *>(&battle)->bytes,
+                PKMN_GEN1_BATTLE_SIZE);
     frame_data += PKMN_GEN1_BATTLE_SIZE;
     frame_data[0] = result;
     frame_data[1] = c1;
