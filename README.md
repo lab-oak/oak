@@ -18,12 +18,9 @@ These programs were all built from a shared header library that is easy to exten
 
 * correct, high-performance mcts implementations
 
-* simple neural network for value and policy inference
+* simple neural networks for value/policy inference and team generation
 
-* compressed training data formats for battling and team generation. These are independent of the kind of model being trained
-
-* highly compressed disk formats for battle and build network training
-the programs can be found by running them with `--help`.
+* compressed training data formats for battling and team generation.
 
 # Building
 

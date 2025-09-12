@@ -1,80 +1,70 @@
-# Stockfish for RBY
+Oak is a high performance software toolkit principally for training battle and team-building neural networks in RBY.
 
-This project deserves some context. It would be nice to first describe, as quickly as I can, the state of the art of computer search in two different games.
+The scope of the library and programs is large in scope. It aims to catch up Pokemon AI with developments that have been very successful in Chess.
 
-## Chess
+# Context
 
-Basically every innovation in computer play has been made with chess in mind. 
-AlphaBeta/Monte Carlo Tree Search (MCTS) were developed and optimized specifically to attack this game, and many other techniques and wisdoms were made too.
+The central fact in any AI development is that Pokemon is an imperfect information game. In this regime the direct analog of tree search is called Counterfactual Regret Minimization. The reality is that CRM is basically, completely infeasible. It entails solving the entire game tree and so it's only been applied to small variants of Poker; RBY OU is way too large. Modifications to the algorithm that make it work for large games (e.g. Rebel/Other are enormously complex and expensive.  
 
-By the late 90s computer engines were unquestionaly stronger than the best players. This was achieved by writing superfast AlphaBeta implementations and finely tuning a simple value estimation function.
+This is not fatal to our effort to create superhuman agents. It just means that a provable, out-of-the-box solution is not available.
 
-Chess and AB are a match made in heaven, and this is really the core reason for success. On the contrary, the value estimation was a crude hueristic that basically added up piece values and various stretegic scores. This approach was dominant but stagnant and it was understood that while you could never beat a computer, they also did not understand quiet, strategic positions.
+The simplest way to attack imperfect information is actually the most reliably effective in various imperfect info games. *Information Set* MCTS starts with 'determinization', where we fill-in the hidden information. Then we just perform a vanilla monte-carlo tree search on this now perfect info subgame. This two step process is done multiple times in parallel, and the value and policies from the many searches are combined.
 
-AlphaZero and subsequenct neural network methods overcame this plataeu.
-They used a slower but more sophisticated evaluation paired with a different kind of search algorithm. These networks were also trained with reinforment learning and later manual iteration; they were not polluted by human biases. 
+With this approach, we claim we can split the problem into two independent subproblems: accurately predicting the opponents team and strong tree search on a *simultaneous move* and *stochastic*, but still perfect info game. 
 
-The top engine today is a version of Stockfish that combines the these two approaches. AlphaBeta has returned but now powerered by a small neural network that can perform millions of evaluations per second on even a phone's processor.
+This is the approach that this project supports, with a (currently) sole focus on the latter problem.
+
+# Features
+
+Now that the game is perfect info, we can take advantage of the scalable and general purpose approaches that worked for Chess and Go and various other games. Below is what Oak provides in that respect.
+
+* Fast Simulator
+
+Most projects use Pokemon-Showdown as the base simulator since it is open source and the de facto implementation of the game. Unfortunately they are doomed from the start since PS is orders of magnitude too slow for anything serious.
+
+This project uses `libpkmn` which 1000x faster than PS and also matches it's behaviour exactly. Depending on the eval, we are able to perform a million mcts iterations in only a few seconds.
+
+Oak implements 
+
+* Proper Search
+
+It is straight-forward to modify MCTS for Pokemon. Just make each node store data for both players and the vanilla selection and update phases are executed jointly. This can be empricially effective but it is unsound. It does not produce low exploitability strategies no matter the number of iterations that are performed.
+
+It is also known there is a fix. This project implements Exp3, which is an 'adversarial' algorithm unlike the typical UCB. These algorithms provably converge to equilibrium. In any case, we also provide both algorithms, together with variants that also take advantage of a neural network's policy inference.
+
+* Complex Eval
+
+It is very easy to create a decent value estimator for chess: an eval that simply totals the piece values for both players will beat most amateurs. If invoked millions of times in a search tree, it will very effectively avoid blunders and be very good at tactics. The first chess superhuman engines did basically this, they evaluated positions using a weighted sum of material and strategic scores.
+
+These engines were surpassed by neural networks which are capable of much more complex estimation and are not polluted by human bias. At first these networks were large enough to require a GPU but eventually it was discovered that smaller, faster networks running on CPU were even more effective.
+
+Oak implements small battle networks that perform hundreds of thousands of inferences per second. There is no 'best practice' for Pokemon NNs so we have what is essentially a MLP that takes a certain one-hot tabular encoding of the battle as input and outputs a number [0, 1] for the value estimate. It has an optional 'policy head' for move prediction.
+
+* Fast Data Generation
 
 
-## Pokemon
+* Extensible Data formats 
 
-The state of computer play in Pokemon is disheartening.
+* Scripting Support
 
+# Results
 
+My compute is limited to an old laptop and I have little enthusiasm for *training* networks. For this reason I don't mind acknowleging that my successes with this program have been modest.
 
-Pokemon doesnt have many examples what could be called an engine. The majority of projects don't use search at all; They give you a probabiliy distribution over your legal moves. This is a fundamentally weaker tool than a search engine that can run indefinitely. They have been limited to "top X on Y ladder".
+* Battling
 
-Pokemon is just much more difficult than Chess. It doesn't have a love like Chess and AB's. In fact, alpha beta is fatally flawed on simultaneious move games; It's worst case performance is a disaster. This means thats Monte Carlo Tree Search (MCTS) is the preferred approach. 
+The basic idea to train a network is to iterate: start with some baseline agent (in this case Monte Carlo eval) and use self-play to generate training data. Use the data to train a network stronger then that agent, and repeat.
 
-The fact that pokemon is simultaneous move is horrible for many other reasons. For starters it basically freakin squares the branching factor of the game! It also spoils the theoretical results that might power the newer approaches like Monte Carlo Tree Search (MCTS).
+With the default params I was consitently able to train a network that outperformed the monte-carlo agent that generated the data. This is not ground breaking because monte carlo eval is quite weak, but it also should be mentioned that, in my testing, monte carlo beats FoulPlay's and my own hand crafted eval.
 
-Getting data for a strong neural network is very hard and expensive. For context more than a *billion* expert examples may be used when training the tiny network that stockfish relies on. There aren't enough public high ladder games going on, for starters.
+* Building
 
-Pokemon-Showdown, the first choice of anyone who has ever attempted this problem, is a trap. Its architecture is matter of factly too slow. Its so slow that it wouldn't even matter if all the other problems went away. This means that computer generated data is very expensive too. Coders who realize this and continue on write their own simulators, which introduces errors from differences in the simulators' mechanics.
+First, I should mention that the team building aspect is not the focus and its potential is limited. This is because it generates teams using a simple policy rollout, no search is used. 
 
-Recently however some hope has appeared.
+# Intentions
 
-There exists a battle simulator that is so fast that it is basically perfect. Like it probably won't ever be outdone or seriously improved, and it crucially also matches showdown exactly. The catch is that it currently only supporst gen 1... which honestly was kinda 😬 at first but now I embrace it. The simplest generation should be targeted first. But seriously if nothing else comes from this post let it be more challengers using Libpkmn instead of Showdown.
+The ideas and methods here were tested and proven by really by the two historically strongest engines.
 
-The theoretical problems have been solved too. Slight changes to the usual MCTS approaches restore the 'guarantees'. It remains to be seen if the modified approaches will be as effective.
+Stockfish and LeelaChess are large, public efforts. The code is developed my a small team of programmers. Data is generated and networks are trained and evalated by many volunteers.
 
-In light of this, there is a path forward to real progress.
-
-## Plan of Attack
-
-I won't waste time explaining how how crucial information management is in Pokemon. Its yet another thing that makes this problem so difficult. I will though try to convince you that its not that bad, and the first step to dealing with it is to ignore it.
-
-Naturally, the proofs which say perfect play is possible if you just run the search long enough require that the game is perfect information. In pokemon, this just means both players have `!showteam'd`.
-
-This is not a ridiculous assumption. First of all, hidden information can only shrink over the course of the game. In some games it shrinks fast since good players can make educated guesses about unrevealed moves and items. The only other unknowns are the EVs, which are accurately deduced by damage rolls (this is actually one thing some projects do very well). Also RBY doesn't have EVs or items, only species and moves are hidden.
-
-The most generically successful approach for dealing with imperfect info games is Information-Set MCTS. The game state is determinized (i.e. we guess the unrevealed species/moves of the opponent) and then run a perfect info search from there. Typically the state is determinized many times and searches are run in parallel. The 
-
-This is also 
-
-There is at least one promising starter, FoulPlay, which has topped OU/Randbats ladders. It is worthy of praise and emulation but I have to also admit that I don't think there is a case that it is competitive with the best players. It also uses an extrememly simple evaluation function.
-
-# Introducing Oak
-
-I hope the previous section was enough to explain how whatever. I hope this section can convince you that 
-
-Oak is a code library and a collection of programs that tries to address all the problems I outlined.
-
-- Everything is fast. The base simulator 
-
-- Data generation and training are easy to do and customize
-
-- Dataa sharing is easy.
-
-The project is avaiable here as source code.
-
-https://github.com/lab-oak/oak/
-
-The project is very easy to build on Linux systems with only the standard development tools, `CMake` and a Zig compiler as requirements. Windows is not currently supported but it *should* be simple to get working.
-
-The code repository has a thorough tutorial that covers training battle and team building networks from scratch. It is even done on the 1v1 case so that normal conputers can generate millions of training examples in a matter of hours.
-
-The code base and its design choices are documented and easy to modify. Novice programmers can tweak the search algorithm, neural network architecure, etc without hassle.
-
-Thank you for reading. I will check this thread for a little while to answer questions. Assistance with installation/operation/contribution will be offered on the [issues](https://github.com/lab-oak/oak/issues) page.
+I would like to see something like this for Pokemon. I believe Pokemon is a very hard game to attack and collaboration and organization are necessary.

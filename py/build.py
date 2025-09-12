@@ -93,7 +93,7 @@ class PPO:
 
 def process_targets(
     network: torch_oak.BuildNetwork,
-    traj: torch_oak.BuildTrajectoryTorch,
+    traj: torch_oak.BuildTrajectory,
     ppo: PPO,
     value_weight=1,
 ):
@@ -245,7 +245,7 @@ def main():
 
             T = trajectories.end.max()
             # here is where we trunacte the episode length for 1v1, etc
-            traj = torch_oak.BuildTrajectoryTorch(trajectories, n=T)
+            traj = torch_oak.BuildTrajectory(trajectories, n=T)
 
             surr, returns, values, logp = process_targets(
                 network, traj, ppo, args.value_weight

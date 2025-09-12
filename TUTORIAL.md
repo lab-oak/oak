@@ -194,7 +194,8 @@ This script was writting for this tutorial. Run it with the various args to view
 This program uses self-play to play-out battles. Each turn will have value and policy targets associated with it. The program accepts many keyword arguments and it would take too long to explain them here. For this tutorial, will run the program with settings that allow millions of battle and team generation samples to be created within an hour on a consumer machine.
 
 ```
-./build/generate --threads=8 --max-pokemon=1 --modify-team-prob=1 --pokemon-delete-prob=1
+./build/generate --threads=8 --max-pokemon=1 --team-modify-prob=1 --pokemon-delete-prob=1
+--
 ```
 
 ### Arguments Explained

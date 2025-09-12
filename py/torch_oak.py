@@ -9,7 +9,7 @@ import struct
 import torch
 
 
-class BuildTrajectoryTorch:
+class BuildTrajectory:
     def __init__(self, traj: py_oak.BuildTrajectory, n=None, device="cpu"):
         if n is None:
             n = 31

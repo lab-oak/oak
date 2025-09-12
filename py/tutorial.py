@@ -1,5 +1,4 @@
 import sys
-import os
 
 import py_oak
 import numpy as np

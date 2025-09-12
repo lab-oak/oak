@@ -1,3 +1,5 @@
+# Warning: Incomplete/WIP
+
 # libpkmn/
 
 The `libpkmn` C API is too barebones for a project of this scale. We write a C++ wrapper for the C bindings that basically mirrors the native Zig library as much as possible.

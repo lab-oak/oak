@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(oak VERSION 0.0.3)
+project(oak VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 23)
 

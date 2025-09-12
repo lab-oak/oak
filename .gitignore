@@ -2,7 +2,6 @@
 libpkmn-showdown.a
 *.battle
 *.build
-*/build-network
 */args
 *.log
 *.net
