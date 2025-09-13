@@ -18,7 +18,9 @@ struct Network {
                      true, false>
       policy_net;
 
-  EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, 1, true, false> value_net;
+  EmbeddingNetDeeper<T::n_dim, NN::Build::value_hidden_dim, 1, true, true,
+                     false>
+      value_net;
 
   void initialize(auto &device) {
     policy_net.initialize(device);
