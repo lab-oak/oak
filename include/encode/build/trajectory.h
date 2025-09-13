@@ -141,35 +141,32 @@ struct TrajectoryInput {
   int64_t *start;
   int64_t *end;
 
+  template <typename F = Format::OU> struct Slot {
+    int species;
+    std::array<Move, F::max_move_pool_size> move_pool;
+    int n_moves;
+    size_t move_pool_size;
+
+    Slot() {};
+
+    Slot(const uint8_t species)
+        : species{species}, n_moves{}, max_moves{F::move_pool_size(species)},
+          move_pool{F::move_pool(species)}, move_pool_size(max_moves) {}
+
+    bool add_move(const auto m) {
+      const auto move_pool_end =
+          std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
+                      static_cast<Move>(m));
+      if (move_pool_end != (move_pool.begin() + move_pool_size)) {
+        --move_pool_size;
+        ++n_moves;
+      }
+    }
+
+    bool is_complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
+  };
+
   template <typename F = Format::OU> struct WriteCache {
-
-    struct Slot {
-      int species;
-      std::array<Move, F::max_move_pool_size> move_pool;
-      int n_moves;
-      size_t move_pool_size;
-
-      Slot() {};
-
-      Slot(const uint8_t species)
-          : species{species}, n_moves{}, max_moves{F::move_pool_size(species)},
-            move_pool{F::move_pool(species)}, move_pool_size(max_moves) {}
-
-      bool add_move(const auto m) {
-        const auto move_pool_end =
-            std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
-                        static_cast<Move>(m));
-        if (move_pool_end != (move_pool.begin() + move_pool_size)) {
-          --move_pool_size;
-          ++n_moves;
-        }
-      }
-
-      bool is_complete() const {
-        return (n_moves >= 4) || (move_pool_size == 0);
-      }
-    };
-
     WriteCache() : slots{}, size{} {
       available_species = {F::legal_species.begin(), F::legal_species.end()};
     }
@@ -216,7 +213,8 @@ struct TrajectoryInput {
     auto start = -1;
     auto last_species = 0;
     auto swap = 0;
-    auto i = 0 for (; i < 31; ++i) {
+    auto i = 0;
+    for (; i < 31; ++i) {
       const auto &u = traj.updates[i];
       if ((start >= 0) && (u.p == 0)) {
         ++i;
@@ -227,21 +225,43 @@ struct TrajectoryInput {
       }
       const auto [s, m] = Tensorizer::species_move_list(u.action);
       if (m == 0) {
-        cache.add_species(s);
+        if (!cache.add_species(s)) {
+          swap = i;
+        } else {
+          last_species = i;
+        }
       }
     }
     auto end = i;
 
-    const auto write_invalid = [this](){
-      // TODO check this
+    const auto write_invalid = [this]() {
       *action++ = -1;
       std::copy_n(mask, mask += Tensorizer<F>::max_actions, -1);
       *policy++ = 0;
-      *
+    };
+
+    const auto write_valid_species = [this, &cache](const auto &u) {};
+    const auto write_valid_moves = [this, &cache](const auto &u) {};
+    const auto write_swap = []() {};
+
+    i = 0;
+    for (; i < start; ++i) {
+      write_invalid();
     }
-
-    static thread_local std::array<int64_t, Tensorizer<F>::max_actions> _mask;
-
+    for (; i < last_species; ++i) {
+      write_valid_species();
+      write_valid_moves();
+    }
+    for (; i < swap; ++i) {
+      write_moves();
+    }
+    for (; i < end; ++i) {
+      write_swap();
+    }
+    for (; i < 31; ++i) {
+      write_invalid();
+    }
+    return;
   }
 };
 
