@@ -6,7 +6,7 @@ import numpy as np
 
 def read_build_trajectories():
 
-    files = py_oak.find_data_files(".", ext=".build")
+    files = py_oak.find_data_files(".", ext=".build")[:10]
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
@@ -119,13 +119,14 @@ def create_set():
         def sample_masked_logits(logits, mask):
             masked_logits = logits.masked_fill(mask == 0, float("-inf"))
             probs = torch.softmax(masked_logits, dim=-1)
-            sampled = torch.multinomial(probs, 1)
-            return sampled, int(probs[sampled].item() * 10000) / 100
+            probs_p = torch.softmax(masked_logits * 1, dim=-1)
+            sampled = torch.multinomial(probs_p, 1)
+            return sampled, int(probs[sampled].item() * 10000) / 100, int(probs_p[sampled].item() * 10000) / 100
 
         logits, _ = network.forward(team)
-        index, p = sample_masked_logits(logits, mask)
+        index, p, q = sample_masked_logits(logits, mask)
         species, _ = py_oak.species_move_list[index]
-        print(f"{py_oak.species_names[species]} : {p}%")
+        print(f"{py_oak.species_names[species]} : {p}% ~ {q}%")
         team[index] = 1
 
         # reset mask and fill with legal moves
@@ -138,9 +139,9 @@ def create_set():
                 mask[index] = 1
 
         for _ in range(min(4, n_moves)):
-            index, p = sample_masked_logits(network.forward(team)[0], mask)
+            index, p, q = sample_masked_logits(network.forward(team)[0], mask)
             _, move = py_oak.species_move_list[index]
-            print(f"    {py_oak.move_names[move]} : {p}%")
+            print(f"    {py_oak.move_names[move]} : {p}% ~ {q}%")
             team[index] = 1
             mask[index] = 0
 

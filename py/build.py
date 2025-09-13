@@ -206,7 +206,7 @@ def main():
         import datetime
 
         now = datetime.datetime.now()
-        working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
+        working_dir = now.strftime("%Y-%m-%d-%H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
 
     network = torch_oak.BuildNetwork()
@@ -215,7 +215,7 @@ def main():
             network.read_parameters(f)
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".build")
-    print("Saving base network in working dir.")
+    print(f"Saving base network in {working_dir}.")
     with open(os.path.join(working_dir, "build-network"), "wb") as f:
         network.write_parameters(f)
 

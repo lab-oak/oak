@@ -195,11 +195,11 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--print-interval=")) {
       print_interval_sec = std::stoll(arg.substr(17));
     } else if (arg.starts_with("--search-time=")) {
-      t1_agent.search_time = arg.substr(14);
+      agent.search_time = arg.substr(14);
     } else if (arg.starts_with("--bandit-name=")) {
-      t1_agent.bandit_name = arg.substr(14);
+      agent.bandit_name = arg.substr(14);
     } else if (arg.starts_with("--battle-network-path=")) {
-      t1_agent.network_path = arg.substr(22);
+      agent.network_path = arg.substr(22);
     } else if (arg.starts_with("--policy-mode=")) {
       policy_options.mode = arg[14];
     } else if (arg.starts_with("--policy-temp=")) {
