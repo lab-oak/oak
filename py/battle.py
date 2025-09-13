@@ -203,7 +203,7 @@ def main():
         import datetime
 
         now = datetime.datetime.now()
-        working_dir = now.strftime("%Y-%m-%d %H:%M:%S")
+        working_dir = now.strftime("battle-%Y-%m-%d %H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
 
     network = torch_oak.BattleNetwork()
