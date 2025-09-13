@@ -14,8 +14,10 @@ struct Network {
 
   using T = Encode::Build::Tensorizer<Format::OU>;
 
-  EmbeddingNet<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true, false>
+  EmbeddingNetDeeper<T::n_dim, NN::Build::policy_hidden_dim, T::n_dim, true,
+                     true, false>
       policy_net;
+
   EmbeddingNet<T::n_dim, NN::Build::value_hidden_dim, 1, true, false> value_net;
 
   void initialize(auto &device) {
