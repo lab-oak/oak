@@ -355,7 +355,39 @@ std::atomic<size_t> update_with_node_counter{};
 // teams
 std::vector<std::vector<PKMN::Set>> teams;
 MatchupMatrix matchup_matrix;
+std::vector<size_t> game_lengths;
+std::atomic<size_t> thread_id{};
 }; // namespace RuntimeData
+
+// gengar mirrors going to turn 999
+// not sharp detection, confuse ray can technically end the game. leech too but
+// ghosts don't get it so idk, psywave also?
+bool endless_battle_check(const auto &p1, const auto &p2) {
+  using namespace PKMN::Data;
+  const auto is_ghost = [](const auto &set) {
+    return (set.species == PKMN::Data::Species::Gastly) ||
+           (set.species == PKMN::Data::Species::Haunter) ||
+           (set.species == PKMN::Data::Species::Gengar);
+  };
+  const auto cant_hit_ghosts = [](const auto &set) {
+    return std::all_of(set.moves.begin(), set.moves.end(), [](const auto move) {
+      const auto type = PKMN::Data::move_data(move).type;
+      const auto bp = PKMN::Data::move_data(move).bp;
+
+      return (type == PKMN::Data::Type::Normal) ||
+             (type == PKMN::Data::Type::Fighting) || (bp == 0);
+    });
+  };
+  // slow in theory but probably doesn't matter
+  return std::all_of(
+      p1.begin(), p1.end(), [is_ghost, cant_hit_ghosts, &p2](const auto &set1) {
+        return std::all_of(p2.begin(), p2.end(),
+                    [is_ghost, cant_hit_ghosts, &set1](const auto &set2) {
+                      return is_ghost(set1) && cant_hit_ghosts(set2) &&
+                          is_ghost(set2) && cant_hit_ghosts(set1);
+                    });
+      });
+}
 
 auto generate_team(mt19937 &device, const auto index)
     -> Train::Build::Trajectory {
@@ -398,7 +430,7 @@ auto generate_team(mt19937 &device, const auto index)
       if (build_network.read_parameters(file)) {
         break;
       } else {
-        if (i == (tries - 1)){
+        if (i == (tries - 1)) {
           throw std::runtime_error{"cant read build net params"};
         }
         sleep(1);
@@ -414,6 +446,9 @@ auto generate_team(mt19937 &device, const auto index)
 
 void generate(uint64_t seed) {
   mt19937 device{seed};
+  size_t id = RuntimeData::thread_id.fetch_add(1) % RuntimeOptions::threads;
+  size_t &game_length = RuntimeData::game_lengths[id];
+
   const size_t training_frames_target_size = RuntimeOptions::buffer_size_mb
                                              << 20;
   const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
@@ -488,6 +523,10 @@ void generate(uint64_t seed) {
     auto p2_build_traj = generate_team(device, p2_team_index);
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
+    if (endless_battle_check(p1_team, p2_team)) {
+      std::cout << "EBC check failed. Continuing." << std::endl;
+      continue;
+    }
     const bool p1_built = (p1_build_traj.updates.size() > 0);
     const bool p2_built = (p2_build_traj.updates.size() > 0);
     float p1_matchup = .5;
@@ -518,7 +557,7 @@ void generate(uint64_t seed) {
       agent.network.value().fill_cache(battle_data.battle);
     }
 
-    size_t updates = 0;
+    game_length = 0;
     try {
 
       while (!pkmn_result_type(battle_data.result)) {
@@ -538,8 +577,8 @@ void generate(uint64_t seed) {
                                           battle_data.durations));
 
         const auto output = RuntimeSearch::run(
-            battle_data, nodes, (updates == 0) ? t1_agent : agent);
-        if (updates == 0) {
+            battle_data, nodes, (game_length == 0) ? t1_agent : agent);
+        if (game_length == 0) {
           p1_matchup = output.empirical_value;
           p2_matchup = 1 - output.empirical_value;
           if (skip_battle) {
@@ -574,8 +613,8 @@ void generate(uint64_t seed) {
         }
         RuntimeData::update_counter.fetch_add(1);
 
-        ++updates;
-        print("update: " + std::to_string(updates));
+        ++game_length;
+        print("update: " + std::to_string(game_length));
       }
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
@@ -655,6 +694,12 @@ void print_thread_fn() {
 
     frames_done = frames_more;
     traj_done = traj_more;
+
+    std::cout << "Game Lengths: ";
+    for (const auto len : RuntimeData::game_lengths) {
+      std::cout << len << ' ';
+    }
+    std::cout << std::endl;
   }
 }
 
@@ -741,6 +786,9 @@ void setup() {
       build_network.write_parameters(stream);
     }
   }
+
+  // print
+  RuntimeData::game_lengths.resize(RuntimeOptions::threads);
 }
 
 void cleanup() {
