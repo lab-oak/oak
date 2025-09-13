@@ -147,20 +147,49 @@ class EmbeddingNet(nn.Module):
 
     def forward(self, x):
         return self.fc1(self.fc0(x))
+    
+class EmbeddingNetDeeper(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, clamp0=True, clamp1=True, clamp2=True):
+        super().__init__()
+        self.fc0 = Affine(in_dim, hidden_dim, clamp=clamp0)
+        self.fc1 = Affine(hidden_dim, hidden_dim, clamp=clamp1)
+        self.fc2 = Affine(hidden_dim, out_dim, clamp=clamp2)
+
+
+    def read_parameters(self, f):
+        self.fc0.read_parameters(f)
+        self.fc1.read_parameters(f)
+        self.fc2.read_parameters(f)
+
+    def write_parameters(self, f):
+        self.fc0.write_parameters(f)
+        self.fc1.write_parameters(f)
+        self.fc2.write_parameters(f)
+
+    def clamp_parameters(
+        self,
+    ):
+        self.fc0.clamp_parameters()
+        self.fc1.clamp_parameters()
+        self.fc2.clamp_parameters()
+
+    def forward(self, x):
+        return self.fc2(self.fc1(self.fc0(x)))
 
 
 class BuildNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.policy_net = EmbeddingNet(
+        self.policy_net = EmbeddingNetDeeper(
             py_oak.species_move_list_size,
             py_oak.build_policy_hidden_dim,
             py_oak.species_move_list_size,
             True,
+            True,
             False,
         )
-        self.value_net = EmbeddingNet(
-            py_oak.species_move_list_size, py_oak.build_value_hidden_dim, 1, True, False
+        self.value_net = EmbeddingNetDeeper(
+            py_oak.species_move_list_size, py_oak.build_value_hidden_dim, 1, True, True, False
         )
 
     def read_parameters(self, f):
