@@ -616,6 +616,11 @@ void generate(uint64_t seed) {
 
         ++game_length;
         print("update: " + std::to_string(game_length));
+        // TODO temporary
+        if ((game_length >= 100) && (game_length % 50 == 0)) {
+          std::cout << "Thread: " << id << " Update: " << game_length << std::endl;
+          std::cout << PKMN::to_string(battle_data) << std::endl;
+        }
       }
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;

@@ -19,6 +19,9 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
+using PKMN::Data::Move;
+using PKMN::Data::Species;
+
 #pragma pack(push, 1)
 template <typename F = Format::OU> struct CompressedTrajectory {
 
@@ -138,135 +141,107 @@ struct TrajectoryInput {
   int64_t *start;
   int64_t *end;
 
+  template <typename F = Format::OU> struct WriteCache {
+
+    struct Slot {
+      int species;
+      std::array<Move, F::max_move_pool_size> move_pool;
+      int n_moves;
+      size_t move_pool_size;
+
+      Slot() {};
+
+      Slot(const uint8_t species)
+          : species{species}, n_moves{}, max_moves{F::move_pool_size(species)},
+            move_pool{F::move_pool(species)}, move_pool_size(max_moves) {}
+
+      bool add_move(const auto m) {
+        const auto move_pool_end =
+            std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
+                        static_cast<Move>(m));
+        if (move_pool_end != (move_pool.begin() + move_pool_size)) {
+          --move_pool_size;
+          ++n_moves;
+        }
+      }
+
+      bool is_complete() const {
+        return (n_moves >= 4) || (move_pool_size == 0);
+      }
+    };
+
+    WriteCache() : slots{}, size{} {
+      available_species = {F::legal_species.begin(), F::legal_species.end()};
+    }
+
+    std::array<Slot, 6> slots;
+    int size;
+    std::vector<Species> available_species;
+
+    bool add_species(const auto s) {
+      const auto found =
+          std::find_if(slots.begin(), slots.end(),
+                       [s](const auto &slot) { return slots.species == s; });
+      if (found != slots.end()) {
+        return false;
+      }
+      const auto empty =
+          std::find_if(slots.begin(), slots.end(),
+                       [](const auto &slot) { return slot.species == 0; });
+      assert(empty != slots.end());
+      slots[size++] = Slot{s};
+      std::erase(available_species, static_cast<Species>(s));
+      return true;
+    }
+
+    void add_move(const auto s, const auto m) {
+      auto selected =
+          std::find_if(slots.begin(), slots.end(),
+                       [](const auto &slot) { return slot.species == s; });
+      assert(selected != slots.end());
+      *selected.add_move(m);
+    }
+
+    void write_moves() const {}
+
+    void write_species() const {}
+  };
+
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
 
-    struct MaskCache {
-      int species;
-      int max_moves;
-      std::remove_cvref_t<decltype(F::move_pool(0))> move_pool;
-      int n_moves;
-      size_t move_pool_size;
+    WriteCache<F> cache{};
 
-      MaskCache() = default;
-
-      MaskCache(const uint8_t species)
-          : species{species}, n_moves{}, max_moves{F::move_pool_size(species)},
-            move_pool{F::move_pool(species)}, move_pool_size(max_moves) {}
-    };
-
-    std::array<MaskCache, 6> caches{};
-    auto n_cache = 0;
-    std::vector<PKMN::Data::Species> available_species(F::legal_species.begin(),
-                                                       F::legal_species.end());
-    bool can_add_species = true;
-    bool done = false;
-    bool started = false;
-
-    for (auto i = 0; i < 31; ++i) {
-      const auto &update = traj.updates[i];
-
-      int64_t _action = -1;
-      std::array<int64_t, Tensorizer<F>::max_actions> _mask;
-      std::fill(_mask.begin(), _mask.end(), -1);
-      float _policy = 0;
-
-      if (update.probability > 0 && !started) {
-        started = true;
-        *start++ = i;
+    auto start = -1;
+    auto last_species = 0;
+    auto swap = 0;
+    auto i = 0 for (; i < 31; ++i) {
+      const auto &u = traj.updates[i];
+      if ((start >= 0) && (u.p == 0)) {
+        ++i;
+        break;
       }
-      if (started && update.probability == 0 && !done) {
-        done = true;
-        *end++ = i;
+      if ((u.p > 0) && (start < 0)) {
+        start = i;
       }
-
-      if (!done) {
-        _action = update.action;
-        if (started) {
-          // set info for writing
-          _policy = update.probability / den;
-          auto mask_index = 0;
-          for (const auto &cache : caches) {
-            if ((cache.species != 0) &&
-                (cache.n_moves < std::min(4, cache.max_moves))) {
-              std::transform(
-                  cache.move_pool.begin(),
-                  cache.move_pool.begin() + cache.move_pool_size,
-                  _mask.begin() + mask_index, [&cache](const auto move) {
-                    const auto action =
-                        Tensorizer<F>::species_move_table(cache.species, move);
-                    assert(action >= 0);
-                    return action;
-                  });
-              mask_index += cache.move_pool_size;
-            } else {
-            }
-          }
-          if (can_add_species) {
-            // copy avaiable mons to _mask
-            std::transform(available_species.begin(), available_species.end(),
-                           _mask.begin() + mask_index, [](const auto species) {
-                             return Tensorizer<F>::species_move_table(species,
-                                                                      0);
-                           });
-            mask_index += available_species.size();
-          }
-          // make the selected action the first one in the mask
-          std::swap(*_mask.begin(),
-                    *std::find(_mask.begin(), _mask.end(), update.action));
-        }
-
-        // update stats
-        const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
-        auto it =
-            std::find_if(caches.begin(), caches.begin() + n_cache,
-                         [s](const auto &cache) { return cache.species == s; });
-        if (m == 0) {
-          // add species
-          if (it == caches.begin() + n_cache) {
-            caches[n_cache++] = MaskCache{s};
-            std::erase(available_species, static_cast<PKMN::Data::Species>(s));
-          } else {
-            can_add_species = false;
-          }
-        } else {
-          // add move
-          assert(it != (caches.begin() + n_cache));
-          auto &cache = *it;
-          auto &move_pool = cache.move_pool;
-          auto x = std::find(move_pool.begin(),
-                             move_pool.begin() + cache.move_pool_size,
-                             static_cast<PKMN::Data::Move>(m));
-          if (x != (move_pool.begin() + cache.move_pool_size)) {
-            std::swap(move_pool[cache.move_pool_size - 1], *x);
-            --cache.move_pool_size;
-            ++cache.n_moves;
-          } else {
-            // we should not be able to add a move that is not present
-            assert(false);
-          }
-        }
+      const auto [s, m] = Tensorizer::species_move_list(u.action);
+      if (m == 0) {
+        cache.add_species(s);
       }
+    }
+    auto end = i;
 
-      // write info
-      *action++ = _action;
-      std::copy(_mask.begin(), _mask.end(), mask);
-      mask += Tensorizer<F>::max_actions;
-      *policy++ = _policy;
+    const auto write_invalid = [this](){
+      // TODO check this
+      *action++ = -1;
+      std::copy_n(mask, mask += Tensorizer<F>::max_actions, -1);
+      *policy++ = 0;
+      *
     }
 
-    if (!done) {
-      *end++ = 31;
-    }
+    static thread_local std::array<int64_t, Tensorizer<F>::max_actions> _mask;
 
-    *value++ = traj.header.value / den;
-    if (traj.header.score ==
-        std::numeric_limits<decltype(traj.header.score)>::max()) {
-      *score++ = -1;
-    } else {
-      *score++ = traj.header.score / 2.0;
-    }
   }
 };
 
