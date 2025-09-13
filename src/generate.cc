@@ -381,11 +381,12 @@ bool endless_battle_check(const auto &p1, const auto &p2) {
   // slow in theory but probably doesn't matter
   return std::all_of(
       p1.begin(), p1.end(), [is_ghost, cant_hit_ghosts, &p2](const auto &set1) {
-        return std::all_of(p2.begin(), p2.end(),
-                    [is_ghost, cant_hit_ghosts, &set1](const auto &set2) {
-                      return is_ghost(set1) && cant_hit_ghosts(set2) &&
-                          is_ghost(set2) && cant_hit_ghosts(set1);
-                    });
+        return std::all_of(
+            p2.begin(), p2.end(),
+            [is_ghost, cant_hit_ghosts, &set1](const auto &set2) {
+              return is_ghost(set1) && cant_hit_ghosts(set2) &&
+                     is_ghost(set2) && cant_hit_ghosts(set1);
+            });
       });
 }
 
