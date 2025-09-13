@@ -2,6 +2,7 @@ import os
 import torch
 import argparse
 import random
+import time
 
 import py_oak
 import torch_oak
@@ -55,6 +56,11 @@ parser.add_argument(
     type=int,
     default=0,
     help="Only use the n-most recent files for freshness",
+)
+parser.add_argument(
+    "--wait",
+    type=int,
+    default=0,
 )
 
 # Device
@@ -287,6 +293,7 @@ def main():
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step}: {ckpt_path}")
 
+        time.sleep(args.wait)
 
 if __name__ == "__main__":
     main()

@@ -392,10 +392,19 @@ auto generate_team(mt19937 &device, const auto index)
     print(TeamBuilding::team_string(team));
     // loading each time allows the network params to be updated at runtime
     NN::Build::Network build_network{};
-    std::ifstream file{RuntimeOptions::TeamGen::network_path};
-    if (!build_network.read_parameters(file)) {
-      throw std::runtime_error{"cant read build net params"};
+    constexpr auto tries = 3;
+    for (auto i = 0; i < tries; ++i) {
+      std::ifstream file{RuntimeOptions::TeamGen::network_path};
+      if (build_network.read_parameters(file)) {
+        break;
+      } else {
+        if (i == (tries - 1)){
+          throw std::runtime_error{"cant read build net params"};
+        }
+        sleep(1);
+      }
     }
+
     const auto trajectory =
         TeamBuilding::rollout_build_network(device, build_network, team);
     assert(trajectory.updates.size() > 0);
