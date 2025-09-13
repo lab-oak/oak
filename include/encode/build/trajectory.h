@@ -141,17 +141,19 @@ struct TrajectoryInput {
   int64_t *start;
   int64_t *end;
 
-  template <typename F = Format::OU> struct Slot {
-    int species;
+  // These two structs store what is *missing* so they can quickly write the
+  // actions masks
+  template <typename F = Format::OU> struct SetHelper {
+    uint species;
     std::array<Move, F::max_move_pool_size> move_pool;
-    int n_moves;
-    size_t move_pool_size;
+    uint n_moves;
+    uint move_pool_size;
 
-    Slot() {};
-
-    Slot(const uint8_t species)
-        : species{species}, n_moves{}, max_moves{F::move_pool_size(species)},
-          move_pool{F::move_pool(species)}, move_pool_size(max_moves) {}
+    SetHelper() {};
+    SetHelper(const uint8_t species)
+        : species{species}, n_moves{},
+          move_pool_size{F::move_pool_size(species)},
+          move_pool{F::move_pool(species)} {}
 
     bool add_move(const auto m) {
       const auto move_pool_end =
@@ -166,19 +168,19 @@ struct TrajectoryInput {
     bool is_complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
   };
 
-  template <typename F = Format::OU> struct WriteCache {
-    WriteCache() : slots{}, size{} {
+  template <typename F = Format::OU> struct TeamHelper {
+    TeamHelper() : slots{}, size{} {
       available_species = {F::legal_species.begin(), F::legal_species.end()};
     }
 
-    std::array<Slot, 6> slots;
+    std::array<SetHelper<F>, 6> slots;
     int size;
     std::vector<Species> available_species;
 
     bool add_species(const auto s) {
       const auto found =
           std::find_if(slots.begin(), slots.end(),
-                       [s](const auto &slot) { return slots.species == s; });
+                       [s](const auto &slot) { return slot.species == s; });
       if (found != slots.end()) {
         return false;
       }
@@ -186,17 +188,26 @@ struct TrajectoryInput {
           std::find_if(slots.begin(), slots.end(),
                        [](const auto &slot) { return slot.species == 0; });
       assert(empty != slots.end());
-      slots[size++] = Slot{s};
-      std::erase(available_species, static_cast<Species>(s));
+      slots[size++] = SetHelper<F>{s};
+      // std::erase(available_species, static_cast<Species>(s));
       return true;
     }
 
     void add_move(const auto s, const auto m) {
       auto selected =
           std::find_if(slots.begin(), slots.end(),
-                       [](const auto &slot) { return slot.species == s; });
+                       [s](const auto &slot) { return slot.species == s; });
       assert(selected != slots.end());
-      *selected.add_move(m);
+      (*selected).add_move(m);
+    }
+
+    void apply(const auto &update) {
+      const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
+      if (m == 0) {
+        std::erase(available_species, static_cast<Species>(s));
+      } else {
+        add_move(s, m);
+      }
     }
 
     void write_moves() const {}
@@ -208,7 +219,7 @@ struct TrajectoryInput {
   void write(const CompressedTrajectory<F> &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
 
-    WriteCache<F> cache{};
+    TeamHelper<F> helper{};
 
     auto start = -1;
     auto last_species = 0;
@@ -216,44 +227,79 @@ struct TrajectoryInput {
     auto i = 0;
     for (; i < 31; ++i) {
       const auto &u = traj.updates[i];
-      if ((start >= 0) && (u.p == 0)) {
+      if ((start >= 0) && (u.probability == 0)) {
         ++i;
         break;
       }
-      if ((u.p > 0) && (start < 0)) {
+      if ((u.probability > 0) && (start < 0)) {
         start = i;
       }
-      const auto [s, m] = Tensorizer::species_move_list(u.action);
+      const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
       if (m == 0) {
-        if (!cache.add_species(s)) {
-          swap = i;
+        if (!helper.add_species(s)) {
+          swap = i + 1;
         } else {
-          last_species = i;
+          last_species = i + 1;
         }
       }
     }
     auto end = i;
 
+    // std::cout << start << ' ' << last_species << ' ' << swap << ' ' << end <<
+    // std::endl; for (const auto &u : traj.updates) {
+    //   const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
+    //   std::cout << (int)s << ' ' << (int)m << std::endl;
+    // }
+
+    const auto step = [this]() {
+      action += 1;
+      policy += 1;
+      mask += Tensorizer<F>::max_actions;
+    };
+
     const auto write_invalid = [this]() {
       *action++ = -1;
-      std::copy_n(mask, mask += Tensorizer<F>::max_actions, -1);
+      std::fill(mask, mask + Tensorizer<F>::max_actions, -1);
+      mask += Tensorizer<F>::max_actions;
       *policy++ = 0;
     };
 
-    const auto write_valid_species = [this, &cache](const auto &u) {};
-    const auto write_valid_moves = [this, &cache](const auto &u) {};
+    const auto write_valid_moves = [this, &helper]() -> int {
+      auto i = 0;
+      for (const auto &set : helper.slots) {
+        std::transform(
+            set.move_pool.begin(), set.move_pool.begin() + set.move_pool_size,
+            mask, [&set](const auto m) {
+              return Tensorizer<F>::species_move_table(set.species, m);
+            });
+        i += set.move_pool_size;
+      }
+      return i;
+    };
+    const auto write_valid_species = [this, &helper]() {
+      std::transform(helper.available_species.begin(),
+                     helper.available_species.end(), mask, [](const auto s) {
+                       return Tensorizer<F>::species_move_table(s, 0);
+                     });
+      return helper.available_species.size();
+    };
     const auto write_swap = []() {};
 
     i = 0;
+
+    auto mask_start = mask;
+
     for (; i < start; ++i) {
       write_invalid();
     }
     for (; i < last_species; ++i) {
       write_valid_species();
       write_valid_moves();
+      helper.apply(traj.updates[i]);
     }
     for (; i < swap; ++i) {
-      write_moves();
+      write_valid_moves();
+      helper.apply(traj.updates[i]);
     }
     for (; i < end; ++i) {
       write_swap();
@@ -261,7 +307,12 @@ struct TrajectoryInput {
     for (; i < 31; ++i) {
       write_invalid();
     }
-    return;
+
+    // // value score
+    // *start++ = start;
+    // *end++ = end;
+
+    // return;
   }
 };
 
