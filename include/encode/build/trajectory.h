@@ -132,6 +132,107 @@ template <typename F = Format::OU> struct CompressedTrajectory {
 };
 #pragma pack(pop)
 
+// These two structs store what is *missing* so they can quickly write the
+// actions masks
+template <typename F = Format::OU> struct SetHelper {
+  uint species;
+  std::array<Move, F::max_move_pool_size> move_pool;
+  uint n_moves;
+  uint move_pool_size;
+
+  SetHelper() {};
+  SetHelper(const uint8_t species)
+      : species{species}, n_moves{}, move_pool_size{F::move_pool_size(species)},
+        move_pool{F::move_pool(species)} {}
+
+  bool add_move(const auto m) {
+    const auto move_pool_end =
+        std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
+                    static_cast<Move>(m));
+    if (move_pool_end != (move_pool.begin() + move_pool_size)) {
+      --move_pool_size;
+      ++n_moves;
+    }
+  }
+
+  bool is_complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
+};
+
+template <typename F = Format::OU> struct TeamHelper {
+  TeamHelper() : slots{}, size{} {
+    available_species = {F::legal_species.begin(), F::legal_species.end()};
+  }
+
+  std::array<SetHelper<F>, 6> slots;
+  int size;
+  std::vector<Species> available_species;
+
+  bool add_species(const auto s) {
+    const auto found =
+        std::find_if(slots.begin(), slots.end(),
+                     [s](const auto &slot) { return slot.species == s; });
+    if (found != slots.end()) {
+      return false;
+    }
+    const auto empty =
+        std::find_if(slots.begin(), slots.end(),
+                     [](const auto &slot) { return slot.species == 0; });
+    assert(empty != slots.end());
+    slots[size++] = SetHelper<F>{s};
+    // std::erase(available_species, static_cast<Species>(s));
+    return true;
+  }
+
+  void add_move(const auto s, const auto m) {
+    auto selected =
+        std::find_if(slots.begin(), slots.end(),
+                     [s](const auto &slot) { return slot.species == s; });
+    assert(selected != slots.end());
+    (*selected).add_move(m);
+  }
+
+  auto prefill_and_get_bounds(const auto &updates) {
+
+    std::tuple<uint, uint, uint, uint> data{};
+    bool started = false;
+    auto &[start, full, swap, end] = data;
+    auto i = 0;
+
+    for (; i < 31; ++i) {
+      const auto &u = updates[i];
+      if ((start >= 0) && (u.probability == 0)) {
+        break;
+      }
+      if ((u.probability > 0) && !started) {
+        started = true;
+        start = i;
+      }
+      const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
+      if (m == 0) {
+        if (!add_species(s)) {
+          swap = i + 1;
+        } else {
+          full = i + 1;
+        }
+      }
+    }
+    end = i + 1;
+    size = 0;
+
+    return data;
+  }
+
+  void apply(const auto &update) {
+    const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
+    if (m == 0) {
+      std::erase(available_species, static_cast<Species>(s));
+      ++size;
+    } else {
+      add_move(s, m);
+    }
+  }
+};
+
 struct TrajectoryInput {
   int64_t *action;
   int64_t *mask;
@@ -147,112 +248,22 @@ struct TrajectoryInput {
     policy += i;
   }
 
-  // These two structs store what is *missing* so they can quickly write the
-  // actions masks
-  template <typename F = Format::OU> struct SetHelper {
-    uint species;
-    std::array<Move, F::max_move_pool_size> move_pool;
-    uint n_moves;
-    uint move_pool_size;
-
-    SetHelper() {};
-    SetHelper(const uint8_t species)
-        : species{species}, n_moves{},
-          move_pool_size{F::move_pool_size(species)},
-          move_pool{F::move_pool(species)} {}
-
-    bool add_move(const auto m) {
-      const auto move_pool_end =
-          std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
-                      static_cast<Move>(m));
-      if (move_pool_end != (move_pool.begin() + move_pool_size)) {
-        --move_pool_size;
-        ++n_moves;
-      }
-    }
-
-    bool is_complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
-  };
-
-  template <typename F = Format::OU> struct TeamHelper {
-    TeamHelper() : slots{}, size{} {
-      available_species = {F::legal_species.begin(), F::legal_species.end()};
-    }
-
-    std::array<SetHelper<F>, 6> slots;
-    int size;
-    std::vector<Species> available_species;
-
-    bool add_species(const auto s) {
-      const auto found =
-          std::find_if(slots.begin(), slots.end(),
-                       [s](const auto &slot) { return slot.species == s; });
-      if (found != slots.end()) {
-        return false;
-      }
-      const auto empty =
-          std::find_if(slots.begin(), slots.end(),
-                       [](const auto &slot) { return slot.species == 0; });
-      assert(empty != slots.end());
-      slots[size++] = SetHelper<F>{s};
-      // std::erase(available_species, static_cast<Species>(s));
-      return true;
-    }
-
-    void add_move(const auto s, const auto m) {
-      auto selected =
-          std::find_if(slots.begin(), slots.end(),
-                       [s](const auto &slot) { return slot.species == s; });
-      assert(selected != slots.end());
-      (*selected).add_move(m);
-    }
-
-    void apply(const auto &update) {
-      const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
-      if (m == 0) {
-        std::erase(available_species, static_cast<Species>(s));
-      } else {
-        add_move(s, m);
-      }
-    }
-  };
-
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
+
     constexpr float den = std::numeric_limits<uint16_t>::max();
+    using Tensorizer<F>::max_actions;
 
     TeamHelper<F> helper{};
 
-    // bounds for team building process
-    // [invalid start] [valid species/moves] [valid moves] [optional swap] [invalid end]
-    auto start = -1;
-    auto last_species = 0;
-    auto swap = 0;
-    auto i = 0;
-    for (; i < 31; ++i) {
-      const auto &u = traj.updates[i];
-      if ((start >= 0) && (u.probability == 0)) {
-        ++i;
-        break;
-      }
-      if ((u.probability > 0) && (start < 0)) {
-        start = i;
-      }
-      const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
-      if (m == 0) {
-        if (!helper.add_species(s)) {
-          swap = i + 1;
-        } else {
-          last_species = i + 1;
-        }
-      }
-    }
-    auto end = i;
+    const auto [start, full, swap, end] = helper.prefill(traj.updates);
 
     const auto write_valid = [this, &helper](const auto &u) -> int {
       *action++ = u.action;
       *policy++ = u.probability / den;
-      for (const auto &set : helper.slots) {
+      old_mask = mask;
+      for (auto i = 0; i < helper.size; ++i) {
+        const auto &set = helper.slots[i];
         std::transform(
             set.move_pool.begin(), set.move_pool.begin() + set.move_pool_size,
             mask, [&set](const auto m) {
@@ -260,38 +271,47 @@ struct TrajectoryInput {
             });
         mask += set.move_pool_size;
       }
-    };
-    const auto write_valid_species = [this, &helper]() {
       std::transform(helper.available_species.begin(),
-                     helper.available_species.end(), mask, [](const auto s) {
-                       return Tensorizer<F>::species_move_table(s, 0);
-                     });
-      return helper.available_species.size();
-    };
-    const auto write_swap = []() {
-      std::transform(helper.slots.begin(), helper.slots.begin() + 0, mask,
-                     [](const auto &set) {});
+                     helper.available_species.end(), mask,
+                     [](const auto s) { return species_move_table(s, 0); });
+      mask = old_mask + max_actions;
+      helper.apply(u);
     };
 
-    using Tensorizer<F>::max_actions;
+    const auto write_valid_full = [this, &helper](const auto &u) {
+      *action++ = u.action;
+      *policy++ = u.probability / den;
+      old_mask = mask;
+      for (auto i = 0; i < helper.size; ++i) {
+        const auto &set = helper.slots[i];
+        std::transform(
+            set.move_pool.begin(), set.move_pool.begin() + set.move_pool_size,
+            mask, [&set](const auto m) {
+              return Tensorizer<F>::species_move_table(set.species, m);
+            });
+        mask += set.move_pool_size;
+      }
+      mask = old_mask + max_actions;
+      helper.apply(u);
+    };
 
     std::fill(mask, mask + (31 * max_actions), -1);
     std::fill(action, action + 31, -1);
     std::fill(policy, policy + 31, 0.0f);
+    step_update(start);
 
     i = start;
-    step(start);
-    for (; i < last_species; ++i) {
+    for (; i < full; ++i) {
       const auto &u = traj.updates[i];
       old_mask = mask;
       write_valid(u);
+      write_valid_species();
       mask = old_mask + max_actions;
     }
     for (; i < swap; ++i) {
       const auto &u = traj.updates[i];
       old_mask = mask;
       write_valid(u);
-      write_valid_species();
       mask = old_mask + max_actions;
     }
     for (; i < end; ++i) {
