@@ -242,26 +242,19 @@ struct TrajectoryInput {
   int64_t *start;
   int64_t *end;
 
-  void step_update(auto i) {
-    action += i;
-    mask += i * Tensorizer<F>::max_actions;
-    policy += i;
-  }
-
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
 
     constexpr float den = std::numeric_limits<uint16_t>::max();
-    using Tensorizer<F>::max_actions;
 
     TeamHelper<F> helper{};
 
-    const auto [start, full, swap, end] = helper.prefill(traj.updates);
+    const auto [start, full, swap, end] = helper.prefill_and_get_bounds(traj.updates);
 
-    const auto write_valid = [this, &helper](const auto &u) -> int {
+    const auto write_valid = [this, &helper](const auto &u) {
       *action++ = u.action;
       *policy++ = u.probability / den;
-      old_mask = mask;
+      const auto old_mask = mask;
       for (auto i = 0; i < helper.size; ++i) {
         const auto &set = helper.slots[i];
         std::transform(
@@ -273,15 +266,15 @@ struct TrajectoryInput {
       }
       std::transform(helper.available_species.begin(),
                      helper.available_species.end(), mask,
-                     [](const auto s) { return species_move_table(s, 0); });
-      mask = old_mask + max_actions;
+                     [](const auto s) { return Tensorizer<F>::species_move_table(s, 0); });
+      mask = old_mask + Tensorizer<F>::max_actions;
       helper.apply(u);
     };
 
     const auto write_valid_full = [this, &helper](const auto &u) {
       *action++ = u.action;
       *policy++ = u.probability / den;
-      old_mask = mask;
+      const auto old_mask = mask;
       for (auto i = 0; i < helper.size; ++i) {
         const auto &set = helper.slots[i];
         std::transform(
@@ -291,41 +284,50 @@ struct TrajectoryInput {
             });
         mask += set.move_pool_size;
       }
-      mask = old_mask + max_actions;
+      mask = old_mask + Tensorizer<F>::max_actions;
       helper.apply(u);
     };
 
-    std::fill(mask, mask + (31 * max_actions), -1);
+    const auto write_swap = [this, &helper](const auto &u) {
+      *action++ = u.action;
+      *policy++ = u.probability / den;
+      const auto old_mask = mask;
+      std::transform(
+          helper.slots.begin(), helper.slots.begin() + helper.size, mask,
+          [](const auto &set) { return Tensorizer<F>::species_move_table(set.species, 0); });
+      mask = old_mask + Tensorizer<F>::max_actions;
+    };
+
+    const auto write_end = [this, start, end](const auto &traj) {
+      *(this->start)++ = start;
+      *(this->end)++ = end;
+      *value++ = traj.header.value / den;
+      if (traj.header.score == std::numeric_limits<uint16_t>::max()) {
+        *score++ = -1;
+      } else {
+        *score++ = traj.header.score / 2.0;
+      }
+    };
+
+    std::fill(mask, mask + (31 * Tensorizer<F>::max_actions), -1);
     std::fill(action, action + 31, -1);
     std::fill(policy, policy + 31, 0.0f);
-    step_update(start);
 
-    i = start;
+    action += start;
+    mask += start * Tensorizer<F>::max_actions;
+    policy += start;
+
+    auto i = start;
     for (; i < full; ++i) {
-      const auto &u = traj.updates[i];
-      old_mask = mask;
-      write_valid(u);
-      write_valid_species();
-      mask = old_mask + max_actions;
+      write_valid(traj.updates[i]);
     }
     for (; i < swap; ++i) {
-      const auto &u = traj.updates[i];
-      old_mask = mask;
-      write_valid(u);
-      mask = old_mask + max_actions;
+      write_valid_full(traj.updates[i]);
     }
     for (; i < end; ++i) {
-      write_swap();
+      write_swap(traj.updates[i]);
     }
-
-    *(this->start)++ = start;
-    *(this->end)++ = end;
-    *value++ = traj.value / den;
-    if (traj.score == std::numeric_limits<uint16_t>::max()) {
-      *score++ = -1;
-    } else {
-      *score++ = traj.score / 2.0;
-    }
+    write_end(traj);
 
     return;
   }
