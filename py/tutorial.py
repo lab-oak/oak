@@ -6,7 +6,8 @@ import numpy as np
 
 def read_build_trajectories():
 
-    files = py_oak.find_data_files(".", ext=".build")[:10]
+    # using only the head gives most recent files
+    files = py_oak.find_data_files(".", ext=".build")[:1]
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
@@ -15,7 +16,6 @@ def read_build_trajectories():
     build_trajectories = py_oak.read_build_trajectories(file)
 
     assert build_trajectories.size > 0, f"No data found in {file}."
-
     for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
@@ -26,16 +26,13 @@ def read_build_trajectories():
         names = []
         for sm in species_move:
             s, m = sm
-            if m == 0:
-                names.append(py_oak.species_names[s])
-            else:
-                names.append(py_oak.move_names[m])
+            names.append(py_oak.species_names[s] + ' ' + py_oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
 
-        data = [f"{n}:{p}" for n, p in zip(names, selection_probs) if p > 0]
+        data = [f"{n}:{p}" for n, p in zip(names, selection_probs)]
         print(data)
         print("value", build_trajectories.value[index].item())
         print("score", build_trajectories.score[index].item())

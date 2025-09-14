@@ -135,17 +135,18 @@ template <typename F = Format::OU> struct CompressedTrajectory {
 // These two structs store what is *missing* so they can quickly write the
 // actions masks
 template <typename F = Format::OU> struct SetHelper {
-  uint species;
+  Species species;
   std::array<Move, F::max_move_pool_size> move_pool;
   uint n_moves;
   uint move_pool_size;
 
-  SetHelper() {};
-  SetHelper(const uint8_t species)
-      : species{species}, n_moves{}, move_pool_size{F::move_pool_size(species)},
+  SetHelper() = default;
+  SetHelper(const auto species)
+      : species{static_cast<Species>(species)}, n_moves{},
+        move_pool_size{F::move_pool_size(species)},
         move_pool{F::move_pool(species)} {}
 
-  bool add_move(const auto m) {
+  void add_move(const auto m) {
     const auto move_pool_end =
         std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
                     static_cast<Move>(m));
@@ -169,14 +170,16 @@ template <typename F = Format::OU> struct TeamHelper {
 
   bool add_species(const auto s) {
     const auto found =
-        std::find_if(slots.begin(), slots.end(),
-                     [s](const auto &slot) { return slot.species == s; });
+        std::find_if(slots.begin(), slots.end(), [s](const auto &slot) {
+          return slot.species == static_cast<Species>(s);
+        });
     if (found != slots.end()) {
       return false;
     }
     const auto empty =
-        std::find_if(slots.begin(), slots.end(),
-                     [](const auto &slot) { return slot.species == 0; });
+        std::find_if(slots.begin(), slots.end(), [](const auto &slot) {
+          return slot.species == Species::None;
+        });
     assert(empty != slots.end());
     slots[size++] = SetHelper<F>{s};
     // std::erase(available_species, static_cast<Species>(s));
@@ -185,8 +188,9 @@ template <typename F = Format::OU> struct TeamHelper {
 
   void add_move(const auto s, const auto m) {
     auto selected =
-        std::find_if(slots.begin(), slots.end(),
-                     [s](const auto &slot) { return slot.species == s; });
+        std::find_if(slots.begin(), slots.end(), [s](const auto &slot) {
+          return slot.species == static_cast<Species>(s);
+        });
     assert(selected != slots.end());
     (*selected).add_move(m);
   }
@@ -249,7 +253,8 @@ struct TrajectoryInput {
 
     TeamHelper<F> helper{};
 
-    const auto [start, full, swap, end] = helper.prefill_and_get_bounds(traj.updates);
+    const auto [start, full, swap, end] =
+        helper.prefill_and_get_bounds(traj.updates);
 
     const auto write_valid = [this, &helper](const auto &u) {
       *action++ = u.action;
@@ -265,13 +270,14 @@ struct TrajectoryInput {
         mask += set.move_pool_size;
       }
       std::transform(helper.available_species.begin(),
-                     helper.available_species.end(), mask,
-                     [](const auto s) { return Tensorizer<F>::species_move_table(s, 0); });
+                     helper.available_species.end(), mask, [](const auto s) {
+                       return Tensorizer<F>::species_move_table(s, 0);
+                     });
       mask = old_mask + Tensorizer<F>::max_actions;
       helper.apply(u);
     };
 
-    const auto write_valid_full = [this, &helper](const auto &u) {
+    const auto write_valid_no_species = [this, &helper](const auto &u) {
       *action++ = u.action;
       *policy++ = u.probability / den;
       const auto old_mask = mask;
@@ -292,9 +298,10 @@ struct TrajectoryInput {
       *action++ = u.action;
       *policy++ = u.probability / den;
       const auto old_mask = mask;
-      std::transform(
-          helper.slots.begin(), helper.slots.begin() + helper.size, mask,
-          [](const auto &set) { return Tensorizer<F>::species_move_table(set.species, 0); });
+      std::transform(helper.slots.begin(), helper.slots.begin() + helper.size,
+                     mask, [](const auto &set) {
+                       return Tensorizer<F>::species_move_table(set.species, 0);
+                     });
       mask = old_mask + Tensorizer<F>::max_actions;
     };
 
@@ -322,12 +329,17 @@ struct TrajectoryInput {
       write_valid(traj.updates[i]);
     }
     for (; i < swap; ++i) {
-      write_valid_full(traj.updates[i]);
+      write_valid_no_species(traj.updates[i]);
     }
     for (; i < end; ++i) {
       write_swap(traj.updates[i]);
     }
     write_end(traj);
+
+    const auto remainder = 31 - end;
+    action += remainder;
+    mask += remainder * Tensorizer<F>::max_actions;
+    policy += remainder;
 
     return;
   }
