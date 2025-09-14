@@ -197,14 +197,14 @@ template <typename F = Format::OU> struct TeamHelper {
 
   auto prefill_and_get_bounds(const auto &updates) {
 
-    std::tuple<uint, uint, uint, uint> data{};
+    std::tuple<int, int, int, int> data{};
     bool started = false;
     auto &[start, full, swap, end] = data;
     auto i = 0;
 
     for (; i < 31; ++i) {
       const auto &u = updates[i];
-      if ((start >= 0) && (u.probability == 0)) {
+      if (started && (u.probability == 0)) {
         break;
       }
       if ((u.probability > 0) && !started) {
@@ -214,13 +214,14 @@ template <typename F = Format::OU> struct TeamHelper {
       const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
       if (m == 0) {
         if (!add_species(s)) {
-          swap = i + 1;
+          swap -= 1;
         } else {
           full = i + 1;
         }
       }
     }
-    end = i + 1;
+    swap += i;
+    end = i;
     size = 0;
 
     return data;
