@@ -31,8 +31,9 @@ def read_build_trajectories():
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
+        actions = build_trajectories.actions[index].reshape(-1)
 
-        data = [f"{n}:{p}" for n, p in zip(names, selection_probs)]
+        data = [f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0]
         print(data)
         print("value", build_trajectories.value[index].item())
         print("score", build_trajectories.score[index].item())
