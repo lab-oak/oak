@@ -78,6 +78,7 @@ template <typename LS> struct FormatImpl {
   static constexpr auto move_pool_size(const auto species) {
     return MOVE_POOL_SIZES[static_cast<uint8_t>(species)];
   }
+  static constexpr auto max_move_pool_size{get_max_move_pool_size<LS>()};
   static constexpr auto legal_species{get_legal_species<LS>()};
 };
 

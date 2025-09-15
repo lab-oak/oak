@@ -21,11 +21,16 @@ using Train::Build::BasicAction;
 
 namespace Build {
 
+using PKMN::Data::all_moves;
+using PKMN::Data::all_species;
+using PKMN::Data::Move;
+using PKMN::Data::Species;
+
 template <typename F = Format::OU> struct Tensorizer {
 
   static consteval auto get_species_move_list_size() {
     auto size = 0;
-    for (const auto species : PKMN::Data::all_species) {
+    for (const auto species : all_species) {
       const auto &move_pool{F::move_pool(species)};
       size += F::move_pool_size(species) > 0;
       size += F::move_pool_size(species);
@@ -37,12 +42,10 @@ template <typename F = Format::OU> struct Tensorizer {
   static constexpr auto species_move_list_size{get_species_move_list_size()};
 
   static consteval auto get_species_move_data() {
-    std::array<std::array<int, PKMN::Data::all_moves.size()>,
-               PKMN::Data::all_species.size()>
-        table{};
-    std::array<std::pair<uint8_t, uint8_t>, species_move_list_size> list{};
+    std::array<std::array<int, all_moves.size()>, all_species.size()> table{};
+    std::array<std::pair<Species, Move>, species_move_list_size> list{};
 
-    std::array<int, PKMN::Data::all_moves.size()> invalid{};
+    std::array<int, all_moves.size()> invalid{};
     std::fill(invalid.begin(), invalid.end(), -1);
     std::fill(table.begin(), table.end(), invalid);
 
@@ -51,11 +54,11 @@ template <typename F = Format::OU> struct Tensorizer {
       const auto s = static_cast<uint8_t>(species);
       const auto m = static_cast<uint8_t>(move);
       table[s][m] = index;
-      list[index] = {s, m};
+      list[index] = std::pair<Species, Move>{species, move};
       ++index;
     };
     for (const auto species : F::legal_species) {
-      go(species, 0);
+      go(species, Move::None);
       for (auto i = 0; i < F::move_pool_size(species); ++i) {
         go(species, F::move_pool(species)[i]);
       }
@@ -116,7 +119,7 @@ template <typename F = Format::OU> struct Tensorizer {
   static std::array<float, n_dim> write(const auto &team) {
     std::array<float, n_dim> input{};
     const auto go = [&input](auto species, auto move) {
-      if (species != PKMN::Data::Species::None) {
+      if (species != Species::None) {
         const auto index = species_move_table(species, move);
         assert(index >= 0);
         input[index] = 1.0;

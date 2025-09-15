@@ -301,6 +301,14 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   return ss.str();
 }
 
+std::string to_string(const pkmn_gen1_battle &battle) {
+  return battle_data_to_string(battle, {});
+}
+
+std::string to_string(const auto &battle_data) {
+  return battle_data_to_string(battle_data.battle, battle_data.durations);
+}
+
 Species string_to_species(const std::string &str) {
   const int index = unique_index(PKMN::Data::SPECIES_CHAR_ARRAY, str);
   if (index < 0) {

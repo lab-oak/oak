@@ -6,7 +6,8 @@ import numpy as np
 
 def read_build_trajectories():
 
-    files = py_oak.find_data_files(".", ext=".build")[:10]
+    # using only the head gives most recent files
+    files = py_oak.find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
@@ -15,7 +16,6 @@ def read_build_trajectories():
     build_trajectories = py_oak.read_build_trajectories(file)
 
     assert build_trajectories.size > 0, f"No data found in {file}."
-
     for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
@@ -26,34 +26,33 @@ def read_build_trajectories():
         names = []
         for sm in species_move:
             s, m = sm
-            if m == 0:
-                names.append(py_oak.species_names[s])
-            else:
-                names.append(py_oak.move_names[m])
+            names.append(py_oak.species_names[s] + ' ' + py_oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
+        actions = build_trajectories.actions[index].reshape(-1)
 
-        data = [f"{n}:{p}" for n, p in zip(names, selection_probs) if p > 0]
+        data = [f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0]
+
+        l = 31
         print(data)
         print("value", build_trajectories.value[index].item())
         print("score", build_trajectories.score[index].item())
-        continue
-        print("actions", build_trajectories.actions[index, :5])
-        print("legal actions mask", build_trajectories.mask[index][:5, :20])
-        print("log probs", np.log(build_trajectories.policy[index, :5]))
+        # continue
+        print("actions", build_trajectories.actions[index, :l])
+        print("legal actions mask", build_trajectories.mask[index, :l, :20])
+        print("log probs", np.log(build_trajectories.policy[index, :l]))
         print(
             "start/end",
             np.concatenate(
                 [
-                    build_trajectories.start[index, :5],
-                    build_trajectories.end[index, :5],
+                    build_trajectories.start[index, :l],
+                    build_trajectories.end[index, :l],
                 ],
                 axis=0,
             ),
         )
-    # print(build_trajectories.value)
 
 
 def show_species_probs():
