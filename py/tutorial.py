@@ -7,6 +7,34 @@ import numpy as np
 def read_build_trajectories():
 
     # using only the head gives most recent files
+    files = py_oak.find_data_files(".", ext=".battle")
+    assert len(files) > 0, "No battle files found in cwd"
+
+    from random import sample, randint
+
+    file = sample(files, 1)[0]
+    # file = files[0]
+
+    data = py_oak.read_battle_data(file)
+    for buf, n in data:
+        frames = py_oak.get_encoded_frames(buf, n)
+
+        i = randint(0, frames.size - 1)
+        print(i, frames.m[i].item(), frames.n[i].item())
+        print(frames.empirical_value[i])
+        print(frames.score[i])
+        print(frames.p1_empirical[i])
+        print(frames.p2_empirical[i])
+        # print(frames.p1_empirical[i])
+        # print(frames.p1_nash[i])
+        # print(frames.p2_empirical[i])
+        # print(frames.p2_nash[i])
+        # print(sum(frames.p1_empirical[i]))
+        # return
+
+def read_bauild_trajectories():
+
+    # using only the head gives most recent files
     files = py_oak.find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 

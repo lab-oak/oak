@@ -183,7 +183,7 @@ class BattleFrame:
         )
 
 
-# Returns a list tuples containing: a bytes object, the number of wrtten to the bytes
+# Returns a list tuples containing: a bytes object, the number of frames in the bytes
 def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]]:
     path_bytes = path.encode("utf-8")
 
@@ -315,8 +315,8 @@ class EncodedBattleFrame:
 
 
 # convert bytes object into BattleFrames
-def get_encoded_frames(data: bytes, frame_count: int) -> BattleFrame:
-    encoded_frames = BattleFrame(frame_count)
+def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrame:
+    encoded_frames = EncodedBattleFrame(frame_count)
     args = (ctypes.c_char_p(data),) + encoded_frames.raw_pointers(0)
     lib.uncompress_and_encode_training_frames(*args)
     return encoded_frames
