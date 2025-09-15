@@ -231,6 +231,7 @@ struct TrajectoryInput {
 
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
+    constexpr float den = std::numeric_limits<uint16_t>::max();
 
     TeamHelper<F> helper{};
 
@@ -283,7 +284,6 @@ struct TrajectoryInput {
         // started
         if (i < end) {
           *action++ = update.action;
-          constexpr float den = std::numeric_limits<uint16_t>::max();
           *policy++ = update.probability / den;
           if (i < swap) {
             if (i < full) {

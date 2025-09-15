@@ -33,6 +33,24 @@ struct Nodes {
     set = false;
   }
 
+  // For UCB game generation, if a node is kept and its stats are not reset
+  // the empirical policies may have 0.0 at some actions.
+  // This is a clumsy fix though. TODO
+  void reset_stats() {
+    if (exp3) {
+      exp3->stats() = {};
+    }
+    if (pexp3) {
+      pexp3->stats() = {};
+    }
+    if (ucb) {
+      ucb->stats() = {};
+    }
+    if (pucb) {
+      pucb->stats() = {};
+    }
+  }
+
   bool update(auto i1, auto i2, const auto &obs) {
     auto update_node = [&](auto &node) -> bool {
       if (!node || !node->is_init()) {
