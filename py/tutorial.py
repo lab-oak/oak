@@ -4,7 +4,7 @@ import py_oak
 import numpy as np
 
 
-def read_build_trajectories():
+def read_battle_trajectories():
 
     # using only the head gives most recent files
     files = py_oak.find_data_files(".", ext=".battle")
@@ -32,7 +32,7 @@ def read_build_trajectories():
         # print(sum(frames.p1_empirical[i]))
         # return
 
-def read_bauild_trajectories():
+def read_build_trajectories():
 
     # using only the head gives most recent files
     files = py_oak.find_data_files(".", ext=".build")
@@ -180,6 +180,8 @@ if __name__ == "__main__":
     if key == "read-build-trajectories":
         # print the first 10 trajectories in cwd
         read_build_trajectories()
+    elif key == "read-battle-trajectories":
+        read_battle_trajectories()
     elif key == "create-set":
         # recreates the build networking rollout code to create a single pokemon set
         create_set()
