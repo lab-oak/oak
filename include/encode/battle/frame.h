@@ -92,7 +92,7 @@ struct FrameInput {
     return copy;
   }
 
-  void write(const Battle::Frame &frame, const Train::Battle::Target &target) {
+  void write(const Frame &frame, const Train::Battle::Target &target) {
     *m++ = frame.m;
     *n++ = frame.n;
 
@@ -109,6 +109,7 @@ struct FrameInput {
     std::fill_n(p1_empirical, 9, 0.f);
     std::fill_n(p1_nash, 9, 0.f);
     // we use 'one after last' index to encode invalid index.
+    // this way we can just cat a -neg inf onto the logits for softmax
     std::fill_n(p1_choice_indices, 9, Encode::Battle::Policy::n_dim);
     std::fill_n(p2_empirical, 9, 0.f);
     std::fill_n(p2_nash, 9, 0.f);
