@@ -232,13 +232,11 @@ struct TrajectoryInput {
   template <typename F = Format::OU>
   void write(const CompressedTrajectory<F> &traj) {
 
-    constexpr float den = std::numeric_limits<uint16_t>::max();
-
     TeamHelper<F> helper{};
 
     // get bounds for mask logic
     auto start = 0;
-    auto full = 0;
+    auto full = 0; // turn off species picks
     auto swap = 0;
     auto end = 0;
     // find start
@@ -249,19 +247,21 @@ struct TrajectoryInput {
         break;
       }
     }
-    // find end, swap, full
+    // notice the reversed for loop. find end, swap, full
     for (auto i = 30; i >= 0; --i) {
       const auto update = traj.updates[i];
       if (update.probability != 0) {
         const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
         if (end == 0) {
+          // + 1 because we use these like '< end' later
           end = i + 1;
-          swap = end;
-          // has a swap
-          if (m == Move::None) {
-            --swap;
-          }
+          // is last move a species pick? (e.g. team size > 1)
+          // must be a swap
+          swap = end - (m == Move::None);
         } else {
+          // need to find the last actual addition
+          // the last species add is always before the swap/end
+          // because movesets must be maximal
           if (m == Move::None) {
             full = i + 1;
             break;
@@ -283,6 +283,7 @@ struct TrajectoryInput {
         // started
         if (i < end) {
           *action++ = update.action;
+          constexpr float den = std::numeric_limits<uint16_t>::max();
           *policy++ = update.probability / den;
           if (i < swap) {
             if (i < full) {
