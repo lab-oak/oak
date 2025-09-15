@@ -146,95 +146,77 @@ template <typename F = Format::OU> struct SetHelper {
         move_pool_size{F::move_pool_size(species)},
         move_pool{F::move_pool(species)} {}
 
+  auto begin() { return move_pool.begin(); }
+  const auto begin() const { return move_pool.begin(); }
+  auto end() { return move_pool.begin() + move_pool_size; }
+  const auto end() const { return move_pool.begin() + move_pool_size; }
+
   void add_move(const auto m) {
     const auto move_pool_end =
-        std::remove(move_pool.begin(), move_pool.begin() + move_pool_size,
-                    static_cast<Move>(m));
-    if (move_pool_end != (move_pool.begin() + move_pool_size)) {
+        std::remove(begin(), end(), static_cast<Move>(m));
+    if (move_pool_end != end()) {
       --move_pool_size;
       ++n_moves;
     }
   }
 
-  bool is_complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
+  bool complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
 };
 
 template <typename F = Format::OU> struct TeamHelper {
-  TeamHelper() : slots{}, size{} {
+  TeamHelper() : sets{}, size{} {
     available_species = {F::legal_species.begin(), F::legal_species.end()};
   }
 
-  std::array<SetHelper<F>, 6> slots;
+  std::array<SetHelper<F>, 6> sets;
   int size;
   std::vector<Species> available_species;
 
-  bool add_species(const auto s) {
-    const auto found =
-        std::find_if(slots.begin(), slots.end(), [s](const auto &slot) {
-          return slot.species == static_cast<Species>(s);
-        });
-    if (found != slots.end()) {
-      return false;
+  auto begin() { return sets.begin(); }
+  const auto begin() const { return sets.begin(); }
+  auto end() { return sets.begin() + size; }
+  const auto end() const { return sets.begin() + size; }
+
+  void apply_action(const auto action) {
+    const auto [s, m] = Tensorizer<F>::species_move_list(action);
+    const auto species = static_cast<Species>(s);
+    const auto move = static_cast<Move>(m);
+    if (move == Move::None) {
+      sets[size++] = SetHelper{species};
+      std::erase(available_species, species);
+    } else {
+      auto it = std::find_if(begin(), end(), [species](const auto &set) {
+        return set.species == species;
+      });
+      assert(it != end());
+      auto &set = *it;
+      set.add_move(move);
     }
-    const auto empty =
-        std::find_if(slots.begin(), slots.end(), [](const auto &slot) {
-          return slot.species == Species::None;
-        });
-    assert(empty != slots.end());
-    slots[size++] = SetHelper<F>{s};
-    // std::erase(available_species, static_cast<Species>(s));
-    return true;
   }
 
-  void add_move(const auto s, const auto m) {
-    auto selected =
-        std::find_if(slots.begin(), slots.end(), [s](const auto &slot) {
-          return slot.species == static_cast<Species>(s);
-        });
-    assert(selected != slots.end());
-    (*selected).add_move(m);
-  }
-
-  auto prefill_and_get_bounds(const auto &updates) {
-
-    std::tuple<int, int, int, int> data{};
-    bool started = false;
-    auto &[start, full, swap, end] = data;
-    auto i = 0;
-
-    for (; i < 31; ++i) {
-      const auto &u = updates[i];
-      if (started && (u.probability == 0)) {
-        break;
-      }
-      if ((u.probability > 0) && !started) {
-        started = true;
-        start = i;
-      }
-      const auto [s, m] = Tensorizer<F>::species_move_list(u.action);
-      if (m == 0) {
-        if (!add_species(s)) {
-          swap -= 1;
-        } else {
-          full = i + 1;
+  auto write_moves(auto *mask) const {
+    for (const auto &set : (*this)) {
+      if (!set.complete()) {
+        for (const auto move : set) {
+          *mask++ = Tensorizer<F>::species_move_table(set.species, move);
         }
       }
     }
-    swap += i;
-    end = i;
-    size = 0;
-
-    return data;
+    return mask;
   }
 
-  void apply(const auto &update) {
-    const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
-    if (m == 0) {
-      std::erase(available_species, static_cast<Species>(s));
-      ++size;
-    } else {
-      add_move(s, m);
+  auto write_species(auto *mask) {
+    for (const auto species : available_species) {
+      *mask++ = Tensorizer<F>::species_move_table(species, Move::None);
     }
+    return mask;
+  }
+
+  auto write_swaps(auto *mask) const {
+    for (const auto &set : (*this)) {
+      *mask++ = Tensorizer<F>::species_move_table(set.species, Move::None);
+    }
+    return mask;
   }
 };
 
@@ -254,93 +236,84 @@ struct TrajectoryInput {
 
     TeamHelper<F> helper{};
 
-    const auto [start, full, swap, end] =
-        helper.prefill_and_get_bounds(traj.updates);
-
-    const auto write_valid = [this, &helper](const auto &u) {
-      *action++ = u.action;
-      *policy++ = u.probability / den;
-      const auto old_mask = mask;
-      for (auto i = 0; i < helper.size; ++i) {
-        const auto &set = helper.slots[i];
-        std::transform(
-            set.move_pool.begin(), set.move_pool.begin() + set.move_pool_size,
-            mask, [&set](const auto m) {
-              return Tensorizer<F>::species_move_table(set.species, m);
-            });
-        mask += set.move_pool_size;
+    // get bounds for mask logic
+    auto start = 0;
+    auto full = 0;
+    auto swap = 0;
+    auto end = 0;
+    // find start
+    for (auto i = 0; i < 31; ++i) {
+      const auto update = traj.updates[i];
+      if (update.probability != 0) {
+        start = i;
+        break;
       }
-      std::transform(helper.available_species.begin(),
-                     helper.available_species.end(), mask, [](const auto s) {
-                       return Tensorizer<F>::species_move_table(s, 0);
-                     });
-      mask = old_mask + Tensorizer<F>::max_actions;
-      helper.apply(u);
-    };
-
-    const auto write_valid_no_species = [this, &helper](const auto &u) {
-      *action++ = u.action;
-      *policy++ = u.probability / den;
-      const auto old_mask = mask;
-      for (auto i = 0; i < helper.size; ++i) {
-        const auto &set = helper.slots[i];
-        std::transform(
-            set.move_pool.begin(), set.move_pool.begin() + set.move_pool_size,
-            mask, [&set](const auto m) {
-              return Tensorizer<F>::species_move_table(set.species, m);
-            });
-        mask += set.move_pool_size;
+    }
+    // find end, swap, full
+    for (auto i = 30; i >= 0; --i) {
+      const auto update = traj.updates[i];
+      if (update.probability != 0) {
+        const auto [s, m] = Tensorizer<F>::species_move_list(update.action);
+        if (end == 0) {
+          end = i + 1;
+          swap = end;
+          // has a swap
+          if (m == Move::None) {
+            --swap;
+          }
+        } else {
+          if (m == Move::None) {
+            full = i + 1;
+            break;
+          }
+        }
       }
-      mask = old_mask + Tensorizer<F>::max_actions;
-      helper.apply(u);
-    };
+    }
 
-    const auto write_swap = [this, &helper](const auto &u) {
-      *action++ = u.action;
-      *policy++ = u.probability / den;
-      const auto old_mask = mask;
-      std::transform(helper.slots.begin(), helper.slots.begin() + helper.size,
-                     mask, [](const auto &set) {
-                       return Tensorizer<F>::species_move_table(set.species, 0);
-                     });
-      mask = old_mask + Tensorizer<F>::max_actions;
-    };
-
-    const auto write_end = [this, start, end](const auto &traj) {
-      *(this->start)++ = start;
-      *(this->end)++ = end;
-      *value++ = traj.header.value / den;
-      if (traj.header.score == std::numeric_limits<uint16_t>::max()) {
-        *score++ = -1;
+    for (auto i = 0; i < 31; ++i) {
+      const auto &update = traj.updates[i];
+      auto mask_begin = mask;
+      auto mask_end = mask + Tensorizer<F>::max_actions;
+      if (i < start) {
+        *action++ = -1;
+        *policy++ = 0;
+        std::fill(mask_begin, mask_end, -1);
+        helper.apply_action(update.action);
       } else {
-        *score++ = traj.header.score / 2.0;
+        // started
+        if (i < end) {
+          *action++ = update.action;
+          *policy++ = update.probability / den;
+          if (i < swap) {
+            if (i < full) {
+              mask = helper.write_species(mask);
+            }
+            mask = helper.write_moves(mask);
+          } else {
+            mask = helper.write_swaps(mask);
+          }
+          std::fill(mask, mask_end, -1);
+          auto chosen = std::find(mask_begin, mask, update.action);
+          std::swap(*chosen, *mask_begin);
+          helper.apply_action(update.action);
+        } else {
+          // ended
+          *action++ = -1;
+          *policy++ = 0;
+          std::fill(mask, mask_end, -1);
+        }
       }
-    };
+      mask = mask_end;
+    } // end update loop
 
-    std::fill(mask, mask + (31 * Tensorizer<F>::max_actions), -1);
-    std::fill(action, action + 31, -1);
-    std::fill(policy, policy + 31, 0.0f);
-
-    action += start;
-    mask += start * Tensorizer<F>::max_actions;
-    policy += start;
-
-    auto i = start;
-    for (; i < full; ++i) {
-      write_valid(traj.updates[i]);
+    *(this->start)++ = start;
+    *(this->end)++ = end;
+    *value++ = traj.header.value / den;
+    if (traj.header.score == std::numeric_limits<uint16_t>::max()) {
+      *score++ = -1;
+    } else {
+      *score++ = traj.header.score / 2.0;
     }
-    for (; i < swap; ++i) {
-      write_valid_no_species(traj.updates[i]);
-    }
-    for (; i < end; ++i) {
-      write_swap(traj.updates[i]);
-    }
-    write_end(traj);
-
-    const auto remainder = 31 - end;
-    action += remainder;
-    mask += remainder * Tensorizer<F>::max_actions;
-    policy += remainder;
 
     return;
   }

@@ -7,7 +7,7 @@ import numpy as np
 def read_build_trajectories():
 
     # using only the head gives most recent files
-    files = py_oak.find_data_files(".", ext=".build")[:1]
+    files = py_oak.find_data_files(".", ext=".build")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
@@ -34,24 +34,25 @@ def read_build_trajectories():
         actions = build_trajectories.actions[index].reshape(-1)
 
         data = [f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0]
+
+        l = 31
         print(data)
         print("value", build_trajectories.value[index].item())
         print("score", build_trajectories.score[index].item())
-        continue
-        print("actions", build_trajectories.actions[index, :5])
-        print("legal actions mask", build_trajectories.mask[index][:5, :20])
-        print("log probs", np.log(build_trajectories.policy[index, :5]))
+        # continue
+        print("actions", build_trajectories.actions[index, :l])
+        print("legal actions mask", build_trajectories.mask[index, :l, :20])
+        print("log probs", np.log(build_trajectories.policy[index, :l]))
         print(
             "start/end",
             np.concatenate(
                 [
-                    build_trajectories.start[index, :5],
-                    build_trajectories.end[index, :5],
+                    build_trajectories.start[index, :l],
+                    build_trajectories.end[index, :l],
                 ],
                 axis=0,
             ),
         )
-    # print(build_trajectories.value)
 
 
 def show_species_probs():
