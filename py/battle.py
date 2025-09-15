@@ -36,6 +36,12 @@ parser.add_argument(
     default=1 / 100,
     help="Write probability for encode_buffers. A lower value means less correlated samples.",
 )
+parser.add_argument(
+    "--max-game-length",
+    type=int,
+    default=10000,
+    help="Ignore games past this length (in updates not turns.)",
+)
 
 # Loss weighting
 parser.add_argument(
@@ -203,7 +209,7 @@ def main():
         import datetime
 
         now = datetime.datetime.now()
-        working_dir = now.strftime("battle-%Y-%m-%d %H:%M:%S")
+        working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
 
     network = torch_oak.BattleNetwork()
@@ -243,6 +249,7 @@ def main():
             encoded_frames,
             start_index=0,
             write_prob=args.write_prob,
+            max_game_length=args.max_game_length,
         )
 
         # apply symmetries for more varied data

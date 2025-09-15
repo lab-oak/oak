@@ -122,6 +122,7 @@ lib.encode_buffer_multithread.argtypes = [
     ctypes.c_uint64,
     ctypes.c_uint64,
     ctypes.c_float,
+    ctypes.c_uint64,
     ctypes.POINTER(ctypes.c_uint8),  # m
     ctypes.POINTER(ctypes.c_uint8),  # n
     ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
@@ -339,6 +340,7 @@ def encode_buffers(
     encoded_frame_input: BattleFrame,
     start_index: int = 0,
     write_prob: float = 1,
+    max_game_length: int = 10000,
 ):
     encoded_paths = [path.encode("utf-8") for path in paths]
     arr = (ctypes.c_char_p * len(encoded_paths))(*encoded_paths)
@@ -349,6 +351,7 @@ def encode_buffers(
         ctypes.c_uint64(threads),
         ctypes.c_uint64(max_count),
         ctypes.c_float(write_prob),
+        ctypes.c_uint64(max_game_length),
     ) + encoded_frame_input.raw_pointers(start_index)
     count = lib.encode_buffer_multithread(*args)
     return count
