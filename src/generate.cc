@@ -569,7 +569,8 @@ void generate(uint64_t seed) {
 
       while (!pkmn_result_type(battle_data.result)) {
 
-        if ((RuntimeOptions::max_game_length >= 1) && (game_length >= RuntimeOptions::max_game_length)) {
+        if ((RuntimeOptions::max_game_length >= 1) &&
+            (game_length >= RuntimeOptions::max_game_length)) {
           throw std::runtime_error{"Max game length exceeded"};
         }
 
@@ -619,6 +620,7 @@ void generate(uint64_t seed) {
         if (RuntimeOptions::keep_node) {
           const bool node_kept = nodes.update(p1_index, p2_index, obs);
           RuntimeData::update_with_node_counter.fetch_add(node_kept);
+          nodes.reset_stats();
         } else {
           nodes.reset();
         }
