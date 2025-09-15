@@ -58,6 +58,9 @@ RuntimeSearch::Agent p2_agent{};
 RuntimePolicy::Options p1_policy_options{};
 RuntimePolicy::Options p2_policy_options{};
 
+size_t team_size = 6;
+size_t max_game_length = 10000;
+
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
 
@@ -91,6 +94,10 @@ void thread_fn(uint64_t seed) {
     try {
       // playout game
       while (!pkmn_result_type(battle_data.result)) {
+
+        if (updates >= max_game_length) {
+          throw std::runtime_error{"too long, skipped."};
+        }
 
         while (RuntimeData::suspended) {
           sleep(1);
@@ -162,7 +169,7 @@ void thread_fn(uint64_t seed) {
 
     // 1v1
     std::vector<PKMN::Set> base{};
-    base.emplace_back();
+    base.resize(team_size);
     const auto traj1 =
         TeamBuilding::rollout_build_network(device, build_network, base);
     const auto traj2 =
@@ -220,11 +227,14 @@ int main(int argc, char **argv) {
   p1_agent.bandit_name = std::string{argv[2]};
   p1_agent.network_path = std::string(argv[3]);
   p1_policy_options.mode = argv[4][0];
+  p1_policy_options.min_prob = .15;
 
   p2_agent.search_time = std::string(argv[5]);
   p2_agent.bandit_name = std::string{argv[6]};
   p2_agent.network_path = std::string(argv[7]);
   p2_policy_options.mode = argv[8][0];
+  p2_policy_options.min_prob = .15;
+
 
   std::cout << "P1: " << p1_agent.to_string() << ' '
             << p1_policy_options.to_string() << std::endl;
@@ -233,6 +243,7 @@ int main(int argc, char **argv) {
 
   size_t threads = 1;
   size_t seed = std::random_device{}();
+
   if (argc > 9) {
     threads = std::atoll(argv[9]);
   }
@@ -240,11 +251,18 @@ int main(int argc, char **argv) {
     print_prob = std::atof(argv[10]);
   }
   if (argc > 11) {
-    seed = std::atoll(argv[11]);
+    team_size = std::atoll(argv[11]);
+  }
+  if (argc > 12) {
+    max_game_length = std::atoll(argv[12]);
+  }
+  if (argc > 13) {
+    seed = std::atoll(argv[13]);
   }
 
   std::cout << "threads: " << threads << std::endl;
   std::cout << "print_prob: " << print_prob << std::endl;
+  std::cout << "team_size: " << team_size << std::endl;
   std::cout << "seed: " << seed << std::endl;
 
   mt19937 device{seed};
