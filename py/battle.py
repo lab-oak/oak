@@ -73,6 +73,12 @@ parser.add_argument(
     dest="no_policy_loss",
     help="Disable policy loss computation",
 )
+parser.add_argument(
+    "--w-policy-loss",
+    type=float,
+    default=1.0,
+    help=".",
+)
 
 # Hardware and reproducibility
 parser.add_argument(
@@ -116,8 +122,11 @@ class Optimizer:
 
 def masked_kl_div(logit, target):
     log_probs = torch.log_softmax(logit, dim=-1)
-    kl = target * (torch.log(target) - log_probs)
-    kl = kl.masked_fill(torch.isneginf(logit), 0)
+    log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
+    log_target = torch.log(target)
+    log_target = log_target.masked_fill(torch.isneginf(log_target), 0)
+    kl = target * (log_target - log_probs)
+    # kl = kl.masked_fill(torch.isneginf(logit), 0)
     return kl.sum(dim=1).mean(dim=0)
 
 
@@ -158,7 +167,7 @@ def loss(
     if not args.no_policy_loss:
         p1_policy_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
         p2_policy_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
-        loss += p1_policy_loss + p2_policy_loss
+        loss += args.w_policy_loss * (p1_policy_loss + p2_policy_loss)
 
     if print_flag:
         window = args.print_window

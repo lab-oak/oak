@@ -43,6 +43,8 @@ RuntimeSearch::Agent agent{"4096", "exp3-0.03", "mc"};
 RuntimeSearch::Agent t1_agent;
 RuntimePolicy::Options policy_options{};
 
+int max_game_length = -1;
+
 namespace TeamGen {
 uint max_pokemon = 6;
 double skip_game_prob = 0;
@@ -154,6 +156,8 @@ auto generate_help_text() -> std::string {
      << "  Bandit algorithm name for the turn-1 agent.\n\n";
   ss << "--t1-battle-network-path=" << t1_agent.network_path << '\n'
      << "  Path to the battle evaluation network for the turn-1 agent.\n\n";
+  ss << "--max-game-length=" << max_game_length << '\n'
+     << "  Games past this length are discarded.\n\n";
   ss << "--help\n"
      << "  Show this help message.\n";
   return ss.str();
@@ -210,6 +214,8 @@ bool parse_options(int argc, char **argv) {
       policy_options.nash_weight = std::stod(arg.substr(21));
     } else if (arg.starts_with("--keep-node=")) {
       keep_node = (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
+    } else if (arg.starts_with("--max-game-length=")) {
+      max_game_length = std::stoi(arg.substr(18));
     } else if (arg.starts_with("--skip-game-prob=")) {
       TeamGen::skip_game_prob = std::stoul(arg.substr(17));
     } else if (arg.starts_with("--max-pokemon=")) {
@@ -562,6 +568,10 @@ void generate(uint64_t seed) {
     try {
 
       while (!pkmn_result_type(battle_data.result)) {
+
+        if ((RuntimeOptions::max_game_length >= 1) && (game_length >= RuntimeOptions::max_game_length)) {
+          throw std::runtime_error{"Max game length exceeded"};
+        }
 
         while (RuntimeData::suspended) {
           sleep(1);
