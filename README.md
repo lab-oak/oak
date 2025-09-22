@@ -42,3 +42,5 @@ and run with
 ```
 ./extern/engine/src/bin/pkmn-debug
 ```
+
+Note: Eigen has failed to build with some versions of g++-15.
