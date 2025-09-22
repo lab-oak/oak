@@ -10,6 +10,14 @@ def read_battle_trajectories():
     files = py_oak.find_data_files(".", ext=".battle")
     assert len(files) > 0, "No battle files found in cwd"
 
+    total_frames = 0
+    for file in files:
+        data = py_oak.read_battle_data(file)
+        s = sum([n for _, n in data])
+        total_frames += s
+
+    print(f"Total frames: {total_frames}")
+
     from random import sample, randint
 
     file = sample(files, 1)[0]
@@ -31,6 +39,7 @@ def read_battle_trajectories():
         # print(frames.p2_nash[i])
         # print(sum(frames.p1_empirical[i]))
         # return
+
 
 def read_build_trajectories():
 
@@ -54,14 +63,16 @@ def read_build_trajectories():
         names = []
         for sm in species_move:
             s, m = sm
-            names.append(py_oak.species_names[s] + ' ' + py_oak.move_names[m])
+            names.append(py_oak.species_names[s] + " " + py_oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
         actions = build_trajectories.actions[index].reshape(-1)
 
-        data = [f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0]
+        data = [
+            f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0
+        ]
 
         l = 31
         print(data)
@@ -148,7 +159,11 @@ def create_set():
             probs = torch.softmax(masked_logits, dim=-1)
             probs_p = torch.softmax(masked_logits * 1, dim=-1)
             sampled = torch.multinomial(probs_p, 1)
-            return sampled, int(probs[sampled].item() * 10000) / 100, int(probs_p[sampled].item() * 10000) / 100
+            return (
+                sampled,
+                int(probs[sampled].item() * 10000) / 100,
+                int(probs_p[sampled].item() * 10000) / 100,
+            )
 
         logits, _ = network.forward(team)
         index, p, q = sample_masked_logits(logits, mask)
