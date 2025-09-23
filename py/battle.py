@@ -129,6 +129,12 @@ def masked_kl_div(logit, target):
     # kl = kl.masked_fill(torch.isneginf(logit), 0)
     return kl.sum(dim=1).mean(dim=0)
 
+def masked_cross_entropy(logit, target):
+    log_probs = torch.log_softmax(logit, dim=-1)
+    log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
+    ce = - target * log_probs
+    return ce.sum(dim=1).mean(dim=0)
+
 
 def loss(
     input: torch_oak.BattleFrame,
@@ -163,10 +169,11 @@ def loss(
     )
 
     loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
+    value_loss = loss.detach().clone()
 
     if not args.no_policy_loss:
-        p1_policy_loss = masked_kl_div(output.p1_policy[:size], p1_policy_target)
-        p2_policy_loss = masked_kl_div(output.p2_policy[:size], p2_policy_target)
+        p1_policy_loss = masked_cross_entropy(output.p1_policy[:size], p1_policy_target)
+        p2_policy_loss = masked_cross_entropy(output.p2_policy[:size], p2_policy_target)
         loss += args.w_policy_loss * (p1_policy_loss + p2_policy_loss)
 
     if print_flag:
@@ -192,7 +199,7 @@ def loss(
             print(torch.cat([x, y], dim=1))
             print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
 
-        print(f"loss: v:{loss.mean()}")
+        print(f"loss: v:{value_loss.mean()}")
 
     return loss
 
