@@ -69,7 +69,10 @@ void thread_fn(uint64_t seed) {
     throw std::runtime_error{"Can't read build network."};
   }
 
-  const auto play = [&](const auto &p1_team, const auto &p2_team) -> void {
+  const auto play = [&](const auto &p1_team, const auto &p2_team) -> int {
+
+    int score_2;
+
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto options = PKMN::options();
     const auto result = PKMN::update(battle, 0, 0, options);
@@ -94,6 +97,10 @@ void thread_fn(uint64_t seed) {
 
         while (RuntimeData::suspended) {
           sleep(1);
+        }
+
+        if (RuntimeData::terminated) {
+          return 1;
         }
 
         const auto [p1_choices, p2_choices] =
@@ -124,8 +131,7 @@ void thread_fn(uint64_t seed) {
         // only if they have same sign and are both non zero
         if ((p1_early_stop * p2_early_stop) > 0) {
           early_stop = true;
-          const size_t score = (p1_early_stop > 0 ? 2 : 0);
-          RuntimeData::score.fetch_add(score);
+          score_2 = (p1_early_stop > 0 ? 2 : 0);
           break;
         }
 
@@ -145,33 +151,28 @@ void thread_fn(uint64_t seed) {
       }
 
       if (!early_stop) {
-        const size_t score = PKMN::score2(battle_data.result);
-        RuntimeData::score.fetch_add(score);
+        score_2 = PKMN::score2(battle_data.result);
       }
-      RuntimeData::n.fetch_add(1);
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
     }
+
+    return score_2;
   };
 
   while (true) {
-    // const auto p1 = Teams::ou_sample_teams[device.random_int(
-    //     Teams::ou_sample_teams.size())];
-    // const auto p2 = Teams::ou_sample_teams[device.random_int(
-    //     Teams::ou_sample_teams.size())];
+    const auto p1 = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
+    const auto p2 = Teams::ou_sample_teams[device.random_int(
+        Teams::ou_sample_teams.size())];
 
-    // 1v1
-    std::vector<PKMN::Set> base{};
-    base.emplace_back();
-    const auto traj1 =
-        TeamBuilding::rollout_build_network(device, build_network, base);
-    const auto traj2 =
-        TeamBuilding::rollout_build_network(device, build_network, base);
-    const auto p1 = traj1.terminal;
-    const auto p2 = traj2.terminal;
+    const auto s1 = play(p1, p2);
+    const auto s2 = play(p2, p1);
 
-    play(p1, p2);
-    play(p2, p1);
+    if (!RuntimeData::terminated) {
+      RuntimeData::score.fetch_add(s1 + s2);
+      RuntimeData::n.fetch_add(2);
+    }
 
     if (RuntimeData::terminated) {
       return;
