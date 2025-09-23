@@ -41,14 +41,8 @@ std::string container_string(const auto &v) {
   return ss.str();
 }
 
-namespace RuntimeData {
-bool terminated = false;
-bool suspended = false;
-
-std::atomic<size_t> score{};
-std::atomic<size_t> n{};
-} // namespace RuntimeData
-
+namespace RuntimeOptions {
+size_t threads = 0;
 double print_prob = .01;
 double early_stop_log = 3.5;
 
@@ -57,6 +51,66 @@ RuntimeSearch::Agent p2_agent{};
 
 RuntimePolicy::Options p1_policy_options{};
 RuntimePolicy::Options p2_policy_options{};
+} // namespace RuntimeOptions
+
+bool parse_options(int argc, char **argv) {
+  using namespace RuntimeOptions;
+
+  if (argc < 2) {
+    std::cout << "Usage: ./vs [OPTIONS]\nArg '--threads=' is "
+                 "required.\n--help for more."
+              << std::endl;
+    return true;
+  }
+
+  std::vector<char *> args(argv + 1, argv + argc);
+  assert(args.size() == argc - 1);
+
+  for (auto &a : args) {
+    if (a == nullptr) {
+      continue;
+    }
+    char *b = nullptr;
+    std::swap(a, b);
+    std::string arg{b};
+    if (arg.starts_with("--help")) {
+      std::cout << "TODO help text" << std::endl;
+      return true;
+    } else if (arg.starts_with("--threads=")) {
+      threads = std::stoul(arg.substr(10));
+    } else if (arg.starts_with("--p1-search-time=")) {
+      p1_agent.search_time = arg.substr(17);
+    } else if (arg.starts_with("--p2-search-time=")) {
+      p2_agent.search_time = arg.substr(17);
+    } else if (arg.starts_with("--p1-bandit-name=")) {
+      p1_agent.bandit_name = arg.substr(17);
+    } else if (arg.starts_with("--p2-bandit-name=")) {
+      p2_agent.bandit_name = arg.substr(17);
+    } else if (arg.starts_with("--p1-network-path=")) {
+      p1_agent.network_path = arg.substr(18);
+    } else if (arg.starts_with("--p2-network-path=")) {
+      p2_agent.network_path = arg.substr(18);
+    } else {
+      std::swap(a, b);
+    }
+  }
+
+  for (auto a : args) {
+    if (a != nullptr) {
+      throw std::runtime_error{"Unrecognized arg: " + std::string(a)};
+    }
+  }
+
+  return threads == 0;
+}
+
+namespace RuntimeData {
+bool terminated = false;
+bool suspended = false;
+
+std::atomic<size_t> score{};
+std::atomic<size_t> n{};
+} // namespace RuntimeData
 
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
@@ -70,7 +124,6 @@ void thread_fn(uint64_t seed) {
   }
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) -> int {
-
     int score_2;
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
@@ -78,8 +131,8 @@ void thread_fn(uint64_t seed) {
     const auto result = PKMN::update(battle, 0, 0, options);
     MCTS::BattleData battle_data{battle, PKMN::durations(), result};
 
-    auto p1_agent_local = p1_agent;
-    auto p2_agent_local = p2_agent;
+    auto p1_agent_local = RuntimeOptions::p1_agent;
+    auto p2_agent_local = RuntimeOptions::p2_agent;
     if (p1_agent_local.uses_network()) {
       p1_agent_local.read_network_parameters();
       p1_agent_local.network.value().fill_cache(battle);
@@ -114,18 +167,20 @@ void thread_fn(uint64_t seed) {
         if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent_local);
-          p1_early_stop =
-              inverse_sigmoid(p1_output.empirical_value) / early_stop_log;
+          p1_early_stop = inverse_sigmoid(p1_output.empirical_value) /
+                          RuntimeOptions::early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
-                                        p1_output.p1_nash, p1_policy_options);
+                                        p1_output.p1_nash,
+                                        RuntimeOptions::p1_policy_options);
         }
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent_local);
-          p2_early_stop =
-              inverse_sigmoid(p2_output.empirical_value) / early_stop_log;
+          p2_early_stop = inverse_sigmoid(p2_output.empirical_value) /
+                          RuntimeOptions::early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
-                                        p2_output.p2_nash, p2_policy_options);
+                                        p2_output.p2_nash,
+                                        RuntimeOptions::p2_policy_options);
         }
 
         // only if they have same sign and are both non zero
@@ -138,7 +193,7 @@ void thread_fn(uint64_t seed) {
         const auto p1_choice = p1_choices[p1_index];
         const auto p2_choice = p2_choices[p2_index];
 
-        if (device.uniform() < print_prob) {
+        if (device.uniform() < RuntimeOptions::print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
           print(PKMN::battle_data_to_string(battle_data.battle,
@@ -208,50 +263,16 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
-  if (argc < 9) {
-    std::cerr
-        << "Side: search-time bandit-name network-path policy-mode.\n Input "
-           "(Side) p1, "
-           "(Side) p2. [threads=1] [print-prob=.01] [seed]"
-        << std::endl;
+  if (const bool exit_early = parse_options(argc, argv)) {
     return 1;
   }
 
-  p1_agent.search_time = std::string(argv[1]);
-  p1_agent.bandit_name = std::string{argv[2]};
-  p1_agent.network_path = std::string(argv[3]);
-  p1_policy_options.mode = argv[4][0];
-
-  p2_agent.search_time = std::string(argv[5]);
-  p2_agent.bandit_name = std::string{argv[6]};
-  p2_agent.network_path = std::string(argv[7]);
-  p2_policy_options.mode = argv[8][0];
-
-  std::cout << "P1: " << p1_agent.to_string() << ' '
-            << p1_policy_options.to_string() << std::endl;
-  std::cout << "P2: " << p2_agent.to_string() << ' '
-            << p2_policy_options.to_string() << std::endl;
-
-  size_t threads = 1;
   size_t seed = std::random_device{}();
-  if (argc > 9) {
-    threads = std::atoll(argv[9]);
-  }
-  if (argc > 10) {
-    print_prob = std::atof(argv[10]);
-  }
-  if (argc > 11) {
-    seed = std::atoll(argv[11]);
-  }
-
-  std::cout << "threads: " << threads << std::endl;
-  std::cout << "print_prob: " << print_prob << std::endl;
-  std::cout << "seed: " << seed << std::endl;
 
   mt19937 device{seed};
 
   std::vector<std::thread> thread_pool{};
-  for (auto t = 0; t < threads; ++t) {
+  for (auto t = 0; t < RuntimeOptions::threads; ++t) {
     thread_pool.emplace_back(std::thread{&thread_fn, device.uniform_64()});
   }
   auto progress_thread = std::thread(&progress_thread_fn, 30);
