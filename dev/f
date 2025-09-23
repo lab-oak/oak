@@ -7,4 +7,5 @@ clang-format -i \
     include/encode/battle/*.h include/encode/build/*.h \
     include/format/*.h include/format/cart/*.h include/format/ou/*.h \
     include/teams/*.h \
-    include/util/*.h
+    include/util/*.h;
+black py/*.py
