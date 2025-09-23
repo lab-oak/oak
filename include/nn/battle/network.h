@@ -220,7 +220,7 @@ struct Network {
     return value;
   }
 
-  static auto print_main_input(float *input) {
+  static void print_main_input(float *input) {
     for (auto s = 0; s < 2; ++s) {
       std::cout << "Active " << (int)(100 * input[0]) << "%\n";
       for (auto i = 0; i < active_out_dim; ++i) {
