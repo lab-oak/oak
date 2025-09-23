@@ -400,14 +400,15 @@ auto generate_team(mt19937 &device, const auto index)
       std::vector<PKMN::Set>(base_team.begin(), base_team.end());
 
   auto team = base_team_vec;
-  omitter.shuffle_and_truncate(device, team);
+  const bool changed = omitter.shuffle_and_truncate(device, team);
+  bool deleted = false;
   if (device.uniform() < team_modify_prob) {
-    omitter.delete_info(device, team);
+    deleted = omitter.delete_info(device, team);
   }
 
-  if (team == base_team_vec) {
+  if (!deleted) {
     Train::Build::Trajectory trajectory{};
-    trajectory.initial = trajectory.terminal = base_team_vec;
+    trajectory.initial = trajectory.terminal = team;
     return trajectory;
   } else {
     print("Team " + std::to_string(index) + " modified:");
@@ -775,8 +776,9 @@ void setup() {
   // build network save/load
   {
     using namespace RuntimeOptions::TeamGen;
-    const bool may_build = (team_modify_prob > 0) &&
-                           (omitter.pokemon_delete_prob > 0 || omitter.move_delete_prob > 0);
+    const bool may_build =
+        (team_modify_prob > 0) &&
+        (omitter.pokemon_delete_prob > 0 || omitter.move_delete_prob > 0);
     if (may_build && network_path == "") {
       std::cout << "Build Network: No path provided, saving to work dir."
                 << std::endl;

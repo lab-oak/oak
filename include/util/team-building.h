@@ -8,37 +8,7 @@
 
 namespace TeamBuilding {
 
-// Expects a full 6. If truncate, then also shuffle
-struct Omitter {
-
-  int max_pokemon{6};
-  double pokemon_delete_prob{};
-  double move_delete_prob{};
-
-  void shuffle_and_truncate(auto &device, auto &team) const {
-    if (max_pokemon < team.size()) {
-      std::mt19937 rd{device.uniform_64()};
-      std::shuffle(team.begin(), team.end(), rd);
-    }
-    team.resize(max_pokemon);
-  }
-
-  auto delete_info(auto &device, auto &team) const {
-    for (auto &set : team) {
-      if (device.uniform() < pokemon_delete_prob) {
-        set = PKMN::Set{};
-      } else {
-        for (auto &move : set.moves) {
-          if (device.uniform() < move_delete_prob) {
-            move = PKMN::Data::Move::None;
-          }
-        }
-      }
-    }
-  }
-};
-
-const auto team_string = [](const auto &team) {
+const auto team_string(const auto &team) {
   std::stringstream ss{};
   for (const auto &set : team) {
     ss << PKMN::species_string(set.species) << ": ";
@@ -48,6 +18,46 @@ const auto team_string = [](const auto &team) {
     ss << '\n';
   }
   return ss.str();
+};
+
+// Expects a full 6. If truncate, then also shuffle
+struct Omitter {
+
+  int max_pokemon{6};
+  double pokemon_delete_prob{};
+  double move_delete_prob{};
+
+  bool shuffle_and_truncate(auto &device, auto &team) const {
+    const auto original = team;
+    if (max_pokemon < team.size()) {
+      std::mt19937 rd{device.uniform_64()};
+      std::shuffle(team.begin(), team.end(), rd);
+    }
+    team.resize(max_pokemon);
+    // std::cout << team_string(team) << std::endl;
+    return (original != team);
+  }
+
+  bool delete_info(auto &device, auto &team) const {
+    using PKMN::Data::Move;
+    using PKMN::Data::Species;
+    bool modified = false;
+    for (auto &set : team) {
+      if ((set.species != Species::None) &&
+          (device.uniform() < pokemon_delete_prob)) {
+        set = PKMN::Set{};
+        modified = true;
+      } else {
+        for (auto &move : set.moves) {
+          if ((move != Move::None) && (device.uniform() < move_delete_prob)) {
+            move = Move::None;
+            modified = true;
+          }
+        }
+      }
+    }
+    return modified;
+  }
 };
 
 auto softmax(auto &x) {
