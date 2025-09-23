@@ -8,6 +8,37 @@
 
 namespace TeamBuilding {
 
+struct Omitter {
+
+  int max_pokemon{6};
+  double pokemon_delete_prob{};
+  double move_delete_prob{};
+
+  auto shuffle_and_truncate(auto& device, const auto &team) const {
+    auto copy = team;
+    std::mt19937 rd{device.uniform_64()};
+    std::random_shuffle(copy.begin(), copy.end(), rd);
+    assert(team.size() >= max_pokemon);
+    std::vector<PKMN::Set> output(copy.begin(), copy.begin() + max_pokemon);
+    return output;
+  }
+
+  auto delete_info(auto& device, auto& team) const {
+    for (auto& set : team) {
+      if (device.uniform() < pokemon_delete_prob) {
+        set = PKMN::Set{};
+      } else {
+        for (auto& move : set.moves) {
+          if (device.uniform() < move_delete_prob) {
+            move = PKMN::Data::Move::None;
+          } 
+        }
+      }
+    }
+  }
+
+};
+
 const auto team_string = [](const auto &team) {
   std::stringstream ss{};
   for (const auto &set : team) {
