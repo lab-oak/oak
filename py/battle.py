@@ -129,10 +129,11 @@ def masked_kl_div(logit, target):
     # kl = kl.masked_fill(torch.isneginf(logit), 0)
     return kl.sum(dim=1).mean(dim=0)
 
+
 def masked_cross_entropy(logit, target):
     log_probs = torch.log_softmax(logit, dim=-1)
     log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
-    ce = - target * log_probs
+    ce = -target * log_probs
     return ce.sum(dim=1).mean(dim=0)
 
 
