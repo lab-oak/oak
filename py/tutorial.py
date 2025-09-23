@@ -32,6 +32,7 @@ def read_battle_trajectories():
         # print(sum(frames.p1_empirical[i]))
         # return
 
+
 def read_build_trajectories():
 
     # using only the head gives most recent files
@@ -54,14 +55,16 @@ def read_build_trajectories():
         names = []
         for sm in species_move:
             s, m = sm
-            names.append(py_oak.species_names[s] + ' ' + py_oak.move_names[m])
+            names.append(py_oak.species_names[s] + " " + py_oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
         actions = build_trajectories.actions[index].reshape(-1)
 
-        data = [f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0]
+        data = [
+            f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0
+        ]
 
         l = 31
         print(data)
@@ -148,7 +151,11 @@ def create_set():
             probs = torch.softmax(masked_logits, dim=-1)
             probs_p = torch.softmax(masked_logits * 1, dim=-1)
             sampled = torch.multinomial(probs_p, 1)
-            return sampled, int(probs[sampled].item() * 10000) / 100, int(probs_p[sampled].item() * 10000) / 100
+            return (
+                sampled,
+                int(probs[sampled].item() * 10000) / 100,
+                int(probs_p[sampled].item() * 10000) / 100,
+            )
 
         logits, _ = network.forward(team)
         index, p, q = sample_masked_logits(logits, mask)

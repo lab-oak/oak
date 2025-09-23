@@ -172,7 +172,8 @@ struct Network {
         std::fill(main_input[s],
                   main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
       } else {
-        std::fill(active_input[s][0], active_input[s][0] + Encode::Battle::Active::n_dim, 0);
+        std::fill(active_input[s][0],
+                  active_input[s][0] + Encode::Battle::Active::n_dim, 0);
         Encode::Battle::Active::write(stored, side.active, duration,
                                       active_input[s][0]);
         active_net.propagate(active_input[s][0], main_input[s] + 1);
