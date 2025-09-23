@@ -43,16 +43,14 @@ RuntimeSearch::Agent agent{"4096", "exp3-0.03", "mc"};
 RuntimeSearch::Agent t1_agent;
 RuntimePolicy::Options policy_options{};
 
-int max_game_length = -1;
+int max_battle_length = -1;
 
 namespace TeamGen {
-uint max_pokemon = 6;
-double skip_game_prob = 0;
 std::string teams_path = "";
 std::string network_path = "";
+
 double team_modify_prob = 0;
-double pokemon_delete_prob = 0;
-double move_delete_prob = 0;
+TeamBuilding::Omitter omitter{};
 double battle_skip_prob = 0;
 }; // namespace TeamGen
 
@@ -132,8 +130,6 @@ auto generate_help_text() -> std::string {
   ss << "--keep-node=" << (keep_node ? "true" : "false") << '\n'
      << "  If true, reuse the corresponding child node after a search update "
         "if available.\n\n";
-  ss << "--skip-game-prob=" << TeamGen::skip_game_prob << '\n'
-     << "  Probability of skipping a game entirely when generating teams.\n\n";
   ss << "--max-pokemon=" << TeamGen::max_pokemon << '\n'
      << "  Maximum Pokémon per team.\n\n";
   ss << "--teams=" << TeamGen::teams_path << '\n'
@@ -156,7 +152,7 @@ auto generate_help_text() -> std::string {
      << "  Bandit algorithm name for the turn-1 agent.\n\n";
   ss << "--t1-battle-network-path=" << t1_agent.network_path << '\n'
      << "  Path to the battle evaluation network for the turn-1 agent.\n\n";
-  ss << "--max-game-length=" << max_game_length << '\n'
+  ss << "--max-battle-length=" << max_battle_length << '\n'
      << "  Games past this length are discarded.\n\n";
   ss << "--help\n"
      << "  Show this help message.\n";
@@ -214,10 +210,8 @@ bool parse_options(int argc, char **argv) {
       policy_options.nash_weight = std::stod(arg.substr(21));
     } else if (arg.starts_with("--keep-node=")) {
       keep_node = (arg.substr(12)[0] == '1' || arg.substr(12) == "true");
-    } else if (arg.starts_with("--max-game-length=")) {
-      max_game_length = std::stoi(arg.substr(18));
-    } else if (arg.starts_with("--skip-game-prob=")) {
-      TeamGen::skip_game_prob = std::stoul(arg.substr(17));
+    } else if (arg.starts_with("--max-battle-length=")) {
+      max_battle_length = std::stoi(arg.substr(20));
     } else if (arg.starts_with("--max-pokemon=")) {
       TeamGen::max_pokemon = std::stoul(arg.substr(14));
     } else if (arg.starts_with("--teams=")) {
@@ -286,13 +280,13 @@ auto runtime_arg_string() -> std::string {
   out << "--policy-nash-weight=" << policy_options.nash_weight << '\n';
 
   out << "--keep-node=" << (keep_node ? "true" : "false") << '\n';
-  out << "--skip-game-prob=" << TeamGen::skip_game_prob << '\n';
   out << "--max-pokemon=" << TeamGen::max_pokemon << '\n';
   out << "--teams=" << TeamGen::teams_path << '\n';
   out << "--build-network-path=" << TeamGen::network_path << '\n';
   out << "--team-modify-prob=" << TeamGen::team_modify_prob << '\n';
   out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
   out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
+  out << "--battle-skip-prob=" << TeamGen::battle_skip_prob << '\n';
 
   out << "--t1-search-time=" << t1_agent.search_time << '\n';
   out << "--t1-bandit-name=" << t1_agent.bandit_name << '\n';
@@ -361,7 +355,7 @@ std::atomic<size_t> update_with_node_counter{};
 // teams
 std::vector<std::vector<PKMN::Set>> teams;
 MatchupMatrix matchup_matrix;
-std::vector<size_t> game_lengths;
+std::vector<size_t> battle_lengths;
 std::atomic<size_t> thread_id{};
 }; // namespace RuntimeData
 
@@ -454,7 +448,7 @@ auto generate_team(mt19937 &device, const auto index)
 void generate(uint64_t seed) {
   mt19937 device{seed};
   size_t id = RuntimeData::thread_id.fetch_add(1) % RuntimeOptions::threads;
-  size_t &game_length = RuntimeData::game_lengths[id];
+  size_t &battle_length = RuntimeData::battle_lengths[id];
 
   const size_t training_frames_target_size = RuntimeOptions::buffer_size_mb
                                              << 20;
@@ -564,13 +558,13 @@ void generate(uint64_t seed) {
       agent.network.value().fill_cache(battle_data.battle);
     }
 
-    game_length = 0;
+    battle_length = 0;
     try {
 
       while (!pkmn_result_type(battle_data.result)) {
 
-        if ((RuntimeOptions::max_game_length >= 1) &&
-            (game_length >= RuntimeOptions::max_game_length)) {
+        if ((RuntimeOptions::max_battle_length >= 1) &&
+            (battle_length >= RuntimeOptions::max_battle_length)) {
           throw std::runtime_error{"Max game length exceeded"};
         }
 
@@ -589,8 +583,8 @@ void generate(uint64_t seed) {
                                           battle_data.durations));
 
         const auto output = RuntimeSearch::run(
-            battle_data, nodes, (game_length == 0) ? t1_agent : agent);
-        if (game_length == 0) {
+            battle_data, nodes, (battle_length == 0) ? t1_agent : agent);
+        if (battle_length == 0) {
           p1_matchup = output.empirical_value;
           p2_matchup = 1 - output.empirical_value;
           if (skip_battle) {
@@ -626,11 +620,11 @@ void generate(uint64_t seed) {
         }
         RuntimeData::update_counter.fetch_add(1);
 
-        ++game_length;
-        print("update: " + std::to_string(game_length));
+        ++battle_length;
+        print("update: " + std::to_string(battle_length));
         // TODO temporary
-        if ((game_length >= 100) && (game_length % 50 == 0)) {
-          std::cout << "Thread: " << id << " Update: " << game_length
+        if ((battle_length >= 100) && (battle_length % 50 == 0)) {
+          std::cout << "Thread: " << id << " Update: " << battle_length
                     << std::endl;
           std::cout << PKMN::to_string(battle_data) << std::endl;
         }
@@ -715,7 +709,7 @@ void print_thread_fn() {
     traj_done = traj_more;
 
     std::cout << "Game Lengths: ";
-    for (const auto len : RuntimeData::game_lengths) {
+    for (const auto len : RuntimeData::battle_lengths) {
       std::cout << len << ' ';
     }
     std::cout << std::endl;
@@ -807,7 +801,7 @@ void setup() {
   }
 
   // print
-  RuntimeData::game_lengths.resize(RuntimeOptions::threads);
+  RuntimeData::battle_lengths.resize(RuntimeOptions::threads);
 }
 
 void cleanup() {
