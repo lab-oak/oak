@@ -140,6 +140,11 @@ lib.encode_buffer_multithread.argtypes = [
 ]
 lib.encode_buffer_multithread.restype = ctypes.c_uint64
 
+lib.print_battle_data.argtypes = [
+    ctypes.POINTER(ctypes.c_uint8),  # battle
+    ctypes.POINTER(ctypes.c_uint8),  # durations
+]
+
 
 class BattleFrame:
     def __init__(self, size: int):
@@ -221,6 +226,11 @@ def get_frames(data: bytes, frame_count: int) -> BattleFrame:
     args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
     lib.uncompress_training_frames(*args)
     return frames
+
+
+def print_battle_data(frames, i):
+    args = frames.raw_pointers(i)
+    lib.print_battle_data(args[2], args[3])
 
 
 class BuildTrajectory:
