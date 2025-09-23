@@ -130,7 +130,7 @@ auto generate_help_text() -> std::string {
   ss << "--keep-node=" << (keep_node ? "true" : "false") << '\n'
      << "  If true, reuse the corresponding child node after a search update "
         "if available.\n\n";
-  ss << "--max-pokemon=" << TeamGen::max_pokemon << '\n'
+  ss << "--max-pokemon=" << TeamGen::omitter.max_pokemon << '\n'
      << "  Maximum Pokémon per team.\n\n";
   ss << "--teams=" << TeamGen::teams_path << '\n'
      << "  Path to a directory of team files.\n\n";
@@ -142,9 +142,9 @@ auto generate_help_text() -> std::string {
      << "  If either player has a build trajectory, this prob is checked to "
         "skip "
         "playing the game and only use the turn 1 search.\n\n";
-  ss << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n'
+  ss << "--pokemon-delete-prob=" << TeamGen::omitter.pokemon_delete_prob << '\n'
      << "  Probability of deleting an entire set during modification.\n\n";
-  ss << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n'
+  ss << "--move-delete-prob=" << TeamGen::omitter.move_delete_prob << '\n'
      << "  Probability of deleting a move during modification.\n\n";
   ss << "--t1-search-time=" << t1_agent.search_time << '\n'
      << "  Search time setting for the turn-1 agent.\n\n";
@@ -213,7 +213,7 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--max-battle-length=")) {
       max_battle_length = std::stoi(arg.substr(20));
     } else if (arg.starts_with("--max-pokemon=")) {
-      TeamGen::max_pokemon = std::stoul(arg.substr(14));
+      TeamGen::omitter.max_pokemon = std::stoul(arg.substr(14));
     } else if (arg.starts_with("--teams=")) {
       TeamGen::teams_path = arg.substr(8);
     } else if (arg.starts_with("--build-network-path=")) {
@@ -221,9 +221,9 @@ bool parse_options(int argc, char **argv) {
     } else if (arg.starts_with("--team-modify-prob=")) {
       TeamGen::team_modify_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      TeamGen::pokemon_delete_prob = std::stod(arg.substr(22));
+      TeamGen::omitter.pokemon_delete_prob = std::stod(arg.substr(22));
     } else if (arg.starts_with("--move-delete-prob=")) {
-      TeamGen::move_delete_prob = std::stod(arg.substr(19));
+      TeamGen::omitter.move_delete_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--battle-skip-prob=")) {
       TeamGen::battle_skip_prob = std::stod(arg.substr(19));
     } else {
@@ -280,12 +280,13 @@ auto runtime_arg_string() -> std::string {
   out << "--policy-nash-weight=" << policy_options.nash_weight << '\n';
 
   out << "--keep-node=" << (keep_node ? "true" : "false") << '\n';
-  out << "--max-pokemon=" << TeamGen::max_pokemon << '\n';
+  out << "--max-pokemon=" << TeamGen::omitter.max_pokemon << '\n';
   out << "--teams=" << TeamGen::teams_path << '\n';
   out << "--build-network-path=" << TeamGen::network_path << '\n';
   out << "--team-modify-prob=" << TeamGen::team_modify_prob << '\n';
-  out << "--pokemon-delete-prob=" << TeamGen::pokemon_delete_prob << '\n';
-  out << "--move-delete-prob=" << TeamGen::move_delete_prob << '\n';
+  out << "--pokemon-delete-prob=" << TeamGen::omitter.pokemon_delete_prob
+      << '\n';
+  out << "--move-delete-prob=" << TeamGen::omitter.move_delete_prob << '\n';
   out << "--battle-skip-prob=" << TeamGen::battle_skip_prob << '\n';
 
   out << "--t1-search-time=" << t1_agent.search_time << '\n';
@@ -394,31 +395,19 @@ auto generate_team(mt19937 &device, const auto index)
     -> Train::Build::Trajectory {
   using namespace RuntimeOptions::TeamGen;
 
-  const auto base_team = RuntimeData::teams[index];
-  std::vector<PKMN::Set> team{base_team.begin(),
-                              base_team.begin() + max_pokemon};
-  const auto original_team = team;
+  const auto &base_team = RuntimeData::teams[index];
+  const auto base_team_vec =
+      std::vector<PKMN::Set>(base_team.begin(), base_team.end());
 
-  const auto r = device.uniform();
-  if (r < team_modify_prob) {
-    for (auto &pokemon : team) {
-      const auto r = device.uniform();
-      if (r < pokemon_delete_prob) {
-        pokemon = {};
-      } else {
-        for (auto m = 0; m < 4; ++m) {
-          const auto rm = device.uniform();
-          if (rm < move_delete_prob) {
-            pokemon.moves[m] = PKMN::Data::Move::None;
-          }
-        }
-      }
-    }
+  auto team = base_team_vec;
+  omitter.shuffle_and_truncate(device, team);
+  if (device.uniform() < team_modify_prob) {
+    omitter.delete_info(device, team);
   }
 
-  if (team == original_team) {
+  if (team == base_team_vec) {
     Train::Build::Trajectory trajectory{};
-    trajectory.initial = trajectory.terminal = original_team;
+    trajectory.initial = trajectory.terminal = base_team_vec;
     return trajectory;
   } else {
     print("Team " + std::to_string(index) + " modified:");
@@ -426,6 +415,7 @@ auto generate_team(mt19937 &device, const auto index)
     // loading each time allows the network params to be updated at runtime
     NN::Build::Network build_network{};
     constexpr auto tries = 3;
+    // sometimes reads fail because python is writing to that file. just retry
     for (auto i = 0; i < tries; ++i) {
       std::ifstream file{RuntimeOptions::TeamGen::network_path};
       if (build_network.read_parameters(file)) {
@@ -786,7 +776,7 @@ void setup() {
   {
     using namespace RuntimeOptions::TeamGen;
     const bool may_build = (team_modify_prob > 0) &&
-                           (pokemon_delete_prob > 0 || move_delete_prob > 0);
+                           (omitter.pokemon_delete_prob > 0 || omitter.move_delete_prob > 0);
     if (may_build && network_path == "") {
       std::cout << "Build Network: No path provided, saving to work dir."
                 << std::endl;
