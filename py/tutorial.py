@@ -4,6 +4,19 @@ import py_oak
 import numpy as np
 
 
+def battle_frame_stats():
+    total_frames = 0
+    total_battles = 0
+    files = py_oak.find_data_files(".", ext=".battle")
+    for file in files:
+        data = py_oak.read_battle_data(file)
+        for buf, n in data:
+            total_battles += 1
+            total_frames += n
+    print(f"Total battle frames: {total_frames}")
+    print(f"Average battle length: {total_frames / total_battles}")
+
+
 def read_battle_trajectories():
 
     # using only the head gives most recent files
@@ -214,5 +227,7 @@ if __name__ == "__main__":
     elif key == "show-species-probs":
         # basic check that PPO works. We expect to see less ratata and more snorlax no matter what
         show_species_probs()
+    elif key == "battle-frame-stats":
+        battle_frame_stats()
     else:
         print("Invalid keyword. See TUTORIAL.md")
