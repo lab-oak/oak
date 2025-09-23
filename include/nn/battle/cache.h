@@ -23,7 +23,7 @@ template <typename T, int dim = 39> struct PokemonCache {
   static constexpr uint8_t n_embeddings = n_status * n_pp;
 
   // all status consditions that dont use sleep duration
-  static constexpr std::array<Status, 9> status_array{
+  static constexpr std::array<Status, 8> status_array{
       Status::None,      Status::Poison, Status::Burn,  Status::Freeze,
       Status::Paralysis, Status::Rest1,  Status::Rest2, Status::Rest3};
 

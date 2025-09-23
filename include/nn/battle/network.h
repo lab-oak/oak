@@ -159,8 +159,6 @@ struct Network {
 
   void write_main(float main_input[2][256], const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
-    static thread_local float pokemon_input[2][5]
-                                           [Encode::Battle::Pokemon::n_dim];
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
     const auto &battle = PKMN::view(b);
@@ -174,6 +172,7 @@ struct Network {
         std::fill(main_input[s],
                   main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
       } else {
+        std::fill(active_input[s][0], active_input[s][0] + Encode::Battle::Active::n_dim, 0);
         Encode::Battle::Active::write(stored, side.active, duration,
                                       active_input[s][0]);
         active_net.propagate(active_input[s][0], main_input[s] + 1);
