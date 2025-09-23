@@ -538,3 +538,14 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
   }
   return -1;
 }
+
+extern "C" void print_battle_data(uint8_t *battle_bytes,
+                                  uint8_t *durations_bytes) {
+  pkmn_gen1_battle battle;
+  pkmn_gen1_chance_durations durations;
+  std::copy(battle_bytes, battle_bytes + PKMN::Layout::Sizes::Battle,
+            battle.bytes);
+  std::copy(durations_bytes, durations_bytes + PKMN::Layout::Sizes::Durations,
+            durations.bytes);
+  std::cout << PKMN::battle_data_to_string(battle, durations) << std::endl;
+}
