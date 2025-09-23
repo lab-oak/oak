@@ -34,11 +34,18 @@ struct Frame {
                                     active[s][0].data());
 
       for (auto slot = 2; slot <= 6; ++slot) {
-        const auto &poke = side.get(slot);
-        const auto sleep = duration.sleep(slot - 1);
-        hp[s][slot - 1] = poke.stats.hp ? (float)poke.hp / poke.stats.hp : 0.0f;
-        Encode::Battle::Pokemon::write(poke, sleep,
-                                       pokemon[s][slot - 2].data());
+        if (side.order[slot - 1] == 0) {
+          hp[s][slot - 1] = 0;
+          std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
+                    0);
+        } else {
+          const auto &poke = side.get(slot);
+          const auto sleep = duration.sleep(slot - 1);
+          hp[s][slot - 1] =
+              poke.stats.hp ? (float)poke.hp / poke.stats.hp : 0.0f;
+          Encode::Battle::Pokemon::write(poke, sleep,
+                                         pokemon[s][slot - 2].data());
+        }
       }
     }
     m = frame.m;
