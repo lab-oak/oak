@@ -44,3 +44,5 @@ and run with
 ```
 
 Note: Eigen has failed to build with some versions of g++-15.
+
+Note Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
