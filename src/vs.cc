@@ -51,6 +51,15 @@ RuntimeSearch::Agent p2_agent{};
 
 RuntimePolicy::Options p1_policy_options{};
 RuntimePolicy::Options p2_policy_options{};
+
+namespace TeamGen {
+std::string teams_path = "";
+std::string network_path = "";
+
+double team_modify_prob = 0;
+TeamBuilding::Omitter omitter{};
+}
+
 } // namespace RuntimeOptions
 
 bool parse_options(int argc, char **argv) {
@@ -114,14 +123,6 @@ std::atomic<size_t> n{};
 
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
-
-  // 1v1
-  auto build_network = NN::Build::Network{};
-  std::ifstream file{std::filesystem::path{"build-network"}};
-  const bool success = build_network.read_parameters(file);
-  if (!success) {
-    throw std::runtime_error{"Can't read build network."};
-  }
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) -> int {
     int score_2;
