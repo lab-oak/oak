@@ -317,11 +317,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  setup();
-
   size_t seed = std::random_device{}();
 
   mt19937 device{seed};
+
+  setup(device);
 
   std::vector<std::thread> thread_pool{};
   for (auto t = 0; t < RuntimeOptions::threads; ++t) {
