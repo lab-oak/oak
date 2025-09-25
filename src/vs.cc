@@ -46,21 +46,49 @@ size_t threads = 0;
 double print_prob = .01;
 double early_stop_log = 3.5;
 
-RuntimeSearch::Agent p1_agent{};
-RuntimeSearch::Agent p2_agent{};
+RuntimeSearch::Agent p1_agent{"4096", "exp3-0.03", "mc"};
+RuntimeSearch::Agent p2_agent{"4096", "exp3-0.03", "mc"};
 
 RuntimePolicy::Options p1_policy_options{};
 RuntimePolicy::Options p2_policy_options{};
 
 namespace TeamGen {
-std::string teams_path = "";
+// std::string teams_path = "";
 std::string network_path = "";
+NN::Build::Network network{};
 
 double team_modify_prob = 0;
 TeamBuilding::Omitter omitter{};
-}
+double battle_skip_prob = 0;
+}; // namespace TeamGen
 
 } // namespace RuntimeOptions
+
+auto generate_team(mt19937 &device, const auto &base_team)
+    -> Train::Build::Trajectory {
+  using namespace RuntimeOptions::TeamGen;
+
+  const auto base_team_vec =
+      std::vector<PKMN::Set>(base_team.begin(), base_team.end());
+
+  auto team = base_team_vec;
+  const bool changed = omitter.shuffle_and_truncate(device, team);
+  bool deleted = false;
+  if (device.uniform() < team_modify_prob) {
+    deleted = omitter.delete_info(device, team);
+  }
+
+  if (!deleted) {
+    Train::Build::Trajectory trajectory{};
+    trajectory.initial = trajectory.terminal = team;
+    return trajectory;
+  } else {
+    const auto trajectory =
+        TeamBuilding::rollout_build_network(device, network, team);
+    assert(trajectory.updates.size() > 0);
+    return trajectory;
+  }
+}
 
 bool parse_options(int argc, char **argv) {
   using namespace RuntimeOptions;
@@ -154,7 +182,8 @@ void thread_fn(uint64_t seed) {
         }
 
         if (RuntimeData::terminated) {
-          return 1;
+          using Ignored = int;
+          return Ignored{};
         }
 
         const auto [p1_choices, p2_choices] =
@@ -212,18 +241,23 @@ void thread_fn(uint64_t seed) {
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
     }
-
     return score_2;
   };
 
   while (true) {
-    const auto p1 = Teams::ou_sample_teams[device.random_int(
+    const auto p1_base_team = Teams::ou_sample_teams[device.random_int(
         Teams::ou_sample_teams.size())];
-    const auto p2 = Teams::ou_sample_teams[device.random_int(
+    const auto p2_base_team = Teams::ou_sample_teams[device.random_int(
         Teams::ou_sample_teams.size())];
 
-    const auto s1 = play(p1, p2);
-    const auto s2 = play(p2, p1);
+    const auto p1_build_traj = generate_team(device, p1_base_team);
+    const auto p2_build_traj = generate_team(device, p2_base_team);
+
+    const auto p1_team = p1_build_traj.terminal;
+    const auto p2_team = p2_build_traj.terminal;
+
+    const auto s1 = play(p1_team, p2_team);
+    const auto s2 = play(p2_team, p1_team);
 
     if (!RuntimeData::terminated) {
       RuntimeData::score.fetch_add(s1 + s2);
@@ -239,8 +273,13 @@ void thread_fn(uint64_t seed) {
 }
 
 void progress_thread_fn(int sec) {
-  while (!RuntimeData::terminated) {
-    sleep(sec);
+  while (true) {
+    for (int s = 0; s < sec; ++s) {
+      if (RuntimeData::terminated) {
+        return;
+      }
+      sleep(sec);
+    }
     std::cout << "score: "
               << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
               << " over " << RuntimeData::n.load() << " games." << std::endl;
@@ -259,6 +298,16 @@ void handle_terminate(int signal) {
   std::cout << "Terminated." << std::endl;
 }
 
+void setup(auto &device) {
+  using namespace RuntimeOptions::TeamGen;
+  if (!network_path.empty()) {
+    std::ifstream file{RuntimeOptions::TeamGen::network_path};
+    network.read_parameters(file);
+  } else {
+    network.initialize(device);
+  }
+}
+
 int main(int argc, char **argv) {
 
   std::signal(SIGINT, handle_terminate);
@@ -267,6 +316,8 @@ int main(int argc, char **argv) {
   if (const bool exit_early = parse_options(argc, argv)) {
     return 1;
   }
+
+  setup();
 
   size_t seed = std::random_device{}();
 
