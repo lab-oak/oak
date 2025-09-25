@@ -391,11 +391,10 @@ bool endless_battle_check(const auto &p1, const auto &p2) {
       });
 }
 
-auto generate_team(mt19937 &device, const auto index)
+auto generate_team(mt19937 &device, const auto &base_team)
     -> Train::Build::Trajectory {
   using namespace RuntimeOptions::TeamGen;
 
-  const auto &base_team = RuntimeData::teams[index];
   const auto base_team_vec =
       std::vector<PKMN::Set>(base_team.begin(), base_team.end());
 
@@ -511,8 +510,10 @@ void generate(uint64_t seed) {
 
     const auto p1_team_index = device.random_int(RuntimeData::teams.size());
     const auto p2_team_index = device.random_int(RuntimeData::teams.size());
-    auto p1_build_traj = generate_team(device, p1_team_index);
-    auto p2_build_traj = generate_team(device, p2_team_index);
+    auto p1_build_traj =
+        generate_team(device, RuntimeData::teams[p1_team_index]);
+    auto p2_build_traj =
+        generate_team(device, RuntimeData::teams[p2_team_index]);
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
     if (endless_battle_check(p1_team, p2_team)) {
