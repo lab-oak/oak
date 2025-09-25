@@ -11,14 +11,13 @@
 #include <atomic>
 #include <cmath>
 #include <csignal>
-#include <cstring>
 #include <exception>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
 
@@ -127,6 +126,17 @@ bool parse_options(int argc, char **argv) {
       p1_agent.network_path = arg.substr(18);
     } else if (arg.starts_with("--p2-network-path=")) {
       p2_agent.network_path = arg.substr(18);
+      
+    } else if (arg.starts_with("--max-pokemon=")) {
+      TeamGen::omitter.max_pokemon = std::stoul(arg.substr(14));
+    } else if (arg.starts_with("--build-network-path=")) {
+      TeamGen::network_path = arg.substr(21);
+    } else if (arg.starts_with("--team-modify-prob=")) {
+      TeamGen::team_modify_prob = std::stod(arg.substr(19));
+    } else if (arg.starts_with("--pokemon-delete-prob=")) {
+      TeamGen::omitter.pokemon_delete_prob = std::stod(arg.substr(22));
+    } else if (arg.starts_with("--move-delete-prob=")) {
+      TeamGen::omitter.move_delete_prob = std::stod(arg.substr(19));
     } else {
       std::swap(a, b);
     }
