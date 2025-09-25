@@ -273,6 +273,7 @@ auto runtime_arg_string() -> std::string {
   out << "--search-time=" << agent.search_time << '\n';
   out << "--bandit-name=" << agent.bandit_name << '\n';
   out << "--battle-network-path=" << agent.network_path << '\n';
+  out << "--max-battle-length=" << max_battle_length << '\n';
 
   out << "--policy-mode=" << policy_options.mode << '\n';
   out << "--policy-temp=" << policy_options.temp << '\n';
@@ -410,7 +411,7 @@ auto generate_team(mt19937 &device, const auto &base_team)
     trajectory.initial = trajectory.terminal = team;
     return trajectory;
   } else {
-    print("Team " + std::to_string(index) + " modified:");
+    print("Team modified:");
     print(TeamBuilding::team_string(team));
     // loading each time allows the network params to be updated at runtime
     NN::Build::Network build_network{};
