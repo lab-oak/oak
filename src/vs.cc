@@ -288,7 +288,7 @@ void progress_thread_fn(int sec) {
       if (RuntimeData::terminated) {
         return;
       }
-      sleep(sec);
+      sleep(1);
     }
     std::cout << "score: "
               << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
