@@ -32,6 +32,8 @@ def read_battle_trajectories():
     for buf, n in data:
         frames = py_oak.get_encoded_frames(buf, n)
 
+        print(frames.score)
+
         i = randint(0, frames.size - 1)
         print(i, frames.m[i].item(), frames.n[i].item())
         # print("value", frames.empirical_value[i])
@@ -49,6 +51,9 @@ def read_battle_trajectories():
             [py_oak.policy_dim_labels[_.item()] for _ in frames.p2_choice_indices[i]],
         )
         raw_frames = py_oak.get_frames(buf, n)
+
+        print("empirical value", frames.empirical_value[i])
+        print("score", frames.score[i])
 
         # print(raw_frames.battle[i])
         # print(raw_frames.battle[i, 23])
