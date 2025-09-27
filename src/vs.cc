@@ -32,21 +32,9 @@ void print(const auto &data, const bool newline = true) {
   }
 }
 
-std::string container_string(const auto &v) {
-  std::stringstream ss{};
-  for (auto x : v) {
-    if constexpr (std::is_same_v<decltype(x), std::string>) {
-      ss << x << ' ';
-    } else {
-      ss << std::to_string(x) << ' ';
-    }
-  }
-  return ss.str();
-}
-
 namespace RuntimeOptions {
 size_t threads = 0;
-double print_prob = .01;
+double print_prob = 0;
 double early_stop_log = 3.5;
 
 RuntimeSearch::Agent p1_agent{"4096", "exp3-0.03", "mc"};
@@ -133,6 +121,10 @@ bool parse_options(int argc, char **argv) {
       p1_agent.network_path = arg.substr(18);
     } else if (arg.starts_with("--p2-network-path=")) {
       p2_agent.network_path = arg.substr(18);
+    } else if (arg.starts_with("--p1-policy-mode=")) {
+      p1_policy_options.mode = arg[17];
+    } else if (arg.starts_with("--p2-policy-mode=")) {
+      p2_policy_options.mode = arg[17];
 
     } else if (arg.starts_with("--max-pokemon=")) {
       TeamGen::omitter.max_pokemon = std::stoul(arg.substr(14));
@@ -147,6 +139,8 @@ bool parse_options(int argc, char **argv) {
 
     } else if (arg.starts_with("--print-prob=")) {
       print_prob = std::stof(arg.substr(13));
+    } else if (arg.starts_with("--early-stop-log=")) {
+      early_stop_log = std::stof(arg.substr(17));
     } else {
       std::swap(a, b);
     }
@@ -169,7 +163,7 @@ std::atomic<size_t> score{};
 std::atomic<size_t> n{};
 
 std::filesystem::path working_dir = std::format(
-    "{:%F-%T}",
+    "vs-{:%F-%T}",
     std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
 // filenames
 std::atomic<size_t> battle_buffer_counter{};
@@ -208,6 +202,12 @@ struct BattleFrameBuffer {
 
     clear();
   }
+
+  void write_frames(const auto &training_frames) {
+    const auto n_bytes_frames = training_frames.n_bytes();
+    training_frames.write(buffer.data() + write_index);
+    write_index += n_bytes_frames;
+  }
 };
 
 void thread_fn(uint64_t seed) {
@@ -219,8 +219,8 @@ void thread_fn(uint64_t seed) {
   const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
                                           << 20;
 
-  BattleFrameBuffer p1_battle_frames{thread_frame_buffer_size};
-  BattleFrameBuffer p2_battle_frames{thread_frame_buffer_size};
+  BattleFrameBuffer p1_battle_frame_buffer{thread_frame_buffer_size};
+  BattleFrameBuffer p2_battle_frame_buffer{thread_frame_buffer_size};
 
   // These are generated slowly so a vector is fine
   std::vector<Train::Build::Trajectory> build_buffer{};
@@ -256,8 +256,11 @@ void thread_fn(uint64_t seed) {
     build_buffer.clear();
   };
 
-  const auto play = [&](const auto &p1_team, const auto &p2_team) -> int {
+  const auto play = [&](auto p1_build_traj, auto p2_build_traj) -> int {
     int score_2;
+
+    const auto &p1_team = p1_build_traj.terminal;
+    const auto &p2_team = p2_build_traj.terminal;
 
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto options = PKMN::options();
@@ -274,6 +277,9 @@ void thread_fn(uint64_t seed) {
       p2_agent_local.read_network_parameters();
       p2_agent_local.network.value().fill_cache(battle);
     }
+
+    Train::Battle::CompressedFrames p1_battle_frames{battle};
+    Train::Battle::CompressedFrames p2_battle_frames{battle};
 
     bool early_stop = false;
     size_t updates = 0;
@@ -298,7 +304,9 @@ void thread_fn(uint64_t seed) {
         int p2_index = 0;
         int p1_early_stop = 0;
         int p2_early_stop = 0;
-        if (p1_choices.size() > 1) {
+        // TODO - make up your mind how this is going to be handled
+        // if (p1_choices.size() > 1) {
+        {
           RuntimeSearch::Nodes nodes{};
           p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent_local);
           p1_early_stop = inverse_sigmoid(p1_output.empirical_value) /
@@ -307,7 +315,8 @@ void thread_fn(uint64_t seed) {
                                         p1_output.p1_nash,
                                         RuntimeOptions::p1_policy_options);
         }
-        if (p2_choices.size() > 1) {
+        // if (p2_choices.size() > 1) {
+        {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent_local);
           p2_early_stop = inverse_sigmoid(p2_output.empirical_value) /
@@ -315,6 +324,11 @@ void thread_fn(uint64_t seed) {
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash,
                                         RuntimeOptions::p2_policy_options);
+        }
+
+        if (updates == 0) {
+          p1_build_traj.value = p1_output.empirical_value;
+          p2_build_traj.value = 1 - p2_output.empirical_value;
         }
 
         // only if they have same sign and are both non zero
@@ -326,6 +340,9 @@ void thread_fn(uint64_t seed) {
 
         const auto p1_choice = p1_choices[p1_index];
         const auto p2_choice = p2_choices[p2_index];
+
+        p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
+        p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
 
         if (device.uniform() < RuntimeOptions::print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
@@ -345,6 +362,13 @@ void thread_fn(uint64_t seed) {
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
     }
+
+    p1_battle_frames.result = battle_data.result;
+    p2_battle_frames.result = battle_data.result;
+
+    p1_battle_frame_buffer.write_frames(p1_battle_frames);
+    p2_battle_frame_buffer.write_frames(p2_battle_frames);
+
     return score_2;
   };
 
@@ -357,20 +381,24 @@ void thread_fn(uint64_t seed) {
     const auto p1_build_traj = generate_team(device, p1_base_team);
     const auto p2_build_traj = generate_team(device, p2_base_team);
 
-    const auto p1_team = p1_build_traj.terminal;
-    const auto p2_team = p2_build_traj.terminal;
-
-    const auto s1 = play(p1_team, p2_team);
-    const auto s2 = play(p2_team, p1_team);
+    const auto s1 = play(p1_build_traj, p2_build_traj);
+    const auto s2 = play(p2_build_traj, p1_build_traj);
 
     if (!RuntimeData::terminated) {
       RuntimeData::score.fetch_add(s1 + s2);
       RuntimeData::n.fetch_add(2);
     }
 
+    if (p1_battle_frame_buffer.write_index >= training_frames_target_size) {
+      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1");
+    }
+    if (p2_battle_frame_buffer.write_index >= training_frames_target_size) {
+      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2");
+    }
+
     if (RuntimeData::terminated) {
-      p1_battle_frames.save_to_disk(RuntimeData::working_dir / "p1");
-      p2_battle_frames.save_to_disk(RuntimeData::working_dir / "p2");
+      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1");
+      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2");
       save_build_buffer_to_disk();
       return;
     }
@@ -412,16 +440,17 @@ void handle_terminate(int signal) {
 void setup(auto &device) {
 
   // create working dir
-  const std::filesystem::path working_dir = "vs-" + RuntimeData::start_datetime;
   std::error_code ec;
-  bool created = std::filesystem::create_directory(working_dir, ec);
-  created && = std::filesystem::create_directory(working_dir / "p1", ec);
-  created && = std::filesystem::create_directory(working_dir / "p2", ec);
+  bool created =
+      std::filesystem::create_directory(RuntimeData::working_dir, ec) &&
+      std::filesystem::create_directory(RuntimeData::working_dir / "p1", ec) &&
+      std::filesystem::create_directory(RuntimeData::working_dir / "p2", ec);
   if (ec) {
     std::cerr << "Error creating directory: " << ec.message() << '\n';
     throw std::runtime_error("Could not create working dir.");
   } else if (created) {
-    std::cout << "Created directory " << working_dir.string() << std::endl;
+    std::cout << "Created directory " << RuntimeData::working_dir.string()
+              << std::endl;
   } else {
     throw std::runtime_error("Could not create working dir.");
   }
