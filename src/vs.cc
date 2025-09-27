@@ -19,6 +19,10 @@
 #include <thread>
 #include <vector>
 
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
 
 void print(const auto &data, const bool newline = true) {
@@ -50,6 +54,9 @@ RuntimeSearch::Agent p2_agent{"4096", "exp3-0.03", "mc"};
 
 RuntimePolicy::Options p1_policy_options{};
 RuntimePolicy::Options p2_policy_options{};
+
+size_t buffer_size_mb = 8;
+size_t max_build_traj = 1 << 10;
 
 namespace TeamGen {
 // std::string teams_path = "";
@@ -126,7 +133,7 @@ bool parse_options(int argc, char **argv) {
       p1_agent.network_path = arg.substr(18);
     } else if (arg.starts_with("--p2-network-path=")) {
       p2_agent.network_path = arg.substr(18);
-      
+
     } else if (arg.starts_with("--max-pokemon=")) {
       TeamGen::omitter.max_pokemon = std::stoul(arg.substr(14));
     } else if (arg.starts_with("--build-network-path=")) {
@@ -137,6 +144,9 @@ bool parse_options(int argc, char **argv) {
       TeamGen::omitter.pokemon_delete_prob = std::stod(arg.substr(22));
     } else if (arg.starts_with("--move-delete-prob=")) {
       TeamGen::omitter.move_delete_prob = std::stod(arg.substr(19));
+
+    } else if (arg.starts_with("--print-prob=")) {
+      print_prob = std::stof(arg.substr(13));
     } else {
       std::swap(a, b);
     }
@@ -157,10 +167,94 @@ bool suspended = false;
 
 std::atomic<size_t> score{};
 std::atomic<size_t> n{};
+
+std::filesystem::path working_dir = std::format(
+    "{:%F-%T}",
+    std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+// filenames
+std::atomic<size_t> battle_buffer_counter{};
+std::atomic<size_t> build_buffer_counter{};
 } // namespace RuntimeData
+
+struct BattleFrameBuffer {
+
+  std::vector<char> buffer;
+  size_t write_index;
+
+  BattleFrameBuffer(size_t size) : buffer{}, write_index{} {
+    buffer.resize(size);
+  }
+
+  void clear() {
+    std::fill(buffer.begin(), buffer.end(), 0);
+    write_index = 0;
+  }
+
+  void save_to_disk(std::filesystem::path dir) {
+    if (write_index == 0) {
+      return;
+    }
+    const auto filename =
+        std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
+        ".battle";
+    const auto full_path = dir / filename;
+    int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+      const auto write_result = write(fd, buffer.data(), write_index);
+      close(fd);
+    } else {
+      std::cerr << "Failed to write buffer to " << full_path << std::endl;
+    }
+
+    clear();
+  }
+};
 
 void thread_fn(uint64_t seed) {
   mt19937 device{seed};
+
+  // data gen
+  const size_t training_frames_target_size = RuntimeOptions::buffer_size_mb
+                                             << 20;
+  const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
+                                          << 20;
+
+  BattleFrameBuffer p1_battle_frames{thread_frame_buffer_size};
+  BattleFrameBuffer p2_battle_frames{thread_frame_buffer_size};
+
+  // These are generated slowly so a vector is fine
+  std::vector<Train::Build::Trajectory> build_buffer{};
+
+  const auto save_build_buffer_to_disk = [&build_buffer]() {
+    if (build_buffer.size() == 0) {
+      return;
+    }
+    const auto filename =
+        std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
+        ".build";
+    const auto full_path = RuntimeData::working_dir / filename;
+
+    const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+      const size_t bytes_to_write =
+          build_buffer.size() *
+          (Encode::Build::CompressedTrajectory<>::size_no_team);
+      ssize_t written = 0;
+      for (const auto &trajectory : build_buffer) {
+        const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
+        written += write(fd, &traj, decltype(traj)::size_no_team);
+      }
+      close(fd);
+      if (written != static_cast<ssize_t>(bytes_to_write)) {
+        std::cerr << "Short write when flushing build buffer to " << full_path
+                  << " (" << written << '/' << bytes_to_write << " bytes)\n";
+      }
+    } else {
+      std::cerr << "Failed to open " << full_path << " for writing\n";
+    }
+
+    build_buffer.clear();
+  };
 
   const auto play = [&](const auto &p1_team, const auto &p2_team) -> int {
     int score_2;
@@ -275,7 +369,14 @@ void thread_fn(uint64_t seed) {
     }
 
     if (RuntimeData::terminated) {
+      p1_battle_frames.save_to_disk(RuntimeData::working_dir / "p1");
+      p2_battle_frames.save_to_disk(RuntimeData::working_dir / "p2");
+      save_build_buffer_to_disk();
       return;
+    }
+
+    if (build_buffer.size() >= RuntimeOptions::max_build_traj) {
+      save_build_buffer_to_disk();
     }
   }
 
@@ -309,6 +410,26 @@ void handle_terminate(int signal) {
 }
 
 void setup(auto &device) {
+
+  // create working dir
+  const std::filesystem::path working_dir = "vs-" + RuntimeData::start_datetime;
+  std::error_code ec;
+  bool created = std::filesystem::create_directory(working_dir, ec);
+  created && = std::filesystem::create_directory(working_dir / "p1", ec);
+  created && = std::filesystem::create_directory(working_dir / "p2", ec);
+  if (ec) {
+    std::cerr << "Error creating directory: " << ec.message() << '\n';
+    throw std::runtime_error("Could not create working dir.");
+  } else if (created) {
+    std::cout << "Created directory " << working_dir.string() << std::endl;
+  } else {
+    throw std::runtime_error("Could not create working dir.");
+  }
+
+  // save args
+  // TODO
+
+  // global build network
   using namespace RuntimeOptions::TeamGen;
   if (!network_path.empty()) {
     std::ifstream file{RuntimeOptions::TeamGen::network_path};
