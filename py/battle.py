@@ -66,7 +66,12 @@ parser.add_argument(
     help="Weight for Nash in policy target (empirical = 1 - this)",
 )
 
-# Policy loss toggle
+# loss options
+parser.add_argument(
+    "--no-value-loss",
+    action="store_true",
+    dest="no_value_loss",
+)   
 parser.add_argument(
     "--no-policy-loss",
     action="store_true",
@@ -169,7 +174,10 @@ def loss(
         w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
     )
 
-    loss = torch.nn.functional.mse_loss(output.value[:size], value_target)
+    loss = torch.zeros((1,))
+
+    if not args.no_value_loss:
+        loss += torch.nn.functional.mse_loss(output.value[:size], value_target)
     value_loss = loss.detach().clone()
 
     if not args.no_policy_loss:
@@ -199,8 +207,8 @@ def loss(
             y = p1_policy_target[:window].view(window, 1, 9)
             print(torch.cat([x, y], dim=1))
             print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
-
-        print(f"loss: v:{value_loss.mean()}")
+        if not args.no_value_loss:
+            print(f"loss: v:{value_loss.mean()}")
 
     return loss
 
