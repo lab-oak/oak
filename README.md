@@ -24,6 +24,8 @@ These programs were all built from a shared header library that is easy to exten
 
 # Building
 
+Note: Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
+
 Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
 ```
@@ -44,5 +46,3 @@ and run with
 ```
 
 Note: Eigen has failed to build with some versions of g++-15.
-
-Note Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
