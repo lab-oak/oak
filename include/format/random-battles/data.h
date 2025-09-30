@@ -65,24 +65,27 @@ constexpr bool isLevel100(Species species) noexcept {
 }
 
 // {Electric: 0, Psychic: 0, Water: 0, Ice: 0, Ground: 0, Fire: 0};
-constexpr std::array<Type, 6> importantTypes{
-    Type::Electric, Type::Psychic, Type::Water,
-    Type::Ice,      Type::Ground,  Type::Fire};
+constexpr std::array<Type, 6> importantTypes{Type::Electric, Type::Psychic,
+                                             Type::Water,    Type::Ice,
+                                             Type::Ground,   Type::Fire};
 
 // template <Data::Types types, int foo, typename T>
 consteval std::array<uint8_t, 6> getImportantWeaknesses(const Species species) {
   const auto types =
       PKMN::Data::SPECIES_DATA[static_cast<uint8_t>(species) - 1].types;
   return {
-      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Electric, types[0])) *
+      static_cast<uint8_t>(
+          PKMN::Data::get_effectiveness(Type::Electric, types[0])) *
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Electric, types[1])) >
           4,
-      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Psychic, types[0])) *
+      static_cast<uint8_t>(
+          PKMN::Data::get_effectiveness(Type::Psychic, types[0])) *
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Psychic, types[1])) >
           4,
-      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Water, types[0])) *
+      static_cast<uint8_t>(
+          PKMN::Data::get_effectiveness(Type::Water, types[0])) *
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Water, types[1])) >
           4,
@@ -90,11 +93,13 @@ consteval std::array<uint8_t, 6> getImportantWeaknesses(const Species species) {
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Ice, types[1])) >
           4,
-      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Ground, types[0])) *
+      static_cast<uint8_t>(
+          PKMN::Data::get_effectiveness(Type::Ground, types[0])) *
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Ground, types[1])) >
           4,
-      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Fire, types[0])) *
+      static_cast<uint8_t>(
+          PKMN::Data::get_effectiveness(Type::Fire, types[0])) *
               static_cast<uint8_t>(
                   PKMN::Data::get_effectiveness(Type::Fire, types[1])) >
           4,

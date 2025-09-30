@@ -161,8 +161,8 @@ using OrderedMoveSet = Detail::OrderedArrayBasedSet<PKMN::Data::Move, 4>;
 // WIP clone of the official showdown random team generator
 namespace RandomBattles {
 
-using PKMN::Data::Species;
 using PKMN::Data::Move;
+using PKMN::Data::Species;
 using PKMN::Data::Type;
 
 using PartialSet = OrderedMoveSet;
@@ -476,8 +476,7 @@ public:
       }
     }
 
-    ArrayBasedVector<RandomBattlesData::RandomSetEntry::max_moves>::Vector<
-        Move>
+    ArrayBasedVector<RandomBattlesData::RandomSetEntry::max_moves>::Vector<Move>
         movePool{data.moves};
     movePool.resize(data.n_moves);
     while ((set_size < maxMoveCount) && movePool.size()) {
