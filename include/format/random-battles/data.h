@@ -1,13 +1,13 @@
 #pragma once
 
-#include <data/moves.h>
-#include <data/species.h>
-#include <data/types.h>
+#include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
+#include <libpkmn/data/types.h>
 
 namespace RandomBattlesData {
 
-using Data::Species;
-using Data::Types;
+using PKMN::Data::Species;
+using PKMN::Data::Type;
 
 static constexpr std::array<Species, 146> pokemonPool{
     Species::Bulbasaur,  Species::Ivysaur,    Species::Venusaur,
@@ -65,38 +65,38 @@ constexpr bool isLevel100(Species species) noexcept {
 }
 
 // {Electric: 0, Psychic: 0, Water: 0, Ice: 0, Ground: 0, Fire: 0};
-constexpr std::array<Data::Types, 6> importantTypes{
-    Types::Electric, Types::Psychic, Types::Water,
-    Types::Ice,      Types::Ground,  Types::Fire};
+constexpr std::array<Type, 6> importantTypes{
+    Type::Electric, Type::Psychic, Type::Water,
+    Type::Ice,      Type::Ground,  Type::Fire};
 
 // template <Data::Types types, int foo, typename T>
 consteval std::array<uint8_t, 6> getImportantWeaknesses(const Species species) {
   const auto types =
-      Data::SPECIES_DATA[static_cast<uint8_t>(species) - 1].types;
+      PKMN::Data::SPECIES_DATA[static_cast<uint8_t>(species) - 1].types;
   return {
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Electric, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Electric, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Electric, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Electric, types[1])) >
           4,
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Psychic, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Psychic, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Psychic, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Psychic, types[1])) >
           4,
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Water, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Water, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Water, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Water, types[1])) >
           4,
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Ice, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Ice, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Ice, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Ice, types[1])) >
           4,
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Ground, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Ground, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Ground, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Ground, types[1])) >
           4,
-      static_cast<uint8_t>(Data::get_effectiveness(Types::Fire, types[0])) *
+      static_cast<uint8_t>(PKMN::Data::get_effectiveness(Type::Fire, types[0])) *
               static_cast<uint8_t>(
-                  Data::get_effectiveness(Types::Fire, types[1])) >
+                  PKMN::Data::get_effectiveness(Type::Fire, types[1])) >
           4,
   };
 }

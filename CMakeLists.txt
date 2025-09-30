@@ -75,3 +75,7 @@ target_link_libraries(pyoak PRIVATE libpkmn_chance)
 add_executable(vs src/vs.cc)
 target_include_directories(vs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(vs PRIVATE libpkmn_chance lrslib128 eigen)
+
+add_executable(randbat src/randbat.cc)
+target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(randbat PRIVATE libpkmn_chance)

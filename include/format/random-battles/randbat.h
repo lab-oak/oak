@@ -1,25 +1,174 @@
 #pragma once
 
-#include <util/vector.h>
-
-#include <data/strings.h>
-
 #include <array>
 #include <bit>
+#include <cassert>
 #include <cstdint>
 #include <functional>
 #include <iostream>
 #include <unordered_map>
 
-#include <ii/random-battles/random-set-data.h>
+#include <format/random-battles/random-set-data.h>
+#include <libpkmn/data/strings.h>
+
+// Provides minimal std::vector interface around a std::array
+// May offer better performance in some cases
+template <std::size_t max_size> struct ArrayBasedVector {
+  template <typename T, typename CapacityT = std::size_t> class Vector {
+  protected:
+    std::array<T, max_size> _storage;
+    CapacityT _size;
+
+  public:
+    constexpr Vector() : _size{} {}
+
+    template <typename InT>
+      requires(std::is_integral_v<InT>)
+    constexpr Vector(const InT n) {
+      assert(0 < n && n <= max_size);
+      _size = n;
+      std::fill(this->begin(), this->end(), T{});
+    }
+
+    template <typename Vec> constexpr Vector(const Vec &other) noexcept {
+      assert(other.size() <= max_size);
+      _size = other.size();
+      std::copy(other.begin(), other.end(), _storage.begin());
+    }
+
+    template <typename Vec>
+    constexpr Vector &operator=(const Vec &other) noexcept {
+      assert(other.size() <= max_size);
+      _size = other.size();
+      std::copy(other.begin(), other.end(), _storage.begin());
+      return *this;
+    }
+
+    template <typename Vec> bool operator==(const Vec &other) const noexcept {
+      for (CapacityT i = 0; i < _size; ++i) {
+        if ((*this)[i] != other[i]) {
+          return false;
+        }
+      }
+      return _size == other.size();
+    }
+
+    template <typename size_type>
+    constexpr void resize(size_type n, T val = T{}) {
+      assert(n <= max_size);
+      if (_size < n) {
+        std::fill(_storage.begin() + _size, _storage.begin() + n, val);
+      }
+      _size = n;
+    }
+
+    template <typename size_type> void reserve(size_type n) noexcept {
+      assert(n <= max_size);
+      _size = n;
+    }
+
+    constexpr void push_back(const T &val = T{}) {
+      assert(_size < max_size);
+      _storage[_size++] = val;
+    }
+
+    constexpr void push_back(T &&val = T{}) {
+      assert(_size < max_size);
+      _storage[_size++] = val;
+    }
+
+    constexpr T &operator[](auto n) { return _storage[n]; }
+
+    constexpr const T &operator[](auto n) const { return _storage[n]; }
+
+    CapacityT size() const noexcept { return _size; }
+
+    constexpr void clear() noexcept { _size = 0; }
+
+    constexpr auto begin() noexcept { return _storage.begin(); }
+
+    constexpr const auto begin() const noexcept { return _storage.begin(); }
+
+    constexpr auto end() noexcept { return _storage.begin() + _size; }
+
+    const auto end() const noexcept { return _storage.begin() + _size; }
+  };
+};
+
+namespace Detail {
+template <typename T, size_t n>
+  requires(std::is_enum_v<T>)
+class OrderedArrayBasedSet {
+public:
+  std::array<T, n> _data;
+
+public:
+  void sort() noexcept {
+    std::sort(_data.begin(), _data.end(), std::greater<T>());
+  }
+
+  // OrderedArrayBasedSet& operator=(const OrderedArrayBasedSet&) = default;
+  bool operator==(const OrderedArrayBasedSet &) const noexcept = default;
+
+  bool operator<(const OrderedArrayBasedSet &other) const noexcept {
+    return _data < other._data;
+  }
+
+  bool insert(const T &val) noexcept {
+    auto free_index = -1;
+    bool is_in = false;
+    for (auto i = 0; i < n; ++i) {
+      if (_data[i] == val) {
+        return false;
+      }
+      if (_data[i] == T{0}) {
+        free_index = i;
+      }
+    }
+    if (free_index >= 0) {
+      _data[free_index] = val;
+      return true;
+    }
+    return false;
+  }
+
+  bool contains(const OrderedArrayBasedSet &other) const noexcept {
+    int i = 0;
+    for (int other_i = 0; other_i < 4; ++other_i) {
+      const auto other_move = other._data[other_i];
+      if (other_move == T{0}) {
+        break;
+      }
+      while (true) {
+        if (other_move == _data[i]) {
+          ++i;
+          break;
+        } else {
+        }
+        if ((i >= 4) || (other_move > _data[i])) {
+          return false;
+        }
+        ++i;
+      }
+    }
+    return true;
+  }
+};
+}; // namespace Detail
+
+using OrderedMoveSet = Detail::OrderedArrayBasedSet<PKMN::Data::Move, 4>;
 
 // WIP clone of the official showdown random team generator
 namespace RandomBattles {
 
-using PartialSet = Data::OrderedMoveSet;
+using PKMN::Data::Species;
+using PKMN::Data::Move;
+using PKMN::Data::Type;
+
+using PartialSet = OrderedMoveSet;
 
 struct PartialTeam {
-  using SpeciesSlot = std::pair<Data::Species, uint8_t>;
+  using SpeciesSlot = std::pair<Species, uint8_t>;
   std::array<SpeciesSlot, 6> species_slots;
   std::array<PartialSet, 6> move_sets;
 
@@ -35,7 +184,7 @@ struct PartialTeam {
     for (int i = 0; i < 6; ++i) {
 
       const auto smaller_species = species_slots[i].first;
-      if (smaller_species == Data::Species::None) {
+      if (smaller_species == Species::None) {
         break;
       }
 
@@ -62,16 +211,16 @@ struct PartialTeam {
   void print() const noexcept {
     for (int i = 0; i < 6; ++i) {
       const auto pair = species_slots[i];
-      if (pair.first == Data::Species::None) {
+      if (pair.first == Species::None) {
         continue;
       }
-      std::cout << Names::species_string(pair.first) << ": ";
+      std::cout << PKMN::species_string(pair.first) << ": ";
       const auto &set_data = move_sets[pair.second]._data;
       for (int m = 0; m < 4; ++m) {
-        if (set_data[m] == Data::Moves::None) {
+        if (set_data[m] == Move::None) {
           continue;
         }
-        std::cout << Names::move_string(set_data[m]) << ", ";
+        std::cout << PKMN::move_string(set_data[m]) << ", ";
       }
       std::cout << std::endl;
     }
@@ -210,7 +359,7 @@ public:
     std::array<int, 6> weaknessCount{};
     int numMaxLevelPokemon{};
 
-    using Arr = ArrayBasedVector<146>::Vector<Data::Species>;
+    using Arr = ArrayBasedVector<146>::Vector<Species>;
 
     Arr pokemonPool{RandomBattlesData::pokemonPool};
     Arr rejectedButNotInvalidPool{};
@@ -218,15 +367,15 @@ public:
     while (n_pokemon < 6 && pokemonPool.size()) {
       auto species = sampleNoReplace(pokemonPool, prng);
 
-      if (species == Data::Species::Ditto && battleHasDitto) {
+      if (species == Species::Ditto && battleHasDitto) {
         continue;
       }
 
       bool skip = false;
 
       // types
-      const auto types = Data::get_types(species);
-      for (const Data::Types type : types) {
+      const auto types = get_types(species);
+      for (const Type type : types) {
         if (typeCount[static_cast<uint8_t>(type)] >= 2) {
           skip = true;
           break;
@@ -280,7 +429,7 @@ public:
       if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
         ++numMaxLevelPokemon;
       }
-      if (species == Data::Species::Ditto) {
+      if (species == Species::Ditto) {
         battleHasDitto = true;
       }
     }
@@ -295,7 +444,7 @@ public:
     return team;
   }
 
-  PartialSet randomSet(Data::Species species) {
+  PartialSet randomSet(Species species) {
     PartialSet set{};
     auto set_size = 0;
 
@@ -328,7 +477,7 @@ public:
     }
 
     ArrayBasedVector<RandomBattlesData::RandomSetEntry::max_moves>::Vector<
-        Data::Moves>
+        Move>
         movePool{data.moves};
     movePool.resize(data.n_moves);
     while ((set_size < maxMoveCount) && movePool.size()) {
@@ -344,7 +493,7 @@ public:
     return set;
   }
 
-  PartialSet finishSet(const Data::Species species, const PartialSet &set) {
+  PartialSet finishSet(const Species species, const PartialSet &set) {
     while (true) {
       const auto finished = randomSet(species);
       if (finished.contains(set)) {
@@ -354,7 +503,7 @@ public:
   }
 
   void finishTeam(PartialTeam &partial) {
-    using Arr = ArrayBasedVector<146>::Vector<Data::Species>;
+    using Arr = ArrayBasedVector<146>::Vector<Species>;
 
     //   const bool species_done = !std::any();
 
