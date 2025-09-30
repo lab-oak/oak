@@ -109,80 +109,80 @@ function fixName(move: string): string {
         "selfdestruct"];
 
     const all_moves_fixed = [
-        "Moves::BodySlam",
-        "Moves::RazorLeaf",
-        "Moves::SleepPowder",
-        "Moves::SwordsDance",
-        "Moves::HyperBeam",
-        "Moves::Counter",
-        "Moves::SeismicToss",
-        "Moves::Slash",
-        "Moves::FireBlast",
-        "Moves::Submission",
-        "Moves::Earthquake",
-        "Moves::Blizzard",
-        "Moves::HydroPump",
-        "Moves::Surf",
-        "Moves::Rest",
-        "Moves::Psychic",
-        "Moves::StunSpore",
-        "Moves::DoubleEdge",
-        "Moves::MegaDrain",
-        "Moves::Substitute",
-        "Moves::Twineedle",
-        "Moves::Agility",
-        "Moves::QuickAttack",
-        "Moves::SkyAttack",
-        "Moves::MirrorMove",
-        "Moves::SandAttack",
-        "Moves::Reflect",
-        "Moves::SuperFang",
-        "Moves::Thunderbolt",
-        "Moves::DrillPeck",
-        "Moves::Leer",
-        "Moves::Mimic",
-        "Moves::Glare",
-        "Moves::RockSlide",
-        "Moves::ThunderWave",
-        "Moves::Thunder",
-        "Moves::DoubleKick",
-        "Moves::BubbleBeam",
-        "Moves::Sing",
-        "Moves::ConfuseRay",
-        "Moves::Flamethrower",
-        "Moves::WingAttack",
-        "Moves::Spore",
-        "Moves::Amnesia",
-        "Moves::LowKick",
-        "Moves::MegaKick",
-        "Moves::Hypnosis",
-        "Moves::Recover",
-        "Moves::Barrier",
-        "Moves::Explosion",
-        "Moves::Stomp",
-        "Moves::Sludge",
-        "Moves::NightShade",
-        "Moves::Crabhammer",
-        "Moves::TakeDown",
-        "Moves::HighJumpKick",
-        "Moves::Meditate",
-        "Moves::RollingKick",
-        "Moves::IceBeam",
-        "Moves::SoftBoiled",
-        "Moves::Growth",
-        "Moves::Smokescreen",
-        "Moves::LovelyKiss",
-        "Moves::Transform",
-        "Moves::TailWhip",
-        "Moves::AcidArmor",
-        "Moves::PinMissile",
-        "Moves::TriAttack",
-        "Moves::SelfDestruct"
+        "Move::BodySlam",
+        "Move::RazorLeaf",
+        "Move::SleepPowder",
+        "Move::SwordsDance",
+        "Move::HyperBeam",
+        "Move::Counter",
+        "Move::SeismicToss",
+        "Move::Slash",
+        "Move::FireBlast",
+        "Move::Submission",
+        "Move::Earthquake",
+        "Move::Blizzard",
+        "Move::HydroPump",
+        "Move::Surf",
+        "Move::Rest",
+        "Move::Psychic",
+        "Move::StunSpore",
+        "Move::DoubleEdge",
+        "Move::MegaDrain",
+        "Move::Substitute",
+        "Move::Twineedle",
+        "Move::Agility",
+        "Move::QuickAttack",
+        "Move::SkyAttack",
+        "Move::MirrorMove",
+        "Move::SandAttack",
+        "Move::Reflect",
+        "Move::SuperFang",
+        "Move::Thunderbolt",
+        "Move::DrillPeck",
+        "Move::Leer",
+        "Move::Mimic",
+        "Move::Glare",
+        "Move::RockSlide",
+        "Move::ThunderWave",
+        "Move::Thunder",
+        "Move::DoubleKick",
+        "Move::BubbleBeam",
+        "Move::Sing",
+        "Move::ConfuseRay",
+        "Move::Flamethrower",
+        "Move::WingAttack",
+        "Move::Spore",
+        "Move::Amnesia",
+        "Move::LowKick",
+        "Move::MegaKick",
+        "Move::Hypnosis",
+        "Move::Recover",
+        "Move::Barrier",
+        "Move::Explosion",
+        "Move::Stomp",
+        "Move::Sludge",
+        "Move::NightShade",
+        "Move::Crabhammer",
+        "Move::TakeDown",
+        "Move::HighJumpKick",
+        "Move::Meditate",
+        "Move::RollingKick",
+        "Move::IceBeam",
+        "Move::SoftBoiled",
+        "Move::Growth",
+        "Move::Smokescreen",
+        "Move::LovelyKiss",
+        "Move::Transform",
+        "Move::TailWhip",
+        "Move::AcidArmor",
+        "Move::PinMissile",
+        "Move::TriAttack",
+        "Move::SelfDestruct"
     ];
 
     // intended behaviour, for when we go out of bounds
     if (move === undefined) {
-        return "Moves::None";
+        return "Move::None";
     }
 
     const index = all_moves_precomputed.indexOf(move);
@@ -382,8 +382,8 @@ const header_header: string =
 namespace RandomBattlesData {
 
 using Data::Species;
-using Data::Moves;
-using Data::Types;
+using Data::Move;
+using Data::Type;
 
 struct RandomSetEntry {
   static constexpr uint8_t max_moves{${max_moves}};
@@ -397,13 +397,13 @@ struct RandomSetEntry {
   uint8_t n_essential_moves;
   uint8_t n_combo_moves;
 
-  std::array<Moves, max_moves> moves;
-  std::array<Moves, max_exclusive_moves> exclusive_moves;
-  std::array<Moves, max_essential_moves> essential_moves;
-  std::array<Moves, max_combo_moves> combo_moves;
+  std::array<Move, max_moves> moves;
+  std::array<Move, max_exclusive_moves> exclusive_moves;
+  std::array<Move, max_essential_moves> essential_moves;
+  std::array<Move, max_combo_moves> combo_moves;
 
   std::array<uint8_t, ${n_important_types}> weaknesses{};
-  std::array<Types, 2> types{};
+  std::array<Type, 2> types{};
 };
 
 constexpr std::array<RandomSetEntry, 152> RANDOM_SET_DATA
