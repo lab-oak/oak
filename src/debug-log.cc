@@ -13,7 +13,7 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
     std::cout << "Usage: provide two sample team indices [0 - "
               << ou_sample_teams.size() << "] and a u64 seed.\n"
               << "Debug log is piped via stdout e.g.:\n"
-              << "\t./build/debug-log 0 1 123456 | "
+              << "\t./release/debug-log 0 1 123456 | "
                  "./extern/engine/src/bin/pkmn-debug "
                  "> index.html"
               << std::endl;

@@ -11,7 +11,7 @@ When running the `dev/libpkmn` script, you may notice a message about a performa
 This program is not part of the usual workflow. It simply runs a search on a fixed battle for 2^n iterations. 'n'=20 by default (1,048,576 iterations) but it can be set as the first argument to the program, e.g.
 
 ```
-./build/benchmark 10
+./release/benchmark 10
 ```
 
 The search completes in ~22 seconds on very modest hardware (AMD Ryzen 5 5500U). The above command and all others assume the user is currently in the oak/ directory.
@@ -43,7 +43,7 @@ With the disclaimers out of the way, let's try using the program
 ### Reading the Program Output
 
 ```
-./build/chall
+./release/chall
 ```
 
 the program outputs
@@ -194,7 +194,7 @@ This script was writting for this tutorial. Run it with the various args to view
 This program uses self-play to play-out battles. Each turn will have value and policy targets associated with it. The program accepts many keyword arguments and it would take too long to explain them here. For this tutorial, will run the program with settings that allow millions of battle and team generation samples to be created within an hour on a consumer machine.
 
 ```
-./build/generate --threads=8 --max-pokemon=1 --team-modify-prob=1 --pokemon-delete-prob=1
+./release/generate --threads=8 --max-pokemon=1 --team-modify-prob=1 --pokemon-delete-prob=1
 --
 ```
 

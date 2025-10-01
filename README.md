@@ -32,7 +32,7 @@ Must have Cmake and a Zig compiler installed. The script below clones the repo, 
 git clone --recurse-submodules https://github.com/lab-oak/oak
 cd oak && git submodule update --recursive
 chmod +x dev/libpkmn && ./dev/libpkmn
-mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
+mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
 ```
 
 The `pkmn-debug` utility is built via
