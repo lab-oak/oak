@@ -281,6 +281,8 @@ void thread_fn(uint64_t seed) {
     Train::Battle::CompressedFrames p1_battle_frames{battle};
     Train::Battle::CompressedFrames p2_battle_frames{battle};
 
+    int p1_early_stop = 0;
+    int p2_early_stop = 0;
     bool early_stop = false;
     size_t updates = 0;
     try {
@@ -302,8 +304,8 @@ void thread_fn(uint64_t seed) {
         MCTS::Output p1_output, p2_output;
         int p1_index = 0;
         int p2_index = 0;
-        int p1_early_stop = 0;
-        int p2_early_stop = 0;
+        p1_early_stop = 0;
+        p2_early_stop = 0;
         // TODO - make up your mind how this is going to be handled
         // if (p1_choices.size() > 1) {
         {
@@ -334,7 +336,6 @@ void thread_fn(uint64_t seed) {
         // only if they have same sign and are both non zero
         if ((p1_early_stop * p2_early_stop) > 0) {
           early_stop = true;
-          score_2 = (p1_early_stop > 0 ? 2 : 0);
           break;
         }
 
@@ -356,7 +357,15 @@ void thread_fn(uint64_t seed) {
         ++updates;
       }
 
-      if (!early_stop) {
+      if (early_stop) {
+        if (p1_early_stop > 0) {
+          score_2 = 2;
+          battle_data.result = PKMN::result(PKMN::Result::Win);
+        } else {
+          score_2 = 0;
+          battle_data.result = PKMN::result(PKMN::Result::Lose);
+        }
+      } else {
         score_2 = PKMN::score2(battle_data.result);
       }
     } catch (const std::exception &e) {
