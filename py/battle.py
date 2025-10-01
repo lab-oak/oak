@@ -241,7 +241,7 @@ def main():
 
     if len(data_files) == 0:
         print(
-            f"No .battle files found in {args.data_dir}. Run ./build/generate with appropriate options to make them."
+            f"No .battle files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
         )
         exit()
     else:

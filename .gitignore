@@ -1,12 +1,12 @@
-/build/
-/debug-build/
+/release/
+/debug/
 libpkmn-showdown.a
 *.battle
 *.build
-*/args
+**/args
 *.log
-*.net
 *.pyc
+# TODO extensinos for build/battle nets
+*.net
 build-network
 battle-network
-args
