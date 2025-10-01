@@ -1,4 +1,4 @@
-const set_json = require("../extern/pokemon-showdown/data/random-battles/gen1/data.json");
+const set_json = require("/home/user/pokemon-showdown/data/random-battles/gen1/data.json");
 
 // only used to get all_moves_precomputed and feed that into GPT
 function get_all_moves_set(): set<string> {
@@ -211,7 +211,7 @@ function print_set_data_as_initializer(libpkmn_species: string): boolean {
     {${Array.from({ length: max_exclusive_moves }, (_, x) => fixName(exclusiveMoves[x]))}},
     {${Array.from({ length: max_essential_moves }, (_, x) => fixName(essentialMoves[x]))}},
     {${Array.from({ length: max_combo_moves }, (_, x) => fixName(comboMoves[x]))}},
-    getImportantWeaknesses(Species::${libpkmn_species}), Data::get_types(Species::${libpkmn_species})},`;
+    getImportantWeaknesses(Species::${libpkmn_species}), get_types(Species::${libpkmn_species})},`;
 
     console.log(s);
     return true;
@@ -377,13 +377,14 @@ const header_header: string =
 
 #include <array>
 
-#include "data.h"
+#include <format/random-battles/data.h>
 
 namespace RandomBattlesData {
 
-using Data::Species;
-using Data::Move;
-using Data::Type;
+using PKMN::Data::get_types;
+using PKMN::Data::Move;
+using PKMN::Data::Species;
+using PKMN::Data::Type;
 
 struct RandomSetEntry {
   static constexpr uint8_t max_moves{${max_moves}};
