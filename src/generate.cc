@@ -273,6 +273,7 @@ auto runtime_arg_string() -> std::string {
   out << "--search-time=" << agent.search_time << '\n';
   out << "--bandit-name=" << agent.bandit_name << '\n';
   out << "--battle-network-path=" << agent.network_path << '\n';
+  out << "--max-battle-length=" << max_battle_length << '\n';
 
   out << "--policy-mode=" << policy_options.mode << '\n';
   out << "--policy-temp=" << policy_options.temp << '\n';
@@ -391,11 +392,10 @@ bool endless_battle_check(const auto &p1, const auto &p2) {
       });
 }
 
-auto generate_team(mt19937 &device, const auto index)
+auto generate_team(mt19937 &device, const auto &base_team)
     -> Train::Build::Trajectory {
   using namespace RuntimeOptions::TeamGen;
 
-  const auto &base_team = RuntimeData::teams[index];
   const auto base_team_vec =
       std::vector<PKMN::Set>(base_team.begin(), base_team.end());
 
@@ -411,7 +411,7 @@ auto generate_team(mt19937 &device, const auto index)
     trajectory.initial = trajectory.terminal = team;
     return trajectory;
   } else {
-    print("Team " + std::to_string(index) + " modified:");
+    print("Team modified:");
     print(TeamBuilding::team_string(team));
     // loading each time allows the network params to be updated at runtime
     NN::Build::Network build_network{};
@@ -511,8 +511,10 @@ void generate(uint64_t seed) {
 
     const auto p1_team_index = device.random_int(RuntimeData::teams.size());
     const auto p2_team_index = device.random_int(RuntimeData::teams.size());
-    auto p1_build_traj = generate_team(device, p1_team_index);
-    auto p2_build_traj = generate_team(device, p2_team_index);
+    auto p1_build_traj =
+        generate_team(device, RuntimeData::teams[p1_team_index]);
+    auto p2_build_traj =
+        generate_team(device, RuntimeData::teams[p2_team_index]);
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
     if (endless_battle_check(p1_team, p2_team)) {

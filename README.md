@@ -24,13 +24,15 @@ These programs were all built from a shared header library that is easy to exten
 
 # Building
 
+Note: Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
+
 Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
 ```
 git clone --recurse-submodules https://github.com/lab-oak/oak
 cd oak && git submodule update --recursive
 chmod +x dev/libpkmn && ./dev/libpkmn
-mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
+mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
 ```
 
 The `pkmn-debug` utility is built via
@@ -44,5 +46,3 @@ and run with
 ```
 
 Note: Eigen has failed to build with some versions of g++-15.
-
-Note Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release

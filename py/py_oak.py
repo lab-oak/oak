@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 
-lib = ctypes.CDLL("./build/libpyoak.so")
+lib = ctypes.CDLL("./release/libpyoak.so")
 
 # battle net hyperparams
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value

@@ -54,17 +54,49 @@ enum class Result : std::underlying_type_t<std::byte> {
   Error = 4,
 };
 
+constexpr Result mirror_result(Result r) {
+  switch (r) {
+  case Result::Win:
+    return Result::Lose;
+  case Result::Lose:
+    return Result::Win;
+  case Result::Tie:
+    return Result::Tie;
+  case Result::None:
+    return Result::None;
+  case Result::Error:
+    return Result::Error;
+  default: {
+    assert(false);
+    return Result::Error;
+  }
+  }
+}
+
 enum class Choice : std::underlying_type_t<std::byte> {
   Pass = 0,
   Move = 1,
   Switch = 2,
 };
 
-pkmn_result result(Result result = Result::None, Choice p1 = Choice::Move,
-                   Choice p2 = Choice::Move) {
+constexpr pkmn_result result(Result result = Result::None,
+                             Choice p1 = Choice::Move,
+                             Choice p2 = Choice::Move) {
   return static_cast<uint8_t>(result) | (static_cast<uint8_t>(p1) << 4) |
          (static_cast<uint8_t>(p2) << 6);
 }
+
+pkmn_result mirror_result(pkmn_result r) {
+  // Extract fields
+  Result res = static_cast<Result>(r & 0x0F);
+  Choice p1 = static_cast<Choice>((r >> 4) & 0x03);
+  Choice p2 = static_cast<Choice>((r >> 6) & 0x03);
+  Result mirrored_res = mirror_result(res);
+  return static_cast<uint8_t>(mirrored_res) | (static_cast<uint8_t>(p2) << 4) |
+         (static_cast<uint8_t>(p1) << 6);
+}
+
+// static_assert(mirror_result() == );
 
 pkmn_result result(const pkmn_gen1_battle &b) {
   const auto &battle = PKMN::view(b);
@@ -215,7 +247,7 @@ auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
 constexpr float score(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
   case PKMN_RESULT_NONE: {
-    return .5;
+    return -1.0;
   }
   case PKMN_RESULT_WIN: {
     return 1.0;
@@ -228,7 +260,7 @@ constexpr float score(const pkmn_result result) noexcept {
   }
   default: {
     assert(false);
-    return 0.5;
+    return -2.0;
   }
   }
 }

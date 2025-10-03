@@ -23,23 +23,31 @@ def read_battle_trajectories():
     files = py_oak.find_data_files(".", ext=".battle")
     assert len(files) > 0, "No battle files found in cwd"
 
-    from random import sample, randint
+    from random import sample, randint, shuffle
 
     file = sample(files, 1)[0]
     # file = files[0]
 
     data = py_oak.read_battle_data(file)
+
+    shuffle(data)
+
     for buf, n in data:
         frames = py_oak.get_encoded_frames(buf, n)
 
-        i = randint(0, frames.size - 1)
+        print("score", frames.score)
+        print("value", frames.empirical_value)
+
+
+        # i = randint(0, frames.size - 1)
+        i = -1
         print(i, frames.m[i].item(), frames.n[i].item())
         # print("value", frames.empirical_value[i])
         # print("score", frames.score[i])
-        print("e1", frames.p1_empirical[i])
-        print("e2", frames.p2_empirical[i])
-        print("n1", frames.p1_nash[i])
-        print("n2", frames.p2_nash[i])
+        # print("e1", frames.p1_empirical[i])
+        # print("e2", frames.p2_empirical[i])
+        # print("n1", frames.p1_nash[i])
+        # print("n2", frames.p2_nash[i])
         print(
             "c1",
             [py_oak.policy_dim_labels[_.item()] for _ in frames.p1_choice_indices[i]],
@@ -49,6 +57,9 @@ def read_battle_trajectories():
             [py_oak.policy_dim_labels[_.item()] for _ in frames.p2_choice_indices[i]],
         )
         raw_frames = py_oak.get_frames(buf, n)
+
+        print("empirical value", frames.empirical_value[i])
+        print("score", frames.score[i])
 
         # print(raw_frames.battle[i])
         # print(raw_frames.battle[i, 23])
