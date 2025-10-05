@@ -38,7 +38,6 @@ def read_battle_trajectories():
         print("score", frames.score)
         print("value", frames.empirical_value)
 
-
         # i = randint(0, frames.size - 1)
         i = -1
         print(i, frames.m[i].item(), frames.n[i].item())
