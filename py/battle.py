@@ -71,7 +71,7 @@ parser.add_argument(
     "--no-value-loss",
     action="store_true",
     dest="no_value_loss",
-)   
+)
 parser.add_argument(
     "--no-policy-loss",
     action="store_true",
