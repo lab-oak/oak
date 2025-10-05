@@ -501,125 +501,126 @@ public:
     }
   }
 
-  PartialTeam finishTeam(PartialTeam team = {}) {
+  // PartialTeam finishTeam(PartialTeam team = {}) {
 
-    auto n_pokemon = 0;
-    std::array<int, 15> typeCount{};
-    std::array<int, 6> weaknessCount{};
-    int numMaxLevelPokemon{};
+  //   auto n_pokemon = 0;
+  //   std::array<int, 15> typeCount{};
+  //   std::array<int, 6> weaknessCount{};
+  //   int numMaxLevelPokemon{};
 
-    using Arr = ArrayBasedVector<146>::Vector<Species>;
+  //   using Arr = ArrayBasedVector<146>::Vector<Species>;
 
-    Arr pokemonPool{RandomBattlesData::pokemonPool};
-    Arr rejectedButNotInvalidPool{};
+  //   Arr pokemonPool{RandomBattlesData::pokemonPool};
+  //   Arr rejectedButNotInvalidPool{};
 
-    for (const auto& set : team) {
-      if (set.species != Species::None) {
-        // auto _ = 
-        ++n_pokemon;
-        const auto si = std::find(pokemonPool.begin(), pokemonPool.end(), set.species);
-        assert(si != pokemonPool.end());
-        const auto _ = fastPop(pokemonPool, std::distance(pokemonPool.begin(), si));
-        const auto& types = get_types(set.species);
-        typeCount[static_cast<uint8_t>(types[0])]++;
-        if (types[0] != types[1]) {
-          typeCount[static_cast<uint8_t>(types[1])]++;
-        }
-        const auto &w =
-            RandomBattlesData::RANDOM_SET_DATA[static_cast<uint8_t>(species)]
-                .weaknesses;
-        }
-        for (int i = 0; i < 6; ++i) {
-          weaknessCount[i] += w[i];
-        }
-        if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
-          ++numMaxLevelPokemon;
-        }
-        if (species == Species::Ditto) {
-          battleHasDitto = true;
-        }
-    }
+  //   for (const auto& set : team) {
+  //     const auto species = set.species;
+  //     if (species != Species::None) {
+  //       ++n_pokemon;
+  //       const auto si = std::find(pokemonPool.begin(), pokemonPool.end(),
+  //       species); assert(si != pokemonPool.end()); const auto _ =
+  //       fastPop(pokemonPool, std::distance(pokemonPool.begin(), si)); const
+  //       auto& types = get_types(species);
+  //       typeCount[static_cast<uint8_t>(types[0])]++;
+  //       if (types[0] != types[1]) {
+  //         typeCount[static_cast<uint8_t>(types[1])]++;
+  //       }
+  //       const auto &w =
+  //           RandomBattlesData::RANDOM_SET_DATA[static_cast<uint8_t>(species)]
+  //               .weaknesses;
+  //       }
+  //       for (int i = 0; i < 6; ++i) {
+  //         weaknessCount[i] += w[i];
+  //       }
+  //       if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1)
+  //       {
+  //         ++numMaxLevelPokemon;
+  //       }
+  //       if (species == Species::Ditto) {
+  //         battleHasDitto = true;
+  //       }
+  //   }
 
-    while (n_pokemon < 6 && pokemonPool.size()) {
-      auto species = sampleNoReplace(pokemonPool, prng);
+  //   while (n_pokemon < 6 && pokemonPool.size()) {
+  //     auto species = sampleNoReplace(pokemonPool, prng);
 
-      if (species == Species::Ditto && battleHasDitto) {
-        continue;
-      }
+  //     if (species == Species::Ditto && battleHasDitto) {
+  //       continue;
+  //     }
 
-      bool skip = false;
+  //     bool skip = false;
 
-      // types
-      const auto types = get_types(species);
-      for (const Type type : types) {
-        if (typeCount[static_cast<uint8_t>(type)] >= 2) {
-          skip = true;
-          break;
-        }
-      }
-      if (skip) {
-        rejectedButNotInvalidPool.push_back(species);
-        continue;
-      }
+  //     // types
+  //     const auto types = get_types(species);
+  //     for (const Type type : types) {
+  //       if (typeCount[static_cast<uint8_t>(type)] >= 2) {
+  //         skip = true;
+  //         break;
+  //       }
+  //     }
+  //     if (skip) {
+  //       rejectedButNotInvalidPool.push_back(species);
+  //       continue;
+  //     }
 
-      // weakness
-      const auto &w =
-          RandomBattlesData::RANDOM_SET_DATA[static_cast<uint8_t>(species)]
-              .weaknesses;
-      for (int i = 0; i < 6; ++i) {
-        if (!w[i]) {
-          continue;
-        }
-        if (weaknessCount[i] >= 2) {
-          skip = true;
-          break;
-        }
-      }
-      if (skip) {
-        rejectedButNotInvalidPool.push_back(species);
-        continue;
-      }
+  //     // weakness
+  //     const auto &w =
+  //         RandomBattlesData::RANDOM_SET_DATA[static_cast<uint8_t>(species)]
+  //             .weaknesses;
+  //     for (int i = 0; i < 6; ++i) {
+  //       if (!w[i]) {
+  //         continue;
+  //       }
+  //       if (weaknessCount[i] >= 2) {
+  //         skip = true;
+  //         break;
+  //       }
+  //     }
+  //     if (skip) {
+  //       rejectedButNotInvalidPool.push_back(species);
+  //       continue;
+  //     }
 
-      // lvl 100
-      if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
-        skip = true;
-      }
-      if (skip) {
-        rejectedButNotInvalidPool.push_back(species);
-        continue;
-      }
+  //     // lvl 100
+  //     if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
+  //       skip = true;
+  //     }
+  //     if (skip) {
+  //       rejectedButNotInvalidPool.push_back(species);
+  //       continue;
+  //     }
 
-      // accept the set
-      team.species_slots[n_pokemon] = {species, n_pokemon};
-      team.move_sets[n_pokemon++] = randomSet(species);
+  //     // accept the set
+  //     team.species_slots[n_pokemon] = {species, n_pokemon};
+  //     team.move_sets[n_pokemon++] = randomSet(species);
 
-      // update
-      typeCount[static_cast<uint8_t>(types[0])]++;
-      if (types[0] != types[1]) {
-        typeCount[static_cast<uint8_t>(types[1])]++;
-      }
+  //     // update
+  //     typeCount[static_cast<uint8_t>(types[0])]++;
+  //     if (types[0] != types[1]) {
+  //       typeCount[static_cast<uint8_t>(types[1])]++;
+  //     }
 
-      for (int i = 0; i < 6; ++i) {
-        weaknessCount[i] += w[i];
-      }
-      if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
-        ++numMaxLevelPokemon;
-      }
-      if (species == Species::Ditto) {
-        battleHasDitto = true;
-      }
-    }
+  //     for (int i = 0; i < 6; ++i) {
+  //       weaknessCount[i] += w[i];
+  //     }
+  //     if (RandomBattlesData::isLevel100(species) && numMaxLevelPokemon > 1) {
+  //       ++numMaxLevelPokemon;
+  //     }
+  //     if (species == Species::Ditto) {
+  //       battleHasDitto = true;
+  //     }
+  //   }
 
-    while (n_pokemon < 6 && rejectedButNotInvalidPool.size()) {
-      const auto species = sampleNoReplace(rejectedButNotInvalidPool, prng);
-      team.species_slots[n_pokemon] = {species, n_pokemon};
-      team.move_sets[n_pokemon++] = randomSet(species);
-    }
+  //   while (n_pokemon < 6 && rejectedButNotInvalidPool.size()) {
+  //     const auto species = sampleNoReplace(rejectedButNotInvalidPool, prng);
+  //     team.species_slots[n_pokemon] = {species, n_pokemon};
+  //     team.move_sets[n_pokemon++] = randomSet(species);
+  //   }
 
-    team.sort();
-    return team;
+  //   team.sort();
+  //   return team;
 
-  }
+  // }
 };
 
 } // namespace RandomBattles
