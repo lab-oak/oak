@@ -85,8 +85,7 @@ int try_generate_all_sets(int argc, char **argv) {
   int64_t initial_seed = rng();
   RandomBattles::PRNG prng{initial_seed};
 
-  const size_t tries_per_species = 10000;
-  // using Map = LinearScanMap<RandomBattles::PartialSet, bool>;
+  const size_t tries_per_species = 5000;
   using Map = std::map<RandomBattles::PartialSet, bool>;
   constexpr auto n_species = RandomBattlesData::pokemonPool.size();
   std::array<Map, n_species> sets{};
@@ -117,4 +116,4 @@ int try_generate_all_sets(int argc, char **argv) {
   return 0;
 }
 
-int main(int argc, char **argv) { return generate_team(argc, argv); }
+int main(int argc, char **argv) { return try_generate_all_sets(argc, argv); }
