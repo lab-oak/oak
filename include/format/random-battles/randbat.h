@@ -1,5 +1,8 @@
 #pragma once
 
+#include <format/random-battles/random-set-data.h>
+#include <libpkmn/pkmn.h>
+
 #include <array>
 #include <bit>
 #include <cassert>
@@ -7,9 +10,6 @@
 #include <functional>
 #include <iostream>
 #include <unordered_map>
-
-#include <format/random-battles/random-set-data.h>
-#include <libpkmn/data/strings.h>
 
 // Provides minimal std::vector interface around a std::array
 // May offer better performance in some cases
@@ -153,6 +153,10 @@ public:
     }
     return true;
   }
+
+  const auto begin() const { return _data.begin(); }
+
+  const auto end() const { return _data.end(); }
 };
 }; // namespace Detail
 
@@ -347,6 +351,21 @@ private:
 
 public:
   Teams(PRNG prng) : prng{prng} {}
+
+  PKMN::Team partialToTeam(const PartialTeam &partial) const {
+    PKMN::Team team{};
+    for (auto i = 0; i < 6; ++i) {
+      auto &set = team[i];
+      const auto [species, slot] = partial.species_slots[i];
+      const auto &moves = partial.move_sets[slot];
+
+      set.species = species;
+      for (auto m = 0; m < 4; ++m) {
+        set.moves[m] = moves._data[m];
+      }
+    }
+    return team;
+  }
 
   PartialTeam randomTeam() {
 

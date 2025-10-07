@@ -8,9 +8,9 @@ namespace RandomBattlesData {
 
 using PKMN::Data::Species;
 using enum PKMN::Data::Move;
+using PKMN::Data::get_types;
 using PKMN::Data::Move;
 using PKMN::Data::Type;
-using PKMN::Data::get_types;
 
 struct RandomSetEntry {
   static constexpr uint8_t max_moves{9};

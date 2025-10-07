@@ -1,3 +1,4 @@
+#include <format/random-battles/randbat.h>
 #include <nn/battle/network.h>
 #include <nn/build/network.h>
 #include <teams/ou-sample-teams.h>
@@ -52,6 +53,8 @@ std::string network_path = "";
 double team_modify_prob = 0;
 TeamBuilding::Omitter omitter{};
 double battle_skip_prob = 0;
+
+bool randbats = false;
 }; // namespace TeamGen
 
 }; // namespace RuntimeOptions
@@ -396,6 +399,20 @@ auto generate_team(mt19937 &device, const auto &base_team)
     -> Train::Build::Trajectory {
   using namespace RuntimeOptions::TeamGen;
 
+  if (randbats) {
+    Train::Build::Trajectory trajectory{};
+    const auto seed = std::bit_cast<int64_t>(device.uniform_64());
+    RandomBattles::PRNG prng{seed};
+    RandomBattles::Teams t{prng};
+    // completed but in weird format
+    const auto partial_team = t.randomTeam();
+    const auto team = t.partialToTeam(partial_team);
+    std::vector<PKMN::Set> team_vec(team.begin(), team.end());
+    trajectory.initial = team_vec;
+    trajectory.terminal = team_vec;
+    return trajectory;
+  }
+
   const auto base_team_vec =
       std::vector<PKMN::Set>(base_team.begin(), base_team.end());
 
@@ -648,7 +665,7 @@ void generate(uint64_t seed) {
     }
 
     // build
-    if (!p1_built && !p2_built) {
+    if (!p1_built && !p2_built && !RuntimeOptions::TeamGen::randbats) {
       RuntimeData::matchup_matrix.update(p1_team_index, p2_team_index,
                                          PKMN::score(battle_data.result));
     }
@@ -737,33 +754,45 @@ void setup() {
   // get teams
   using RuntimeData::teams;
   if (!RuntimeOptions::TeamGen::teams_path.empty()) {
-    // read teams file
-    const auto side_to_team = [](const PKMN::Side &side) {
-      std::vector<PKMN::Set> team{};
-      for (const auto &pokemon : side.pokemon) {
-        if (pokemon.species != PKMN::Data::Species::None) {
-          PKMN::Set set{};
-          set.species = pokemon.species;
-          std::transform(pokemon.moves.begin(), pokemon.moves.end(),
-                         set.moves.begin(),
-                         [](const auto ms) { return ms.id; });
-          team.emplace_back(set);
+
+    if (RuntimeOptions::TeamGen::teams_path == "randbats" ||
+        RuntimeOptions::TeamGen::teams_path == "random-battles") {
+      std::transform(Teams::ou_sample_teams.begin(),
+                     Teams::ou_sample_teams.end(), std::back_inserter(teams),
+                     [](const auto &team) {
+                       std::vector<PKMN::Set> t{team.begin(), team.end()};
+                       return t;
+                     });
+      RuntimeOptions::TeamGen::randbats = true;
+    } else {
+      // read teams file
+      const auto side_to_team = [](const PKMN::Side &side) {
+        std::vector<PKMN::Set> team{};
+        for (const auto &pokemon : side.pokemon) {
+          if (pokemon.species != PKMN::Data::Species::None) {
+            PKMN::Set set{};
+            set.species = pokemon.species;
+            std::transform(pokemon.moves.begin(), pokemon.moves.end(),
+                           set.moves.begin(),
+                           [](const auto ms) { return ms.id; });
+            team.emplace_back(set);
+          }
         }
+        return team;
+      };
+      std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+      while (true) {
+        std::string line{};
+        std::getline(file, line);
+        if (line.empty()) {
+          break;
+        }
+        const auto [side, _] = Parse::parse_side(line);
+        teams.push_back(side_to_team(side));
       }
-      return team;
-    };
-    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
-    while (true) {
-      std::string line{};
-      std::getline(file, line);
-      if (line.empty()) {
-        break;
+      if (teams.size() == 0) {
+        throw std::runtime_error{"Could not parse teams"};
       }
-      const auto [side, _] = Parse::parse_side(line);
-      teams.push_back(side_to_team(side));
-    }
-    if (teams.size() == 0) {
-      throw std::runtime_error{"Could not parse teams"};
     }
   } else {
     // use sample teams
