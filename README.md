@@ -4,7 +4,7 @@ Oak is a software toolkit for perfect info search and neural network training fo
 
 * A program for generating neural network training data for both battling and team building
 
-* An analyis engine that accepts any position in a a simple text format
+* An analysis engine that accepts any position in a a simple text format
 
 * A tool for comparing the strength of different neural network and search parameters
 
@@ -24,7 +24,9 @@ These programs were all built from a shared header library that is easy to exten
 
 # Building
 
-Note: Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
+**Note**: Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
+
+**Note**: Eigen has failed to build with some versions of g++-15.
 
 Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
@@ -44,5 +46,3 @@ and run with
 ```
 ./extern/engine/src/bin/pkmn-debug
 ```
-
-Note: Eigen has failed to build with some versions of g++-15.
