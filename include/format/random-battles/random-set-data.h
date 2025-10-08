@@ -1846,4 +1846,9 @@ constexpr std::array<RandomSetEntry, 152> RANDOM_SET_DATA{
                    getImportantWeaknesses(Species::Mew),
                    get_types(Species::Mew)},
 }; // RANDOM_SET_DATA
+
+constexpr auto random_set_data(const auto species) {
+  return RANDOM_SET_DATA[static_cast<uint8_t>(species)];
+}
+
 }; // namespace RandomBattlesData

@@ -358,7 +358,7 @@ public:
       auto &set = team[i];
       const auto [species, slot] = partial.species_slots[i];
       const auto &moves = partial.move_sets[slot];
-
+      set.level = RandomBattlesData::random_set_data(species).level;
       set.species = species;
       for (auto m = 0; m < 4; ++m) {
         set.moves[m] = moves._data[m];

@@ -34,6 +34,7 @@ constexpr bool calc = false;
 struct Set {
   Data::Species species;
   std::array<Data::Move, 4> moves;
+  uint8_t level{100};
 
   constexpr bool operator==(const Set &other) const {
     auto a = moves;
