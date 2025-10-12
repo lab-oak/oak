@@ -3,6 +3,7 @@
 #include <search/tree.h>
 #include <teams/benchmark-teams.h>
 #include <util/random.h>
+#include <util/search.h>
 
 struct FastModel {
   fast_prng device;
@@ -23,13 +24,10 @@ int benchmark(int argc, char **argv) {
   const auto durations = PKMN::durations();
   MCTS::BattleData battle_data{battle, durations, result};
 
-  FastModel model{battle_data.battle.bytes +
-                  PKMN::Layout::Offsets::Battle::rng};
-
-  MCTS::Search search{};
   int exp = 20;
   std::string bandit_name{"exp3-0.03"};
   std::string network_path{"mc"};
+
   if (argc > 1) {
     exp = std::atoi(argv[1]);
   }
@@ -44,11 +42,15 @@ int benchmark(int argc, char **argv) {
   std::cout << "Benchmarking for 2^" << exp << " iterations." << std::endl;
   const size_t iterations = 1 << exp;
 
-  Exp3::Bandit::Params bandit_params{.03};
-  using Node = Tree::Node<Exp3::JointBandit, MCTS::Obs>;
-  Node node{};
-  const auto output =
-      search.run(iterations, bandit_params, node, model, battle_data);
+  RuntimeSearch::Nodes nodes{};
+  RuntimeSearch::Agent agent{std::to_string(iterations), bandit_name,
+                             network_path};
+
+  if (agent.uses_network()) {
+    agent.read_network_parameters();
+  }
+
+  const auto output = RuntimeSearch::run(battle_data, nodes, agent);
 
   std::cout << output.duration.count() << " ms." << std::endl;
 
