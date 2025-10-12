@@ -1,3 +1,4 @@
+#include <format/random-battles/randbat.h>
 #include <libpkmn/data.h>
 #include <libpkmn/strings.h>
 #include <nn/battle/network.h>
@@ -381,14 +382,31 @@ void thread_fn(uint64_t seed) {
     return score_2;
   };
 
+  const auto randbat_traj = [&]() {
+    Train::Build::Trajectory trajectory{};
+    const auto seed = std::bit_cast<int64_t>(device.uniform_64());
+    RandomBattles::PRNG prng{seed};
+    RandomBattles::Teams t{prng};
+    // completed but in weird format
+    const auto partial_team = t.randomTeam();
+    const auto team = t.partialToTeam(partial_team);
+    std::vector<PKMN::Set> team_vec(team.begin(), team.end());
+    trajectory.initial = team_vec;
+    trajectory.terminal = team_vec;
+    return trajectory;
+  };
+
   while (true) {
     const auto p1_base_team = Teams::ou_sample_teams[device.random_int(
         Teams::ou_sample_teams.size())];
     const auto p2_base_team = Teams::ou_sample_teams[device.random_int(
         Teams::ou_sample_teams.size())];
 
-    const auto p1_build_traj = generate_team(device, p1_base_team);
-    const auto p2_build_traj = generate_team(device, p2_base_team);
+    // const auto p1_build_traj = generate_team(device, p1_base_team);
+    // const auto p2_build_traj = generate_team(device, p2_base_team);
+
+    const auto p1_build_traj = randbat_traj();
+    const auto p2_build_traj = randbat_traj();
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
     const auto s2 = play(p2_build_traj, p1_build_traj);
