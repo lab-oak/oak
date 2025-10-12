@@ -5,11 +5,10 @@
 #include <cstddef>
 #include <istream>
 
-template <std::size_t in_dim, std::size_t out_dim, bool clamp = true>
-class Affine {
+template <bool clamp = true> class Affine {
 public:
-  static constexpr std::size_t kIn = in_dim;
-  static constexpr std::size_t kOut = out_dim;
+  uint in_dim;
+  uint out_dim;
 
   using InputVector = Eigen::VectorXf;
   using OutputVector = Eigen::VectorXf;
@@ -20,19 +19,21 @@ public:
   WeightMatrix weights;
   OutputVector biases;
 
-  Affine() : weights(kOut, kIn), biases(kOut) {}
+  Affine(uint in_dim, uint out_dim)
+      : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
+        biases(out_dim) {}
 
   bool operator==(const Affine &other) const {
     return (biases == other.biases) && (weights == other.weights);
   }
 
   void initialize(auto &device) {
-    const float k = 1.0f / std::sqrt(static_cast<float>(kIn));
-    for (std::size_t i = 0; i < kOut; ++i) {
+    const float k = 1.0f / std::sqrt(static_cast<float>(in_dim));
+    for (std::size_t i = 0; i < out_dim; ++i) {
       biases(i) = device.uniform() * 2 * k - k;
     }
-    for (std::size_t i = 0; i < kOut; ++i) {
-      for (std::size_t j = 0; j < kIn; ++j) {
+    for (std::size_t i = 0; i < out_dim; ++i) {
+      for (std::size_t j = 0; j < in_dim; ++j) {
         weights(i, j) = device.uniform() * 2 * k - k;
       }
     }
@@ -48,39 +49,39 @@ public:
       return false;
     }
     if (!stream.read(reinterpret_cast<char *>(biases.data()),
-                     kOut * sizeof(float))) {
+                     out_dim * sizeof(float))) {
       return false;
     }
     if (!stream.read(reinterpret_cast<char *>(weights.data()),
-                     kOut * kIn * sizeof(float))) {
+                     out_dim * in_dim * sizeof(float))) {
       return false;
     }
-    bool match = (in == kIn) && (out == kOut);
+    bool match = (in == in_dim) && (out == out_dim);
     // if (!match) {
-    //   std::cout << in << ' ' << kIn << std::endl;
-    //   std::cout << out << ' ' << kOut << std::endl;
+    //   std::cout << in << ' ' << in_dim << std::endl;
+    //   std::cout << out << ' ' << out_dim << std::endl;
     // }
     return match;
   }
 
   bool write_parameters(std::ostream &stream) const {
-    uint32_t in = kIn;
-    uint32_t out = kOut;
+    uint32_t in = in_dim;
+    uint32_t out = out_dim;
     stream.write(reinterpret_cast<const char *>(&in), sizeof(uint32_t));
     stream.write(reinterpret_cast<const char *>(&out), sizeof(uint32_t));
     stream.write(reinterpret_cast<const char *>(biases.data()),
-                 kOut * sizeof(float));
+                 out_dim * sizeof(float));
     stream.write(reinterpret_cast<const char *>(weights.data()),
-                 kOut * kIn * sizeof(float));
+                 out_dim * in_dim * sizeof(float));
     return !stream.fail();
   }
 
   void propagate(const float *input_data, float *output_data) const {
-    const auto input = Eigen::Map<const InputVector>(input_data, kIn);
-    Eigen::Map<OutputVector> output(output_data, kOut);
+    const auto input = Eigen::Map<const InputVector>(input_data, in_dim);
+    Eigen::Map<OutputVector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
     if constexpr (clamp) {
-      for (std::size_t i = 0; i < kOut; ++i) {
+      for (std::size_t i = 0; i < out_dim; ++i) {
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }
     }

@@ -32,7 +32,7 @@ template <typename T, int dim = 39> struct PokemonCache {
 
   // iterate through all move pp/status combinations for a pokemon and store
   // embedding
-  void fill(const auto &pokemon_net, const PKMN::Pokemon &base_pokemon) {
+  void fill(auto &pokemon_net, const PKMN::Pokemon &base_pokemon) {
     auto pokemon = base_pokemon;
     // iterate through all 16 has-pp combinations
     for (auto m = 0; m < 16; ++m) {

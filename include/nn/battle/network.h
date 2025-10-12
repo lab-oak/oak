@@ -11,17 +11,24 @@ namespace NN {
 
 namespace Battle {
 
-template <int in_dim, int hidden_dim, int value_hidden_dim,
-          int policy_hidden_dim, int policy_out_dim>
 struct MainNet {
 
-  Affine<in_dim, hidden_dim> fc0;
-  Affine<hidden_dim, value_hidden_dim> value_fc1;
-  Affine<value_hidden_dim, 1, false> value_fc2;
-  Affine<hidden_dim, policy_hidden_dim> policy1_fc1;
-  Affine<policy_hidden_dim, policy_out_dim, false> policy1_fc2;
-  Affine<hidden_dim, policy_hidden_dim> policy2_fc1;
-  Affine<policy_hidden_dim, policy_out_dim, false> policy2_fc2;
+  Affine<> fc0;
+  Affine<> value_fc1;
+  Affine<false> value_fc2;
+  Affine<> policy1_fc1;
+  Affine<false> policy1_fc2;
+  Affine<> policy2_fc1;
+  Affine<false> policy2_fc2;
+
+  MainNet(uint in_dim, uint hidden_dim, uint value_hidden_dim,
+          uint policy_hidden_dim, uint policy_out_dim)
+      : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
+        value_fc2(value_hidden_dim, 1),
+        policy1_fc1(hidden_dim, policy_hidden_dim),
+        policy1_fc2(policy_hidden_dim, policy_out_dim),
+        policy2_fc1(hidden_dim, policy_hidden_dim),
+        policy2_fc2(policy_hidden_dim, policy_out_dim) {}
 
   bool operator==(const MainNet &) const = default;
 
@@ -103,21 +110,24 @@ struct MainNet {
 };
 
 struct Network {
-  using PokemonNet = EmbeddingNet<Encode::Battle::Pokemon::n_dim,
-                                  pokemon_hidden_dim, pokemon_out_dim>;
-  using ActiveNet = EmbeddingNet<Encode::Battle::Active::n_dim,
-                                 active_hidden_dim, active_out_dim>;
+  using PokemonNet = EmbeddingNet<>;
+  using ActiveNet = EmbeddingNet<>;
 
   PokemonNet pokemon_net;
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
       pokemon_cache;
   ActiveNet active_net;
-  MainNet<2 * side_out_dim, hidden_dim, value_hidden_dim, policy_hidden_dim,
-          policy_out_dim>
-      main_net;
+
+  MainNet main_net;
   mt19937 device;
 
-  Network() : pokemon_net{}, active_net{}, main_net{} {}
+  Network()
+      : pokemon_net{Encode::Battle::Pokemon::n_dim, pokemon_hidden_dim,
+                    pokemon_out_dim},
+        active_net{Encode::Battle::Active::n_dim, active_hidden_dim,
+                   active_out_dim},
+        main_net{2 * side_out_dim, hidden_dim, value_hidden_dim,
+                 policy_hidden_dim, policy_out_dim} {}
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
