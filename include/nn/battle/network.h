@@ -16,10 +16,10 @@ struct MainNet {
   Affine<> fc0;
   Affine<> value_fc1;
   Affine<false> value_fc2;
-  Affine<> policy1_fc1;
-  Affine<false> policy1_fc2;
-  Affine<> policy2_fc1;
-  Affine<false> policy2_fc2;
+  Affine<> p1_policy_fc1;
+  Affine<false> p1_policy_fc2;
+  Affine<> p2_policy_fc1;
+  Affine<false> p2_policy_fc2;
 
   std::vector<float> buffer;
   std::vector<float> value_buffer;
@@ -30,10 +30,10 @@ struct MainNet {
           uint32_t policy_hidden_dim, uint32_t policy_out_dim)
       : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
         value_fc2(value_hidden_dim, 1),
-        policy1_fc1(hidden_dim, policy_hidden_dim),
-        policy1_fc2(policy_hidden_dim, policy_out_dim),
-        policy2_fc1(hidden_dim, policy_hidden_dim),
-        policy2_fc2(policy_hidden_dim, policy_out_dim), buffer{},
+        p1_policy_fc1(hidden_dim, policy_hidden_dim),
+        p1_policy_fc2(policy_hidden_dim, policy_out_dim),
+        p2_policy_fc1(hidden_dim, policy_hidden_dim),
+        p2_policy_fc2(policy_hidden_dim, policy_out_dim), buffer{},
         value_buffer{}, p1_policy_buffer{}, p2_policy_buffer{} {
     buffer.resize(hidden_dim);
     value_buffer.resize(value_hidden_dim);
@@ -47,28 +47,28 @@ struct MainNet {
     fc0.initialize(device);
     value_fc1.initialize(device);
     value_fc2.initialize(device);
-    policy1_fc1.initialize(device);
-    policy1_fc2.initialize(device);
-    policy2_fc1.initialize(device);
-    policy2_fc2.initialize(device);
+    p1_policy_fc1.initialize(device);
+    p1_policy_fc2.initialize(device);
+    p2_policy_fc1.initialize(device);
+    p2_policy_fc2.initialize(device);
   }
 
   bool read_parameters(std::istream &stream) {
     return fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
            value_fc2.read_parameters(stream) &&
-           policy1_fc1.read_parameters(stream) &&
-           policy1_fc2.read_parameters(stream) &&
-           policy2_fc1.read_parameters(stream) &&
-           policy2_fc2.read_parameters(stream);
+           p1_policy_fc1.read_parameters(stream) &&
+           p1_policy_fc2.read_parameters(stream) &&
+           p2_policy_fc1.read_parameters(stream) &&
+           p2_policy_fc2.read_parameters(stream);
   }
 
   bool write_parameters(std::ostream &stream) {
     return fc0.write_parameters(stream) && value_fc1.write_parameters(stream) &&
            value_fc2.write_parameters(stream) &&
-           policy1_fc1.write_parameters(stream) &&
-           policy1_fc2.write_parameters(stream) &&
-           policy2_fc1.write_parameters(stream) &&
-           policy2_fc2.write_parameters(stream);
+           p1_policy_fc1.write_parameters(stream) &&
+           p1_policy_fc2.write_parameters(stream) &&
+           p2_policy_fc1.write_parameters(stream) &&
+           p2_policy_fc2.write_parameters(stream);
   }
 
   float propagate(const float *input_data) {
@@ -87,16 +87,16 @@ struct MainNet {
     value_fc1.propagate(buffer.data(), value_buffer.data());
     value_fc2.propagate(value_buffer.data(), &output);
 
-    policy1_fc1.propagate(buffer.data(), p1_policy_buffer.data());
-    policy2_fc1.propagate(buffer.data(), p2_policy_buffer.data());
+    p1_policy_fc1.propagate(buffer.data(), p1_policy_buffer.data());
+    p2_policy_fc1.propagate(buffer.data(), p2_policy_buffer.data());
 
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];
       assert(p1_c < Encode::Battle::Policy::n_dim);
       const float logit =
-          policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              p1_policy_buffer.data(), policy1_fc1.out_dim)) +
-          policy1_fc2.biases[p1_c];
+          p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              p1_policy_buffer.data(), p1_policy_fc1.out_dim)) +
+          p1_policy_fc2.biases[p1_c];
       p1[i] = logit;
     }
 
@@ -104,9 +104,9 @@ struct MainNet {
       const auto p2_c = p2_choice_index[i];
       assert(p2_c < Encode::Battle::Policy::n_dim);
       const float logit =
-          policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              p2_policy_buffer.data(), policy2_fc1.out_dim)) +
-          policy2_fc2.biases[p2_c];
+          p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              p2_policy_buffer.data(), p2_policy_fc1.out_dim)) +
+          p2_policy_fc2.biases[p2_c];
       p2[i] = logit;
     }
 
