@@ -43,16 +43,6 @@ struct MainNet {
 
   bool operator==(const MainNet &) const = default;
 
-  void initialize(auto &device) {
-    fc0.initialize(device);
-    value_fc1.initialize(device);
-    value_fc2.initialize(device);
-    p1_policy_fc1.initialize(device);
-    p1_policy_fc2.initialize(device);
-    p2_policy_fc1.initialize(device);
-    p2_policy_fc2.initialize(device);
-  }
-
   bool read_parameters(std::istream &stream) {
     return fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
            value_fc2.read_parameters(stream) &&
@@ -62,7 +52,7 @@ struct MainNet {
            p2_policy_fc2.read_parameters(stream);
   }
 
-  bool write_parameters(std::ostream &stream) {
+  bool write_parameters(std::ostream &stream) const {
     return fc0.write_parameters(stream) && value_fc1.write_parameters(stream) &&
            value_fc2.write_parameters(stream) &&
            p1_policy_fc1.write_parameters(stream) &&
@@ -126,24 +116,16 @@ struct Network {
   MainNet main_net;
   mt19937 device;
 
-  Network()
-      : pokemon_net{Encode::Battle::Pokemon::n_dim, pokemon_hidden_dim,
-                    pokemon_out_dim},
-        active_net{Encode::Battle::Active::n_dim, active_hidden_dim,
-                   active_out_dim},
-        main_net{2 * side_out_dim, hidden_dim, value_hidden_dim,
-                 policy_hidden_dim, policy_out_dim} {}
+  Network(uint32_t phd = pokemon_hidden_dim, uint32_t ahd = active_hidden_dim,
+          uint32_t hd = hidden_dim, uint32_t vhd = value_hidden_dim,
+          uint32_t pohd = policy_hidden_dim)
+      : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pokemon_out_dim},
+        active_net{Encode::Battle::Active::n_dim, ahd, active_out_dim},
+        main_net{2 * side_out_dim, hd, vhd, pohd, policy_out_dim} {}
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
            (main_net == main_net);
-  }
-
-  void initialize() {
-    mt19937 device{std::random_device{}()};
-    pokemon_net.initialize(device);
-    active_net.initialize(device);
-    main_net.initialize(device);
   }
 
   void fill_cache(const pkmn_gen1_battle &b) {
@@ -161,7 +143,7 @@ struct Network {
            main_net.read_parameters(stream);
   }
 
-  bool write_parameters(std::ostream &stream) {
+  bool write_parameters(std::ostream &stream) const {
     return pokemon_net.write_parameters(stream) &&
            active_net.write_parameters(stream) &&
            main_net.write_parameters(stream);
