@@ -21,6 +21,11 @@ struct MainNet {
   Affine<> policy2_fc1;
   Affine<false> policy2_fc2;
 
+  std::vector<float> buffer;
+  std::vector<float> value_buffer;
+  std::vector<float> p1_policy_buffer;
+  std::vector<float> p2_policy_buffer;
+
   MainNet(uint in_dim, uint hidden_dim, uint value_hidden_dim,
           uint policy_hidden_dim, uint policy_out_dim)
       : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
@@ -28,7 +33,13 @@ struct MainNet {
         policy1_fc1(hidden_dim, policy_hidden_dim),
         policy1_fc2(policy_hidden_dim, policy_out_dim),
         policy2_fc1(hidden_dim, policy_hidden_dim),
-        policy2_fc2(policy_hidden_dim, policy_out_dim) {}
+        policy2_fc2(policy_hidden_dim, policy_out_dim), buffer{},
+        value_buffer{}, p1_policy_buffer{}, p2_policy_buffer{} {
+    buffer.resize(hidden_dim);
+    value_buffer.resize(value_hidden_dim);
+    p1_policy_buffer.resize(policy_hidden_dim);
+    p2_policy_buffer.resize(policy_hidden_dim);
+  }
 
   bool operator==(const MainNet &) const = default;
 
@@ -60,37 +71,31 @@ struct MainNet {
            policy2_fc2.write_parameters(stream);
   }
 
-  float propagate(const float *input_data) const {
-    static thread_local float buffer0[hidden_dim];
-    static thread_local float value_buffer1[value_hidden_dim];
-    static thread_local float value_buffer2[1];
-    fc0.propagate(input_data, buffer0);
-    value_fc1.propagate(buffer0, value_buffer1);
-    value_fc2.propagate(value_buffer1, value_buffer2);
-    return 1 / (1 + std::exp(-value_buffer2[0]));
+  float propagate(const float *input_data) {
+    float output;
+    fc0.propagate(input_data, buffer.data());
+    value_fc1.propagate(buffer.data(), value_buffer.data());
+    value_fc2.propagate(value_buffer.data(), &output);
+    return 1 / (1 + std::exp(-output));
   }
 
   float propagate(const float *input_data, const auto m, const auto n,
                   const auto *p1_choice_index, const auto *p2_choice_index,
-                  float *p1, float *p2) const {
-    static thread_local float buffer0[hidden_dim];
-    static thread_local float value_buffer1[value_hidden_dim];
-    static thread_local float value_buffer2[1];
-    static thread_local float policy1_buffer1[policy_hidden_dim];
-    static thread_local float policy2_buffer1[policy_hidden_dim];
+                  float *p1, float *p2) {
+    float output;
+    fc0.propagate(input_data, buffer.data());
+    value_fc1.propagate(buffer.data(), value_buffer.data());
+    value_fc2.propagate(value_buffer.data(), &output);
 
-    fc0.propagate(input_data, buffer0);
-    value_fc1.propagate(buffer0, value_buffer1);
-    value_fc2.propagate(value_buffer1, value_buffer2);
-    policy1_fc1.propagate(buffer0, policy1_buffer1);
-    policy2_fc1.propagate(buffer0, policy2_buffer1);
+    policy1_fc1.propagate(buffer.data(), p1_policy_buffer.data());
+    policy2_fc1.propagate(buffer.data(), p2_policy_buffer.data());
 
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];
       assert(p1_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              policy1_buffer1, value_hidden_dim)) +
+              p1_policy_buffer.data(), value_hidden_dim)) +
           policy1_fc2.biases[p1_c];
       p1[i] = logit;
     }
@@ -100,12 +105,12 @@ struct MainNet {
       assert(p2_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              policy2_buffer1, value_hidden_dim)) +
+              p2_policy_buffer.data(), value_hidden_dim)) +
           policy2_fc2.biases[p2_c];
       p2[i] = logit;
     }
 
-    return 1 / (1 + std::exp(-value_buffer2[0]));
+    return 1 / (1 + std::exp(-output));
   }
 };
 
