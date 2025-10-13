@@ -1,7 +1,7 @@
 #pragma once
 
 #include <encode/battle/battle.h>
-#include <libpkmn/data.h>
+#include <encode/battle/policy.h>
 #include <nn/battle/cache.h>
 #include <nn/params.h>
 #include <nn/subnet.h>
@@ -26,8 +26,8 @@ struct MainNet {
   std::vector<float> p1_policy_buffer;
   std::vector<float> p2_policy_buffer;
 
-  MainNet(uint in_dim, uint hidden_dim, uint value_hidden_dim,
-          uint policy_hidden_dim, uint policy_out_dim)
+  MainNet(uint32_t in_dim, uint32_t hidden_dim, uint32_t value_hidden_dim,
+          uint32_t policy_hidden_dim, uint32_t policy_out_dim)
       : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
         value_fc2(value_hidden_dim, 1),
         policy1_fc1(hidden_dim, policy_hidden_dim),
@@ -95,7 +95,7 @@ struct MainNet {
       assert(p1_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy1_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              p1_policy_buffer.data(), value_hidden_dim)) +
+              p1_policy_buffer.data(), policy1_fc1.out_dim)) +
           policy1_fc2.biases[p1_c];
       p1[i] = logit;
     }
@@ -105,7 +105,7 @@ struct MainNet {
       assert(p2_c < Encode::Battle::Policy::n_dim);
       const float logit =
           policy2_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
-              p2_policy_buffer.data(), value_hidden_dim)) +
+              p2_policy_buffer.data(), policy2_fc1.out_dim)) +
           policy2_fc2.biases[p2_c];
       p2[i] = logit;
     }
@@ -172,7 +172,7 @@ struct Network {
     return 1 + active_out_dim + (i - 1) * (1 + pokemon_out_dim);
   }
 
-  void write_main(float main_input[2][256], const pkmn_gen1_battle &b,
+  void write_main(float main_input[2][side_out_dim], const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
@@ -218,7 +218,7 @@ struct Network {
 
   float inference(const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
-    static thread_local float main_input[2][256];
+    static thread_local float main_input[2][side_out_dim];
     write_main(main_input, b, d);
     float value = main_net.propagate(main_input[0]);
     return value;
@@ -228,7 +228,7 @@ struct Network {
                   const pkmn_gen1_chance_durations &d, const auto m,
                   const auto n, const auto *p1_choice_index,
                   const auto *p2_choice_index, float *p1, float *p2) {
-    static thread_local float main_input[2][256];
+    static thread_local float main_input[2][side_out_dim];
     write_main(main_input, b, d);
     float value = main_net.propagate(main_input[0], m, n, p1_choice_index,
                                      p2_choice_index, p1, p2);
@@ -252,7 +252,7 @@ struct Network {
         std::cout << std::endl;
       }
 
-      input += 256;
+      input += side_out_dim;
     }
   }
 };

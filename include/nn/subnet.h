@@ -1,6 +1,5 @@
 #pragma once
 
-#include <encode/battle/policy.h>
 #include <nn/affine.h>
 
 namespace NN {
@@ -10,7 +9,7 @@ template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
   Affine<clamp_1> fc1;
   std::vector<float> buf;
 
-  EmbeddingNet(uint in_dim, uint hidden_dim, uint out_dim)
+  EmbeddingNet(uint32_t in_dim, uint32_t hidden_dim, uint32_t out_dim)
       : fc0{in_dim, hidden_dim}, fc1{hidden_dim, out_dim}, buf{} {
     buf.resize(hidden_dim);
   }
