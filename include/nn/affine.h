@@ -7,8 +7,8 @@
 
 template <bool clamp = true> class Affine {
 public:
-  uint in_dim;
-  uint out_dim;
+  uint32_t in_dim;
+  uint32_t out_dim;
 
   using InputVector = Eigen::VectorXf;
   using OutputVector = Eigen::VectorXf;
@@ -19,7 +19,7 @@ public:
   WeightMatrix weights;
   OutputVector biases;
 
-  Affine(uint in_dim, uint out_dim)
+  Affine(uint32_t in_dim, uint32_t out_dim)
       : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
         biases(out_dim) {}
 
@@ -65,10 +65,8 @@ public:
   }
 
   bool write_parameters(std::ostream &stream) const {
-    uint32_t in = in_dim;
-    uint32_t out = out_dim;
-    stream.write(reinterpret_cast<const char *>(&in), sizeof(uint32_t));
-    stream.write(reinterpret_cast<const char *>(&out), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&in_dim), sizeof(uint32_t));
+    stream.write(reinterpret_cast<const char *>(&out_dim), sizeof(uint32_t));
     stream.write(reinterpret_cast<const char *>(biases.data()),
                  out_dim * sizeof(float));
     stream.write(reinterpret_cast<const char *>(weights.data()),
