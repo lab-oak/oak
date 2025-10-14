@@ -42,8 +42,14 @@ parser.add_argument(
     default=10000,
     help="Ignore games past this length (in updates not turns.)",
 )
+parser.add_argument(
+    "--clamp-parameters",
+    type=bool,
+    default=True,
+    help="Clamp parameters [-2, 2] to support Stockfish style quantization",
+)
 
-# Loss weighting
+# Loss options
 parser.add_argument(
     "--w-nash",
     type=float,
@@ -65,8 +71,6 @@ parser.add_argument(
     default=0.0,
     help="Weight for Nash in policy target (empirical = 1 - this)",
 )
-
-# loss options
 parser.add_argument(
     "--no-value-loss",
     action="store_true",
@@ -83,6 +87,44 @@ parser.add_argument(
     type=float,
     default=1.0,
     help=".",
+)
+parser.add_argument(
+    "--lr-decay", type=float, default=1.0, help="Applied each step after decay begins"
+)
+parser.add_argument(
+    "--lr-decay-start",
+    type=int,
+    default=0,
+    help="The first step to begin applying lr decay",
+)
+
+# Network hyperparameters
+parser.add_argument(
+    "--pokemon-hidden-dim",
+    type=int,
+    default=py_oak.pokemon_hidden_dim,
+    help="Pokemon encoding net hidden dim",
+)
+parser.add_argument(
+    "--active-hidden-dim",
+    type=int,
+    default=py_oak.active_hidden_dim,
+    help="ActivePokemon encoding net hidden dim",
+)
+parser.add_argument(
+    "--hidden-dim", type=int, default=py_oak.hidden_dim, help="Main subnet hidden dim"
+)
+parser.add_argument(
+    "--value-hidden-dim",
+    type=int,
+    default=py_oak.value_hidden_dim,
+    help="Value head hidden dim",
+)
+parser.add_argument(
+    "--policy-hidden-dim",
+    type=int,
+    default=py_oak.policy_hidden_dim,
+    help="Policy head hidden dim",
 )
 
 # Hardware and reproducibility
@@ -237,7 +279,13 @@ def main():
         working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
 
-    network = torch_oak.BattleNetwork()
+    network = torch_oak.BattleNetwork(
+        args.pokemon_hidden_dim,
+        args.active_hidden_dim,
+        args.hidden_dim,
+        args.value_hidden_dim,
+        args.policy_hidden_dim,
+    )
     if args.net_path:
         with open(args.net_path, "rb") as f:
             network.read_parameters(f)
@@ -290,7 +338,12 @@ def main():
         loss_value.backward()
         optimizer.step()
 
-        network.clamp_parameters()
+        if args.clamp_parameters:
+            network.clamp_parameters()
+
+        if step >= args.lr_decay_start:
+            for group in optimizer.opt.param_groups:
+                group["lr"] *= args.lr_decay
 
         if ((step + 1) % args.checkpoint) == 0:
             ckpt_path = ""

@@ -12,7 +12,6 @@ public:
 
   using InputVector = Eigen::VectorXf;
   using OutputVector = Eigen::VectorXf;
-
   using WeightMatrix =
       Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
@@ -23,31 +22,15 @@ public:
       : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
         biases(out_dim) {}
 
-  bool operator==(const Affine &other) const {
-    return (biases == other.biases) && (weights == other.weights);
-  }
-
-  void initialize(auto &device) {
-    const float k = 1.0f / std::sqrt(static_cast<float>(in_dim));
-    for (std::size_t i = 0; i < out_dim; ++i) {
-      biases(i) = device.uniform() * 2 * k - k;
-    }
-    for (std::size_t i = 0; i < out_dim; ++i) {
-      for (std::size_t j = 0; j < in_dim; ++j) {
-        weights(i, j) = device.uniform() * 2 * k - k;
-      }
-    }
-  }
-
   bool read_parameters(std::istream &stream) {
-    uint32_t in;
-    uint32_t out;
-    if (!stream.read(reinterpret_cast<char *>(&in), sizeof(uint32_t))) {
+    if (!stream.read(reinterpret_cast<char *>(&in_dim), sizeof(uint32_t))) {
       return false;
     }
-    if (!stream.read(reinterpret_cast<char *>(&out), sizeof(uint32_t))) {
+    if (!stream.read(reinterpret_cast<char *>(&out_dim), sizeof(uint32_t))) {
       return false;
     }
+    weights.resize(out_dim, in_dim);
+    biases.resize(out_dim);
     if (!stream.read(reinterpret_cast<char *>(biases.data()),
                      out_dim * sizeof(float))) {
       return false;
@@ -56,12 +39,7 @@ public:
                      out_dim * in_dim * sizeof(float))) {
       return false;
     }
-    bool match = (in == in_dim) && (out == out_dim);
-    // if (!match) {
-    //   std::cout << in << ' ' << in_dim << std::endl;
-    //   std::cout << out << ' ' << out_dim << std::endl;
-    // }
-    return match;
+    return true;
   }
 
   bool write_parameters(std::ostream &stream) const {
@@ -81,6 +59,22 @@ public:
     if constexpr (clamp) {
       for (std::size_t i = 0; i < out_dim; ++i) {
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
+      }
+    }
+  }
+
+  bool operator==(const Affine &other) const {
+    return (biases == other.biases) && (weights == other.weights);
+  }
+
+  void initialize(auto &device) {
+    const float k = 1.0f / std::sqrt(static_cast<float>(in_dim));
+    for (std::size_t i = 0; i < out_dim; ++i) {
+      biases(i) = device.uniform() * 2 * k - k;
+    }
+    for (std::size_t i = 0; i < out_dim; ++i) {
+      for (std::size_t j = 0; j < in_dim; ++j) {
+        weights(i, j) = device.uniform() * 2 * k - k;
       }
     }
   }

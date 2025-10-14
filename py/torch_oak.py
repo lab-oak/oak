@@ -150,17 +150,21 @@ class EmbeddingNet(nn.Module):
 
 
 class BuildNetwork(nn.Module):
-    def __init__(self):
+    def __init__(
+        self,
+        policy_hidden_dim=py_oak.build_policy_hidden_dim,
+        value_hidden_dim=py_oak.build_value_hidden_dim,
+    ):
         super().__init__()
         self.policy_net = EmbeddingNet(
             py_oak.species_move_list_size,
-            py_oak.build_policy_hidden_dim,
+            policy_hidden_dim,
             py_oak.species_move_list_size,
             True,
             False,
         )
         self.value_net = EmbeddingNet(
-            py_oak.species_move_list_size, py_oak.build_value_hidden_dim, 1, True, False
+            py_oak.species_move_list_size, value_hidden_dim, 1, True, False
         )
 
     def read_parameters(self, f):
@@ -268,20 +272,28 @@ class OutputBuffers:
 
 
 class BattleNetwork(torch.nn.Module):
-    pokemon_hidden_dim = py_oak.pokemon_hidden_dim
     pokemon_out_dim = py_oak.pokemon_out_dim
-    active_hidden_dim = py_oak.active_hidden_dim
     active_out_dim = py_oak.active_out_dim
     side_out_dim = py_oak.side_out_dim
-    hidden_dim = py_oak.hidden_dim
-    value_hidden_dim = py_oak.value_hidden_dim
-    policy_hidden_dim = py_oak.policy_hidden_dim
     policy_out_dim = py_oak.policy_out_dim
     pokemon_in_dim = py_oak.pokemon_in_dim
     active_in_dim = py_oak.active_in_dim
 
-    def __init__(self):
+    def __init__(
+        self,
+        phd=py_oak.pokemon_hidden_dim,
+        ahd=py_oak.active_hidden_dim,
+        hd=py_oak.hidden_dim,
+        vhd=py_oak.value_hidden_dim,
+        pohd=py_oak.policy_hidden_dim,
+    ):
         super().__init__()
+        self.pokemon_hidden_dim = phd
+        self.active_hidden_dim = ahd
+        self.hidden_dim = hd
+        self.value_hidden_dim = vhd
+        self.policy_hidden_dim = pohd
+
         self.pokemon_net = EmbeddingNet(
             self.pokemon_in_dim, self.pokemon_hidden_dim, self.pokemon_out_dim
         )

@@ -138,9 +138,18 @@ struct Network {
   }
 
   bool read_parameters(std::istream &stream) {
-    return pokemon_net.read_parameters(stream) &&
-           active_net.read_parameters(stream) &&
-           main_net.read_parameters(stream);
+    const bool ok = pokemon_net.read_parameters(stream) &&
+                    active_net.read_parameters(stream) &&
+                    main_net.read_parameters(stream);
+    if (!ok) {
+      return false;
+    }
+    char dummy;
+    if (stream.read(&dummy, 1)) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
   bool write_parameters(std::ostream &stream) const {
