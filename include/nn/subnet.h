@@ -22,7 +22,12 @@ template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
   }
 
   bool read_parameters(std::istream &stream) {
-    return fc0.read_parameters(stream) && fc1.read_parameters(stream);
+    const bool ok = fc0.read_parameters(stream) && fc1.read_parameters(stream);
+    if (!ok) {
+      return false;
+    }
+    buf.resize(fc0.out_dim);
+    return true;
   }
 
   bool write_parameters(std::ostream &stream) const {

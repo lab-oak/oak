@@ -44,12 +44,21 @@ struct MainNet {
   bool operator==(const MainNet &) const = default;
 
   bool read_parameters(std::istream &stream) {
-    return fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
+    const bool ok = fc0.read_parameters(stream) && value_fc1.read_parameters(stream) &&
            value_fc2.read_parameters(stream) &&
            p1_policy_fc1.read_parameters(stream) &&
            p1_policy_fc2.read_parameters(stream) &&
            p2_policy_fc1.read_parameters(stream) &&
            p2_policy_fc2.read_parameters(stream);
+
+    if (!ok) {
+      return false;
+    }
+    buffer.resize(fc0.out_dim);
+    value_buffer.resize(value_fc1.out_dim);
+    p1_policy_buffer.resize(p1_policy_fc1.out_dim);
+    p2_policy_buffer.resize(p2_policy_fc1.out_dim);
+    return true;
   }
 
   bool write_parameters(std::ostream &stream) const {
