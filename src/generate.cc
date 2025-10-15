@@ -793,6 +793,7 @@ void setup() {
       if (teams.size() == 0) {
         throw std::runtime_error{"Could not parse teams"};
       }
+      RuntimeData::matchup_matrix.resize(teams.size());
     }
   } else {
     // use sample teams
