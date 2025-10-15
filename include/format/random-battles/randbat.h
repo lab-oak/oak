@@ -502,7 +502,7 @@ public:
       set_size += set.insert(sampleNoReplace(movePool, prng));
     }
 
-    assert((set_size == maxMoveCount) || (species == Species::Ditto)) ;
+    assert((set_size == maxMoveCount) || (species == Species::Ditto));
 
     prng.shuffle(set._data);
     // sort before returning for fast comparison
