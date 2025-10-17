@@ -73,10 +73,10 @@ auto parse_set(const auto &words) {
                    [](auto c) { return std::tolower(c); });
 
     if (lower.ends_with('%')) {
-      const auto percent = std::stoll(lower.substr(0, lower.size() - 1));
-      set.hp = percent / 100.0;
+      const auto percent = std::stoul(lower.substr(0, lower.size() - 1));
+      set.percent = percent;
     } else if (lower.ends_with("hp")) {
-      const auto raw = std::stoll(lower.substr(0, lower.size() - 2));
+      const auto raw = std::stoul(lower.substr(0, lower.size() - 2));
       set.hp = raw;
     }
 
