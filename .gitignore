@@ -4,6 +4,7 @@ libpkmn-showdown.a
 *.battle
 *.build
 **/args
+**/matchup-matrix
 *.log
 *.pyc
 # TODO extensinos for build/battle nets

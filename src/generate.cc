@@ -829,15 +829,20 @@ void setup() {
 }
 
 void cleanup() {
-  std::cout << "Matchup Matrix:" << std::endl;
+  const std::filesystem::path working_dir = RuntimeData::start_datetime;
+  const auto matchup_matrix_path = working_dir / "matchup-matrix";
+  std::ofstream matchup_matrix_file(matchup_matrix_path);
+  if (!matchup_matrix_file) {
+    std::cerr << "Failed to open matchup matrix file" << std::endl;
+  }
   for (auto i = 0; i < RuntimeData::matchup_matrix.n_teams; ++i) {
     for (auto j = 0; j < i; ++j) {
-      std::cout << i << ' ' << j << ": ";
+      matchup_matrix_file << i << ' ' << j << ": ";
       const auto &entry = RuntimeData::matchup_matrix(i, j);
       if (entry.n) {
-        std::cout << entry.v / 2.0 / entry.n << std::endl;
+        matchup_matrix_file << entry.v / 2.0 / entry.n << std::endl;
       } else {
-        std::cout << "N/A" << std::endl;
+        matchup_matrix_file << "N/A" << std::endl;
       }
     }
   }
