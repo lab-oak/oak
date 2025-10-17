@@ -7,7 +7,11 @@ import numpy as np
 def battle_frame_stats():
     total_frames = 0
     total_battles = 0
-    files = py_oak.find_data_files(".", ext=".battle")
+    path = "."
+    if len(sys.argv) >= 3:
+        path = sys.argv[2]
+
+    files = py_oak.find_data_files(path, ext=".battle")
     for file in files:
         data = py_oak.read_battle_data(file)
         for buf, n in data:
