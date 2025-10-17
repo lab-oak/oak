@@ -111,13 +111,12 @@ constexpr PKMN::Pokemon init_pokemon(const auto &set) {
   pokemon.stats.spc = compute_stat(base_stats[4], false, pokemon.level);
   // moves
   for (auto m = 0; m < 4; ++m) {
-    if constexpr (std::is_convertible_v<decltype(set.moves[0]), Move>) {
-      pokemon.moves[m].id = static_cast<Move>(set.moves[m]);
-      pokemon.moves[m].pp = max_pp(pokemon.moves[m].id);
-    } else {
-      pokemon.moves[m] = set.moves[m];
+    pokemon.moves[m].id = static_cast<Move>(set.moves[m]);
+    if constexpr (requires {set.pp;}) {
       pokemon.moves[m].pp =
-          std::min(set.moves[m].pp, max_pp(pokemon.moves[m].id));
+                std::min(set.pp[m], max_pp(pokemon.moves[m].id));
+    } else {
+      pokemon.moves[m].pp = max_pp(pokemon.moves[m].id);
     }
   }
 
