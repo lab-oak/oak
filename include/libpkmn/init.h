@@ -112,9 +112,8 @@ constexpr PKMN::Pokemon init_pokemon(const auto &set) {
   // moves
   for (auto m = 0; m < 4; ++m) {
     pokemon.moves[m].id = static_cast<Move>(set.moves[m]);
-    if constexpr (requires {set.pp;}) {
-      pokemon.moves[m].pp =
-                std::min(set.pp[m], max_pp(pokemon.moves[m].id));
+    if constexpr (requires { set.pp; }) {
+      pokemon.moves[m].pp = std::min(set.pp[m], max_pp(pokemon.moves[m].id));
     } else {
       pokemon.moves[m].pp = max_pp(pokemon.moves[m].id);
     }
