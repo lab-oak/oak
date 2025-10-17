@@ -22,7 +22,8 @@ MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
 int main(int argc, char **argv) {
 
   std::string default_bandit = "exp3-0.03";
-  RuntimeSearch::Agent agent{"0", default_bandit, "mc", std::nullopt,
+  std::string default_search_time = "0";
+  RuntimeSearch::Agent agent{default_search_time, default_bandit, "mc", std::nullopt,
                              &search_flag};
   uint64_t seed = mt19937{std::random_device{}()}.uniform_64();
 
@@ -32,14 +33,18 @@ int main(int argc, char **argv) {
   if (argc > 2) {
     agent.bandit_name = argv[2];
   }
-
   if (argc > 3) {
-    seed = std::atoll(argv[3]);
+    agent.search_time = argv[3];
+    agent.flag = nullptr;
+  }
+  if (argc > 4) {
+    seed = std::atoll(argv[4]);
     std::cout << "seed: " << seed << std::endl;
   }
 
   std::cout << "network path: " << agent.network_path << std::endl;
   std::cout << "bandit algorithm: " << agent.bandit_name << std::endl;
+  std::cout << "search time: " << agent.search_time << std::endl;
 
   RuntimePolicy::Options policy_options{};
 
