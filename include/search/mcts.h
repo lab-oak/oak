@@ -492,6 +492,28 @@ void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
     }
     std::cout << '\n';
   }
+
+  std::cout << "\nVisits:\n";
+  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
+  std::cout << fix_label(std::string{col_offset.data()}) << ' ';
+
+  for (size_t j = 0; j < output.n; ++j)
+    std::cout << fix_label(p2_labels[j]) << " ";
+  std::cout << "\n";
+
+  for (size_t i = 0; i < output.m; ++i) {
+    std::cout << fix_label(p1_labels[i]) << " ";
+    for (size_t j = 0; j < output.n; ++j) {
+      if (output.visit_matrix[i][j] == 0) {
+        std::cout << " ----    ";
+      } else {
+        auto avg = output.visit_matrix[i][j];
+        std::cout << std::left << std::fixed << std::setw(label_width)
+                  << std::setprecision(3) << avg << " ";
+      }
+    }
+    std::cout << '\n';
+  }
 }
 
 } // namespace MCTS
