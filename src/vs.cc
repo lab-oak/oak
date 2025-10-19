@@ -8,6 +8,7 @@
 #include <util/random.h>
 #include <util/search.h>
 #include <util/team-building.h>
+#include <util/parse.h>
 
 #include <atomic>
 #include <cmath>
@@ -55,9 +56,59 @@ NN::Build::Network network{};
 double team_modify_prob = 0;
 TeamBuilding::Omitter omitter{};
 double battle_skip_prob = 0;
+
+std::string teams_path = "teams";
 }; // namespace TeamGen
 
 } // namespace RuntimeOptions
+
+namespace RuntimeData {
+std::vector<std::vector<PKMN::Set>> teams;
+}
+
+auto populate_teams() {
+  using RuntimeData::teams;
+  if (!RuntimeOptions::TeamGen::teams_path.empty()) {
+
+    // read teams file
+    const auto side_to_team = [](const PKMN::Side &side) {
+      std::vector<PKMN::Set> team{};
+      for (const auto &pokemon : side.pokemon) {
+        if (pokemon.species != PKMN::Data::Species::None) {
+          PKMN::Set set{};
+          set.species = pokemon.species;
+          std::transform(pokemon.moves.begin(), pokemon.moves.end(),
+                          set.moves.begin(),
+                          [](const auto ms) { return ms.id; });
+          team.emplace_back(set);
+        }
+      }
+      return team;
+    };
+    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
+    while (true) {
+      std::string line{};
+      std::getline(file, line);
+      if (line.empty()) {
+        break;
+      }
+      const auto [side, _] = Parse::parse_side(line);
+      teams.push_back(side_to_team(side));
+    }
+    if (teams.size() == 0) {
+      throw std::runtime_error{"Could not parse teams"};
+    }
+    
+  } else {
+    // use sample teams
+    std::transform(Teams::ou_sample_teams.begin(), Teams::ou_sample_teams.end(),
+                   std::back_inserter(teams), [](const auto &team) {
+                     std::vector<PKMN::Set> t{team.begin(), team.end()};
+                     return t;
+                   });
+  }
+
+}
 
 auto generate_team(mt19937 &device, const auto &base_team)
     -> Train::Build::Trajectory {
@@ -397,16 +448,16 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    const auto p1_base_team = Teams::ou_sample_teams[device.random_int(
-        Teams::ou_sample_teams.size())];
-    const auto p2_base_team = Teams::ou_sample_teams[device.random_int(
-        Teams::ou_sample_teams.size())];
+    const auto p1_base_team = RuntimeData::teams[device.random_int(
+        RuntimeData::teams.size())];
+    const auto p2_base_team = RuntimeData::teams[device.random_int(
+        RuntimeData::teams.size())];
 
-    // const auto p1_build_traj = generate_team(device, p1_base_team);
-    // const auto p2_build_traj = generate_team(device, p2_base_team);
+    const auto p1_build_traj = generate_team(device, p1_base_team);
+    const auto p2_build_traj = generate_team(device, p2_base_team);
 
-    const auto p1_build_traj = randbat_traj();
-    const auto p2_build_traj = randbat_traj();
+    // const auto p1_build_traj = randbat_traj();
+    // const auto p2_build_traj = randbat_traj();
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
     const auto s2 = play(p2_build_traj, p1_build_traj);
@@ -493,6 +544,8 @@ void setup(auto &device) {
   } else {
     network.initialize(device);
   }
+
+  populate_teams();
 }
 
 int main(int argc, char **argv) {
