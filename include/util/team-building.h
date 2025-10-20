@@ -235,6 +235,20 @@ struct Provider {
       return {trajectory, -1};
     }
   }
+
+  void try_read_parameters() const {
+    const bool can_build =
+        (team_modify_prob > 0) &&
+        ((omitter.pokemon_delete_prob > 0) || (omitter.move_delete_prob > 0));
+    if (can_build) {
+      NN::Build::Network test_network{};
+      std::ifstream file{network_path};
+      if (!test_network.read_parameters(file)) {
+        throw std::runtime_error{"Can't ready build network path while kargs "
+                                 "make teambuilding possible."};
+      }
+    }
+  }
 };
 
 } // namespace TeamBuilding

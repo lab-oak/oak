@@ -48,92 +48,10 @@ RuntimePolicy::Options p2_policy_options{};
 size_t buffer_size_mb = 8;
 size_t max_build_traj = 1 << 10;
 
-namespace TeamGen {
-// std::string teams_path = "";
-std::string network_path = "";
-NN::Build::Network network{};
-
-double team_modify_prob = 0;
-TeamBuilding::Omitter omitter{};
-double battle_skip_prob = 0;
-
-std::string teams_path = "teams";
-}; // namespace TeamGen
+std::string teams_path = "";
+TeamBuilding::Provider provider{teams_path};
 
 } // namespace RuntimeOptions
-
-namespace RuntimeData {
-std::vector<std::vector<PKMN::Set>> teams;
-}
-
-auto populate_teams() {
-  using RuntimeData::teams;
-  if (!RuntimeOptions::TeamGen::teams_path.empty()) {
-
-    // read teams file
-    const auto side_to_team = [](const PKMN::Side &side) {
-      std::vector<PKMN::Set> team{};
-      for (const auto &pokemon : side.pokemon) {
-        if (pokemon.species != PKMN::Data::Species::None) {
-          PKMN::Set set{};
-          set.species = pokemon.species;
-          std::transform(pokemon.moves.begin(), pokemon.moves.end(),
-                         set.moves.begin(),
-                         [](const auto ms) { return ms.id; });
-          team.emplace_back(set);
-        }
-      }
-      return team;
-    };
-    std::ifstream file{RuntimeOptions::TeamGen::teams_path};
-    while (true) {
-      std::string line{};
-      std::getline(file, line);
-      if (line.empty()) {
-        break;
-      }
-      const auto [side, _] = Parse::parse_side(line);
-      teams.push_back(side_to_team(side));
-    }
-    if (teams.size() == 0) {
-      throw std::runtime_error{"Could not parse teams"};
-    }
-
-  } else {
-    // use sample teams
-    std::transform(Teams::ou_sample_teams.begin(), Teams::ou_sample_teams.end(),
-                   std::back_inserter(teams), [](const auto &team) {
-                     std::vector<PKMN::Set> t{team.begin(), team.end()};
-                     return t;
-                   });
-  }
-}
-
-auto generate_team(mt19937 &device, const auto &base_team)
-    -> Train::Build::Trajectory {
-  using namespace RuntimeOptions::TeamGen;
-
-  const auto base_team_vec =
-      std::vector<PKMN::Set>(base_team.begin(), base_team.end());
-
-  auto team = base_team_vec;
-  const bool changed = omitter.shuffle_and_truncate(device, team);
-  bool deleted = false;
-  if (device.uniform() < team_modify_prob) {
-    deleted = omitter.delete_info(device, team);
-  }
-
-  if (!deleted) {
-    Train::Build::Trajectory trajectory{};
-    trajectory.initial = trajectory.terminal = team;
-    return trajectory;
-  } else {
-    const auto trajectory =
-        TeamBuilding::rollout_build_network(device, network, team);
-    assert(trajectory.updates.size() > 0);
-    return trajectory;
-  }
-}
 
 bool parse_options(int argc, char **argv) {
   using namespace RuntimeOptions;
@@ -178,15 +96,17 @@ bool parse_options(int argc, char **argv) {
       p2_policy_options.mode = arg[17];
 
     } else if (arg.starts_with("--max-pokemon=")) {
-      TeamGen::omitter.max_pokemon = std::stoul(arg.substr(14));
+      provider.omitter.max_pokemon = std::stoul(arg.substr(14));
+    } else if (arg.starts_with("--teams=")) {
+      teams_path = arg.substr(8);
     } else if (arg.starts_with("--build-network-path=")) {
-      TeamGen::network_path = arg.substr(21);
+      provider.network_path = arg.substr(21);
     } else if (arg.starts_with("--team-modify-prob=")) {
-      TeamGen::team_modify_prob = std::stod(arg.substr(19));
+      provider.team_modify_prob = std::stod(arg.substr(19));
     } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      TeamGen::omitter.pokemon_delete_prob = std::stod(arg.substr(22));
+      provider.omitter.pokemon_delete_prob = std::stod(arg.substr(22));
     } else if (arg.starts_with("--move-delete-prob=")) {
-      TeamGen::omitter.move_delete_prob = std::stod(arg.substr(19));
+      provider.omitter.move_delete_prob = std::stod(arg.substr(19));
 
     } else if (arg.starts_with("--print-prob=")) {
       print_prob = std::stof(arg.substr(13));
@@ -432,31 +352,12 @@ void thread_fn(uint64_t seed) {
     return score_2;
   };
 
-  const auto randbat_traj = [&]() {
-    Train::Build::Trajectory trajectory{};
-    const auto seed = std::bit_cast<int64_t>(device.uniform_64());
-    RandomBattles::PRNG prng{seed};
-    RandomBattles::Teams t{prng};
-    // completed but in weird format
-    const auto partial_team = t.randomTeam();
-    const auto team = t.partialToTeam(partial_team);
-    std::vector<PKMN::Set> team_vec(team.begin(), team.end());
-    trajectory.initial = team_vec;
-    trajectory.terminal = team_vec;
-    return trajectory;
-  };
-
   while (true) {
-    const auto p1_base_team =
-        RuntimeData::teams[device.random_int(RuntimeData::teams.size())];
-    const auto p2_base_team =
-        RuntimeData::teams[device.random_int(RuntimeData::teams.size())];
 
-    const auto p1_build_traj = generate_team(device, p1_base_team);
-    const auto p2_build_traj = generate_team(device, p2_base_team);
-
-    // const auto p1_build_traj = randbat_traj();
-    // const auto p2_build_traj = randbat_traj();
+    auto [p1_build_traj, p1_team_index] =
+        RuntimeOptions::provider.get_trajectory(device);
+    auto [p2_build_traj, p2_team_index] =
+        RuntimeOptions::provider.get_trajectory(device);
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
     const auto s2 = play(p2_build_traj, p1_build_traj);
@@ -535,16 +436,9 @@ void setup(auto &device) {
   // save args
   // TODO
 
-  // global build network
-  using namespace RuntimeOptions::TeamGen;
-  if (!network_path.empty()) {
-    std::ifstream file{RuntimeOptions::TeamGen::network_path};
-    network.read_parameters(file);
-  } else {
-    network.initialize(device);
-  }
-
-  populate_teams();
+  // teams
+  RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
+  RuntimeOptions::provider.try_read_parameters();
 }
 
 int main(int argc, char **argv) {

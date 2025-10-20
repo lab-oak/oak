@@ -686,18 +686,7 @@ void setup() {
 
   // teams
   RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
-  const bool can_build =
-      (RuntimeOptions::provider.team_modify_prob > 0) &&
-      ((RuntimeOptions::provider.omitter.pokemon_delete_prob > 0) ||
-       (RuntimeOptions::provider.omitter.move_delete_prob > 0));
-  if (can_build) {
-    NN::Build::Network test_network{};
-    std::ifstream file{RuntimeOptions::provider.network_path};
-    if (!test_network.read_parameters(file)) {
-      throw std::runtime_error{"Can't ready build network path while kargs "
-                               "make teambuilding possible."};
-    }
-  }
+  provider.try_load_parameters();
 
   // stats
   RuntimeData::battle_lengths.resize(RuntimeOptions::threads);
