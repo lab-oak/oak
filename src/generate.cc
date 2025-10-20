@@ -686,7 +686,7 @@ void setup() {
 
   // teams
   RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
-  provider.try_load_parameters();
+  RuntimeOptions::provider.try_read_parameters();
 
   // stats
   RuntimeData::battle_lengths.resize(RuntimeOptions::threads);

@@ -49,7 +49,7 @@ struct Bandit {
     } else {
       std::array<float, 9> q{};
       uint64_t N{};
-      for (auto i = 0; i < k; ++i) {
+      for (auto i = k - 1; i >= 0; --i) {
         if (visits[i] == 0) {
           outcome.index = i;
           return;
@@ -57,11 +57,11 @@ struct Bandit {
         q[i] = (float)scores[i] / visits[i];
         N += visits[i];
       }
-      float log_N = std::log(N);
+      float sqrtN = std::sqrt(N);
       float max = 0;
       const float p = 1.0 / k;
       for (auto i = 0; i < k; ++i) {
-        float e = params.c * p * std::sqrt(log_N / visits[i]);
+        float e = params.c * p * sqrtN / (visits[i] + 1);
         float a = e + q[i];
         if (a > max) {
           max = a;
