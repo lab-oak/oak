@@ -30,7 +30,8 @@ int process_and_sample(auto &device, const auto &empirical, const auto &nash,
   } else if (policy_options.mode == 'n') {
     policy = nash;
   } else if (policy_options.mode == 'x') {
-    return std::distance(empirical.begin(), std::max_element(empirical.begin(), empirical.end()));
+    return std::distance(empirical.begin(),
+                         std::max_element(empirical.begin(), empirical.end()));
   } else if (policy_options.mode == 'm') {
     const auto weighted_sum = [](const auto &a, const auto &b,
                                  const auto alpha) {

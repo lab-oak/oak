@@ -102,7 +102,8 @@ struct MainNet {
       const auto p1_c = p1_choice_index[i];
       assert(p1_c < Encode::Battle::Policy::n_dim);
       // const float logit =
-      //     p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+      //     p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const
+      //     Eigen::VectorXf>(
       //         p1_policy_buffer.data(), p1_policy_fc1.out_dim)) +
       //     p1_policy_fc2.biases[p1_c];
       // p1[i] = logit;
@@ -113,7 +114,8 @@ struct MainNet {
       const auto p2_c = p2_choice_index[i];
       assert(p2_c < Encode::Battle::Policy::n_dim);
       // const float logit =
-      //     p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+      //     p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const
+      //     Eigen::VectorXf>(
       //         p2_policy_buffer.data(), p2_policy_fc1.out_dim)) +
       //     p2_policy_fc2.biases[p2_c];
       // p2[i] = logit;
@@ -237,18 +239,20 @@ struct Network {
 
   float inference(const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d, const auto m,
-                  const auto n, const auto *p1_choice,
-                  const auto *p2_choice, float *p1, float *p2) {
+                  const auto n, const auto *p1_choice, const auto *p2_choice,
+                  float *p1, float *p2) {
     static thread_local float main_input[2][side_out_dim];
     static thread_local uint16_t p1_choice_index[9];
     static thread_local uint16_t p2_choice_index[9];
     write_main(main_input, b, d);
-    const auto& battle = PKMN::view(b);
+    const auto &battle = PKMN::view(b);
     for (auto i = 0; i < m; ++i) {
-      p1_choice_index[i] = Encode::Battle::Policy::get_index(battle.sides[0], p1_choice[i]);
+      p1_choice_index[i] =
+          Encode::Battle::Policy::get_index(battle.sides[0], p1_choice[i]);
     }
     for (auto i = 0; i < n; ++i) {
-      p2_choice_index[i] = Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
+      p2_choice_index[i] =
+          Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
     float value = main_net.propagate(main_input[0], m, n, p1_choice_index,
                                      p2_choice_index, p1, p2);
