@@ -1,4 +1,5 @@
 import os
+import struct
 import torch
 import argparse
 import random
@@ -9,33 +10,12 @@ import subprocess
 import py_oak
 import torch_oak
 
-
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
 
-parser.add_argument(
-    "--working-dir",
-    default=None,
-    type=str,
-)
-
-parser.add_argument(
-    "--vs-path",
-    default="./release/vs",
-    type=str,
-)
-
-parser.add_argument(
-    "--search-iterations",
-    default=2**12,
-    type=int,
-)
-
-parser.add_argument(
-    "--threads",
-    default=1,
-    type=int,
-)
-
+parser.add_argument("--working-dir", default=None, type=str)
+parser.add_argument("--vs-path", default="./release/vs", type=str)
+parser.add_argument("--search-iterations", default=2**12, type=int)
+parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
 parser.add_argument("--games-per-update", default=2**10, type=int)
@@ -44,7 +24,6 @@ args = parser.parse_args()
 
 
 class ID:
-
     def __init__(self, net_hash, bandit_name, policy_mode):
         self.net_hash = net_hash
         assert len(bandit_name) < 15, f"Error: bandit-name too long: {bandit_name}"
@@ -52,134 +31,131 @@ class ID:
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
 
-    def write(f):
-        # write 8 byte hash, 15 char bytes, then 1 char byte to binary file stream
-        pass
-
-
-# global data
+    def write(self, f):
+        f.write(struct.pack("<Q", self.net_hash))
+        bn = self.bandit_name.encode("utf8")
+        bn = bn.ljust(15, b"\0")
+        f.write(bn)
+        f.write(self.policy_mode.encode("utf8"))
 
 
 class Global:
-
-    def __init__(
-        self,
-    ):
-
-        # Elo ratings
-        self.ratings: Dict[ID, int] = {}
-        # UCB data
-        self.ucb = Dict[ID, [float, int]]
-
-        # W/D/L database
+    def __init__(self):
+        self.ratings: Dict[ID, float] = {}
+        self.ucb: Dict[ID, tuple[float, int]] = {}
         self.results: Dict[tuple[ID, ID], tuple[int, int, int]] = {}
-
         self.directory: Dict[int, str] = {}
 
-    def remove_id(id: ID):
-        # search through add to remove all references. Results remove all entries that match either ID in the key
+    def remove_id(self, target_id: ID):
+        self.ratings = {k: v for k, v in self.ratings.items() if k != target_id}
+        self.ucb = {k: v for k, v in self.ucb.items() if k != target_id}
+        self.results = {
+            k: v
+            for k, v in self.results.items()
+            if k[0] != target_id and k[1] != target_id
+        }
+        if target_id.net_hash in self.directory:
+            del self.directory[target_id.net_hash]
 
-        pass
+    def sample_ids(self):
+        if not self.ucb:
+            raise RuntimeError("No IDs to sample from")
 
-    def sample_ids() -> [ID, ID]:
+        ids_sorted = sorted(self.ucb.items(), key=lambda x: x[1][0], reverse=True)
+        if len(ids_sorted) < 2:
+            raise RuntimeError("Need at least 2 IDs")
 
-        # compute ucb, sample argmax
-
-        pass
+        id1 = ids_sorted[0][0]
+        id2 = ids_sorted[1][0]
+        return id1, id2
 
 
 glob = Global()
 
 
 def read_files():
-    with open(os.path.join([args.working_dir, "ratings"]), "rb") as f:
-        # write ID then f32 elo rating
-        pass
+    base = args.working_dir
 
-    with open(os.path.join([args.working_dir, "results"]), "rb") as f:
-        # write ID1, ID2 (already ordered in key) then W, L, D u32s
-        pass
+    # RATINGS
+    path = os.path.join(base, "ratings")
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            while True:
+                data = f.read(8 + 15 + 1 + 4)
+                if len(data) < 8 + 15 + 1 + 4:
+                    break
+                net_hash = struct.unpack("<Q", data[:8])[0]
+                bandit = data[8:23].rstrip(b"\0").decode("ascii")
+                mode = data[23:24].decode("ascii")
+                rating = struct.unpack("<f", data[24:28])[0]
+                obj = ID(net_hash, bandit, mode)
+                glob.ratings[obj] = rating
+                glob.ucb[obj] = (0.0, 0)
 
-    with open(os.path.join([args.working_dir, "directory"]), "rb") as f:
-        # write 64 bit netowkr hash then null terminated path string
-        pass
+    # RESULTS
+    path = os.path.join(base, "results")
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            while True:
+                id_chunk = f.read((8 + 15 + 1) * 2 + 4 * 3)
+                if len(id_chunk) < (8 + 15 + 1) * 2 + 12:
+                    break
+
+                p = 0
+
+                def read_id():
+                    nonlocal p
+                    nh = struct.unpack("<Q", id_chunk[p : p + 8])[0]
+                    p += 8
+                    bn = id_chunk[p : p + 15].rstrip(b"\0").decode("ascii")
+                    p += 15
+                    pm = id_chunk[p : p + 1].decode("ascii")
+                    p += 1
+                    return ID(nh, bn, pm)
+
+                id1 = read_id()
+                id2 = read_id()
+                w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
+                glob.results[(id1, id2)] = (w, l, d)
+
+    # DIRECTORY
+    path = os.path.join(base, "directory")
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            while True:
+                h_bytes = f.read(8)
+                if len(h_bytes) < 8:
+                    break
+                net_hash = struct.unpack("<Q", h_bytes)[0]
+                path_bytes = []
+                while True:
+                    c = f.read(1)
+                    if not c or c == b"\0":
+                        break
+                    path_bytes.append(c)
+                full_path = b"".join(path_bytes).decode("utf-8")
+                glob.directory[net_hash] = full_path
 
 
 def write_files():
-    # all of these should overwrite
-    with open(os.path.join([args.working_dir, "ratings"]), "wb") as f:
+    base = args.working_dir
 
-        pass
+    # RATINGS
+    with open(os.path.join(base, "ratings"), "wb") as f:
+        for obj, rating in glob.ratings.items():
+            obj.write(f)
+            f.write(struct.pack("<f", rating))
 
-    with open(os.path.join([args.working_dir, "results"]), "wb") as f:
+    # RESULTS
+    with open(os.path.join(base, "results"), "wb") as f:
+        for (id1, id2), (w, l, d) in glob.results.items():
+            id1.write(f)
+            id2.write(f)
+            f.write(struct.pack("<III", w, l, d))
 
-        pass
-
-    with open(os.path.join([args.working_dir, "directory"]), "wb") as f:
-
-        pass
-
-
-def setup():
-
-    if args.working_dir is None:
-        import datetime
-
-        now = datetime.datetime.now()
-        working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
-        os.makedirs(working_dir, exist_ok=False)
-        args.working_dir = working_dir
-
-    else:
-        read_files()
-
-
-def update():
-    pass
-
-
-def run_once(lesserID: ID, greaterID: ID):
-    cmd = [
-        args.vs_path,
-        "--threads=1",
-        "--game-pairs=1",
-        f"--p1-network-path={glob.directory[lesserID.net_hash]}",
-        f"--p2-network-path={glob.directory[greaterID.net_hash]}",
-        f"--p1-search-time={args.search_iterations}",
-        f"--p2-search-time={args.search_iterations}",
-        f"--p1-bandit-name={lesserID.bandit_name}"
-        f"--p2-bandit-name={greaterID.bandit_name}"
-        f"--p1-policy-mode={lesserID.policy_mode}",
-        f"--p2-policy-mode={greaterID.policy_mode}",
-    ]
-
-    result = subprocess.run(cmd, text=True, capture_output=True)
-
-    return result
-
-
-def main():
-
-    setup()
-
-    while True:
-
-        with ThreadPoolExecutor(max_workers=args.threads) as pool:
-
-            nullID = ID(0, "", "n")
-            glob.directory[nullID.net_hash] = ""
-
-            futures = [
-                pool.submit(run_once(nullID, nullID))
-                for i in range(args.games_per_update)
-            ]
-            for fut in as_completed(futures):
-                res = fut.result()
-                results.append(res)
-                print(f"[done {res['index']}] exit={res['exit_code']}")
-
-    update()
-
-
-if __name__ == "__main__":
-    main()
+    # DIRECTORY
+    with open(os.path.join(base, "directory"), "wb") as f:
+        for nh, path_str in glob.directory.items():
+            f.write(struct.pack("<Q", nh))
+            f.write(path_str.encode("utf-8"))
+            f.write(b"\0")
