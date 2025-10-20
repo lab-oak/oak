@@ -4,7 +4,7 @@
 #include <nn/build/network.h>
 #include <train/build/trajectory.h>
 
-// Rollout battle network
+#include <unistd.h>
 
 namespace TeamBuilding {
 
@@ -19,16 +19,6 @@ const auto team_string(const auto &team) {
   }
   return ss.str();
 };
-
-auto softmax(auto &x) {
-  auto y = x;
-  std::transform(y.begin(), y.end(), y.begin(),
-                 [](const auto v) { return std::exp(v); });
-  const auto sum = std::accumulate(y.begin(), y.end(), 0.0);
-  std::transform(y.begin(), y.end(), y.begin(),
-                 [sum](const auto v) { return v / sum; });
-  return y;
-}
 
 auto load_teams(std::string path) {
   std::vector<std::vector<PKMN::Set>> teams{};
@@ -75,44 +65,15 @@ auto load_teams(std::string path) {
   return teams;
 }
 
-// Expects a full 6. If truncate, then also shuffle
-struct Omitter {
-
-  int max_pokemon{6};
-  double pokemon_delete_prob{};
-  double move_delete_prob{};
-
-  bool shuffle_and_truncate(auto &device, auto &team) const {
-    const auto original = team;
-    if (max_pokemon < team.size()) {
-      std::mt19937 rd{device.uniform_64()};
-      std::shuffle(team.begin(), team.end(), rd);
-      team.resize(max_pokemon);
-    }
-    return (original != team);
-  }
-
-  bool delete_info(auto &device, auto &team) const {
-    using PKMN::Data::Move;
-    using PKMN::Data::Species;
-    bool modified = false;
-    for (auto &set : team) {
-      if ((set.species != Species::None) &&
-          (device.uniform() < pokemon_delete_prob)) {
-        set = PKMN::Set{};
-        modified = true;
-      } else {
-        for (auto &move : set.moves) {
-          if ((move != Move::None) && (device.uniform() < move_delete_prob)) {
-            move = Move::None;
-            modified = true;
-          }
-        }
-      }
-    }
-    return modified;
-  }
-};
+auto softmax(auto &x) {
+  auto y = x;
+  std::transform(y.begin(), y.end(), y.begin(),
+                 [](const auto v) { return std::exp(v); });
+  const auto sum = std::accumulate(y.begin(), y.end(), 0.0);
+  std::transform(y.begin(), y.end(), y.begin(),
+                 [sum](const auto v) { return v / sum; });
+  return y;
+}
 
 [[nodiscard]] auto rollout_build_network(auto &device, auto &network,
                                          const auto &team) {
@@ -164,17 +125,58 @@ struct Omitter {
   return trajectory;
 }
 
+struct Omitter {
+
+  int max_pokemon{6};
+  double pokemon_delete_prob{};
+  double move_delete_prob{};
+  double team_shuffle_prob{};
+
+  bool shuffle_and_truncate(auto &device, auto &team) const {
+    const auto original = team;
+    if (device.uniform() < team_shuffle_prob) {
+      std::mt19937 rd{device.uniform_64()};
+      std::shuffle(team.begin(), team.end(), rd);
+    }
+    if (max_pokemon < team.size()) {
+      team.resize(max_pokemon);
+    }
+    return (original != team);
+  }
+
+  bool delete_info(auto &device, auto &team) const {
+    using PKMN::Data::Move;
+    using PKMN::Data::Species;
+    bool modified = false;
+    for (auto &set : team) {
+      if ((set.species != Species::None) &&
+          (device.uniform() < pokemon_delete_prob)) {
+        set = PKMN::Set{};
+        modified = true;
+      } else {
+        for (auto &move : set.moves) {
+          if ((move != Move::None) && (device.uniform() < move_delete_prob)) {
+            move = Move::None;
+            modified = true;
+          }
+        }
+      }
+    }
+    return modified;
+  }
+};
+
 struct Provider {
 
   bool rb;
   std::vector<std::vector<PKMN::Set>> teams;
   Omitter omitter;
   std::string network_path;
-  double modify_team_prob;
+  double team_modify_prob;
 
-  Provider(const std::string teams_path)
-      : rb{false}, teams{}, omitter{}, network{} {
-    if ((teams_path == "random-battles") || teams_path == "randbats") {
+  Provider(const std::string &teams_path)
+      : rb{false}, teams{}, omitter{}, network_path{} {
+    if ((teams_path == "random-battles") || (teams_path == "randbats")) {
       rb = true;
     } else {
       teams = load_teams(teams_path);
@@ -198,15 +200,16 @@ struct Provider {
       return {trajectory, -1};
     }
 
+    assert(teams.size() > 0);
+
     const int team_index = device.random_int(teams.size());
     auto team = teams[team_index];
-    const bool changed = omitter.shuffle_and_truncate(device, team);
-    bool deleted = false;
+    bool changed = omitter.shuffle_and_truncate(device, team);
     if (device.uniform() < team_modify_prob) {
-      deleted = omitter.delete_info(device, team);
+      changed = changed && omitter.delete_info(device, team);
     }
 
-    if (!deleted) {
+    if (!changed) {
       Train::Build::Trajectory trajectory{};
       trajectory.initial = trajectory.terminal = team;
       return {trajectory, team_index};
@@ -226,7 +229,6 @@ struct Provider {
           sleep(1);
         }
       }
-
       const auto trajectory =
           TeamBuilding::rollout_build_network(device, build_network, team);
       assert(trajectory.updates.size() > 0);
