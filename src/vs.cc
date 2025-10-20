@@ -4,11 +4,11 @@
 #include <nn/battle/network.h>
 #include <teams/ou-sample-teams.h>
 #include <train/battle/compressed-frame.h>
+#include <util/parse.h>
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
 #include <util/team-building.h>
-#include <util/parse.h>
 
 #include <atomic>
 #include <cmath>
@@ -78,8 +78,8 @@ auto populate_teams() {
           PKMN::Set set{};
           set.species = pokemon.species;
           std::transform(pokemon.moves.begin(), pokemon.moves.end(),
-                          set.moves.begin(),
-                          [](const auto ms) { return ms.id; });
+                         set.moves.begin(),
+                         [](const auto ms) { return ms.id; });
           team.emplace_back(set);
         }
       }
@@ -98,7 +98,7 @@ auto populate_teams() {
     if (teams.size() == 0) {
       throw std::runtime_error{"Could not parse teams"};
     }
-    
+
   } else {
     // use sample teams
     std::transform(Teams::ou_sample_teams.begin(), Teams::ou_sample_teams.end(),
@@ -107,7 +107,6 @@ auto populate_teams() {
                      return t;
                    });
   }
-
 }
 
 auto generate_team(mt19937 &device, const auto &base_team)
@@ -448,10 +447,10 @@ void thread_fn(uint64_t seed) {
   };
 
   while (true) {
-    const auto p1_base_team = RuntimeData::teams[device.random_int(
-        RuntimeData::teams.size())];
-    const auto p2_base_team = RuntimeData::teams[device.random_int(
-        RuntimeData::teams.size())];
+    const auto p1_base_team =
+        RuntimeData::teams[device.random_int(RuntimeData::teams.size())];
+    const auto p2_base_team =
+        RuntimeData::teams[device.random_int(RuntimeData::teams.size())];
 
     const auto p1_build_traj = generate_team(device, p1_base_team);
     const auto p2_build_traj = generate_team(device, p2_base_team);
