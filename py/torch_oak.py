@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import py_oak
 
 import struct
+import hashlib
 
 import torch
 
@@ -82,6 +83,15 @@ class BattleFrame:
         swap(mask, self.p1_nash, self.p2_nash)
 
 
+def hash_bytes(data: bytes) -> int:
+    return int.from_bytes(hashlib.blake2b(data, digest_size=8).digest(), "little")
+
+
+def combine_hash(h1: int, h2: int) -> int:
+    # A simple 64-bit mixing function
+    return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) & 0xFFFFFFFFFFFFFFFF
+
+
 class Affine(nn.Module):
     def __init__(self, in_dim, out_dim, clamp=True):
         super().__init__()
@@ -90,14 +100,17 @@ class Affine(nn.Module):
         self.layer = torch.nn.Linear(in_dim, out_dim)
         self.clamp = clamp
 
-    # Read the parameters in the same way as the C++ net
     def read_parameters(self, f):
         dims = f.read(8)
         in_dim, out_dim = struct.unpack("<II", dims)
-        assert in_dim == self.in_dim, f"Expected in_dim={self.in_dim}, got {in_dim}"
-        assert (
-            out_dim == self.out_dim
-        ), f"Expected out_dim={self.out_dim}, got {out_dim}"
+        # assert in_dim == self.in_dim, f"Expected in_dim={self.in_dim}, got {in_dim}"
+        # assert (
+        #     out_dim == self.out_dim
+        # ), f"Expected out_dim={self.out_dim}, got {out_dim}"
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.layer = torch.nn.Linear(self.in_dim, self.out_dim)
+
         self.layer.bias.data.copy_(
             torch.frombuffer(
                 bytearray(f.read(self.layer.bias.numel() * 4)), dtype=torch.float32
@@ -114,7 +127,6 @@ class Affine(nn.Module):
         f.write(self.layer.bias.detach().cpu().numpy().astype("f4").tobytes())
         f.write(self.layer.weight.detach().cpu().numpy().astype("f4").tobytes())
 
-    # To make the network quantizable using the Stockfish scheme
     def clamp_parameters(self):
         self.layer.weight.data.clamp_(-2, 2)
 
@@ -123,6 +135,14 @@ class Affine(nn.Module):
         if self.clamp:
             return torch.clamp(x, 0.0, 1.0)
         return x
+
+    def hash(self) -> int:
+        data = (
+            self.layer.weight.detach().cpu().numpy().astype("f4").tobytes()
+            + self.layer.bias.detach().cpu().numpy().astype("f4").tobytes()
+            + struct.pack("<?II", self.clamp, self.in_dim, self.out_dim)
+        )
+        return hash_bytes(data)
 
 
 class EmbeddingNet(nn.Module):
@@ -139,14 +159,17 @@ class EmbeddingNet(nn.Module):
         self.fc0.write_parameters(f)
         self.fc1.write_parameters(f)
 
-    def clamp_parameters(
-        self,
-    ):
+    def clamp_parameters(self):
         self.fc0.clamp_parameters()
         self.fc1.clamp_parameters()
 
     def forward(self, x):
         return self.fc1(self.fc0(x))
+
+    def hash(self) -> int:
+        h = self.fc0.hash()
+        h = combine_hash(h, self.fc1.hash())
+        return h
 
 
 class BuildNetwork(nn.Module):
@@ -210,9 +233,7 @@ class MainNet(nn.Module):
         self.policy2_fc1.write_parameters(f)
         self.policy2_fc2.write_parameters(f)
 
-    def clamp_parameters(
-        self,
-    ):
+    def clamp_parameters(self):
         self.fc0.clamp_parameters()
         self.value_fc1.clamp_parameters()
         self.value_fc2.clamp_parameters()
@@ -238,6 +259,19 @@ class MainNet(nn.Module):
         value_b2 = self.value_fc2(value_b1)
         value = torch.sigmoid(value_b2)
         return value
+
+    def hash(self) -> int:
+        h = self.fc0.hash()
+        for sub in [
+            self.value_fc1,
+            self.value_fc2,
+            self.policy1_fc1,
+            self.policy1_fc2,
+            self.policy2_fc1,
+            self.policy2_fc2,
+        ]:
+            h = combine_hash(h, sub.hash())
+        return h
 
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
@@ -351,3 +385,9 @@ class BattleNetwork(torch.nn.Module):
         output.p2_policy[:size] = torch.gather(
             output.p2_policy_logit, 1, input.p2_choice_indices[:size]
         )
+
+    def hash(self) -> int:
+        h = self.pokemon_net.hash()
+        h = combine_hash(h, self.active_net.hash())
+        h = combine_hash(h, self.main_net.hash())
+        return h & 0xFFFFFFFFFFFFFFFF
