@@ -38,6 +38,8 @@ namespace RuntimeOptions {
 size_t threads = 0;
 double print_prob = 0;
 double early_stop_log = 3.5;
+long long int max_games = -1;
+bool save_data = true;
 
 RuntimeSearch::Agent p1_agent{"4096", "exp3-0.03", "mc"};
 RuntimeSearch::Agent p2_agent{"4096", "exp3-0.03", "mc"};
@@ -78,6 +80,10 @@ bool parse_options(int argc, char **argv) {
       return true;
     } else if (arg.starts_with("--threads=")) {
       threads = std::stoul(arg.substr(10));
+    } else if (arg.starts_with("--max-games=")) {
+      max_games = std::stoll(arg.substr(12));
+    } else if (arg.starts_with("--skip-save")) {
+      save_data = false;
     } else if (arg.starts_with("--p1-search-time=")) {
       p1_agent.search_time = arg.substr(17);
     } else if (arg.starts_with("--p2-search-time=")) {
@@ -139,6 +145,11 @@ std::filesystem::path working_dir = std::format(
 // filenames
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
+
+std::atomic<size_t> match_counter{};
+std::atomic<size_t> win{};
+std::atomic<size_t> loss{};
+std::atomic<size_t> draw{};
 } // namespace RuntimeData
 
 struct BattleFrameBuffer {
@@ -156,6 +167,9 @@ struct BattleFrameBuffer {
   }
 
   void save_to_disk(std::filesystem::path dir) {
+    if (RuntimeOptions::save_data == false) {
+      return;
+    }
     if (write_index == 0) {
       return;
     }
@@ -197,6 +211,9 @@ void thread_fn(uint64_t seed) {
   std::vector<Train::Build::Trajectory> build_buffer{};
 
   const auto save_build_buffer_to_disk = [&build_buffer]() {
+    if (RuntimeOptions::save_data == false) {
+      return;
+    }
     if (build_buffer.size() == 0) {
       return;
     }
@@ -349,10 +366,25 @@ void thread_fn(uint64_t seed) {
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
+    if (score_2 == 0) {
+      RuntimeData::loss.fetch_add(1);
+    } else if (score_2 == 1) {
+      RuntimeData::draw.fetch_add(1);
+    } else if (score_2 == 2) {
+      RuntimeData::win.fetch_add(1);
+    } else {
+      assert(false);
+    }
+
     return score_2;
   };
 
-  while (true) {
+  // std::cout << RuntimeOptions::max_games << std::endl;
+
+  while (
+      (RuntimeOptions::max_games < 0) ||
+      (RuntimeData::match_counter.fetch_add(1) < RuntimeOptions::max_games)) {
+    // std::cout << RuntimeData::match_counter.load() << std::endl;
 
     auto [p1_build_traj, p1_team_index] =
         RuntimeOptions::provider.get_trajectory(device);
@@ -390,7 +422,9 @@ void thread_fn(uint64_t seed) {
 }
 
 void progress_thread_fn(int sec) {
-  while (true) {
+  while (
+      (RuntimeOptions::max_games < 0) ||
+      (RuntimeData::match_counter.load() < RuntimeOptions::max_games)) {
     for (int s = 0; s < sec; ++s) {
       if (RuntimeData::terminated) {
         return;
@@ -418,19 +452,22 @@ void handle_terminate(int signal) {
 void setup(auto &device) {
 
   // create working dir
-  std::error_code ec;
-  bool created =
-      std::filesystem::create_directory(RuntimeData::working_dir, ec) &&
-      std::filesystem::create_directory(RuntimeData::working_dir / "p1", ec) &&
-      std::filesystem::create_directory(RuntimeData::working_dir / "p2", ec);
-  if (ec) {
-    std::cerr << "Error creating directory: " << ec.message() << '\n';
-    throw std::runtime_error("Could not create working dir.");
-  } else if (created) {
-    std::cout << "Created directory " << RuntimeData::working_dir.string()
-              << std::endl;
-  } else {
-    throw std::runtime_error("Could not create working dir.");
+  if (RuntimeOptions::save_data) {
+    std::error_code ec;
+    bool created =
+        std::filesystem::create_directory(RuntimeData::working_dir, ec) &&
+        std::filesystem::create_directory(RuntimeData::working_dir / "p1",
+                                          ec) &&
+        std::filesystem::create_directory(RuntimeData::working_dir / "p2", ec);
+    if (ec) {
+      std::cerr << "Error creating directory: " << ec.message() << '\n';
+      throw std::runtime_error("Could not create working dir.");
+    } else if (created) {
+      std::cout << "Created directory " << RuntimeData::working_dir.string()
+                << std::endl;
+    } else {
+      throw std::runtime_error("Could not create working dir.");
+    }
   }
 
   // save args
@@ -469,4 +506,6 @@ int main(int argc, char **argv) {
   std::cout << "score: "
             << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
             << " over " << RuntimeData::n.load() << " games." << std::endl;
+  std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load() << ' '
+            << RuntimeData::loss.load() << std::endl;
 }
