@@ -422,11 +422,13 @@ void thread_fn(uint64_t seed) {
 }
 
 void progress_thread_fn(int sec) {
-  while (
-      (RuntimeOptions::max_games < 0) ||
-      (RuntimeData::match_counter.load() < RuntimeOptions::max_games)) {
+  while (true) {
     for (int s = 0; s < sec; ++s) {
       if (RuntimeData::terminated) {
+        return;
+      }
+      if ((RuntimeOptions::max_games > 0) &&
+          (RuntimeData::match_counter.load() >= RuntimeOptions::max_games)) {
         return;
       }
       sleep(1);
