@@ -28,6 +28,9 @@ parser.add_argument("--exp3-param-max", default=5.0, type=float)
 parser.add_argument("--ucb-param-min", default=0.001, type=float)
 parser.add_argument("--ucb-param-max", default=5.0, type=float)
 parser.add_argument("--allow-policy", default=False, type=bool)
+parser.add_argument("--start", default=0, type=int)
+parser.add_argument("--c", default=1.414, type=float)
+parser.add_argument("--K", default=8, type=float)
 
 args = parser.parse_args()
 
@@ -89,7 +92,7 @@ def permute(id: ID) -> ID:
 class Global:
 
     default_rating: int = 1200
-    c: float = 1.414
+    c: float = args.c
 
     def __init__(self):
 
@@ -180,15 +183,14 @@ class Global:
         self.results[(lesserID, greaterID)] = wdl
 
         # Elo update
-        K = 32
         R_lesser = self.ratings[lesserID]
         R_greater = self.ratings[greaterID]
 
         E_lesser = 1 / (1 + 10 ** ((R_greater - R_lesser) / 400))
         E_greater = 1 - E_lesser
 
-        self.ratings[lesserID] += K * (score - E_lesser)
-        self.ratings[greaterID] += K * ((1 - score) - E_greater)
+        self.ratings[lesserID] += args.K * (score - E_lesser)
+        self.ratings[greaterID] += args.K * ((1 - score) - E_greater)
 
         # ucb, update value only
         v, n = self.ucb[lesserID]
@@ -204,7 +206,6 @@ class Global:
 
         sorted_ratings = sorted(self.ratings.items(), key=lambda kv: kv[1])
         for kv in sorted_ratings[:n]:
-            del self.ratings[kv[0]]
             del self.ucb[kv[0]]
 
 
@@ -354,7 +355,11 @@ def main():
 
     while True:
 
-        for _ in range(args.saves_per_update):
+        for _ in range(args.start, args.saves_per_update):
+
+            print("step", _)
+
+            args.start = 0
 
             sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
 
