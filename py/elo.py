@@ -20,7 +20,8 @@ parser.add_argument("--search-iterations", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
-parser.add_argument("--games-per-update", default=2**10, type=int)
+parser.add_argument("--games-per-save", default=2**10, type=int)
+parser.add_argument("--saves-per-update", default=1, type=int)
 parser.add_argument("--teams", default="", type=str)
 parser.add_argument("--exp3-param-min", default=0.001, type=float)
 parser.add_argument("--exp3-param-max", default=5.0, type=float)
@@ -205,7 +206,6 @@ glob = Global()
 def read_files():
     base = args.working_dir
 
-    # RATINGS
     path = os.path.join(base, "ratings")
     if os.path.exists(path):
         with open(path, "rb") as f:
@@ -221,7 +221,6 @@ def read_files():
                 glob.ratings[obj] = rating
                 glob.ucb[obj] = [0.0, 0]
 
-    # RESULTS
     path = os.path.join(base, "results")
     if os.path.exists(path):
         with open(path, "rb") as f:
@@ -247,7 +246,6 @@ def read_files():
                 w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
                 glob.results[(id1, id2)] = (w, l, d)
 
-    # DIRECTORY
     path = os.path.join(base, "directory")
     if os.path.exists(path):
         with open(path, "rb") as f:
@@ -269,20 +267,17 @@ def read_files():
 def write_files():
     base = args.working_dir
 
-    # RATINGS
     with open(os.path.join(base, "ratings"), "wb") as f:
         for obj, rating in glob.ratings.items():
             obj.write(f)
             f.write(struct.pack("<f", rating))
 
-    # RESULTS
     with open(os.path.join(base, "results"), "wb") as f:
         for (id1, id2), (w, l, d) in glob.results.items():
             id1.write(f)
             id2.write(f)
             f.write(struct.pack("<III", w, l, d))
 
-    # DIRECTORY
     with open(os.path.join(base, "directory"), "wb") as f:
         for nh, path_str in glob.directory.items():
             f.write(struct.pack("<Q", nh))
@@ -338,26 +333,29 @@ def main():
 
     while True:
 
-        sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
+        for _ in range(args.saves_per_update):
 
-        for key, value in sorted_ratings:
-            print(glob.directory[key.net_hash], key.bandit_name, key.policy_mode, value)
-        print("")
+            sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
 
-        with ThreadPoolExecutor(max_workers=args.threads) as pool:
+            for key, value in sorted_ratings:
+                print(glob.directory[key.net_hash], key.bandit_name, key.policy_mode, value)
+            print("")
 
-            futures = []
-            for _ in range(args.games_per_update):
-                futures.append(pool.submit(run_once))
+            with ThreadPoolExecutor(max_workers=args.threads) as pool:
 
-            for fut in as_completed(futures):
-                lesserID, greaterID, data = fut.result()
-                glob.update(lesserID, greaterID, data)
+                futures = []
+                for _ in range(args.games_per_save):
+                    futures.append(pool.submit(run_once))
 
-        glob.remove_lowest(10)
-        glob.fill_from_path(args.net_path, 10)
+                for fut in as_completed(futures):
+                    lesserID, greaterID, data = fut.result()
+                    glob.update(lesserID, greaterID, data)
 
-        write_files()
+            write_files()
+
+        glob.remove_lowest(args.n_delete)
+        glob.fill_from_path(args.net_path, args.n_delete)
+
 
 
 if __name__ == "__main__":
