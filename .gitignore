@@ -7,7 +7,12 @@ libpkmn-showdown.a
 **/matchup-matrix
 *.log
 *.pyc
-# TODO extensinos for build/battle nets
+# TODO extensions for build/battle nets
 *.net
 build-network
 battle-network
+# Elo
+**/directory
+**/ratings
+**/results
+**/ucb
