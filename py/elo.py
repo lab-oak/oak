@@ -4,7 +4,7 @@ import torch
 import argparse
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict
+from typing import Dict, List
 import subprocess
 import math
 
@@ -49,6 +49,20 @@ class ID:
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
 
+    def __eq__(self, other):
+        if not isinstance(other, ID):
+            return NotImplemented
+        return (
+            self.net_hash == other.net_hash
+            and self.bandit_name == other.bandit_name
+            and self.policy_mode == other.policy_mode
+        )
+
+    def __hash__(self):
+        return hash(
+            (self.net_hash, self.bandit_name, self.policy_mode)
+        )  # combine fields safely
+
     def write(self, f):
         f.write(struct.pack("<Q", self.net_hash))
         bn = self.bandit_name.encode("utf8")
@@ -81,7 +95,7 @@ class Global:
 
         self.ratings: Dict[ID, float] = {}
         self.ucb: Dict[ID, tuple[float, int]] = {}
-        self.results: Dict[tuple[ID, ID], tuple[int, int, int]] = {}
+        self.results: Dict[tuple[ID, ID], List[int, int, int]] = {}
         self.directory: Dict[int, str] = {}
 
     def fill_from_path(self, path, n=args.max_agents):
@@ -129,15 +143,7 @@ class Global:
         return id
 
     def remove_id(self, target_id: ID):
-        self.ratings = {k: v for k, v in self.ratings.items() if k != target_id}
-        self.ucb = {k: v for k, v in self.ucb.items() if k != target_id}
-        self.results = {
-            k: v
-            for k, v in self.results.items()
-            if k[0] != target_id and k[1] != target_id
-        }
-        if target_id.net_hash in self.directory:
-            del self.directory[target_id.net_hash]
+        return NotImplemented
 
     def select(self):
 
@@ -187,10 +193,12 @@ class Global:
         # ucb, update value only
         v, n = self.ucb[lesserID]
         total_v = v * (n - 1)
-        self.ucb[lesserID] = [(total_v + v) / n, n]
+        assert n > 0, "Bad UCB update"
+        self.ucb[lesserID] = [(total_v + score) / n, n]
         v, n = self.ucb[greaterID]
+        assert n > 0, "Bad UCB update"
         total_v = v * (n - 1)
-        self.ucb[greaterID] = [(total_v + v) / n, n]
+        self.ucb[greaterID] = [(total_v + (1 - score)) / n, n]
 
     def remove_lowest(self, n):
 
@@ -204,6 +212,9 @@ glob = Global()
 
 
 def read_files():
+
+    print("Reading files")
+
     base = args.working_dir
 
     with open(os.path.join(base, "ratings"), "rb") as f:
@@ -226,7 +237,7 @@ def read_files():
             net_hash = struct.unpack("<Q", data[:8])[0]
             bandit = data[8:23].rstrip(b"\0").decode("ascii")
             mode = data[23:24].decode("ascii")
-            score, visits = struct.unpack("<f", data[24:32])
+            score, visits = struct.unpack("<fI", data[24:32])
             obj = ID(net_hash, bandit, mode)
             glob.ucb[obj] = [score, visits]
 
@@ -251,7 +262,7 @@ def read_files():
             id1 = read_id()
             id2 = read_id()
             w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
-            glob.results[(id1, id2)] = (w, l, d)
+            glob.results[(id1, id2)] = [w, l, d]
 
     with open(os.path.join(base, "directory"), "rb") as f:
         while True:
@@ -278,7 +289,7 @@ def write_files():
             f.write(struct.pack("<f", rating))
 
     with open(os.path.join(base, "ucb"), "wb") as f:
-        for obj, data in glob.ratings.items():
+        for obj, data in glob.ucb.items():
             obj.write(f)
             f.write(struct.pack("<fI", data[0], data[1]))
 
@@ -333,7 +344,7 @@ def run_once() -> [ID, ID, [int, int, int]]:
 
     result = subprocess.run(cmd, text=True, capture_output=True)
     last_line = result.stdout.strip().splitlines()[-1]
-    data = tuple(map(int, last_line.split()))
+    data = list(map(int, last_line.split()))
     return lesserID, greaterID, data
 
 
@@ -368,6 +379,10 @@ def main():
                     glob.update(lesserID, greaterID, data)
 
             write_files()
+
+        print(
+            f"Removing lowest {args.n_delete} agents and replacing with random agents."
+        )
 
         glob.remove_lowest(args.n_delete)
         glob.fill_from_path(args.net_path, args.n_delete)
