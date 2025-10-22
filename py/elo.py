@@ -14,13 +14,14 @@ import torch_oak
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
 
 parser.add_argument("--working-dir", default=None, type=str)
+parser.add_argument("--net-path", default=".", type=str)
 parser.add_argument("--vs-path", default="./release/vs", type=str)
 parser.add_argument("--search-iterations", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
 parser.add_argument("--games-per-update", default=2**10, type=int)
-
+parser.add_argument("--teams", default="", type=str)
 parser.add_argument("--exp3-param-min", default=0.001, type=float)
 parser.add_argument("--exp3-param-max", default=5.0, type=float)
 parser.add_argument("--ucb-param-min", default=0.001, type=float)
@@ -66,18 +67,23 @@ def less_than(id1: ID, id2: ID):
     )
 
 
+def permute(id: ID) -> ID:
+    child = id
+
+
 class Global:
 
     default_rating: int = 1200
-    c = 1.414
+    c: float = 1.414
 
-    def __init__(self, path):
+    def __init__(self):
 
         self.ratings: Dict[ID, float] = {}
         self.ucb: Dict[ID, tuple[float, int]] = {}
         self.results: Dict[tuple[ID, ID], tuple[int, int, int]] = {}
         self.directory: Dict[int, str] = {}
 
+    def fill_from_path(self, path, n=args.max_agents):
         net_files = py_oak.find_data_files(path, ext=".net")
 
         for file in net_files:
@@ -90,7 +96,7 @@ class Global:
         # assume 0 hash is not possible
         self.directory[0] = "mc"
 
-        for _ in range(args.max_agents):
+        for _ in range(n):
             agent = self.new_agent()
             self.ratings[agent] = self.default_rating
             self.ucb[agent] = [0, 0]
@@ -108,9 +114,9 @@ class Global:
 
         param = None
         if bandit.startswith("pexp3") or bandit.startswith("exp3"):
-            param = log_uniform(args.exp3_param_min, args.exp3_param_max)
+            param = random.uniform(args.exp3_param_min, args.exp3_param_max)
         elif bandit.startswith("pucb") or bandit.startswith("ucb"):
-            param = log_uniform(args.ucb_param_min, args.ucb_param_max)
+            param = random.uniform(args.ucb_param_min, args.ucb_param_max)
         else:
             assert false, "bad bandit name"
         bandit_name = bandit + str(param)[:5]
@@ -132,7 +138,7 @@ class Global:
         if target_id.net_hash in self.directory:
             del self.directory[target_id.net_hash]
 
-    def sample_ids(self):
+    def select(self):
 
         N = sum(map(lambda kv: kv[1][1], self.ucb.items()))
 
@@ -144,14 +150,17 @@ class Global:
         if len(ids_sorted) < 2:
             raise RuntimeError("Need at least 2 IDs")
 
-        id1 = ids_sorted[0][0]
-        id2 = ids_sorted[1][0]
+        first, second = ids_sorted[:2]
 
+        # increment visits first (virtual loss)
+        first[1][1] = first[1][1] + 1
+        second[1][1] = second[1][1] + 1
+
+        id1 = first[0]
+        id2 = second[0]
         if less_than(id2, id1):
             id1, id2 = id2, id1
-
         return id1, id2
-
 
     def update(self, lesserID, greaterID, data):
         score = (data[0] + 0.5 * data[1]) / 2
@@ -174,16 +183,24 @@ class Global:
         self.ratings[lesserID] += K * (score - E_lesser)
         self.ratings[greaterID] += K * ((1 - score) - E_greater)
 
-        # ucb
+        # ucb, update value only
         v, n = self.ucb[lesserID]
-        total_v = v * n
-        self.ucb[lesserID] = [(total_v + v) / (n + 1), n + 1]
+        total_v = v * (n - 1)
+        self.ucb[lesserID] = [(total_v + v) / n, n]
         v, n = self.ucb[greaterID]
-        total_v = v * n
-        self.ucb[greaterID] = [(total_v + v) / (n + 1), n + 1]
+        total_v = v * (n - 1)
+        self.ucb[greaterID] = [(total_v + v) / n, n]
+
+    def remove_lowest(self, n):
+
+        sorted_ratings = sorted(self.ratings.items(), key=lambda kv: kv[1])
+        for kv in sorted_ratings[:n]:
+            del self.ratings[kv[0]]
+            del self.ucb[kv[0]]
 
 
-glob = Global(".")
+glob = Global()
+
 
 def read_files():
     base = args.working_dir
@@ -202,7 +219,7 @@ def read_files():
                 rating = struct.unpack("<f", data[24:28])[0]
                 obj = ID(net_hash, bandit, mode)
                 glob.ratings[obj] = rating
-                glob.ucb[obj] = (0.0, 0)
+                glob.ucb[obj] = [0.0, 0]
 
     # RESULTS
     path = os.path.join(base, "results")
@@ -283,20 +300,22 @@ def setup():
         os.makedirs(working_dir, exist_ok=False)
         args.working_dir = working_dir
 
+        glob.fill_from_path(args.net_path)
+
     else:
         read_files()
 
 
-
 def run_once() -> [ID, ID, [int, int, int]]:
 
-    lesserID, greaterID = glob.sample_ids()
+    lesserID, greaterID = glob.select()
 
     cmd = [
         args.vs_path,
         "--threads=1",
         "--max-games=1",
         "--skip-save",
+        f"--teams={args.teams}",
         f"--p1-network-path={glob.directory[lesserID.net_hash]}",
         f"--p2-network-path={glob.directory[greaterID.net_hash]}",
         f"--p1-search-time={args.search_iterations}",
@@ -319,9 +338,11 @@ def main():
 
     while True:
 
-        for key, value in glob.ratings.items():
-            key.print()
-            print(value)
+        sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
+
+        for key, value in sorted_ratings:
+            print(glob.directory[key.net_hash], key.bandit_name, key.policy_mode, value)
+        print("")
 
         with ThreadPoolExecutor(max_workers=args.threads) as pool:
 
@@ -333,7 +354,10 @@ def main():
                 lesserID, greaterID, data = fut.result()
                 glob.update(lesserID, greaterID, data)
 
-        # write_files()
+        glob.remove_lowest(10)
+        glob.fill_from_path(args.net_path, 10)
+
+        write_files()
 
 
 if __name__ == "__main__":
