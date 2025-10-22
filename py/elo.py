@@ -206,62 +206,67 @@ glob = Global()
 def read_files():
     base = args.working_dir
 
-    path = os.path.join(base, "ratings")
-    if os.path.exists(path):
-        with open(path, "rb") as f:
+    with open(os.path.join(base, "ratings"), "rb") as f:
+        while True:
+            data = f.read(8 + 15 + 1 + 4)
+            if len(data) < 8 + 15 + 1 + 4:
+                break
+            net_hash = struct.unpack("<Q", data[:8])[0]
+            bandit = data[8:23].rstrip(b"\0").decode("ascii")
+            mode = data[23:24].decode("ascii")
+            rating = struct.unpack("<f", data[24:28])[0]
+            obj = ID(net_hash, bandit, mode)
+            glob.ratings[obj] = rating
+
+    with open(os.path.join(base, "ucb"), "rb") as f:
+        while True:
+            data = f.read(8 + 15 + 1 + 4 + 4)
+            if len(data) < 8 + 15 + 1 + 4 + 4:
+                break
+            net_hash = struct.unpack("<Q", data[:8])[0]
+            bandit = data[8:23].rstrip(b"\0").decode("ascii")
+            mode = data[23:24].decode("ascii")
+            score, visits = struct.unpack("<f", data[24:32])
+            obj = ID(net_hash, bandit, mode)
+            glob.ucb[obj] = [score, visits]
+
+    with open(os.path.join(base, "results"), "rb") as f:
+        while True:
+            id_chunk = f.read((8 + 15 + 1) * 2 + 4 * 3)
+            if len(id_chunk) < (8 + 15 + 1) * 2 + 12:
+                break
+
+            p = 0
+
+            def read_id():
+                nonlocal p
+                nh = struct.unpack("<Q", id_chunk[p : p + 8])[0]
+                p += 8
+                bn = id_chunk[p : p + 15].rstrip(b"\0").decode("ascii")
+                p += 15
+                pm = id_chunk[p : p + 1].decode("ascii")
+                p += 1
+                return ID(nh, bn, pm)
+
+            id1 = read_id()
+            id2 = read_id()
+            w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
+            glob.results[(id1, id2)] = (w, l, d)
+
+    with open(os.path.join(base, "directory"), "rb") as f:
+        while True:
+            h_bytes = f.read(8)
+            if len(h_bytes) < 8:
+                break
+            net_hash = struct.unpack("<Q", h_bytes)[0]
+            path_bytes = []
             while True:
-                data = f.read(8 + 15 + 1 + 4)
-                if len(data) < 8 + 15 + 1 + 4:
+                c = f.read(1)
+                if not c or c == b"\0":
                     break
-                net_hash = struct.unpack("<Q", data[:8])[0]
-                bandit = data[8:23].rstrip(b"\0").decode("ascii")
-                mode = data[23:24].decode("ascii")
-                rating = struct.unpack("<f", data[24:28])[0]
-                obj = ID(net_hash, bandit, mode)
-                glob.ratings[obj] = rating
-                glob.ucb[obj] = [0.0, 0]
-
-    path = os.path.join(base, "results")
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            while True:
-                id_chunk = f.read((8 + 15 + 1) * 2 + 4 * 3)
-                if len(id_chunk) < (8 + 15 + 1) * 2 + 12:
-                    break
-
-                p = 0
-
-                def read_id():
-                    nonlocal p
-                    nh = struct.unpack("<Q", id_chunk[p : p + 8])[0]
-                    p += 8
-                    bn = id_chunk[p : p + 15].rstrip(b"\0").decode("ascii")
-                    p += 15
-                    pm = id_chunk[p : p + 1].decode("ascii")
-                    p += 1
-                    return ID(nh, bn, pm)
-
-                id1 = read_id()
-                id2 = read_id()
-                w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
-                glob.results[(id1, id2)] = (w, l, d)
-
-    path = os.path.join(base, "directory")
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            while True:
-                h_bytes = f.read(8)
-                if len(h_bytes) < 8:
-                    break
-                net_hash = struct.unpack("<Q", h_bytes)[0]
-                path_bytes = []
-                while True:
-                    c = f.read(1)
-                    if not c or c == b"\0":
-                        break
-                    path_bytes.append(c)
-                full_path = b"".join(path_bytes).decode("utf-8")
-                glob.directory[net_hash] = full_path
+                path_bytes.append(c)
+            full_path = b"".join(path_bytes).decode("utf-8")
+            glob.directory[net_hash] = full_path
 
 
 def write_files():
@@ -271,6 +276,11 @@ def write_files():
         for obj, rating in glob.ratings.items():
             obj.write(f)
             f.write(struct.pack("<f", rating))
+
+    with open(os.path.join(base, "ucb"), "wb") as f:
+        for obj, data in glob.ratings.items():
+            obj.write(f)
+            f.write(struct.pack("<fI", data[0], data[1]))
 
     with open(os.path.join(base, "results"), "wb") as f:
         for (id1, id2), (w, l, d) in glob.results.items():
@@ -338,7 +348,13 @@ def main():
             sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
 
             for key, value in sorted_ratings:
-                print(glob.directory[key.net_hash], key.bandit_name, key.policy_mode, value)
+                print(
+                    glob.directory[key.net_hash],
+                    key.bandit_name,
+                    key.policy_mode,
+                    value,
+                    glob.ucb[key],
+                )
             print("")
 
             with ThreadPoolExecutor(max_workers=args.threads) as pool:
@@ -355,7 +371,6 @@ def main():
 
         glob.remove_lowest(args.n_delete)
         glob.fill_from_path(args.net_path, args.n_delete)
-
 
 
 if __name__ == "__main__":
