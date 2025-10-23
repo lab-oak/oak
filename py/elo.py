@@ -247,6 +247,7 @@ def read_files():
 
         sorted_ratings = sorted(temp.items(), key=lambda kv: kv[1], reverse=True)
         for key, value in sorted_ratings[:args.max_agents]:
+            value[1] = 0
             glob.ucb[key] = value            
 
     with open(os.path.join(base, "results"), "rb") as f:
