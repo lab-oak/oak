@@ -208,6 +208,10 @@ class Global:
         for kv in sorted_ratings[:n]:
             del self.ucb[kv[0]]
 
+    def reset_visits(self):
+        for key, value in self.ucb:
+            value[1] = 0
+
 
 glob = Global()
 
@@ -247,7 +251,7 @@ def read_files():
 
         sorted_ratings = sorted(temp.items(), key=lambda kv: kv[1], reverse=True)
         for key, value in sorted_ratings[:args.max_agents]:
-            value[1] = 0
+            # value[1] = 0
             glob.ucb[key] = value            
 
     with open(os.path.join(base, "results"), "rb") as f:
@@ -400,6 +404,7 @@ def main():
 
         glob.remove_lowest(args.n_delete)
         glob.fill_from_path(args.net_path, args.n_delete)
+        glob.reset_visits()
 
 
 if __name__ == "__main__":
