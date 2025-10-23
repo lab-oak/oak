@@ -204,7 +204,7 @@ class Global:
 
     def remove_lowest(self, n):
 
-        sorted_ratings = sorted(self.ratings.items(), key=lambda kv: kv[1])
+        sorted_ratings = sorted(self.ucb.items(), key=lambda kv: kv[1])
         for kv in sorted_ratings[:n]:
             del self.ucb[kv[0]]
 
@@ -231,6 +231,9 @@ def read_files():
             glob.ratings[obj] = rating
 
     with open(os.path.join(base, "ucb"), "rb") as f:
+
+        temp = dict()
+
         while True:
             data = f.read(8 + 15 + 1 + 4 + 4)
             if len(data) < 8 + 15 + 1 + 4 + 4:
@@ -240,7 +243,11 @@ def read_files():
             mode = data[23:24].decode("ascii")
             score, visits = struct.unpack("<fI", data[24:32])
             obj = ID(net_hash, bandit, mode)
-            glob.ucb[obj] = [score, visits]
+            temp[obj] = [score, visits]
+
+        sorted_ratings = sorted(temp.items(), key=lambda kv: kv[1], reverse=True)
+        for key, value in sorted_ratings[:args.max_agents]:
+            glob.ucb[key] = value            
 
     with open(os.path.join(base, "results"), "rb") as f:
         while True:
@@ -364,13 +371,14 @@ def main():
             sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
 
             for key, value in sorted_ratings:
-                print(
-                    glob.directory[key.net_hash],
-                    key.bandit_name,
-                    key.policy_mode,
-                    value,
-                    glob.ucb[key],
-                )
+                if key in glob.ucb: 
+                    print(
+                        glob.directory[key.net_hash],
+                        key.bandit_name,
+                        key.policy_mode,
+                        value,
+                        glob.ucb[key],
+                    )
             print("")
 
             with ThreadPoolExecutor(max_workers=args.threads) as pool:
