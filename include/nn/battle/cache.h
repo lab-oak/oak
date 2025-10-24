@@ -3,6 +3,7 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/key.h>
 #include <libpkmn/data/status.h>
+#include <nn/params.h>
 
 #include <map>
 
@@ -81,25 +82,26 @@ template <typename T, int dim = 39> struct PokemonCache {
 
 template <typename T, int dim = 55> struct ActivePokemonCache {
 
-  std::map<std::tuple<PKMN::ActivePokemon, uint8_t>, std::array<T, dim>>
+  std::map<std::pair<PKMN::ActivePokemon, uint8_t>, std::array<T, dim>>
       embeddings;
 
   const T *get(auto &active_net, const auto &active, const auto &pokemon,
-               const auto sleep) {
+               const auto &duration) {
     const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{
-        active, Encode::Battle::pokemon_key(pokemon, sleep)};
+        active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
     if (embeddings.find(key) == embeddings.end()) {
       return embeddings[key].data();
     } else {
       static thread_local std::array<float, Encode::Battle::Active::n_dim>
           input;
       static thread_local std::array<float, pokemon_out_dim> output;
-      Encode::Battle::Active::write(pokemon, active, sleep, input.data());
+      Encode::Battle::Active::write(pokemon, active, duration, input.data());
       active_net.propagate(input.data(), output.data());
       auto &embedding = embeddings[key];
       for (auto i = 0; i < active_out_dim; ++i) {
         embedding[i] = output[i] * 127;
       }
+      return embedding.data();
     }
   }
 };

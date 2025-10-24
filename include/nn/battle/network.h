@@ -141,7 +141,8 @@ struct Network {
 
   std::array<std::array<PokemonCache<uint8_t, pokemon_out_dim>, 6>, 2>
       discrete_pokemon_cache;
-  ActivePokemonCache<uint8_t> discrete_active_cache;
+  std::array<std::array<ActivePokemonCache<uint8_t>, 6>, 2>
+      discrete_active_cache;
   Stockfish::NetworkArchitecture discrete_main_net;
   bool use_discrete = false;
 
@@ -162,9 +163,12 @@ struct Network {
     for (auto s = 0; s < 2; ++s) {
       for (auto p = 0; p < 6; ++p) {
         pokemon_cache[s][p].fill(pokemon_net, battle.sides[s].pokemon[p]);
-        for (auto i = 0; i < pokemon_out_dim; ++i) {
-          discrete_pokemon_cache[s][p].embeddings[i] =
-              pokemon_cache[s][p].embeddings[i] * 127;
+
+        for (auto j = 0; j < PokemonCache<float>::n_embeddings; ++j) {
+          for (auto i = 0; i < pokemon_out_dim; ++i) {
+            discrete_pokemon_cache[s][p].embeddings[j][i] =
+                pokemon_cache[s][p].embeddings[j][i] * 127;
+          }
         }
       }
     }
@@ -254,16 +258,16 @@ struct Network {
         std::fill(main_input[s],
                   main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
       } else {
-        std::fill(active_input[s][0],
-                  active_input[s][0] + Encode::Battle::Active::n_dim, 0);
-        Encode::Battle::Active::write(stored, side.active, duration,
-                                      active_input[s][0]);
-        active_net.propagate(active_input[s][0], main_input[s] + 1);
+        const auto *embedding =
+            discrete_active_cache[s][side.order[0] - 1].get(
+                active_net, side.active, stored, duration);
+        std::memcpy(main_input[s], embedding, pokemon_out_dim * sizeof(int8_t));
+
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
       }
 
       for (auto slot = 2; slot <= 6; ++slot) {
-        float *output = main_input[s] + main_input_index(slot - 1);
+        int8_t *output = main_input[s] + main_input_index(slot - 1);
         const auto id = side.order[slot - 1];
         if (id == 0) {
           std::fill(output, output + (pokemon_out_dim + 1), 0);
@@ -274,7 +278,8 @@ struct Network {
           } else {
             const auto sleep = duration.sleep(slot - 1);
             const auto *embedding =
-                pokemon_cache[s][side.order[slot - 1] - 1].get(pokemon, sleep);
+                discrete_pokemon_cache[s][side.order[slot - 1] - 1].get(pokemon,
+                                                                        sleep);
             std::memcpy(output + 1, embedding, pokemon_out_dim * sizeof(float));
             output[0] = (float)pokemon.hp / pokemon.stats.hp;
           }
