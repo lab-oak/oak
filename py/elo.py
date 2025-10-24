@@ -45,12 +45,13 @@ def log_uniform(min, max):
 
 
 class ID:
-    def __init__(self, net_hash, bandit_name, policy_mode):
+    def __init__(self, net_hash, bandit_name, policy_mode, iterations):
         self.net_hash = net_hash
         assert len(bandit_name) < 15, f"Error: bandit-name too long: {bandit_name}"
         self.bandit_name = bandit_name
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
+        self.iterations = iterations
 
     def __eq__(self, other):
         if not isinstance(other, ID):
@@ -59,11 +60,12 @@ class ID:
             self.net_hash == other.net_hash
             and self.bandit_name == other.bandit_name
             and self.policy_mode == other.policy_mode
+            and self.iterations == other.iterations
         )
 
     def __hash__(self):
         return hash(
-            (self.net_hash, self.bandit_name, self.policy_mode)
+            (self.net_hash, self.bandit_name, self.policy_mode, self.iterations)
         )  # combine fields safely
 
     def write(self, f):
@@ -72,16 +74,18 @@ class ID:
         bn = bn.ljust(15, b"\0")
         f.write(bn)
         f.write(self.policy_mode.encode("utf8"))
+        f.write(struct.pack("<I", self.iterations))
 
     def print(self):
-        print(self.net_hash, self.bandit_name, self.policy_mode)
+        print(self.net_hash, self.bandit_name, self.policy_mode, self.iterations)
 
 
 def less_than(id1: ID, id2: ID):
-    return (id1.net_hash, id1.bandit_name, id1.policy_mode) < (
+    return (id1.net_hash, id1.bandit_name, id1.policy_mode, id1.iterations) < (
         id2.net_hash,
         id2.bandit_name,
         id2.policy_mode,
+        id2.iterations,
     )
 
 
@@ -142,8 +146,7 @@ class Global:
         selection_modes = ["n", "e", "x"]
         selection_mode = random.choice(selection_modes)
 
-        id = ID(net_hash, bandit_name, selection_mode)
-        return id
+        return ID(net_hash, bandit_name, selection_mode, 4096)
 
     def remove_id(self, target_id: ID):
         return NotImplemented
@@ -209,7 +212,7 @@ class Global:
             del self.ucb[kv[0]]
 
     def reset_visits(self):
-        for key, value in self.ucb:
+        for key, value in self.ucb.items():
             value[1] = 0
 
 
@@ -224,14 +227,15 @@ def read_files():
 
     with open(os.path.join(base, "ratings"), "rb") as f:
         while True:
-            data = f.read(8 + 15 + 1 + 4)
-            if len(data) < 8 + 15 + 1 + 4:
+            data = f.read(8 + 15 + 1 + 4 + 4)
+            if len(data) < 8 + 15 + 1 + 4 + 4:
                 break
             net_hash = struct.unpack("<Q", data[:8])[0]
             bandit = data[8:23].rstrip(b"\0").decode("ascii")
             mode = data[23:24].decode("ascii")
-            rating = struct.unpack("<f", data[24:28])[0]
-            obj = ID(net_hash, bandit, mode)
+            iterations = struct.unpack("<I", data[24:28])[0]
+            rating = struct.unpack("<f", data[28:43])[0]
+            obj = ID(net_hash, bandit, mode, iterations)
             glob.ratings[obj] = rating
 
     with open(os.path.join(base, "ucb"), "rb") as f:
@@ -239,25 +243,27 @@ def read_files():
         temp = dict()
 
         while True:
-            data = f.read(8 + 15 + 1 + 4 + 4)
-            if len(data) < 8 + 15 + 1 + 4 + 4:
+            data = f.read(8 + 15 + 1 + 4 + 4 + 4)
+            if len(data) < 8 + 15 + 1 + 4 + 4 + 4:
                 break
             net_hash = struct.unpack("<Q", data[:8])[0]
             bandit = data[8:23].rstrip(b"\0").decode("ascii")
             mode = data[23:24].decode("ascii")
-            score, visits = struct.unpack("<fI", data[24:32])
-            obj = ID(net_hash, bandit, mode)
+            iterations = struct.unpack("<I", data[24:28])[0]
+            print(len(data))
+            score, visits = struct.unpack("<fI", data[28:36])
+            obj = ID(net_hash, bandit, mode, iterations)
             temp[obj] = [score, visits]
 
         sorted_ratings = sorted(temp.items(), key=lambda kv: kv[1], reverse=True)
-        for key, value in sorted_ratings[:args.max_agents]:
+        for key, value in sorted_ratings[: args.max_agents]:
             # value[1] = 0
-            glob.ucb[key] = value            
+            glob.ucb[key] = value
 
     with open(os.path.join(base, "results"), "rb") as f:
         while True:
-            id_chunk = f.read((8 + 15 + 1) * 2 + 4 * 3)
-            if len(id_chunk) < (8 + 15 + 1) * 2 + 12:
+            id_chunk = f.read((8 + 15 + 1 + 4) * 2 + 4 * 3)
+            if len(id_chunk) < (8 + 15 + 1 + 4) * 2 + 12:
                 break
 
             p = 0
@@ -270,11 +276,14 @@ def read_files():
                 p += 15
                 pm = id_chunk[p : p + 1].decode("ascii")
                 p += 1
-                return ID(nh, bn, pm)
+                it = struct.unpack("<I", id_chunk[p : p + 4])[0]
+                p += 4
+                return ID(nh, bn, pm, it)
 
             id1 = read_id()
             id2 = read_id()
             w, l, d = struct.unpack("<III", id_chunk[p : p + 12])
+            p += 12
             glob.results[(id1, id2)] = [w, l, d]
 
     with open(os.path.join(base, "directory"), "rb") as f:
@@ -347,8 +356,8 @@ def run_once() -> [ID, ID, [int, int, int]]:
         f"--teams={args.teams}",
         f"--p1-network-path={glob.directory[lesserID.net_hash]}",
         f"--p2-network-path={glob.directory[greaterID.net_hash]}",
-        f"--p1-search-time={args.search_iterations}",
-        f"--p2-search-time={args.search_iterations}",
+        f"--p1-search-time={lesserID.iterations}",
+        f"--p2-search-time={greaterID.iterations}",
         f"--p1-bandit-name={lesserID.bandit_name}",
         f"--p2-bandit-name={greaterID.bandit_name}",
         f"--p1-policy-mode={lesserID.policy_mode}",
@@ -376,11 +385,12 @@ def main():
             sorted_ratings = sorted(glob.ratings.items(), key=lambda kv: kv[1])
 
             for key, value in sorted_ratings:
-                if key in glob.ucb: 
+                if key in glob.ucb:
                     print(
                         glob.directory[key.net_hash],
                         key.bandit_name,
                         key.policy_mode,
+                        key.iterations,
                         value,
                         glob.ucb[key],
                     )
