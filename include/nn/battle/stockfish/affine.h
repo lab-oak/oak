@@ -67,11 +67,15 @@ public:
   }
 
   void copy_parameters(const auto &affine) {
+    assert(InputDimensions == affine.in_dim);
+    assert(OutputDimensions == affine.out_dim);
     for (auto i = 0; i < OutputDimensions; ++i) {
-      biases[i] = static_cast<int8_t>(affine.biases.data()[i] * 64);
+      biases[i] = static_cast<int32_t>(affine.biases.data()[i] * 64 * 127);
     }
     for (auto i = 0; i < OutputDimensions * InputDimensions; ++i) {
-      weights[i] = static_cast<int8_t>(affine.weights.data()[i] * 64);
+      weights[get_weight_index(i)] = static_cast<int8_t>(affine.weights.data()[i] * 64);
+      assert(affine.weights.data()[i] < 2);
+      assert(affine.weights.data()[i] > -2);
     }
     // assert(std::none_of());
   }

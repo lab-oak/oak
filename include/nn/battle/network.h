@@ -12,6 +12,8 @@ namespace NN {
 
 namespace Battle {
 
+inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
+
 struct MainNet {
 
   Affine<> fc0;
@@ -123,7 +125,7 @@ struct MainNet {
       p2[i] = p2_policy_buffer_2[p2_c];
     }
 
-    return 1 / (1 + std::exp(-output));
+    return sigmoid(output);
   }
 };
 
@@ -298,13 +300,13 @@ struct Network {
     static thread_local uint8_t discrete_main_input[2][side_out_dim];
 
     write_main(main_input, b, d);
-    write_main(discrete_main_input, b, d);
+    // write_main(discrete_main_input, b, d);
 
-    std::cout << "f32\n";
-    print_main_input(main_input);
-    std::cout << "u8\n";
-    print_main_input(discrete_main_input);
-
+    // std::cout << "f32\n";
+    // print_main_input(main_input);
+    // std::cout << "u8\n";
+    // print_main_input(discrete_main_input);
+    // float value_d = sigmoid(discrete_main_net.propagate(discrete_main_input[0]));
     float value = main_net.propagate(main_input[0]);
     return value;
   }
