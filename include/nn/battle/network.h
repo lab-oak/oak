@@ -268,7 +268,6 @@ struct Network {
             active_net, side.active, stored, duration);
         std::memcpy(main_input[s] + 1, embedding,
                     active_out_dim * sizeof(uint8_t));
-
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
       }
 
@@ -284,9 +283,9 @@ struct Network {
           } else {
             const auto sleep = duration.sleep(slot - 1);
             const auto *embedding =
-                discrete_pokemon_cache[s][side.order[slot - 1] - 1].get(pokemon,
-                                                                        sleep);
-            std::memcpy(output + 1, embedding, pokemon_out_dim * sizeof(float));
+                discrete_pokemon_cache[s][id - 1].get(pokemon, sleep);
+            std::memcpy(output + 1, embedding,
+                        pokemon_out_dim * sizeof(uint8_t));
             output[0] = (float)pokemon.hp / pokemon.stats.hp;
           }
         }
@@ -298,17 +297,12 @@ struct Network {
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float main_input[2][side_out_dim];
     static thread_local uint8_t discrete_main_input[2][side_out_dim];
-
-    write_main(main_input, b, d);
-    // write_main(discrete_main_input, b, d);
-
-    // std::cout << "f32\n";
-    // print_main_input(main_input);
-    // std::cout << "u8\n";
-    // print_main_input(discrete_main_input);
-    // float value_d = sigmoid(discrete_main_net.propagate(discrete_main_input[0]));
-    float value = main_net.propagate(main_input[0]);
-    return value;
+    // write_main(main_input, b, d);
+    write_main(discrete_main_input, b, d);
+    float value_d =
+        sigmoid(discrete_main_net.propagate(discrete_main_input[0]));
+    // float value = main_net.propagate(main_input[0]);
+    return value_d;
   }
 
   float inference(const pkmn_gen1_battle &b,
