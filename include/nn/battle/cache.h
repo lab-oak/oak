@@ -93,7 +93,7 @@ template <typename T, int dim = 55> struct ActivePokemonCache {
       return embeddings[key].data();
     } else {
       std::array<float, Encode::Battle::Active::n_dim> input{};
-      static thread_local std::array<float, pokemon_out_dim> output;
+      static thread_local std::array<float, active_out_dim> output;
       Encode::Battle::Active::write(pokemon, active, duration, input.data());
       active_net.propagate(input.data(), output.data());
       auto &embedding = embeddings[key];
