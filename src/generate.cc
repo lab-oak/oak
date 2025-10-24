@@ -1,7 +1,5 @@
-#include <format/random-battles/randbat.h>
 #include <nn/battle/network.h>
 #include <nn/build/network.h>
-#include <teams/ou-sample-teams.h>
 #include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
 #include <train/build/trajectory.h>
