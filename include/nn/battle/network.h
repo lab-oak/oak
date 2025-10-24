@@ -151,7 +151,8 @@ struct Network {
           uint32_t pohd = policy_hidden_dim)
       : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pokemon_out_dim},
         active_net{Encode::Battle::Active::n_dim, ahd, active_out_dim},
-        main_net{2 * side_out_dim, hd, vhd, pohd, policy_out_dim} {}
+        main_net{2 * side_out_dim, hd, vhd, pohd, policy_out_dim},
+        discrete_active_cache{} {}
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
@@ -168,7 +169,11 @@ struct Network {
           for (auto i = 0; i < pokemon_out_dim; ++i) {
             discrete_pokemon_cache[s][p].embeddings[j][i] =
                 pokemon_cache[s][p].embeddings[j][i] * 127;
+            // std::cout << pokemon_cache[s][p].embeddings[j][i] << '/';
+            // std::cout << discrete_pokemon_cache[s][p].embeddings[j][i] /
+            // 127.0 << ' ';
           }
+          // std::cout << std::endl;
         }
       }
     }
@@ -245,7 +250,8 @@ struct Network {
     }
   }
 
-  void write_main(int8_t main_input[2][side_out_dim], const pkmn_gen1_battle &b,
+  void write_main(uint8_t main_input[2][side_out_dim],
+                  const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
@@ -256,18 +262,18 @@ struct Network {
 
       if (stored.hp == 0) {
         std::fill(main_input[s],
-                  main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
+                  main_input[s] + (active_out_dim + 1), 0);
       } else {
-        const auto *embedding =
-            discrete_active_cache[s][side.order[0] - 1].get(
-                active_net, side.active, stored, duration);
-        std::memcpy(main_input[s], embedding, pokemon_out_dim * sizeof(int8_t));
+        const auto *embedding = discrete_active_cache[s][side.order[0] - 1].get(
+            active_net, side.active, stored, duration);
+        std::memcpy(main_input[s] + 1, embedding,
+                    active_out_dim * sizeof(uint8_t));
 
         main_input[s][0] = (float)stored.hp / stored.stats.hp;
       }
 
       for (auto slot = 2; slot <= 6; ++slot) {
-        int8_t *output = main_input[s] + main_input_index(slot - 1);
+        uint8_t *output = main_input[s] + main_input_index(slot - 1);
         const auto id = side.order[slot - 1];
         if (id == 0) {
           std::fill(output, output + (pokemon_out_dim + 1), 0);
@@ -291,7 +297,16 @@ struct Network {
   float inference(const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float main_input[2][side_out_dim];
+    static thread_local uint8_t discrete_main_input[2][side_out_dim];
+
     write_main(main_input, b, d);
+    write_main(discrete_main_input, b, d);
+    
+    std::cout << "f32\n";
+    print_main_input(main_input);
+    std::cout << "u8\n";
+    print_main_input(discrete_main_input);
+
     float value = main_net.propagate(main_input[0]);
     return value;
   }
@@ -318,24 +333,41 @@ struct Network {
     return value;
   }
 
-  static void print_main_input(float *input) {
+  static void print_main_input(float input[2][256]) {
     for (auto s = 0; s < 2; ++s) {
-      std::cout << "Active " << (int)(100 * input[0]) << "%\n";
+      std::cout << "Active " << (int)(100 * input[s][0]) << "%\n";
       for (auto i = 0; i < active_out_dim; ++i) {
-        std::cout << input[1 + i] << ' ';
+        std::cout << input[s][1 + i] << ' ';
       }
       std::cout << std::endl;
 
       for (auto p = 1; p < 6; ++p) {
-        auto p_input = input + main_input_index(p);
+        auto p_input = input[s] + main_input_index(p);
         std::cout << "Pokemon " << (int)(100 * p_input[0]) << "%\n";
         for (auto i = 0; i < pokemon_out_dim; ++i) {
           std::cout << p_input[1 + i] << ' ';
         }
         std::cout << std::endl;
       }
+    }
+  }
 
-      input += side_out_dim;
+  static void print_main_input(uint8_t input[2][256]) {
+    for (auto s = 0; s < 2; ++s) {
+      std::cout << "Active " << (int)(100 * input[s][0]) << "%\n";
+      for (auto i = 0; i < active_out_dim; ++i) {
+        std::cout << input[s][1 + i] / 127.0 << ' ';
+      }
+      std::cout << std::endl;
+
+      for (auto p = 1; p < 6; ++p) {
+        auto p_input = input[s] + main_input_index(p);
+        std::cout << "Pokemon " << (int)(100 * p_input[0]) << "%\n";
+        for (auto i = 0; i < pokemon_out_dim; ++i) {
+          std::cout << p_input[1 + i] / 127.0 << ' ';
+        }
+        std::cout << std::endl;
+      }
     }
   }
 };
