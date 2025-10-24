@@ -32,7 +32,7 @@ struct Bandit {
   void init(const auto k) noexcept {
     this->k = k;
     std::fill(scores.begin(), scores.begin() + k, 0);
-    std::fill(visits.begin(), visits.begin() + k, 0);
+    std::fill(visits.begin(), visits.begin() + k, uint24_t{});
   }
 
   bool is_init() const noexcept { return k; }
