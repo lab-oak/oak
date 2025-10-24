@@ -14,6 +14,7 @@ function(create_library target mode dir)
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libpkmn/${mode}/${dir}/libpkmn-showdown.a
   )
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/engine/zig-out/include)
+  target_compile_options(${target} INTERFACE -mavx2)
 endfunction()
 
 create_library(libpkmn_client_release release client)
@@ -47,7 +48,6 @@ target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC)
 add_executable(benchmark src/benchmark.cc)
 target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
-target_compile_options(benchmark PRIVATE -mavx2)
 
 add_executable(search-test src/search-test.cc)
 target_include_directories(search-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -76,7 +76,6 @@ target_link_libraries(pyoak PRIVATE libpkmn_chance)
 add_executable(vs src/vs.cc)
 target_include_directories(vs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(vs PRIVATE libpkmn_chance lrslib128 eigen)
-target_compile_options(vs PRIVATE -mavx2)
 
 add_executable(randbat src/randbat.cc)
 target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
