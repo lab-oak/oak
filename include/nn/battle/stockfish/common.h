@@ -27,11 +27,6 @@
 #include <iostream>
 #include <type_traits>
 
-// True if and only if the binary is compiled on a little-endian machine
-static inline const std::uint16_t Le = 1;
-static inline const bool IsLittleEndian =
-    *reinterpret_cast<const char *>(&Le) == 1;
-
 #include <immintrin.h>
 
 namespace NN::Battle::Stockfish {

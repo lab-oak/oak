@@ -18,19 +18,15 @@
 
 // Input features and network structure used in NNUE evaluation function
 
-#ifndef NNUE_ARCHITECTURE_H_INCLUDED
-#define NNUE_ARCHITECTURE_H_INCLUDED
+#pragma once
 
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
 
-// #include "features/half_ka_v2_hm.h"
-#include "affine_transform.h"
-// #include "layers/affine_transform_sparse_input.h"
-#include "clipped_relu.h"
-// #include "layers/sqr_clipped_relu.h"
-#include "nnue_common.h"
+#include <nn/battle/stockfish/affine.h>
+#include <nn/battle/stockfish/clipped_relu.h>
+#include <nn/battle/stockfish/common.h>
 
 namespace NN::Battle::Stockfish {
 
@@ -39,15 +35,19 @@ struct NetworkArchitecture {
   static constexpr int FC_0_OUTPUTS = 32;
   static constexpr int FC_1_OUTPUTS = 32;
 
-  Layers::AffineTransform<ConcatenatedSidesDims, FC_0_OUTPUTS> fc_0;
-  Layers::ClippedReLU<FC_0_OUTPUTS> ac_0;
-  Layers::AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_1;
-  Layers::ClippedReLU<FC_1_OUTPUTS> ac_1;
-  Layers::AffineTransform<FC_1_OUTPUTS, 1> fc_2;
+  AffineTransform<ConcatenatedSidesDims, FC_0_OUTPUTS> fc_0;
+  ClippedReLU<FC_0_OUTPUTS> ac_0;
+  AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_1;
+  ClippedReLU<FC_1_OUTPUTS> ac_1;
+  AffineTransform<FC_1_OUTPUTS, 1> fc_2;
 
-  void copy_parameters(const auto &main_net) {}
+  void copy_parameters(const auto &main_net) {
+    fc_0.copy_parameters(main_net.fc0);
+    fc_1.copy_parameters(main_net.value_fc1);
+    fc_2.copy_parameters(main_net.value_fc2);
+  }
 
-  std::int32_t propagate(const TransformedFeatureType *transformedFeatures) {
+  float propagate(const TransformedFeatureType *transformedFeatures) const {
     struct alignas(CacheLineSize) Buffer {
       alignas(CacheLineSize) typename decltype(fc_0)::OutputBuffer fc_0_out;
       alignas(CacheLineSize) typename decltype(ac_0)::OutputBuffer ac_0_out;
@@ -76,12 +76,10 @@ struct NetworkArchitecture {
     // buffer.fc_0_out[FC_0_OUTPUTS] is such that 1.0 is equal to
     // 127*(1<<WeightScaleBits) in quantized form, but we want 1.0 to be equal
     // to 600*OutputScale
-    std::int32_t outputValue = buffer.fc_2_out[0];
+    auto outputValue = buffer.fc_2_out[0] / float(127 * (1 << 6));
 
     return outputValue;
   }
 };
 
 } // namespace NN::Battle::Stockfish
-
-#endif // #ifndef NNUE_ARCHITECTURE_H_INCLUDED

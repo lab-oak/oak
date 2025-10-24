@@ -18,8 +18,7 @@
 
 // Definition of layer AffineTransform of NNUE evaluation function
 
-#ifndef NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
-#define NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
+#pragma once
 
 #include <cstdint>
 #include <iostream>
@@ -67,7 +66,15 @@ public:
     return get_weight_index_scrambled(i);
   }
 
-  void copy_parameters(const float *bias, const float *weights) {}
+  void copy_parameters(const auto &affine) {
+    for (auto i = 0; i < OutputDimensions; ++i) {
+      biases[i] = static_cast<int8_t>(affine.biases.data()[i] * 64);
+    }
+    for (auto i = 0; i < OutputDimensions * InputDimensions; ++i) {
+      weights[i] = static_cast<int8_t>(affine.weights.data()[i] * 64);
+    }
+    // assert(std::none_of());
+  }
 
   // Forward propagation
   void propagate(const InputType *input, OutputType *output) const {
@@ -151,5 +158,3 @@ public:
 };
 
 } // namespace NN::Battle::Stockfish
-
-#endif // #ifndef NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED

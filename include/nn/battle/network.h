@@ -3,6 +3,7 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/policy.h>
 #include <nn/battle/cache.h>
+#include <nn/battle/stockfish/network.h>
 #include <nn/params.h>
 #include <nn/subnet.h>
 #include <util/random.h>
@@ -138,6 +139,12 @@ struct Network {
   MainNet main_net;
   mt19937 device;
 
+  std::array<std::array<PokemonCache<uint8_t, pokemon_out_dim>, 6>, 2>
+      discrete_pokemon_cache;
+  ActivePokemonCache<uint8_t> discrete_active_cache;
+  Stockfish::NetworkArchitecture discrete_main_net;
+  bool use_discrete = false;
+
   Network(uint32_t phd = pokemon_hidden_dim, uint32_t ahd = active_hidden_dim,
           uint32_t hd = hidden_dim, uint32_t vhd = value_hidden_dim,
           uint32_t pohd = policy_hidden_dim)
@@ -155,6 +162,10 @@ struct Network {
     for (auto s = 0; s < 2; ++s) {
       for (auto p = 0; p < 6; ++p) {
         pokemon_cache[s][p].fill(pokemon_net, battle.sides[s].pokemon[p]);
+        for (auto i = 0; i < pokemon_out_dim; ++i) {
+          discrete_pokemon_cache[s][p].embeddings[i] =
+              pokemon_cache[s][p].embeddings[i] * 127;
+        }
       }
     }
   }
@@ -170,6 +181,7 @@ struct Network {
     if (stream.read(&dummy, 1)) {
       return false;
     } else {
+      discrete_main_net.copy_parameters(main_net);
       return true;
     }
   }
@@ -189,6 +201,48 @@ struct Network {
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
+    const auto &battle = PKMN::view(b);
+    const auto &durations = PKMN::view(d);
+    for (auto s = 0; s < 2; ++s) {
+      const auto &side = battle.sides[s];
+      const auto &duration = durations.get(s);
+      const auto &stored = side.stored();
+
+      if (stored.hp == 0) {
+        std::fill(main_input[s],
+                  main_input[s] + (Encode::Battle::Active::n_dim + 1), 0);
+      } else {
+        std::fill(active_input[s][0],
+                  active_input[s][0] + Encode::Battle::Active::n_dim, 0);
+        Encode::Battle::Active::write(stored, side.active, duration,
+                                      active_input[s][0]);
+        active_net.propagate(active_input[s][0], main_input[s] + 1);
+        main_input[s][0] = (float)stored.hp / stored.stats.hp;
+      }
+
+      for (auto slot = 2; slot <= 6; ++slot) {
+        float *output = main_input[s] + main_input_index(slot - 1);
+        const auto id = side.order[slot - 1];
+        if (id == 0) {
+          std::fill(output, output + (pokemon_out_dim + 1), 0);
+        } else {
+          const auto &pokemon = side.pokemon[id - 1];
+          if (pokemon.hp == 0) {
+            std::fill(output, output + (pokemon_out_dim + 1), 0);
+          } else {
+            const auto sleep = duration.sleep(slot - 1);
+            const auto *embedding =
+                pokemon_cache[s][side.order[slot - 1] - 1].get(pokemon, sleep);
+            std::memcpy(output + 1, embedding, pokemon_out_dim * sizeof(float));
+            output[0] = (float)pokemon.hp / pokemon.stats.hp;
+          }
+        }
+      }
+    }
+  }
+
+  void write_main(int8_t main_input[2][side_out_dim], const pkmn_gen1_battle &b,
+                  const pkmn_gen1_chance_durations &d) {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     for (auto s = 0; s < 2; ++s) {

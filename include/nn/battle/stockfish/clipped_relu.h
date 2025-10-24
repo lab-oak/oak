@@ -18,14 +18,13 @@
 
 // Definition of layer ClippedReLU of NNUE evaluation function
 
-#ifndef NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
-#define NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
+#pragma once
 
 #include <algorithm>
 #include <cstdint>
 #include <iosfwd>
 
-#include "nnue_common.h"
+#include <nn/battle/stockfish/common.h>
 
 namespace NN::Battle::Stockfish {
 
@@ -107,5 +106,3 @@ public:
 };
 
 } // namespace NN::Battle::Stockfish
-
-#endif // NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
