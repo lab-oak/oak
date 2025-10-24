@@ -261,8 +261,7 @@ struct Network {
       const auto &stored = side.stored();
 
       if (stored.hp == 0) {
-        std::fill(main_input[s],
-                  main_input[s] + (active_out_dim + 1), 0);
+        std::fill(main_input[s], main_input[s] + (active_out_dim + 1), 0);
       } else {
         const auto *embedding = discrete_active_cache[s][side.order[0] - 1].get(
             active_net, side.active, stored, duration);
@@ -301,7 +300,7 @@ struct Network {
 
     write_main(main_input, b, d);
     write_main(discrete_main_input, b, d);
-    
+
     std::cout << "f32\n";
     print_main_input(main_input);
     std::cout << "u8\n";

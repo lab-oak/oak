@@ -89,11 +89,10 @@ template <typename T, int dim = 55> struct ActivePokemonCache {
                const auto &duration) {
     const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{
         active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
-    if (embeddings.find(key) == embeddings.end()) {
+    if (embeddings.find(key) != embeddings.end()) {
       return embeddings[key].data();
     } else {
-      static thread_local std::array<float, Encode::Battle::Active::n_dim>
-          input;
+      std::array<float, Encode::Battle::Active::n_dim> input{};
       static thread_local std::array<float, pokemon_out_dim> output;
       Encode::Battle::Active::write(pokemon, active, duration, input.data());
       active_net.propagate(input.data(), output.data());

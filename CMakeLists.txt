@@ -47,6 +47,7 @@ target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC)
 add_executable(benchmark src/benchmark.cc)
 target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
+target_compile_options(benchmark PRIVATE -mavx2)
 
 add_executable(search-test src/search-test.cc)
 target_include_directories(search-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

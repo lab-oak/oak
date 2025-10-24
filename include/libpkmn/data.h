@@ -24,14 +24,13 @@ struct alignas(1) Stats {
   uint16_t def;
   uint16_t spe;
   uint16_t spc;
-  auto operator<=>(const Stats& other) const = default;
+  auto operator<=>(const Stats &) const = default;
 };
 
 struct alignas(1) MoveSlot {
   Data::Move id;
   uint8_t pp;
-  auto operator<=>(const MoveSlot& other) const = default;
-
+  auto operator<=>(const MoveSlot &) const = default;
 };
 
 static_assert(Data::Move::Substitute < Data::Move::Struggle);
@@ -44,8 +43,7 @@ struct alignas(1) Pokemon {
   Data::Species species;
   uint8_t types;
   uint8_t level;
-  auto operator<=>(const Pokemon& other) const = default;
-
+  auto operator<=>(const Pokemon &) const = default;
 
   int percent() const noexcept {
     return std::ceil(100 * static_cast<float>(hp) / stats.hp);
@@ -55,7 +53,7 @@ struct alignas(1) Pokemon {
 struct alignas(1) Volatiles {
   uint64_t bits;
 
-  auto operator<=>(const Volatiles& other) const = default;
+  auto operator<=>(const Volatiles &) const = default;
 
   bool bide() const { return bits & (1ULL << 0); }
   void set_bide(bool val) { val ? bits |= (1ULL << 0) : bits &= ~(1ULL << 0); }
@@ -166,7 +164,7 @@ static_assert(i4_conversion_is_valid());
 struct alignas(1) Boosts {
   uint8_t bytes[4];
 
-auto operator<=>(const Boosts &other) const = default;
+  auto operator<=>(const Boosts &) const = default;
 
   int8_t atk() const noexcept { return decode_i4(bytes[0] & 0b00001111); }
   int8_t def() const noexcept {
@@ -209,7 +207,7 @@ struct alignas(1) ActivePokemon {
   Volatiles volatiles;
   std::array<MoveSlot, 4> moves;
 
-  auto operator<=>(const ActivePokemon& other) const = default;
+  auto operator<=>(const ActivePokemon &) const = default;
 };
 
 struct alignas(1) Side {
