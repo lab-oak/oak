@@ -96,10 +96,8 @@ template <int Out1, int Out2> struct NetworkArchitecture : Network {
 std::shared_ptr<Network> make_network(int size) {
 
   if (size == 32) {
-    std::cout << "make 32 net" << std::endl;
     return std::make_shared<NetworkArchitecture<32, 32>>();
   } else if (size == 64) {
-    std::cout << "make 64 net" << std::endl;
     return std::make_shared<NetworkArchitecture<64, 64>>();
   } else {
     return std::shared_ptr<Network>{nullptr};

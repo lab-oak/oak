@@ -100,6 +100,10 @@ bool parse_options(int argc, char **argv) {
       p1_policy_options.mode = arg[17];
     } else if (arg.starts_with("--p2-policy-mode=")) {
       p2_policy_options.mode = arg[17];
+    } else if (arg.starts_with("--p1-policy-temp=")) {
+      p1_policy_options.temp = stod(arg.substr(17));
+    } else if (arg.starts_with("--p2-policy-temp=")) {
+      p2_policy_options.temp = stod(arg.substr(17));
 
     } else if (arg.starts_with("--max-pokemon=")) {
       provider.omitter.max_pokemon = std::stoul(arg.substr(14));
