@@ -8,9 +8,7 @@
 #include <nn/subnet.h>
 #include <util/random.h>
 
-namespace NN {
-
-namespace Battle {
+namespace NN::Battle {
 
 inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
@@ -93,36 +91,24 @@ struct MainNet {
     p1_policy_fc1.propagate(buffer.data(), p1_policy_buffer.data());
     p2_policy_fc1.propagate(buffer.data(), p2_policy_buffer.data());
 
-    std::vector<float> p1_policy_buffer_2{};
-    std::vector<float> p2_policy_buffer_2{};
-    p1_policy_buffer_2.resize(Encode::Battle::Policy::n_dim);
-    p2_policy_buffer_2.resize(Encode::Battle::Policy::n_dim);
-
-    p1_policy_fc2.propagate(p1_policy_buffer.data(), p1_policy_buffer_2.data());
-    p2_policy_fc2.propagate(p2_policy_buffer.data(), p2_policy_buffer_2.data());
-
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];
       assert(p1_c < Encode::Battle::Policy::n_dim);
-      // const float logit =
-      //     p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const
-      //     Eigen::VectorXf>(
-      //         p1_policy_buffer.data(), p1_policy_fc1.out_dim)) +
-      //     p1_policy_fc2.biases[p1_c];
-      // p1[i] = logit;
-      p1[i] = p1_policy_buffer_2[p1_c];
+      const float logit =
+          p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              p1_policy_buffer.data(), p1_policy_fc1.out_dim)) +
+          p1_policy_fc2.biases[p1_c];
+      p1[i] = logit;
     }
 
     for (auto i = 0; i < n; ++i) {
       const auto p2_c = p2_choice_index[i];
       assert(p2_c < Encode::Battle::Policy::n_dim);
-      // const float logit =
-      //     p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const
-      //     Eigen::VectorXf>(
-      //         p2_policy_buffer.data(), p2_policy_fc1.out_dim)) +
-      //     p2_policy_fc2.biases[p2_c];
-      // p2[i] = logit;
-      p2[i] = p2_policy_buffer_2[p2_c];
+      const float logit =
+          p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+              p2_policy_buffer.data(), p2_policy_fc1.out_dim)) +
+          p2_policy_fc2.biases[p2_c];
+      p2[i] = logit;
     }
 
     return sigmoid(output);
@@ -145,8 +131,7 @@ struct Network {
       discrete_pokemon_cache;
   std::array<std::array<ActivePokemonCache<uint8_t>, 6>, 2>
       discrete_active_cache;
-  Stockfish::NetworkArchitecture discrete_main_net;
-  bool use_discrete = false;
+  std::shared_ptr<Stockfish::Network> discrete_main_net;
 
   Network(uint32_t phd = pokemon_hidden_dim, uint32_t ahd = active_hidden_dim,
           uint32_t hd = hidden_dim, uint32_t vhd = value_hidden_dim,
@@ -154,7 +139,9 @@ struct Network {
       : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pokemon_out_dim},
         active_net{Encode::Battle::Active::n_dim, ahd, active_out_dim},
         main_net{2 * side_out_dim, hd, vhd, pohd, policy_out_dim},
-        discrete_active_cache{} {}
+        discrete_active_cache{} {
+    discrete_main_net = Stockfish::make_network(0);
+  }
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
@@ -192,7 +179,9 @@ struct Network {
     if (stream.read(&dummy, 1)) {
       return false;
     } else {
-      discrete_main_net.copy_parameters(main_net);
+      discrete_main_net = Stockfish::make_network(main_net.fc0.out_dim);
+      discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
+                                         main_net.value_fc2);
       return true;
     }
   }
@@ -297,13 +286,14 @@ struct Network {
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float main_input[2][side_out_dim];
     static thread_local uint8_t discrete_main_input[2][side_out_dim];
-    write_main(main_input, b, d);
-    print_main_input(main_input);
+    // write_main(main_input, b, d);
+    // print_main_input(main_input);
     write_main(discrete_main_input, b, d);
-    print_main_input(discrete_main_input);
-    // float value_d =
-        // sigmoid(discrete_main_net.propagate(discrete_main_input[0]));
-    float value = main_net.propagate(main_input[0]);
+    // print_main_input(discrete_main_input);
+    float value = sigmoid(discrete_main_net->propagate(discrete_main_input[0]));
+    // float value = main_net.propagate(main_input[0]);
+    // std::cout << value << " ~ " << value_d << std::endl;
+
     return value;
   }
 
@@ -368,6 +358,4 @@ struct Network {
   }
 };
 
-} // namespace Battle
-
-} // namespace NN
+} // namespace NN::Battle

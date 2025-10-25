@@ -23,17 +23,26 @@
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
+#include <memory>
 
+#include <nn/affine.h>
 #include <nn/battle/stockfish/affine.h>
 #include <nn/battle/stockfish/clipped_relu.h>
 #include <nn/battle/stockfish/common.h>
 
 namespace NN::Battle::Stockfish {
 
-struct NetworkArchitecture {
+struct Network {
+  virtual float
+  propagate(const TransformedFeatureType *transformedFeatures) const = 0;
+  virtual void copy_parameters(const Affine<> &, const Affine<> &,
+                               const Affine<false> &) = 0;
+};
+
+template <int Out1, int Out2> struct NetworkArchitecture : Network {
   static constexpr IndexType ConcatenatedSidesDims = 512;
-  static constexpr int FC_0_OUTPUTS = 32;
-  static constexpr int FC_1_OUTPUTS = 32;
+  static constexpr int FC_0_OUTPUTS = Out1;
+  static constexpr int FC_1_OUTPUTS = Out2;
 
   AffineTransform<ConcatenatedSidesDims, FC_0_OUTPUTS> fc_0;
   ClippedReLU<FC_0_OUTPUTS> ac_0;
@@ -41,13 +50,15 @@ struct NetworkArchitecture {
   ClippedReLU<FC_1_OUTPUTS> ac_1;
   AffineTransform<FC_1_OUTPUTS, 1> fc_2;
 
-  void copy_parameters(const auto &main_net) {
-    fc_0.copy_parameters(main_net.fc0);
-    fc_1.copy_parameters(main_net.value_fc1);
-    fc_2.copy_parameters(main_net.value_fc2);
+  void copy_parameters(const Affine<> &affine0, const Affine<> &affine1,
+                       const Affine<false> &affine2) {
+    fc_0.copy_parameters(affine0);
+    fc_1.copy_parameters(affine1);
+    fc_2.copy_parameters(affine2);
   }
 
-  float propagate(const TransformedFeatureType *transformedFeatures) const {
+  float
+  propagate(const TransformedFeatureType *transformedFeatures) const override {
     struct alignas(CacheLineSize) Buffer {
       alignas(CacheLineSize) typename decltype(fc_0)::OutputBuffer fc_0_out;
       alignas(CacheLineSize) typename decltype(ac_0)::OutputBuffer ac_0_out;
@@ -81,5 +92,18 @@ struct NetworkArchitecture {
     return outputValue;
   }
 };
+
+std::shared_ptr<Network> make_network(int size) {
+
+  if (size == 32) {
+    std::cout << "make 32 net" << std::endl;
+    return std::make_shared<NetworkArchitecture<32, 32>>();
+  } else if (size == 64) {
+    std::cout << "make 64 net" << std::endl;
+    return std::make_shared<NetworkArchitecture<64, 64>>();
+  } else {
+    return std::shared_ptr<Network>{nullptr};
+  }
+}
 
 } // namespace NN::Battle::Stockfish
