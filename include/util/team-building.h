@@ -3,6 +3,7 @@
 #include <encode/build/trajectory.h>
 #include <nn/build/network.h>
 #include <train/build/trajectory.h>
+#include <format/random-battles/randbat.h>
 
 #include <unistd.h>
 
