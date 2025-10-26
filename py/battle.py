@@ -185,7 +185,7 @@ def masked_cross_entropy(logit, target):
 
 
 def loss(
-    input: torch_oak.BattleFrame,
+    input: torch_oak.EncodedBattleFrames,
     output: torch_oak.OutputBuffers,
     args,
     print_flag=False,
@@ -303,8 +303,8 @@ def main():
     else:
         print(f"{len(data_files)} data_files found")
 
-    encoded_frames = py_oak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = torch_oak.BattleFrame(encoded_frames)
+    encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
+    encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames)
     output_buffer = torch_oak.OutputBuffers(args.batch_size)
     optimizer = Optimizer(network, args.lr)
 

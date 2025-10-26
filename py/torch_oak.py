@@ -6,10 +6,19 @@ import py_oak
 
 import struct
 import hashlib
+from typing import Dict, List
 
 import torch
 
+class BattleFrameSampler:
+    def __init__(self, paths):
+        self.paths = paths
+        self.path_frame_counts : List[int]
+        self.path_frame_data : List[List[[int, int]]]
 
+        for path in paths
+            pass
+            
 class BuildTrajectory:
     def __init__(self, traj: py_oak.BuildTrajectory, n=None, device="cpu"):
         if n is None:
@@ -36,7 +45,7 @@ class BuildTrajectory:
         self.size = sum(r).item()
 
 
-class BattleFrame:
+class EncodedBattleFrames:
     def __init__(self, encoded_frame: py_oak.EncodedBattleFrame):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
@@ -357,7 +366,7 @@ class BattleNetwork(torch.nn.Module):
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-    def inference(self, input: BattleFrame, output: OutputBuffers):
+    def inference(self, input: EncodedBattleFrames, output: OutputBuffers):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])
