@@ -62,13 +62,13 @@ policy_dim_labels: list[str] = char_pp_to_str_list(
 )
 policy_dim_labels.append("")
 
-lib.get_compressed_battles_helper.argtypes = [
+lib.parse_compressed_battles.argtypes = [
     ctypes.c_char_p,
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_uint16),
     ctypes.POINTER(ctypes.c_uint16),
 ]
-lib.get_compressed_battles_helper.restype = ctypes.c_int
+lib.parse_compressed_battles.restype = ctypes.c_int
 
 lib.uncompress_training_frames.argtypes = [
     ctypes.c_char_p,
@@ -205,7 +205,7 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
         ctypes.c_uint64(max_battles),
     )
 
-    n = lib.get_compressed_battles_helper(*args)
+    n = lib.parse_compressed_battles(*args)
 
     if n < 0:
         raise RuntimeError("Failed to read battle data")
