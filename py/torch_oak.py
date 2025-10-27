@@ -10,39 +10,16 @@ from typing import Dict, List
 
 import torch
 
+
 class BattleFrameSampler:
     def __init__(self, paths):
         self.paths = paths
-        self.path_frame_counts : List[int]
-        self.path_frame_data : List[List[[int, int]]]
+        self.path_frame_counts: List[int] = []
+        self.path_frame_data: List[List[[int, int]]] = []
 
-        for path in paths
-            pass
-            
-class BuildTrajectory:
-    def __init__(self, traj: py_oak.BuildTrajectory, n=None, device="cpu"):
-        if n is None:
-            n = 31
-        self.size = traj.size
-        self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
-        self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
-        self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
-        self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
-        self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
-        self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
-        self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
-
-    def sample(self, p=1):
-        r = torch.rand((self.size,)) < p
-        with torch.no_grad():
-            self.actions = self.actions[r].clone()
-            self.mask = self.mask[r].clone()
-            self.policy = self.policy[r].clone()
-            self.value = self.value[r].clone()
-            self.score = self.score[r].clone()
-            self.start = self.start[r].clone()
-            self.end = self.end[r].clone()
-        self.size = sum(r).item()
+        # for path in paths
+        #     data: List[[bytes, int]] = read_battle_data(path)
+        #     path_frame_counts.append(sum(n for _, n in data))
 
 
 class EncodedBattleFrames:
@@ -101,6 +78,35 @@ def combine_hash(h1: int, h2: int) -> int:
     return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) & 0xFFFFFFFFFFFFFFFF
 
 
+class BuildTrajectories:
+    def __init__(self, traj: py_oak.BuildTrajectories, n=None, device="cpu"):
+        if n is None:
+            n = 31
+        self.size = traj.size
+        self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
+        self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
+        self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
+        self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
+        self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
+        self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
+        self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
+
+    def sample(self, p=1):
+        r = torch.rand((self.size,)) < p
+        with torch.no_grad():
+            self.actions = self.actions[r].clone()
+            self.mask = self.mask[r].clone()
+            self.policy = self.policy[r].clone()
+            self.value = self.value[r].clone()
+            self.score = self.score[r].clone()
+            self.start = self.start[r].clone()
+            self.end = self.end[r].clone()
+        self.size = sum(r).item()
+
+
+# Networks
+
+
 class Affine(nn.Module):
     def __init__(self, in_dim, out_dim, clamp=True):
         super().__init__()
@@ -112,10 +118,6 @@ class Affine(nn.Module):
     def read_parameters(self, f):
         dims = f.read(8)
         in_dim, out_dim = struct.unpack("<II", dims)
-        # assert in_dim == self.in_dim, f"Expected in_dim={self.in_dim}, got {in_dim}"
-        # assert (
-        #     out_dim == self.out_dim
-        # ), f"Expected out_dim={self.out_dim}, got {out_dim}"
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.layer = torch.nn.Linear(self.in_dim, self.out_dim)
@@ -179,36 +181,6 @@ class EmbeddingNet(nn.Module):
         h = self.fc0.hash()
         h = combine_hash(h, self.fc1.hash())
         return h
-
-
-class BuildNetwork(nn.Module):
-    def __init__(
-        self,
-        policy_hidden_dim=py_oak.build_policy_hidden_dim,
-        value_hidden_dim=py_oak.build_value_hidden_dim,
-    ):
-        super().__init__()
-        self.policy_net = EmbeddingNet(
-            py_oak.species_move_list_size,
-            policy_hidden_dim,
-            py_oak.species_move_list_size,
-            True,
-            False,
-        )
-        self.value_net = EmbeddingNet(
-            py_oak.species_move_list_size, value_hidden_dim, 1, True, False
-        )
-
-    def read_parameters(self, f):
-        self.policy_net.read_parameters(f)
-        self.value_net.read_parameters(f)
-
-    def write_parameters(self, f):
-        self.policy_net.write_parameters(f)
-        self.value_net.write_parameters(f)
-
-    def forward(self, x):
-        return self.policy_net.forward(x), self.value_net.forward(x)
 
 
 class MainNet(nn.Module):
@@ -400,3 +372,33 @@ class BattleNetwork(torch.nn.Module):
         h = combine_hash(h, self.active_net.hash())
         h = combine_hash(h, self.main_net.hash())
         return h & 0xFFFFFFFFFFFFFFFF
+
+
+class BuildNetwork(nn.Module):
+    def __init__(
+        self,
+        policy_hidden_dim=py_oak.build_policy_hidden_dim,
+        value_hidden_dim=py_oak.build_value_hidden_dim,
+    ):
+        super().__init__()
+        self.policy_net = EmbeddingNet(
+            py_oak.species_move_list_size,
+            policy_hidden_dim,
+            py_oak.species_move_list_size,
+            True,
+            False,
+        )
+        self.value_net = EmbeddingNet(
+            py_oak.species_move_list_size, value_hidden_dim, 1, True, False
+        )
+
+    def read_parameters(self, f):
+        self.policy_net.read_parameters(f)
+        self.value_net.read_parameters(f)
+
+    def write_parameters(self, f):
+        self.policy_net.write_parameters(f)
+        self.value_net.write_parameters(f)
+
+    def forward(self, x):
+        return self.policy_net.forward(x), self.value_net.forward(x)

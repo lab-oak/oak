@@ -233,7 +233,7 @@ def print_battle_data(frames, i):
     lib.print_battle_data(args[2], args[3])
 
 
-class BuildTrajectory:
+class BuildTrajectories:
     def __init__(self, size):
         self.size = size
 
@@ -333,11 +333,11 @@ def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrame:
 
 
 # convert bytes object into BattleFrames
-def read_build_trajectories(path) -> BuildTrajectory:
+def read_build_trajectories(path) -> BuildTrajectories:
     buffer_size = int(os.path.getsize(path) / 128)
     path_bytes = path.encode("utf-8")
 
-    trajectories = BuildTrajectory(buffer_size)
+    trajectories = BuildTrajectories(buffer_size)
     args = (ctypes.c_char_p(path_bytes),) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
     return trajectories

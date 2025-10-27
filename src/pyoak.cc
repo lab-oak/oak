@@ -81,8 +81,8 @@ extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;
 extern "C" const int build_max_actions = Tensorizer::max_actions;
 
 extern "C" int parse_compressed_battles(const char *path, char *out_data,
-                                             uint16_t *offsets,
-                                             uint16_t *frame_counts) {
+                                        uint16_t *offsets,
+                                        uint16_t *frame_counts) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     std::cerr << "Failed to open file: " << path << std::endl;
@@ -190,7 +190,6 @@ extern "C" void uncompress_and_encode_training_frames(
     input.write(encoded, frame.target);
   }
 }
-
 
 extern "C" size_t encode_buffer_multithread(
     const char *const *paths, size_t n_paths, size_t threads, size_t max_count,
