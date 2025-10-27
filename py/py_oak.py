@@ -260,7 +260,7 @@ class BuildTrajectories:
         )
 
 
-class EncodedBattleFrame:
+class EncodedBattleFrames:
     def __init__(self, size):
         self.size = size
 
@@ -325,8 +325,8 @@ class EncodedBattleFrame:
 
 
 # convert bytes object into BattleFrames
-def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrame:
-    encoded_frames = EncodedBattleFrame(frame_count)
+def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrames:
+    encoded_frames = EncodedBattleFrames(frame_count)
     args = (ctypes.c_char_p(data),) + encoded_frames.raw_pointers(0)
     lib.uncompress_and_encode_training_frames(*args)
     return encoded_frames

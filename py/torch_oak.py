@@ -23,7 +23,7 @@ class BattleFrameSampler:
 
 
 class EncodedBattleFrames:
-    def __init__(self, encoded_frame: py_oak.EncodedBattleFrame):
+    def __init__(self, encoded_frame: py_oak.EncodedBattleFrames):
         self.size = encoded_frame.size
         self.m = torch.from_numpy(encoded_frame.m)
         self.n = torch.from_numpy(encoded_frame.n)
