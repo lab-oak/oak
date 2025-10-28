@@ -597,6 +597,8 @@ void generate(uint64_t seed) {
 
     // build
     if (!p1_built && !p2_built && !RuntimeOptions::provider.rb) {
+      assert(p1_team_index >= 0);
+      assert(p2_team_index >= 0);
       RuntimeData::matchup_matrix.update(p1_team_index, p2_team_index,
                                          PKMN::score(battle_data.result));
     }
@@ -685,6 +687,7 @@ void setup() {
   // teams
   RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
   RuntimeOptions::provider.try_read_parameters();
+  RuntimeData::matchup_matrix.resize(RuntimeOptions::provider.teams.size());
 
   // stats
   RuntimeData::battle_lengths.resize(RuntimeOptions::threads);
