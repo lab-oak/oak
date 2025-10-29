@@ -38,7 +38,7 @@ int process_and_sample(auto &device, const auto &empirical, const auto &nash,
       auto result = a;
       std::transform(a.begin(), a.end(), b.begin(), result.begin(),
                      [alpha](const auto &x, const auto &y) {
-                       return alpha * x + (decltype(alpha))(1) - alpha * y;
+                       return alpha * x + (1 - alpha) * y;
                      });
       return result;
     };
