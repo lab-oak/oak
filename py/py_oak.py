@@ -62,6 +62,17 @@ policy_dim_labels: list[str] = char_pp_to_str_list(
 )
 policy_dim_labels.append("")
 
+frame_target_types = [
+    ctypes.POINTER(ctypes.c_uint32),  # iterations
+    ctypes.POINTER(ctypes.c_float),  # p1_empirical
+    ctypes.POINTER(ctypes.c_float),  # p1_nash
+    ctypes.POINTER(ctypes.c_float),  # p2_empirical
+    ctypes.POINTER(ctypes.c_float),  # p2_nash
+    ctypes.POINTER(ctypes.c_float),  # empirical_value
+    ctypes.POINTER(ctypes.c_float),  # nash_value
+    ctypes.POINTER(ctypes.c_float),  # score
+]
+
 lib.parse_compressed_battles.argtypes = [
     ctypes.c_char_p,
     ctypes.c_char_p,
@@ -79,14 +90,7 @@ lib.uncompress_training_frames.argtypes = [
     ctypes.POINTER(ctypes.c_uint8),  # result
     ctypes.POINTER(ctypes.c_uint8),  # p1_choices
     ctypes.POINTER(ctypes.c_uint8),  # p2_choices
-    ctypes.POINTER(ctypes.c_float),  # p1_empirical
-    ctypes.POINTER(ctypes.c_float),  # p1_nash
-    ctypes.POINTER(ctypes.c_float),  # p2_empirical
-    ctypes.POINTER(ctypes.c_float),  # p2_nash
-    ctypes.POINTER(ctypes.c_float),  # empirical_value
-    ctypes.POINTER(ctypes.c_float),  # nash_value
-    ctypes.POINTER(ctypes.c_float),  # score
-]
+] + frame_target_types
 
 lib.uncompress_and_encode_training_frames.argtypes = [
     ctypes.c_char_p,
@@ -97,14 +101,7 @@ lib.uncompress_and_encode_training_frames.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
-    ctypes.POINTER(ctypes.c_float),  # p1_empirical
-    ctypes.POINTER(ctypes.c_float),  # p1_nash
-    ctypes.POINTER(ctypes.c_float),  # p2_empirical
-    ctypes.POINTER(ctypes.c_float),  # p2_nash
-    ctypes.POINTER(ctypes.c_float),  # empirical_value
-    ctypes.POINTER(ctypes.c_float),  # nash_value
-    ctypes.POINTER(ctypes.c_float),  # score
-]
+] + frame_target_types
 
 lib.read_build_trajectories.argtypes = [
     ctypes.c_char_p,
@@ -130,15 +127,7 @@ lib.encode_buffer_multithread.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
-    ctypes.POINTER(ctypes.c_uint32),  # iterations
-    ctypes.POINTER(ctypes.c_float),  # p1_empirical
-    ctypes.POINTER(ctypes.c_float),  # p1_nash
-    ctypes.POINTER(ctypes.c_float),  # p2_empirical
-    ctypes.POINTER(ctypes.c_float),  # p2_nash
-    ctypes.POINTER(ctypes.c_float),  # empirical_value
-    ctypes.POINTER(ctypes.c_float),  # nash_value
-    ctypes.POINTER(ctypes.c_float),  # score
-]
+] + frame_target_types
 lib.encode_buffer_multithread.restype = ctypes.c_uint64
 
 lib.print_battle_data.argtypes = [
@@ -205,7 +194,6 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
         ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char)),
         ctypes.cast(offsets, ctypes.POINTER(ctypes.c_uint16)),
         ctypes.cast(frame_counts, ctypes.POINTER(ctypes.c_uint16)),
-        ctypes.c_uint64(max_battles),
     )
 
     n = lib.parse_compressed_battles(*args)

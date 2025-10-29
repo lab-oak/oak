@@ -133,8 +133,8 @@ extern "C" int parse_compressed_battles(const char *path, char *out_data,
 extern "C" void uncompress_training_frames(
     const char *data, uint8_t *m, uint8_t *n, uint8_t *battle,
     uint8_t *durations, uint8_t *result, uint8_t *p1_choices,
-    uint8_t *p2_choices, float *p1_empirical, float *p1_nash,
-    float *p2_empirical, float *p2_nash, float *empirical_value,
+    uint8_t *p2_choices, uint32_t *iterations, float *p1_empirical,
+    float *p1_nash, float *p2_empirical, float *p2_nash, float *empirical_value,
     float *nash_value, float *score) {
 
   Train::Battle::CompressedFrames compressed_frames{};
@@ -147,6 +147,7 @@ extern "C" void uncompress_training_frames(
                                   .result = result,
                                   .p1_choices = p1_choices,
                                   .p2_choices = p2_choices,
+                                  .iterations = iterations,
                                   .p1_empirical = p1_empirical,
                                   .p1_nash = p1_nash,
                                   .p2_empirical = p2_empirical,
@@ -164,8 +165,9 @@ extern "C" void uncompress_training_frames(
 extern "C" void uncompress_and_encode_training_frames(
     const char *data, uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
     int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
-    float *p1_empirical, float *p1_nash, float *p2_empirical, float *p2_nash,
-    float *empirical_value, float *nash_value, float *score) {
+    uint32_t *iterations, float *p1_empirical, float *p1_nash,
+    float *p2_empirical, float *p2_nash, float *empirical_value,
+    float *nash_value, float *score) {
 
   Train::Battle::CompressedFrames compressed_frames{};
   compressed_frames.read(data);
@@ -177,6 +179,7 @@ extern "C" void uncompress_and_encode_training_frames(
                                    .pokemon = pokemon,
                                    .active = active,
                                    .hp = hp,
+                                   .iterations = iterations,
                                    .p1_empirical = p1_empirical,
                                    .p1_nash = p1_nash,
                                    .p2_empirical = p2_empirical,

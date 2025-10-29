@@ -39,18 +39,16 @@ def read_battle_trajectories():
     for buf, n in data:
         frames = py_oak.get_encoded_frames(buf, n)
 
-        print("score", frames.score)
-        print("value", frames.empirical_value)
-
         # i = randint(0, frames.size - 1)
         i = -1
         print(i, frames.m[i].item(), frames.n[i].item())
-        # print("value", frames.empirical_value[i])
-        # print("score", frames.score[i])
-        # print("e1", frames.p1_empirical[i])
-        # print("e2", frames.p2_empirical[i])
-        # print("n1", frames.p1_nash[i])
-        # print("n2", frames.p2_nash[i])
+
+        print("score", frames.score[i])
+        print("value", frames.empirical_value[i])
+        print("e1", frames.p1_empirical[i])
+        print("e2", frames.p2_empirical[i])
+        print("n1", frames.p1_nash[i])
+        print("n2", frames.p2_nash[i])
         print(
             "c1",
             [py_oak.policy_dim_labels[_.item()] for _ in frames.p1_choice_indices[i]],
@@ -61,22 +59,12 @@ def read_battle_trajectories():
         )
         raw_frames = py_oak.get_frames(buf, n)
 
-        print("empirical value", frames.empirical_value[i])
-        print("score", frames.score[i])
+        print("iterations", frames.iterations[i])
 
         # print(raw_frames.battle[i])
         # print(raw_frames.battle[i, 23])
         # print(raw_frames.durations[i])
-        # return
-
         py_oak.print_battle_data(raw_frames, i)
-        return
-        # print(frames.p1_empirical[i])
-        # print(frames.p1_nash[i])
-        # print(frames.p2_empirical[i])
-        # print(frames.p2_nash[i])
-        # print(sum(frames.p1_empirical[i]))
-        # return
 
 
 def read_build_trajectories():
