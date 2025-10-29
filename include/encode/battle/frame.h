@@ -72,6 +72,7 @@ struct FrameInput {
   float *active;
   float *hp;
 
+  uint32_t *iterations;
   float *p1_empirical;
   float *p1_nash;
   float *p2_empirical;
@@ -90,6 +91,7 @@ struct FrameInput {
     copy.p1_empirical += i * 9;
     copy.p1_nash += i * 9;
     copy.p1_choice_indices += i * 9;
+    copy.iterations += i;
     copy.p2_empirical += i * 9;
     copy.p2_nash += i * 9;
     copy.p2_choice_indices += i * 9;
@@ -113,6 +115,7 @@ struct FrameInput {
                 sizeof(float) * 12);
     hp += 12;
 
+    *iterations++ = target.iterations;
     std::fill_n(p1_empirical, 9, 0.f);
     std::fill_n(p1_nash, 9, 0.f);
     // we use 'one after last' index to encode invalid index.

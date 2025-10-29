@@ -92,10 +92,15 @@ extern "C" int parse_compressed_battles(const char *path, char *out_data,
   int n_games = 0;
   size_t total_offset = 0;
   while (true) {
-    uint16_t offset;
+
+    if (file.peek() == EOF) {
+      break;
+    }
+
+    uint32_t offset;
     uint16_t frame_count;
-    file.read(reinterpret_cast<char *>(&offset), 2);
-    if (file.gcount() < 2) {
+    file.read(reinterpret_cast<char *>(&offset), 4);
+    if (file.gcount() < 4) {
       std::cerr << "bad offset read" << std::endl;
       return -1;
     }
@@ -104,7 +109,7 @@ extern "C" int parse_compressed_battles(const char *path, char *out_data,
       std::cerr << "bad frame count read" << std::endl;
       return -1;
     }
-    file.seekg(-4, std::ios::cur);
+    file.seekg(-6, std::ios::cur);
 
     std::vector<char> buffer;
     buffer.reserve(offset);
@@ -120,10 +125,6 @@ extern "C" int parse_compressed_battles(const char *path, char *out_data,
     frame_counts[n_games] = frame_count;
     total_offset += offset;
     ++n_games;
-
-    if (file.peek() == EOF) {
-      break;
-    }
   }
 
   return n_games;
@@ -195,8 +196,8 @@ extern "C" size_t encode_buffer_multithread(
     const char *const *paths, size_t n_paths, size_t threads, size_t max_count,
     float write_prob, size_t max_game_length, uint8_t *m, uint8_t *n,
     int64_t *p1_choice_indices, int64_t *p2_choice_indices, float *pokemon,
-    float *active, float *hp, float *p1_empirical, float *p1_nash,
-    float *p2_empirical, float *p2_nash, float *empirical_value,
+    float *active, float *hp, uint32_t *iterations, float *p1_empirical,
+    float *p1_nash, float *p2_empirical, float *p2_nash, float *empirical_value,
     float *nash_value, float *score) {
 
   const Encode::Battle::FrameInput input{.m = m,
@@ -206,6 +207,7 @@ extern "C" size_t encode_buffer_multithread(
                                          .pokemon = pokemon,
                                          .active = active,
                                          .hp = hp,
+                                         .iterations = iterations,
                                          .p1_empirical = p1_empirical,
                                          .p1_nash = p1_nash,
                                          .p2_empirical = p2_empirical,
@@ -214,7 +216,7 @@ extern "C" size_t encode_buffer_multithread(
                                          .nash_value = nash_value,
                                          .score = score};
 
-  const auto ptrs = std::bit_cast<std::array<void *, 14>>(input);
+  const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
   for (const auto *x : ptrs) {
     if (!x) {
       std::cerr << "encode_buffer: null pointer in input" << std::endl;
@@ -244,15 +246,30 @@ extern "C" size_t encode_buffer_multithread(
       // parse file
       while (true) {
 
+        if (file.peek() == EOF) {
+          break;
+        }
+
         // read to buffer
-        uint16_t offset;
-        file.read(reinterpret_cast<char *>(&offset), 2);
-        if (file.gcount() < 2) {
+        uint32_t offset;
+        uint16_t n_frames;
+        file.read(reinterpret_cast<char *>(&offset), 4);
+        if (file.gcount() < 4) {
           std::cerr << "Bad offset read" << std::endl;
           return;
         }
-        file.seekg(-2, std::ios::cur);
+        file.read(reinterpret_cast<char *>(&n_frames), 2);
+        if (file.gcount() < 2) {
+          std::cerr << "Bad n_frames read" << std::endl;
+          return;
+        }
+        file.seekg(-6, std::ios::cur);
+        if (offset > 200000) {
+          throw std::runtime_error{"Too long"};
+          return;
+        }
         buffer.resize(offset);
+
         buffer.clear();
         char *buf = buffer.data();
         file.read(buf, offset);
@@ -280,10 +297,6 @@ extern "C" size_t encode_buffer_multithread(
           auto input_correct = input.index(cur);
           Encode::Battle::Frame encoded{frame};
           input_correct.write(encoded, frame.target);
-        }
-
-        if (file.peek() == EOF) {
-          break;
         }
       }
     }

@@ -7,6 +7,7 @@ namespace Train {
 namespace Battle {
 
 struct Target {
+  uint32_t iterations;
   std::array<float, 9> p1_empirical;
   std::array<float, 9> p1_nash;
   std::array<float, 9> p2_empirical;

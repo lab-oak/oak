@@ -5,9 +5,7 @@
 
 #include <istream>
 
-namespace Train {
-
-namespace Battle {
+namespace Train::Battle {
 
 template <typename in_type, typename out_type>
 constexpr out_type compress_probs(in_type x) {
@@ -36,11 +34,18 @@ constexpr out_type uncompress_probs(in_type x) {
 template <typename policy_type = uint16_t, typename value_type = uint16_t>
 struct CompressedFramesImpl {
 
+  using Offset = uint32_t;
+  using FrameCount = uint16_t;
+
   struct Update {
+
+    using MN = uint8_t;
+    using Iter = uint32_t;
     // rolling out
     uint8_t m, n;
     pkmn_choice c1, c2;
     // training
+    Iter iterations;
     value_type empirical_value;
     value_type nash_value;
     std::vector<policy_type> p1_empirical;
@@ -50,33 +55,34 @@ struct CompressedFramesImpl {
 
     static constexpr size_t n_bytes_static(auto m, auto n) {
       // The leading byte is the combination m/n
-      return 1 + 2 * sizeof(pkmn_result) + sizeof(value_type) +
-             sizeof(value_type) + 2 * (m + n) * sizeof(policy_type);
+      return sizeof(MN) + 2 * sizeof(pkmn_choice) + sizeof(Iter) +
+             2 * sizeof(value_type) + 2 * (m + n) * sizeof(policy_type);
     }
 
     Update() = default;
     Update(const auto &search_output, pkmn_choice c1, pkmn_choice c2)
         : m{static_cast<uint8_t>(search_output.m)},
           n{static_cast<uint8_t>(search_output.n)}, c1{c1}, c2{c2},
-          empirical_value{
-              compress_probs<float, value_type>(search_output.empirical_value)},
+          iterations{static_cast<uint32_t>(search_output.iterations)},
+          empirical_value{compress_probs<double, value_type>(
+              search_output.empirical_value)},
           nash_value{
-              compress_probs<float, value_type>(search_output.nash_value)} {
+              compress_probs<double, value_type>(search_output.nash_value)} {
       p1_empirical.resize(m);
       p1_nash.resize(m);
       p2_empirical.resize(n);
       p2_nash.resize(n);
       for (auto i = 0; i < m; ++i) {
         p1_empirical[i] =
-            compress_probs<float, policy_type>(search_output.p1_empirical[i]);
+            compress_probs<double, policy_type>(search_output.p1_empirical[i]);
         p1_nash[i] =
-            compress_probs<float, policy_type>(search_output.p1_nash[i]);
+            compress_probs<double, policy_type>(search_output.p1_nash[i]);
       }
       for (auto i = 0; i < n; ++i) {
         p2_empirical[i] =
-            compress_probs<float, policy_type>(search_output.p2_empirical[i]);
+            compress_probs<double, policy_type>(search_output.p2_empirical[i]);
         p2_nash[i] =
-            compress_probs<float, policy_type>(search_output.p2_nash[i]);
+            compress_probs<double, policy_type>(search_output.p2_nash[i]);
       }
     }
 
@@ -85,9 +91,12 @@ struct CompressedFramesImpl {
     bool write(char *buffer) const {
       auto index = 0;
       buffer[index] = (m - 1) | ((n - 1) << 4);
-      buffer[index + 1] = c1;
-      buffer[index + 2] = c2;
-      index += 3;
+      index += 1;
+      buffer[index + 0] = c1;
+      buffer[index + 1] = c2;
+      index += 2;
+      *reinterpret_cast<Iter *>(buffer + index) = iterations;
+      index += sizeof(Iter);
       std::memcpy(buffer + index,
                   reinterpret_cast<const char *>(&empirical_value),
                   sizeof(value_type));
@@ -115,12 +124,17 @@ struct CompressedFramesImpl {
     }
 
     bool read(const char *buffer) {
-      const auto mn = static_cast<uint8_t>(buffer[0]);
+      auto index = 0;
+      const auto mn = static_cast<uint8_t>(buffer[index]);
       m = (mn % 16) + 1;
       n = (mn / 16) + 1;
-      c1 = static_cast<pkmn_choice>(buffer[1]);
-      c2 = static_cast<pkmn_choice>(buffer[2]);
-      auto index = 3;
+      index += 1;
+      c1 = static_cast<pkmn_choice>(buffer[index]);
+      index += 1;
+      c2 = static_cast<pkmn_choice>(buffer[index]);
+      index += 1;
+      iterations = *reinterpret_cast<const Iter *>(buffer + index);
+      index += sizeof(Iter);
       empirical_value = *reinterpret_cast<const value_type *>(buffer + index);
       index += sizeof(value_type);
       nash_value = *reinterpret_cast<const value_type *>(buffer + index);
@@ -148,9 +162,9 @@ struct CompressedFramesImpl {
   CompressedFramesImpl() = default;
   CompressedFramesImpl(const pkmn_gen1_battle &battle) : battle{battle} {}
 
-  auto n_bytes() const {
-    auto n =
-        2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
+  uint32_t n_bytes() const {
+    uint32_t n = sizeof(Offset) + sizeof(FrameCount) +
+                 sizeof(pkmn_gen1_battle) + sizeof(pkmn_result);
     for (const auto &update : updates) {
       n += update.n_bytes();
     }
@@ -158,9 +172,11 @@ struct CompressedFramesImpl {
   }
 
   bool write(char *buffer) const {
-    reinterpret_cast<uint16_t *>(buffer)[0] = n_bytes();
-    reinterpret_cast<uint16_t *>(buffer)[1] = updates.size();
-    auto index = 4;
+    auto index = 0;
+    *reinterpret_cast<Offset *>(buffer + index) = n_bytes();
+    index += sizeof(Offset);
+    *reinterpret_cast<FrameCount *>(buffer + index) = updates.size();
+    index += sizeof(FrameCount);
     std::memcpy(buffer + index, battle.bytes, sizeof(pkmn_gen1_battle));
     index += sizeof(pkmn_gen1_battle);
     buffer[index] = static_cast<char>(result);
@@ -175,19 +191,24 @@ struct CompressedFramesImpl {
   }
 
   bool read(const char *buffer) {
-    const auto buffer_16 = reinterpret_cast<const uint16_t *>(buffer);
-    const auto buffer_length = buffer_16[0];
-    const auto n_updates = buffer_16[1];
-    std::memcpy(battle.bytes, buffer + 4, sizeof(pkmn_gen1_battle));
-    auto index = 2 * sizeof(uint16_t) + sizeof(pkmn_gen1_battle);
+    uint32_t index = 0;
+    const Offset buffer_length =
+        *reinterpret_cast<const Offset *>(buffer + index);
+    index += sizeof(Offset);
+    const FrameCount n_updates =
+        *reinterpret_cast<const FrameCount *>(buffer + index);
+    index += sizeof(FrameCount);
+    std::memcpy(battle.bytes, buffer + index, sizeof(pkmn_gen1_battle));
+    index += sizeof(pkmn_gen1_battle);
     result = buffer[index];
-    ++index;
+    index += 1;
     while (index < buffer_length) {
       updates.emplace_back();
       auto &update = updates.back();
       update.read(buffer + index);
       index += update.n_bytes();
     }
+    assert(updates.size() == n_updates);
     assert(index == buffer_length);
     return true;
   }
@@ -205,6 +226,7 @@ struct CompressedFramesImpl {
       Battle::Frame &frame = frames.back();
       frame.m = update.m;
       frame.n = update.n;
+      frame.target.iterations = update.iterations;
 
       const auto [p1_choices, p2_choices] = PKMN::choices(b, result);
 
@@ -241,6 +263,4 @@ struct CompressedFramesImpl {
 
 using CompressedFrames = CompressedFramesImpl<>;
 
-} // namespace Battle
-
-}; // namespace Train
+} // namespace Train::Battle

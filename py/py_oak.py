@@ -130,6 +130,7 @@ lib.encode_buffer_multithread.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # pokemon
     ctypes.POINTER(ctypes.c_float),  # active
     ctypes.POINTER(ctypes.c_float),  # hp
+    ctypes.POINTER(ctypes.c_uint32),  # iterations
     ctypes.POINTER(ctypes.c_float),  # p1_empirical
     ctypes.POINTER(ctypes.c_float),  # p1_nash
     ctypes.POINTER(ctypes.c_float),  # p2_empirical
@@ -160,6 +161,7 @@ class BattleFrame:
         self.p1_choices = np.zeros((size, 9), dtype=np.uint8)
         self.p2_choices = np.zeros((size, 9), dtype=np.uint8)
 
+        self.iterations = np.zeros((size, 1), dtype=np.uint32)
         self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
         self.p1_nash = np.zeros((size, 9), dtype=np.float32)
         self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
@@ -178,6 +180,7 @@ class BattleFrame:
             self.result[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
             self.p1_choices[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
             self.p2_choices[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
+            self.iterations[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint32)),
             self.p1_empirical[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             self.p1_nash[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             self.p2_empirical[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -274,6 +277,7 @@ class EncodedBattleFrames:
         self.active = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
         self.hp = np.zeros((size, 2, 6, 1), dtype=np.float32)
 
+        self.iterations = np.zeros((size, 1), dtype=np.uint32)
         self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
         self.p1_nash = np.zeros((size, 9), dtype=np.float32)
         self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
@@ -293,6 +297,7 @@ class EncodedBattleFrames:
         self.active.fill(0)
         self.hp.fill(0)
 
+        self.iterations.fill(0)
         self.p1_empirical.fill(0)
         self.p1_nash.fill(0)
         self.p2_empirical.fill(0)
@@ -314,6 +319,7 @@ class EncodedBattleFrames:
             ptr(self.pokemon, ctypes.c_float),
             ptr(self.active, ctypes.c_float),
             ptr(self.hp, ctypes.c_float),
+            ptr(self.iterations, ctypes.c_uint32),
             ptr(self.p1_empirical, ctypes.c_float),
             ptr(self.p1_nash, ctypes.c_float),
             ptr(self.p2_empirical, ctypes.c_float),

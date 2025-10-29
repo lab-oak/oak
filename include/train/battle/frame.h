@@ -24,6 +24,7 @@ struct FrameInput {
   uint8_t *result;
   uint8_t *p1_choices;
   uint8_t *p2_choices;
+  uint32_t *iterations;
   float *p1_empirical;
   float *p1_nash;
   float *p2_empirical;
@@ -62,6 +63,7 @@ struct FrameInput {
     p2_nash += 9;
     p1_choices += 9;
     p2_choices += 9;
+    *iterations++ = frame.target.iterations;
     *empirical_value++ = frame.target.empirical_value;
     *nash_value++ = frame.target.nash_value;
     *score++ = frame.target.score;
