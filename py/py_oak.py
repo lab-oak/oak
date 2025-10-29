@@ -73,13 +73,13 @@ frame_target_types = [
     ctypes.POINTER(ctypes.c_float),  # score
 ]
 
-lib.parse_compressed_battles.argtypes = [
+lib.index_compressed_battle_frames.argtypes = [
     ctypes.c_char_p,
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_uint16),
     ctypes.POINTER(ctypes.c_uint16),
 ]
-lib.parse_compressed_battles.restype = ctypes.c_int
+lib.index_compressed_battle_frames.restype = ctypes.c_int
 
 lib.uncompress_training_frames.argtypes = [
     ctypes.c_char_p,
@@ -196,7 +196,7 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
         ctypes.cast(frame_counts, ctypes.POINTER(ctypes.c_uint16)),
     )
 
-    n = lib.parse_compressed_battles(*args)
+    n = lib.index_compressed_battle_frames(*args)
 
     if n < 0:
         raise RuntimeError("Failed to read battle data")

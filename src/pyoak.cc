@@ -80,7 +80,7 @@ extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;
 // input and output dim for policy net due to encoding
 extern "C" const int build_max_actions = Tensorizer::max_actions;
 
-extern "C" int parse_compressed_battles(const char *path, char *out_data,
+extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
                                         uint16_t *offsets,
                                         uint16_t *frame_counts) {
   std::ifstream file(path, std::ios::binary);
