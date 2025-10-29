@@ -37,9 +37,13 @@ bool debug_print = true;
 
 bool keep_node = true;
 
-RuntimeSearch::Agent agent{"4096", "exp3-0.03", "mc"};
+RuntimeSearch::Agent agent{"4096", "ucb-0.173", "mc"};
 RuntimeSearch::Agent t1_agent;
-RuntimePolicy::Options policy_options{};
+RuntimeSearch::Agent fast_agent;
+
+RuntimePolicy::Options policy_options{'e', 2.5, .001};
+
+double fast_search_prob = 0;
 
 int max_battle_length = -1;
 
@@ -226,6 +230,7 @@ bool parse_options(int argc, char **argv) {
   }
 
   t1_agent = agent;
+  fast_agent = agent;
 
   for (auto &a : args) {
     if (a == nullptr) {
@@ -240,6 +245,10 @@ bool parse_options(int argc, char **argv) {
       t1_agent.bandit_name = arg.substr(17);
     } else if (arg.starts_with("--t1-battle-network-path=")) {
       t1_agent.network_path = arg.substr(25);
+    } else if (arg.starts_with("--fast-search-time=")) {
+      fast_agent.search_time = arg.substr(19);
+    } else if (arg.starts_with("--fast-search-prob=")) {
+      fast_search_prob = std::stod(arg.substr(19));
     } else {
       std::swap(a, b);
     }
@@ -490,13 +499,19 @@ void generate(uint64_t seed) {
 
     auto agent = RuntimeOptions::agent;
     auto t1_agent = RuntimeOptions::t1_agent;
+    auto fast_agent = RuntimeOptions::fast_agent;
+
     auto nodes = RuntimeSearch::Nodes{};
 
     // if the std::optional<NN::Network> is not set then the params/cache will
     // be loaded/filled before every turn.
+    // don't need to preload t1 agent since its used only once
     if (agent.uses_network()) {
       agent.read_network_parameters();
       agent.network.value().fill_cache(battle_data.battle);
+      if (RuntimeOptions::fast_search_prob > 0) {
+        fast_agent.network = agent.network;
+      }
     }
 
     battle_length = 0;
@@ -523,8 +538,11 @@ void generate(uint64_t seed) {
         print(PKMN::battle_data_to_string(battle_data.battle,
                                           battle_data.durations));
 
+        const bool use_fast =
+            device.uniform() < RuntimeOptions::fast_search_prob;
         const auto output = RuntimeSearch::run(
-            battle_data, nodes, (battle_length == 0) ? t1_agent : agent);
+            battle_data, nodes,
+            (battle_length == 0) ? t1_agent : (use_fast ? fast_agent : agent));
         if (battle_length == 0) {
           p1_matchup = output.empirical_value;
           p2_matchup = 1 - output.empirical_value;
@@ -541,7 +559,6 @@ void generate(uint64_t seed) {
         const auto p1_choice = output.p1_choices[p1_index];
         const auto p2_choice = output.p2_choices[p2_index];
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
-        // here so we can use the update to store the empirical value
 
         // update battle, durations, result (state info)
         battle_data.result =
