@@ -3,7 +3,9 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/key.h>
 #include <libpkmn/data/status.h>
-#include <nn/battle/cache.h>
+#include <nn/params.h>
+
+#include <map>
 
 namespace NN {
 
@@ -46,7 +48,16 @@ template <typename T, int dim = 39> struct PokemonCache {
         std::array<float, Encode::Battle::Pokemon::n_dim> input{};
         Encode::Battle::Pokemon::write(pokemon, sleep, input.data());
         const auto key = Encode::Battle::pokemon_key(pokemon, sleep);
-        pokemon_net.propagate(input.data(), this->embeddings[key].data());
+        if constexpr (std::is_same_v<T, float>) {
+          pokemon_net.propagate(input.data(), this->embeddings[key].data());
+        } else if constexpr (std::is_same_v<T, int8_t>) {
+          static thread_local std::array<float, dim> float_buffer;
+          pokemon_net.propagate(input.data(), float_buffer.data());
+          for (auto i = 0; i < dim; ++i) {
+            this->embeddings[key][i] =
+                static_cast<uint8_t>(127 * float_buffer[i]);
+          }
+        }
       };
 
       // non slept status conditions
@@ -66,6 +77,31 @@ template <typename T, int dim = 39> struct PokemonCache {
   const T *get(const auto &pokemon, const auto sleep) const {
     const auto key = Encode::Battle::pokemon_key(pokemon, sleep);
     return embeddings[key].data();
+  }
+};
+
+template <typename T, int dim = 55> struct ActivePokemonCache {
+
+  std::map<std::pair<PKMN::ActivePokemon, uint8_t>, std::array<T, dim>>
+      embeddings;
+
+  const T *get(auto &active_net, const auto &active, const auto &pokemon,
+               const auto &duration) {
+    const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{
+        active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
+    if (embeddings.find(key) != embeddings.end()) {
+      return embeddings[key].data();
+    } else {
+      std::array<float, Encode::Battle::Active::n_dim> input{};
+      static thread_local std::array<float, active_out_dim> output;
+      Encode::Battle::Active::write(pokemon, active, duration, input.data());
+      active_net.propagate(input.data(), output.data());
+      auto &embedding = embeddings[key];
+      for (auto i = 0; i < active_out_dim; ++i) {
+        embedding[i] = output[i] * 127;
+      }
+      return embedding.data();
+    }
   }
 };
 
