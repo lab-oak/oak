@@ -31,11 +31,14 @@ constexpr out_type uncompress_probs(in_type x) {
   }
 }
 
-template <typename policy_type = uint16_t, typename value_type = uint16_t>
+template <typename policy_type = uint16_t, typename value_type = uint16_t,
+          typename offset_type = uint32_t>
 struct CompressedFramesImpl {
 
-  using Offset = uint32_t;
+  using Offset = offset_type;
   using FrameCount = uint16_t;
+
+  constexpr static bool new_format{std::is_same_v<offset_type, uint32_t>};
 
   struct Update {
 
@@ -55,8 +58,9 @@ struct CompressedFramesImpl {
 
     static constexpr size_t n_bytes_static(auto m, auto n) {
       // The leading byte is the combination m/n
-      return sizeof(MN) + 2 * sizeof(pkmn_choice) + sizeof(Iter) +
-             2 * sizeof(value_type) + 2 * (m + n) * sizeof(policy_type);
+      return sizeof(MN) + 2 * sizeof(pkmn_choice) +
+             (new_format ? sizeof(Iter) : 0) + 2 * sizeof(value_type) +
+             2 * (m + n) * sizeof(policy_type);
     }
 
     Update() = default;
@@ -95,8 +99,10 @@ struct CompressedFramesImpl {
       buffer[index + 0] = c1;
       buffer[index + 1] = c2;
       index += 2;
-      *reinterpret_cast<Iter *>(buffer + index) = iterations;
-      index += sizeof(Iter);
+      if constexpr (new_format) {
+        *reinterpret_cast<Iter *>(buffer + index) = iterations;
+        index += sizeof(Iter);
+      }
       std::memcpy(buffer + index,
                   reinterpret_cast<const char *>(&empirical_value),
                   sizeof(value_type));
@@ -133,8 +139,12 @@ struct CompressedFramesImpl {
       index += 1;
       c2 = static_cast<pkmn_choice>(buffer[index]);
       index += 1;
-      iterations = *reinterpret_cast<const Iter *>(buffer + index);
-      index += sizeof(Iter);
+      if constexpr (new_format) {
+        iterations = *reinterpret_cast<const Iter *>(buffer + index);
+        index += sizeof(Iter);
+      } else {
+        iterations = 1 >> 12;
+      }
       empirical_value = *reinterpret_cast<const value_type *>(buffer + index);
       index += sizeof(value_type);
       nash_value = *reinterpret_cast<const value_type *>(buffer + index);
