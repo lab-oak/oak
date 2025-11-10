@@ -7,9 +7,7 @@
 #include <nn/subnet.h>
 #include <util/random.h>
 
-namespace NN {
-
-namespace Battle {
+namespace NN::Battle {
 
 struct MainNet {
 
@@ -134,16 +132,22 @@ struct Network {
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
       pokemon_cache;
   ActiveNet active_net;
-
   MainNet main_net;
+
+  std::vector<float> main_input;
+
   mt19937 device;
 
+  // All layers are optional but have defaults in params.h
   Network(uint32_t phd = pokemon_hidden_dim, uint32_t ahd = active_hidden_dim,
+          uint32_t pod = pokemon_out_dim, uint32_t aod = active_out_dim,
           uint32_t hd = hidden_dim, uint32_t vhd = value_hidden_dim,
           uint32_t pohd = policy_hidden_dim)
-      : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pokemon_out_dim},
-        active_net{Encode::Battle::Active::n_dim, ahd, active_out_dim},
-        main_net{2 * side_out_dim, hd, vhd, pohd, policy_out_dim} {}
+      : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pod},
+        active_net{Encode::Battle::Active::n_dim, ahd, aod},
+        main_net{2 * (aod + 5 * pod), hd, vhd, pohd, policy_out_dim} {
+          main_input.resize(2 * (aod + 5 * pod));
+        }
 
   bool operator==(const Network &other) {
     return (pokemon_net == pokemon_net) && (active_net == active_net) &&
@@ -185,7 +189,7 @@ struct Network {
     return 1 + active_out_dim + (i - 1) * (1 + pokemon_out_dim);
   }
 
-  void write_main(float main_input[2][side_out_dim], const pkmn_gen1_battle &b,
+  void write_main(float **main_input, const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 
@@ -280,6 +284,4 @@ struct Network {
   }
 };
 
-} // namespace Battle
-
-} // namespace NN
+} // namespace NN::Battle

@@ -23,22 +23,22 @@ class BattleFrameSampler:
 
 
 class EncodedBattleFrames:
-    def __init__(self, encoded_frame: py_oak.EncodedBattleFrames):
-        self.size = encoded_frame.size
-        self.m = torch.from_numpy(encoded_frame.m)
-        self.n = torch.from_numpy(encoded_frame.n)
-        self.p1_choice_indices = torch.from_numpy(encoded_frame.p1_choice_indices)
-        self.p2_choice_indices = torch.from_numpy(encoded_frame.p2_choice_indices)
-        self.pokemon = torch.from_numpy(encoded_frame.pokemon)
-        self.active = torch.from_numpy(encoded_frame.active)
-        self.hp = torch.from_numpy(encoded_frame.hp)
-        self.p1_empirical = torch.from_numpy(encoded_frame.p1_empirical)
-        self.p1_nash = torch.from_numpy(encoded_frame.p1_nash)
-        self.p2_empirical = torch.from_numpy(encoded_frame.p2_empirical)
-        self.p2_nash = torch.from_numpy(encoded_frame.p2_nash)
-        self.empirical_value = torch.from_numpy(encoded_frame.empirical_value)
-        self.nash_value = torch.from_numpy(encoded_frame.nash_value)
-        self.score = torch.from_numpy(encoded_frame.score)
+    def __init__(self, frames: py_oak.EncodedBattleFrames):
+        self.size = frames.size
+        self.m = torch.from_numpy(frames.m)
+        self.n = torch.from_numpy(frames.n)
+        self.p1_choice_indices = torch.from_numpy(frames.p1_choice_indices)
+        self.p2_choice_indices = torch.from_numpy(frames.p2_choice_indices)
+        self.pokemon = torch.from_numpy(frames.pokemon)
+        self.active = torch.from_numpy(frames.active)
+        self.hp = torch.from_numpy(frames.hp)
+        self.p1_empirical = torch.from_numpy(frames.p1_empirical)
+        self.p1_nash = torch.from_numpy(frames.p1_nash)
+        self.p2_empirical = torch.from_numpy(frames.p2_empirical)
+        self.p2_nash = torch.from_numpy(frames.p2_nash)
+        self.empirical_value = torch.from_numpy(frames.empirical_value)
+        self.nash_value = torch.from_numpy(frames.nash_value)
+        self.score = torch.from_numpy(frames.score)
 
     def permute_pokemon(self):
         perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
@@ -257,17 +257,20 @@ class MainNet(nn.Module):
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
 class OutputBuffers:
-    def __init__(self, size):
+    def __init__(self, size, pod=py_oak.pokemon_out_dim, aod=py_oak.active_out_dim):
         self.size = size
+        self.pokemon_out_dim = pod
+        self.active_out_dim = aod
+        self.side_out_dim = aod + 5 * pod
         self.pokemon = torch.zeros(
-            (size, 2, 5, BattleNetwork.pokemon_out_dim), dtype=torch.float32
+            (size, 2, 5, self.pokemon_out_dim), dtype=torch.float32
         )
         self.active = torch.zeros(
-            (size, 2, 1, BattleNetwork.active_out_dim), dtype=torch.float32
+            (size, 2, 1, self.active_out_dim), dtype=torch.float32
         )
-        self.sides = torch.zeros((size, 2, 1, 256), dtype=torch.float32)
+        self.sides = torch.zeros((size, 2, 1, self.side_out_dim), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
-        # last dim in neg inf to supply logit for invalid actions
+        # last dim is neg inf to supply logit for invalid actions
         self.p1_policy_logit = torch.zeros(size, py_oak.policy_out_dim + 1)
         self.p2_policy_logit = torch.zeros(size, py_oak.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
@@ -287,17 +290,17 @@ class OutputBuffers:
 
 
 class BattleNetwork(torch.nn.Module):
-    pokemon_out_dim = py_oak.pokemon_out_dim
-    active_out_dim = py_oak.active_out_dim
-    side_out_dim = py_oak.side_out_dim
-    policy_out_dim = py_oak.policy_out_dim
+    # only remaining hard-coded dims
     pokemon_in_dim = py_oak.pokemon_in_dim
     active_in_dim = py_oak.active_in_dim
+    policy_out_dim = py_oak.policy_out_dim
 
     def __init__(
         self,
         phd=py_oak.pokemon_hidden_dim,
         ahd=py_oak.active_hidden_dim,
+        pod=py_oak.pokemon_out_dim,
+        aod=py_oak.active_out_dim,
         hd=py_oak.hidden_dim,
         vhd=py_oak.value_hidden_dim,
         pohd=py_oak.policy_hidden_dim,
@@ -305,6 +308,9 @@ class BattleNetwork(torch.nn.Module):
         super().__init__()
         self.pokemon_hidden_dim = phd
         self.active_hidden_dim = ahd
+        self.pokemon_out_dim = pod
+        self.active_out_dim = aod
+        self.side_out_dim = aod + 5 * pod
         self.hidden_dim = hd
         self.value_hidden_dim = vhd
         self.policy_hidden_dim = pohd
@@ -338,7 +344,9 @@ class BattleNetwork(torch.nn.Module):
         self.active_net.clamp_parameters()
         self.main_net.clamp_parameters()
 
-    def inference(self, input: EncodedBattleFrames, output: OutputBuffers):
+    def inference(
+        self, input: EncodedBattleFrames, output: OutputBuffers, use_policy: bool = True
+    ):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
         output.active[:size] = self.active_net.forward(input.active[:size])
@@ -355,11 +363,16 @@ class BattleNetwork(torch.nn.Module):
         ).view(size, 2, 1, 5 * (1 + self.pokemon_out_dim))
         output.sides[:size, :, :, 1 + self.active_out_dim :] = pokemon_flat[:size]
         battle = output.sides[:size].view(size, 2 * self.side_out_dim)
-        (
-            output.value[:size],
-            output.p1_policy_logit[:size, :-1],
-            output.p2_policy_logit[:size, :-1],
-        ) = self.main_net.forward(battle)
+
+        if use_policy:
+            (
+                output.value[:size],
+                output.p1_policy_logit[:size, :-1],
+                output.p2_policy_logit[:size, :-1],
+            ) = self.main_net.forward(battle)
+        else:
+            output.value = self.main_net.forward_value_only(battle)
+
         output.p1_policy[:size] = torch.gather(
             output.p1_policy_logit, 1, input.p1_choice_indices[:size]
         )
