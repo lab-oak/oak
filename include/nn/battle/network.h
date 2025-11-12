@@ -123,8 +123,10 @@ struct Network {
   std::array<std::array<PokemonCache<float, pokemon_out_dim>, 6>, 2>
       pokemon_cache;
   ActiveNet active_net;
-
   MainNet main_net;
+
+  std::vector<float> main_input;
+
   mt19937 device;
 
   std::array<std::array<PokemonCache<uint8_t, pokemon_out_dim>, 6>, 2>
@@ -134,6 +136,7 @@ struct Network {
   std::shared_ptr<Stockfish::Network> discrete_main_net;
 
   Network(uint32_t phd = pokemon_hidden_dim, uint32_t ahd = active_hidden_dim,
+          uint32_t pod = pokemon_out_dim, uint32_t aod = active_out_dim,
           uint32_t hd = hidden_dim, uint32_t vhd = value_hidden_dim,
           uint32_t pohd = policy_hidden_dim)
       : pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pokemon_out_dim},
@@ -197,7 +200,7 @@ struct Network {
     return 1 + active_out_dim + (i - 1) * (1 + pokemon_out_dim);
   }
 
-  void write_main(float main_input[2][side_out_dim], const pkmn_gen1_battle &b,
+  void write_main(float **main_input, const pkmn_gen1_battle &b,
                   const pkmn_gen1_chance_durations &d) {
     static thread_local float active_input[2][1][Encode::Battle::Active::n_dim];
 

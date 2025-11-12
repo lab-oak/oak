@@ -112,6 +112,18 @@ parser.add_argument(
     help="ActivePokemon encoding net hidden dim",
 )
 parser.add_argument(
+    "--pokemon-out-dim",
+    type=int,
+    default=py_oak.pokemon_out_dim,
+    help="Pokemon encoding net output dim",
+)
+parser.add_argument(
+    "--active-out-dim",
+    type=int,
+    default=py_oak.active_out_dim,
+    help="ActivePokemon encoding net output dim",
+)
+parser.add_argument(
     "--hidden-dim", type=int, default=py_oak.hidden_dim, help="Main subnet hidden dim"
 )
 parser.add_argument(
@@ -282,6 +294,8 @@ def main():
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
         args.active_hidden_dim,
+        args.pokemon_out_dim,
+        args.active_out_dim,
         args.hidden_dim,
         args.value_hidden_dim,
         args.policy_hidden_dim,
@@ -305,7 +319,9 @@ def main():
 
     encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
     encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames)
-    output_buffer = torch_oak.OutputBuffers(args.batch_size)
+    output_buffer = torch_oak.OutputBuffers(
+        args.batch_size, args.pokemon_out_dim, args.active_out_dim
+    )
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):
@@ -329,7 +345,7 @@ def main():
         encoded_frames_torch.permute_pokemon()
         encoded_frames_torch.permute_sides()
 
-        network.inference(encoded_frames_torch, output_buffer)
+        network.inference(encoded_frames_torch, output_buffer, not args.no_policy_loss)
 
         optimizer.zero_grad()
         loss_value = loss(

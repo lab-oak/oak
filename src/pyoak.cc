@@ -81,8 +81,8 @@ extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;
 extern "C" const int build_max_actions = Tensorizer::max_actions;
 
 extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
-                                        uint16_t *offsets,
-                                        uint16_t *frame_counts) {
+                                              uint16_t *offsets,
+                                              uint16_t *frame_counts) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     std::cerr << "Failed to open file: " << path << std::endl;
