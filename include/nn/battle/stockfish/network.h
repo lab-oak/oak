@@ -93,14 +93,14 @@ template <int Out1, int Out2> struct NetworkArchitecture : Network {
   }
 };
 
-std::shared_ptr<Network> make_network(int size) {
+std::unique_ptr<Network> make_network(int size) {
 
   if (size == 32) {
-    return std::make_shared<NetworkArchitecture<32, 32>>();
+    return std::make_unique<NetworkArchitecture<32, 32>>();
   } else if (size == 64) {
-    return std::make_shared<NetworkArchitecture<64, 64>>();
+    return std::make_unique<NetworkArchitecture<64, 64>>();
   } else {
-    return std::shared_ptr<Network>{nullptr};
+    return std::unique_ptr<Network>{nullptr};
   }
 }
 

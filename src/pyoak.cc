@@ -2,7 +2,7 @@
 #include <encode/battle/frame.h>
 #include <encode/battle/policy.h>
 #include <encode/build/trajectory.h>
-#include <nn/params.h>
+#include <nn/default-hyperparameters.h>
 #include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
 #include <train/build/trajectory.h>
@@ -65,15 +65,16 @@ extern "C" const char *const *policy_dim_labels = policy_dim_label_ptrs.data();
 extern "C" const int pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
 extern "C" const int active_in_dim = Encode::Battle::Active::n_dim;
 
-extern "C" const int pokemon_hidden_dim = NN::Battle::pokemon_hidden_dim;
-extern "C" const int pokemon_out_dim = NN::Battle::pokemon_out_dim;
-extern "C" const int active_hidden_dim = NN::Battle::active_hidden_dim;
-extern "C" const int active_out_dim = NN::Battle::active_out_dim;
-extern "C" const int side_out_dim = NN::Battle::side_out_dim;
-extern "C" const int hidden_dim = NN::Battle::hidden_dim;
-extern "C" const int value_hidden_dim = NN::Battle::value_hidden_dim;
-extern "C" const int policy_hidden_dim = NN::Battle::policy_hidden_dim;
-extern "C" const int policy_out_dim = NN::Battle::policy_out_dim;
+extern "C" const int pokemon_hidden_dim =
+    NN::Battle::Default::pokemon_hidden_dim;
+extern "C" const int pokemon_out_dim = NN::Battle::Default::pokemon_out_dim;
+extern "C" const int active_hidden_dim = NN::Battle::Default::active_hidden_dim;
+extern "C" const int active_out_dim = NN::Battle::Default::active_out_dim;
+extern "C" const int side_out_dim = NN::Battle::Default::side_out_dim;
+extern "C" const int hidden_dim = NN::Battle::Default::hidden_dim;
+extern "C" const int value_hidden_dim = NN::Battle::Default::value_hidden_dim;
+extern "C" const int policy_hidden_dim = NN::Battle::Default::policy_hidden_dim;
+extern "C" const int policy_out_dim = NN::Battle::Default::policy_out_dim;
 
 extern "C" const int build_policy_hidden_dim = NN::Build::policy_hidden_dim;
 extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;

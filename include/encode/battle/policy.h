@@ -3,6 +3,8 @@
 #include <libpkmn/data/moves.h>
 #include <libpkmn/data/strings.h>
 
+#include <cassert>
+
 /*
 
 Actions in battle are encoded as either a move or a species. All moves are
@@ -17,11 +19,7 @@ are legal, so we don't have to compute the entire logit layer.
 
 */
 
-namespace Encode {
-
-namespace Battle {
-
-namespace Policy {
+namespace Encode::Battle::Policy {
 
 // all moves besides struggle, all pokemon. No None.
 constexpr auto n_dim = 164 + 151;
@@ -77,8 +75,4 @@ consteval auto get_dim_labels() {
 
 constexpr auto dim_labels = get_dim_labels();
 
-} // namespace Policy
-
-} // namespace Battle
-
-} // namespace Encode
+} // namespace Encode::Battle::Policy

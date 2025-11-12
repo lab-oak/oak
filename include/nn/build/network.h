@@ -2,8 +2,8 @@
 
 #include <encode/build/trajectory.h>
 #include <format/ou/data.h>
-#include <nn/params.h>
-#include <nn/subnet.h>
+#include <nn/default-hyperparameters.h>
+#include <nn/embedding-net.h>
 #include <train/build/trajectory.h>
 
 namespace NN {
@@ -18,8 +18,8 @@ struct Network {
   EmbeddingNet<true, false> value_net;
 
   Network()
-      : policy_net{T::n_dim, NN::Build::policy_hidden_dim, T::n_dim},
-        value_net{T::n_dim, NN::Build::value_hidden_dim, 1} {}
+      : policy_net{T::n_dim, NN::Build::Default::policy_hidden_dim, T::n_dim},
+        value_net{T::n_dim, NN::Build::Default::value_hidden_dim, 1} {}
 
   void initialize(auto &device) {
     policy_net.initialize(device);

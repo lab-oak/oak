@@ -508,7 +508,7 @@ void generate(uint64_t seed) {
     // don't need to preload t1 agent since its used only once
     if (agent.uses_network()) {
       agent.read_network_parameters();
-      agent.network.value().fill_cache(battle_data.battle);
+      agent.network.value().fill_pokemon_caches(battle_data.battle);
       if (RuntimeOptions::fast_search_prob > 0) {
         fast_agent.network = agent.network;
       }

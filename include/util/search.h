@@ -76,6 +76,8 @@ struct Agent {
   std::string search_time;
   std::string bandit_name;
   std::string network_path;
+  bool discrete_network;
+  bool matrix_ucb;
   // valid if already loaded/cache set
   std::optional<NN::Battle::Network> network;
   bool *flag;
@@ -92,6 +94,10 @@ struct Agent {
       network = std::nullopt;
       throw std::runtime_error{"Agent could not read network parameters at: " +
                                network_path};
+    } else {
+      if (discrete_network) {
+        network.value().enable_discrete();
+      }
     }
   }
 
@@ -135,9 +141,7 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
 
   const auto run_2 = [&](auto dur, auto &model) {
     MCTS::Search search{};
-    const auto &lower = agent.bandit_name;
-    // std::transform(lower.begin(), lower.end(), lower.begin(),
-    //                [](auto c) { return std::tolower(c); });
+    const auto &bandit_name = agent.bandit_name;
 
     const auto get = [&nodes](auto &node) -> auto & {
       using Node = std::remove_reference_t<decltype(*node)>;
@@ -153,28 +157,28 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       return *node;
     };
 
-    if (lower.starts_with("exp3-")) {
-      const float gamma = std::stof(lower.substr(5));
+    if (bandit_name.starts_with("exp3-")) {
+      const float gamma = std::stof(bandit_name.substr(5));
       Exp3::Bandit::Params params{gamma};
       return search.run(dur, params, get(nodes.exp3), model, battle_data,
                         output);
-    } else if (lower.starts_with("ucb-")) {
-      const float c = std::stof(lower.substr(4));
+    } else if (bandit_name.starts_with("ucb-")) {
+      const float c = std::stof(bandit_name.substr(4));
       UCB::Bandit::Params params{c};
       return search.run(dur, params, get(nodes.ucb), model, battle_data,
                         output);
-    } else if (lower.starts_with("pexp3-")) {
-      const float gamma = std::stof(lower.substr(6));
+    } else if (bandit_name.starts_with("pexp3-")) {
+      const float gamma = std::stof(bandit_name.substr(6));
       PExp3::Bandit::Params params{gamma};
       return search.run(dur, params, get(nodes.pexp3), model, battle_data,
                         output);
-    } else if (lower.starts_with("pucb-")) {
-      const float c = std::stof(lower.substr(5));
+    } else if (bandit_name.starts_with("pucb-")) {
+      const float c = std::stof(bandit_name.substr(5));
       PUCB::Bandit::Params params{c};
       return search.run(dur, params, get(nodes.pucb), model, battle_data,
                         output);
     } else {
-      throw std::runtime_error("Could not parse bandit string: " + lower);
+      throw std::runtime_error("Could not parse bandit string: " + bandit_name);
       return output;
     }
   };
@@ -184,7 +188,7 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
     if (agent.uses_network()) {
       if (!agent.network.has_value()) {
         agent.read_network_parameters();
-        agent.network.value().fill_cache(battle_data.battle);
+        agent.network.value().fill_pokemon_caches(battle_data.battle);
       }
       return run_2(dur, agent.network.value());
     } else {

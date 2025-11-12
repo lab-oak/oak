@@ -2,6 +2,9 @@
 
 #include <nn/affine.h>
 
+#include <fstream>
+#include <vector>
+
 namespace NN {
 
 template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
@@ -13,8 +16,6 @@ template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
       : fc0{in_dim, hidden_dim}, fc1{hidden_dim, out_dim}, buf{} {
     buf.resize(hidden_dim);
   }
-
-  bool operator==(const EmbeddingNet &) const = default;
 
   void initialize(auto &device) {
     fc0.initialize(device);
