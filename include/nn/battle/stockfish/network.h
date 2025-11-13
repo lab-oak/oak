@@ -39,8 +39,8 @@ struct Network {
                                const Affine<false> &) = 0;
 };
 
-template <int Out1, int Out2> struct NetworkArchitecture : Network {
-  static constexpr IndexType ConcatenatedSidesDims = 512;
+template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
+  static constexpr IndexType ConcatenatedSidesDims = In;
   static constexpr int FC_0_OUTPUTS = Out1;
   static constexpr int FC_1_OUTPUTS = Out2;
 
@@ -71,7 +71,7 @@ template <int Out1, int Out2> struct NetworkArchitecture : Network {
 
 #if defined(__clang__) && (__APPLE__)
     // workaround for a bug reported with xcode 12
-    static thread_local auto tlsBuffer = std::make_unique<Buffer>();
+    static thread_local auto tlsBuffer = std::make_shared<Buffer>();
     // Access TLS only once, cache result.
     Buffer &buffer = *tlsBuffer;
 #else
@@ -93,14 +93,47 @@ template <int Out1, int Out2> struct NetworkArchitecture : Network {
   }
 };
 
-std::unique_ptr<Network> make_network(int size) {
+namespace Impl {
+std::shared_ptr<Network> invalid() {
+  throw std::runtime_error{"Invalid layer size (check code)."};
+  return std::shared_ptr<Network>{nullptr};
+}
+template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {
+  if (H1 < h2) {
+    throw std::runtime_error{"Quantized net must have decreasing layer size."};
+    return std::shared_ptr<Network>{nullptr};
+  }
 
-  if (size == 32) {
-    return std::make_unique<NetworkArchitecture<32, 32>>();
-  } else if (size == 64) {
-    return std::make_unique<NetworkArchitecture<64, 64>>();
-  } else {
-    return std::unique_ptr<Network>{nullptr};
+  switch (h2) {
+  case 32:
+    return std::make_shared<NetworkArchitecture<In, H1, 32>>();
+  case 64:
+    return std::make_shared<NetworkArchitecture<In, H1, 64>>();
+  default:
+    return invalid();
+  }
+}
+template <int In> std::shared_ptr<Network> make_network_1(int h1, int h2) {
+  switch (h1) {
+  case 32:
+    return make_network_2<In, 32>(h2);
+  case 64:
+    return make_network_2<In, 64>(h2);
+  default:
+    return invalid();
+  }
+}
+} // namespace Impl
+
+std::shared_ptr<Network> make_network(int in, int h1, int h2) {
+  switch (in) {
+  case 512:
+    return Impl::make_network_1<512>(h1, h2);
+  case 786:
+    return Impl::make_network_1<768>(h2, h2);
+  case 1024:
+  default:
+    return Impl::invalid();
   }
 }
 

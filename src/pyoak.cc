@@ -76,8 +76,8 @@ extern "C" const int value_hidden_dim = NN::Battle::Default::value_hidden_dim;
 extern "C" const int policy_hidden_dim = NN::Battle::Default::policy_hidden_dim;
 extern "C" const int policy_out_dim = NN::Battle::Default::policy_out_dim;
 
-extern "C" const int build_policy_hidden_dim = NN::Build::policy_hidden_dim;
-extern "C" const int build_value_hidden_dim = NN::Build::value_hidden_dim;
+extern "C" const int build_policy_hidden_dim = NN::Build::Default::policy_hidden_dim;
+extern "C" const int build_value_hidden_dim = NN::Build::Default::value_hidden_dim;
 // input and output dim for policy net due to encoding
 extern "C" const int build_max_actions = Tensorizer::max_actions;
 

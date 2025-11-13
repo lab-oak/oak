@@ -6,8 +6,10 @@
 #include <iostream>
 
 std::string default_bandit = "exp3-0.03";
-RuntimeSearch::Agent default_agent{"1_000_000", default_bandit, "mc",
-                                   std::nullopt};
+
+RuntimeSearch::Agent default_agent{.search_time = "1_000_000",
+                                   .bandit_name = default_bandit,
+                                   .network_path = "mc"};
 
 constexpr float small = .03;
 

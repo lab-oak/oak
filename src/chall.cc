@@ -23,8 +23,10 @@ int main(int argc, char **argv) {
 
   std::string default_bandit = "exp3-0.03";
   std::string default_search_time = "0";
-  RuntimeSearch::Agent agent{default_search_time, default_bandit, "mc",
-                             std::nullopt, &search_flag};
+  RuntimeSearch::Agent agent{.search_time = default_search_time,
+                             .bandit_name = default_bandit,
+                             .network_path = "mc",
+                             .flag = &search_flag};
   uint64_t seed = mt19937{std::random_device{}()}.uniform_64();
 
   if (argc > 1) {

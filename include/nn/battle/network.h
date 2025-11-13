@@ -19,7 +19,7 @@ struct Network {
   EmbeddingNet<> pokemon_net;
   EmbeddingNet<> active_net;
   MainNet main_net;
-  std::unique_ptr<Stockfish::Network> discrete_main_net;
+  std::shared_ptr<Stockfish::Network> discrete_main_net;
 
   template <typename T> using BattleSet = std::array<std::array<T, 6>, 2>;
   BattleSet<PokemonCache<float>> pokemon_caches;
@@ -78,9 +78,6 @@ struct Network {
     if (stream.read(&dummy, 1)) {
       return false;
     } else {
-      discrete_main_net = Stockfish::make_network(main_net.fc0.out_dim);
-      discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
-                                         main_net.value_fc2);
       return true;
     }
   }
@@ -98,6 +95,8 @@ struct Network {
 
   void enable_discrete() {
     // TODO call make_network
+    discrete_main_net = Stockfish::make_network(
+        main_net.fc0.in_dim, main_net.fc0.out_dim, main_net.value_fc1.out_dim);
     discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
                                        main_net.value_fc2);
     use_discrete = true;
