@@ -11,7 +11,7 @@ def battle_frame_stats():
     if len(sys.argv) >= 3:
         path = sys.argv[2]
 
-    files = py_oak.find_data_files(path, ext=".battle")
+    files = py_oak.find_data_files(path, ext=".battle.data")
     for file in files:
         data = py_oak.read_battle_data(file)
         for buf, n in data:
@@ -24,7 +24,7 @@ def battle_frame_stats():
 def read_battle_trajectories():
 
     # using only the head gives most recent files
-    files = py_oak.find_data_files(".", ext=".battle")
+    files = py_oak.find_data_files(".", ext=".battle.data")
     assert len(files) > 0, "No battle files found in cwd"
 
     from random import sample, randint, shuffle
@@ -70,7 +70,7 @@ def read_battle_trajectories():
 def read_build_trajectories():
 
     # using only the head gives most recent files
-    files = py_oak.find_data_files(".", ext=".build")
+    files = py_oak.find_data_files(".", ext=".build.data")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample

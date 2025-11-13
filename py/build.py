@@ -214,7 +214,7 @@ def main():
         with open(args.net_path, "rb") as f:
             network.read_parameters(f)
 
-    data_files = py_oak.find_data_files(args.data_dir, ext=".build")
+    data_files = py_oak.find_data_files(args.data_dir, ext=".build.data")
     print(f"Saving base network in {working_dir}.")
     with open(os.path.join(working_dir, "build-network"), "wb") as f:
         network.write_parameters(f)
@@ -236,7 +236,7 @@ def main():
     from random import sample
 
     for step in range(steps):
-        data_files = py_oak.find_data_files(args.data_dir, ext=".build")
+        data_files = py_oak.find_data_files(args.data_dir, ext=".build.data")
         if args.data_window > 0:
             data_files = data_files[: args.data_window]
 

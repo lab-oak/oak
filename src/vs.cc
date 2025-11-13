@@ -179,7 +179,7 @@ struct BattleFrameBuffer {
     }
     const auto filename =
         std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
-        ".battle";
+        ".battle.data";
     const auto full_path = dir / filename;
     int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
@@ -223,7 +223,7 @@ void thread_fn(uint64_t seed) {
     }
     const auto filename =
         std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
-        ".build";
+        ".build.data";
     const auto full_path = RuntimeData::working_dir / filename;
 
     const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
