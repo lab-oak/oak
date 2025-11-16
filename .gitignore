@@ -1,18 +1,17 @@
 /release/
 /debug/
 libpkmn-showdown.a
-*.battle
-*.build
+*.data
+*.net
 **/args
 **/matchup-matrix
 *.log
 *.pyc
-# TODO extensions for build/battle nets
-*.net
-build-network
-battle-network
 # Elo
 **/directory
 **/ratings
 **/results
 **/ucb
+# delete soon
+*.battle
+battle-network

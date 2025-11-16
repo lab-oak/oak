@@ -306,12 +306,12 @@ def main():
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
     print("Saving base network in working dir.")
-    with open(os.path.join(working_dir, "battle-network"), "wb") as f:
+    with open(os.path.join(working_dir, "random.battle.net"), "wb") as f:
         network.write_parameters(f)
 
     if len(data_files) == 0:
         print(
-            f"No .battle files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
+            f"No .battle.data files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
         )
         exit()
     else:
@@ -366,7 +366,7 @@ def main():
             if args.in_place:
                 ckpt_path = args.net_path
             else:
-                ckpt_path = os.path.join(working_dir, f"{step + 1}.net")
+                ckpt_path = os.path.join(working_dir, f"{step + 1}.battle.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")

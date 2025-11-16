@@ -1,3 +1,7 @@
+# Warning
+
+This tutorial is incomplete and out of date.
+
 # First Steps
 
 This software is intended to run on Linux. It should be able to run on Windows but that is outside the scope of these instructions. Any relatively recent distribution should work, although you may need to update your compilers since the code uses C++23 features throughout.
@@ -276,7 +280,7 @@ we can see a large number of '.build' files. The ratio of build to battle files 
 --t1-battle-network-path=mc
 ```
 
-reports the args used. The build network path is empty/was not provided so a new network was initialized and saved in the work dir as `build-network`.
+reports the args used. The build network path is empty/was not provided so a new network was initialized and saved in the work dir as `random.build.net`.
 
 ### Inspecting the Data with Python
 

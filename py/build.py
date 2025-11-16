@@ -216,16 +216,16 @@ def main():
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".build.data")
     print(f"Saving base network in {working_dir}.")
-    with open(os.path.join(working_dir, "build-network"), "wb") as f:
+    with open(os.path.join(working_dir, "random.build.net"), "wb") as f:
         network.write_parameters(f)
 
     if len(data_files) == 0:
         print(
-            f"No .build files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
+            f"No .build.data files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
         )
         exit()
     else:
-        print(f"{len(data_files)} data_files found")
+        print(f"{len(data_files)} data files found")
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
     steps = args.steps
@@ -288,7 +288,7 @@ def main():
             if args.in_place:
                 ckpt_path = args.net_path
             else:
-                ckpt_path = os.path.join(working_dir, f"{step}.net")
+                ckpt_path = os.path.join(working_dir, f"{step}.build.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step}: {ckpt_path}")
