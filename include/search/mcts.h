@@ -45,9 +45,9 @@ struct Output {
 
 using Obs = std::array<uint8_t, 16>;
 
-template <bool _root_matrix = true, bool _root_matrix_ucb = false,
+template <bool _root_matrix = true, bool _root_matrix_ucb = true,
           size_t _root_matrix_ucb_delay = (1ULL << 12),
-          size_t _root_matrix_ucb_interval = (1ULL << 5),
+          size_t _root_matrix_ucb_interval = (1ULL << 6),
           size_t _root_rolls = 3, size_t _other_rolls = 1,
           bool _debug_print = false>
 struct SearchOptions {
@@ -95,7 +95,9 @@ template <typename Options = SearchOptions<>> struct Search {
     }
 
     if (!node.is_init()) {
+
       node.init(output.m, output.n);
+
       if constexpr (requires {
                       node.stats().softmax_logits(nullptr, nullptr);
                       model.inference(
@@ -112,12 +114,12 @@ template <typename Options = SearchOptions<>> struct Search {
       }
     }
 
+    const auto start = std::chrono::high_resolution_clock::now();
     // Three types for 'dur' (the time investement of the search) are allowed:
     // chrono duration
     if constexpr (requires {
                     std::chrono::duration_cast<std::chrono::milliseconds>(dur);
                   }) {
-      const auto start = std::chrono::high_resolution_clock::now();
       const auto duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(dur);
       std::chrono::milliseconds elapsed{};
@@ -128,73 +130,26 @@ template <typename Options = SearchOptions<>> struct Search {
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
       }
-      output.duration +=
-          std::chrono::duration_cast<std::chrono::milliseconds>(dur);
-
       // run while boolean flag is set
     } else if constexpr (requires { *dur; }) {
-      const auto start = std::chrono::high_resolution_clock::now();
       while (*dur) {
         ++output.iterations;
         output.total_value +=
             run_root_iteration(bandit_params, node, input, model, output);
       }
-      const auto end = std::chrono::high_resolution_clock::now();
-      output.duration +=
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
       // number of iterations
     } else {
-      const auto start = std::chrono::high_resolution_clock::now();
       for (auto i = 0; i < dur; ++i) {
         output.total_value +=
             run_root_iteration(bandit_params, node, input, model, output);
+        ++output.iterations;
       }
-      output.iterations += dur;
-      const auto end = std::chrono::high_resolution_clock::now();
-      output.duration +=
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     }
+    const auto end = std::chrono::high_resolution_clock::now();
+    output.duration +=
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     return process_output(output);
-  }
-
-  // use battle seed to quickly compute a clamped damage roll
-  template <size_t n_rolls>
-  static constexpr uint8_t roll_byte(const uint8_t seed) {
-    constexpr uint8_t lowest_roll{217};
-    constexpr uint8_t middle_roll{236};
-    if constexpr (n_rolls == 1) {
-      return middle_roll;
-    } else {
-      static_assert((n_rolls == 2) || (n_rolls == 3) || (n_rolls == 20));
-      constexpr uint8_t step = 38 / (n_rolls - 1);
-      return lowest_roll + step * (seed % n_rolls);
-    }
-  }
-
-  // pkmn_gen1_battle_options_set with constexpr logic
-  void battle_options_set(pkmn_gen1_battle &battle, size_t depth) {
-    if constexpr (!Options::clamping) {
-      pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
-    } else {
-      // last two bytes of battle rng
-      const auto *rand = battle.bytes + PKMN::Layout::Offsets::Battle::rng + 6;
-      auto *over = this->calc_options.overrides.bytes;
-      if constexpr (Options::rolls_same) {
-        over[0] = roll_byte<Options::root_rolls>(rand[0]);
-        over[8] = roll_byte<Options::root_rolls>(rand[1]);
-      } else {
-        if (depth == 0) {
-          over[0] = roll_byte<Options::root_rolls>(rand[0]);
-          over[8] = roll_byte<Options::root_rolls>(rand[1]);
-        } else {
-          over[0] = roll_byte<Options::other_rolls>(rand[0]);
-          over[8] = roll_byte<Options::other_rolls>(rand[1]);
-        }
-      }
-      pkmn_gen1_battle_options_set(&options, nullptr, nullptr, &calc_options);
-    }
   }
 
   float run_root_iteration(const auto &bandit_params, auto &node,
@@ -208,7 +163,6 @@ template <typename Options = SearchOptions<>> struct Search {
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
     if constexpr (Options::root_matrix_ucb) {
-
       if ((output.iterations >= Options::root_matrix_ucb_delay)) {
 
         uint8_t p1_index{}, p2_index{};
@@ -219,7 +173,9 @@ template <typename Options = SearchOptions<>> struct Search {
 
           std::array<int, 9 * 9> p1_ucb_matrix;
           std::array<int, 9 * 9> p2_ucb_matrix;
-          constexpr int discretize_factor = 80;
+          constexpr int discretize_factor = 256;
+
+          const float log_T = std::log(output.iterations);
 
           for (auto i = 0; i < output.m; ++i) {
             for (auto j = 0; j < output.n; ++j) {
@@ -232,15 +188,17 @@ template <typename Options = SearchOptions<>> struct Search {
                 p2_entry = 1 - p1_entry;
               }
 
-              float exploration =
-                  std::sqrt(2 * (2 * std::log(output.iterations) + ucb_weight) /
-                            (output.iterations + 1));
+              const float exploration = std::sqrt(2 * (2 * log_T + ucb_weight) /
+                                                  (visit_matrix[i][j] + 1));
+
               p1_entry += exploration;
               p2_entry += exploration;
 
-              p1_ucb_matrix[i * output.n + j] = p1_entry / discretize_factor;
-              p2_ucb_matrix[i * output.n + j] = p2_entry / discretize_factor;
+              p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
+              p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
+
             }
+            // std::cout << std::endl;
           }
 
           // solve and sample
@@ -262,23 +220,35 @@ template <typename Options = SearchOptions<>> struct Search {
                                                     p2_nash.data(), 0};
             LRSNash::solve_fast(&solve_input, &solve_output);
           }
+
+          for (auto i = 0; i < output.m; ++i) {
+            std::cout << int{100000 * p1_nash[i]} / 100 << ' ';
+          }
+          std::cout << std::endl;
+          for (auto i = 0; i < output.n; ++i) {
+            std::cout << int{100000 * p2_nash[i]} / 100 << ' ';
+          }
+          std::cout << std::endl;
+          std::cout << std::endl;
         }
 
         {
-          float p = model.device.uniform_64();
+          float p = model.device.uniform();
           for (auto i = 0; i < output.m; ++i) {
             p -= p1_nash[i];
             if (p <= 0) {
+              p1_index = i;
               break;
             }
           }
         }
 
         {
-          float p = model.device.uniform_64();
+          float p = model.device.uniform();
           for (auto i = 0; i < output.n; ++i) {
             p -= p2_nash[i];
             if (p <= 0) {
+              p2_index = i;
               break;
             }
           }
@@ -292,7 +262,13 @@ template <typename Options = SearchOptions<>> struct Search {
             *pkmn_gen1_battle_options_chance_actions(&options));
         auto &child = node(p1_index, p2_index, obs);
 
-        return run_iteration(bandit_params, child, copy, model, 1).first;
+        const auto value =
+            run_iteration(bandit_params, child, copy, model, 1).first;
+
+        ++visit_matrix[p1_index][p2_index];
+        value_matrix[p1_index][p2_index] += value;
+
+        return value;
       } else {
         return run_iteration(bandit_params, node, copy, model).first;
       }
@@ -470,6 +446,44 @@ template <typename Options = SearchOptions<>> struct Search {
       return {.5, .5};
     }
     };
+  }
+
+  // use battle seed to quickly compute a clamped damage roll
+  template <size_t n_rolls>
+  static constexpr uint8_t roll_byte(const uint8_t seed) {
+    constexpr uint8_t lowest_roll{217};
+    constexpr uint8_t middle_roll{236};
+    if constexpr (n_rolls == 1) {
+      return middle_roll;
+    } else {
+      static_assert((n_rolls == 2) || (n_rolls == 3) || (n_rolls == 20));
+      constexpr uint8_t step = 38 / (n_rolls - 1);
+      return lowest_roll + step * (seed % n_rolls);
+    }
+  }
+
+  // pkmn_gen1_battle_options_set with constexpr logic
+  void battle_options_set(pkmn_gen1_battle &battle, size_t depth) {
+    if constexpr (!Options::clamping) {
+      pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
+    } else {
+      // last two bytes of battle rng
+      const auto *rand = battle.bytes + PKMN::Layout::Offsets::Battle::rng + 6;
+      auto *over = this->calc_options.overrides.bytes;
+      if constexpr (Options::rolls_same) {
+        over[0] = roll_byte<Options::root_rolls>(rand[0]);
+        over[8] = roll_byte<Options::root_rolls>(rand[1]);
+      } else {
+        if (depth == 0) {
+          over[0] = roll_byte<Options::root_rolls>(rand[0]);
+          over[8] = roll_byte<Options::root_rolls>(rand[1]);
+        } else {
+          over[0] = roll_byte<Options::other_rolls>(rand[0]);
+          over[8] = roll_byte<Options::other_rolls>(rand[1]);
+        }
+      }
+      pkmn_gen1_battle_options_set(&options, nullptr, nullptr, &calc_options);
+    }
   }
 
   Output process_output(Output &output) {
