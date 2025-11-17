@@ -24,6 +24,10 @@ struct MonteCarlo {
   mt19937 device;
 };
 
+int percent(float x) {
+  return int{x * 10000} / 100;
+}
+
 // strategies, value estimate, etc. All info the search produces
 struct Output {
   uint8_t m;
@@ -47,7 +51,7 @@ using Obs = std::array<uint8_t, 16>;
 
 template <bool _root_matrix = true, bool _root_matrix_ucb = true,
           size_t _root_matrix_ucb_delay = (1ULL << 12),
-          size_t _root_matrix_ucb_interval = (1ULL << 6),
+          size_t _root_matrix_ucb_interval = (1ULL << 8),
           size_t _root_rolls = 3, size_t _other_rolls = 1,
           bool _debug_print = false>
 struct SearchOptions {
@@ -163,6 +167,8 @@ template <typename Options = SearchOptions<>> struct Search {
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
     if constexpr (Options::root_matrix_ucb) {
+      static constexpr float c_ucb = .1;
+
       if ((output.iterations >= Options::root_matrix_ucb_delay)) {
 
         uint8_t p1_index{}, p2_index{};
@@ -188,21 +194,24 @@ template <typename Options = SearchOptions<>> struct Search {
                 p2_entry = 1 - p1_entry;
               }
 
-              const float exploration = std::sqrt(2 * (2 * log_T + ucb_weight) /
+              std::cout << visit_matrix[i][j] << ' ';
+
+              const float exploration = c_ucb * std::sqrt(2 * (2 * log_T + ucb_weight) /
                                                   (visit_matrix[i][j] + 1));
 
               p1_entry += exploration;
-              p2_entry += exploration;
+              p2_entry -= exploration;
 
               p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
               p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
-
+              // std::cout << percent(1 - value_matrix[i][j] / visit_matrix[i][j]) << '/' << percent(exploration) << ' ';
             }
-            // std::cout << std::endl;
+            std::cout << std::endl;
           }
 
           // solve and sample
           std::array<float, 9 + 2> dummy;
+
           {
             LRSNash::FastInput solve_input{
                 static_cast<int>(output.m), static_cast<int>(output.n),
