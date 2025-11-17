@@ -24,9 +24,14 @@ struct MonteCarlo {
   mt19937 device;
 };
 
-int percent(float x) {
-  return int{x * 10000} / 100;
-}
+template <typename BanditParams> struct MatrixUCBParams {
+  static constexpr bool matrix_ucb{true};
+
+  BanditParams bandit_params;
+  uint32_t delay;
+  uint32_t interval;
+  float c;
+};
 
 // strategies, value estimate, etc. All info the search produces
 struct Output {
@@ -49,16 +54,10 @@ struct Output {
 
 using Obs = std::array<uint8_t, 16>;
 
-template <bool _root_matrix = true, bool _root_matrix_ucb = true,
-          size_t _root_matrix_ucb_delay = (1ULL << 12),
-          size_t _root_matrix_ucb_interval = (1ULL << 8),
-          size_t _root_rolls = 3, size_t _other_rolls = 1,
-          bool _debug_print = false>
+template <bool _root_matrix = true, size_t _root_rolls = 3,
+          size_t _other_rolls = 1, bool _debug_print = false>
 struct SearchOptions {
   static constexpr bool root_matrix = _root_matrix;
-  static constexpr bool root_matrix_ucb = _root_matrix_ucb;
-  static constexpr size_t root_matrix_ucb_delay = _root_matrix_ucb_delay;
-  static constexpr size_t root_matrix_ucb_interval = _root_matrix_ucb_interval;
   static constexpr size_t root_rolls = _root_rolls;
   static constexpr size_t other_rolls = _other_rolls;
   static constexpr bool debug_print = _debug_print;
@@ -81,7 +80,7 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p1_nash;
   std::array<float, 9 + 2> p2_nash;
 
-  Output run(const auto dur, const auto &bandit_params, auto &node, auto &model,
+  Output run(const auto dur, const auto &params, auto &node, auto &model,
              const MCTS::BattleData &input, Output output = {}) {
 
     // reset data members
@@ -94,9 +93,9 @@ template <typename Options = SearchOptions<>> struct Search {
     output.n = pkmn_gen1_battle_choices(
         &input.battle, PKMN_PLAYER_P2, pkmn_result_p2(input.result),
         output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-    if constexpr (Options::root_matrix_ucb) {
-      ucb_weight = std::log(2 * output.m * output.n);
-    }
+    // if constexpr (Options::root_matrix_ucb) {
+    ucb_weight = std::log(2 * output.m * output.n);
+    // }
 
     if (!node.is_init()) {
 
@@ -129,7 +128,7 @@ template <typename Options = SearchOptions<>> struct Search {
       std::chrono::milliseconds elapsed{};
       while (elapsed < duration) {
         output.total_value +=
-            run_root_iteration(bandit_params, node, input, model, output);
+            run_root_iteration(params, node, input, model, output);
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
@@ -139,13 +138,13 @@ template <typename Options = SearchOptions<>> struct Search {
       while (*dur) {
         ++output.iterations;
         output.total_value +=
-            run_root_iteration(bandit_params, node, input, model, output);
+            run_root_iteration(params, node, input, model, output);
       }
       // number of iterations
     } else {
       for (auto i = 0; i < dur; ++i) {
         output.total_value +=
-            run_root_iteration(bandit_params, node, input, model, output);
+            run_root_iteration(params, node, input, model, output);
         ++output.iterations;
       }
     }
@@ -156,8 +155,8 @@ template <typename Options = SearchOptions<>> struct Search {
     return process_output(output);
   }
 
-  float run_root_iteration(const auto &bandit_params, auto &node,
-                           const auto &input, auto &model, Output &output) {
+  float run_root_iteration(const auto &params, auto &node, const auto &input,
+                           auto &model, Output &output) {
     auto copy = input;
     auto *rng = reinterpret_cast<uint64_t *>(
         copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
@@ -166,14 +165,17 @@ template <typename Options = SearchOptions<>> struct Search {
     apply_durations(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
-    if constexpr (Options::root_matrix_ucb) {
-      static constexpr float c_ucb = .1;
+    // check if we are passing MatrixUCB param wrapper
+    if constexpr (requires {
+                    std::remove_cvref_t<decltype(params)>::matrix_ucb == true;
+                  }) {
+      // if constexpr (true) {
 
-      if ((output.iterations >= Options::root_matrix_ucb_delay)) {
+      if ((output.iterations >= params.delay)) {
 
         uint8_t p1_index{}, p2_index{};
 
-        if (output.iterations % Options::root_matrix_ucb_interval == 0) {
+        if (output.iterations % params.interval == 0) {
 
           // get ucb matrices
 
@@ -194,19 +196,16 @@ template <typename Options = SearchOptions<>> struct Search {
                 p2_entry = 1 - p1_entry;
               }
 
-              std::cout << visit_matrix[i][j] << ' ';
-
-              const float exploration = c_ucb * std::sqrt(2 * (2 * log_T + ucb_weight) /
-                                                  (visit_matrix[i][j] + 1));
+              const float exploration =
+                  params.c * std::sqrt(2 * (2 * log_T + ucb_weight) /
+                                       (visit_matrix[i][j] + 1));
 
               p1_entry += exploration;
               p2_entry -= exploration;
 
               p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
               p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
-              // std::cout << percent(1 - value_matrix[i][j] / visit_matrix[i][j]) << '/' << percent(exploration) << ' ';
             }
-            std::cout << std::endl;
           }
 
           // solve and sample
@@ -229,16 +228,6 @@ template <typename Options = SearchOptions<>> struct Search {
                                                     p2_nash.data(), 0};
             LRSNash::solve_fast(&solve_input, &solve_output);
           }
-
-          for (auto i = 0; i < output.m; ++i) {
-            std::cout << int{100000 * p1_nash[i]} / 100 << ' ';
-          }
-          std::cout << std::endl;
-          for (auto i = 0; i < output.n; ++i) {
-            std::cout << int{100000 * p2_nash[i]} / 100 << ' ';
-          }
-          std::cout << std::endl;
-          std::cout << std::endl;
         }
 
         {
@@ -272,17 +261,17 @@ template <typename Options = SearchOptions<>> struct Search {
         auto &child = node(p1_index, p2_index, obs);
 
         const auto value =
-            run_iteration(bandit_params, child, copy, model, 1).first;
+            run_iteration(params.bandit_params, child, copy, model, 1).first;
 
         ++visit_matrix[p1_index][p2_index];
         value_matrix[p1_index][p2_index] += value;
 
         return value;
       } else {
-        return run_iteration(bandit_params, node, copy, model).first;
+        return run_iteration(params.bandit_params, node, copy, model).first;
       }
     } else {
-      return run_iteration(bandit_params, node, copy, model).first;
+      return run_iteration(params, node, copy, model).first;
     }
   }
 
