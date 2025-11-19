@@ -37,7 +37,6 @@ auto parse_set(const auto &words) {
   set.species = PKMN::string_to_species(words[0]);
 
   auto n_moves = 0;
-
   // remaining words after only mandatory one: species
   for (auto i = 1; i < words.size(); ++i) {
     const auto &word = words[i];
@@ -221,7 +220,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     //   vol.set_disable(true);
     //   duration.set_disable(disable);
     // }
-    if (const auto thrashing = parse_colon_split(lower, "(trash");
+    if (const auto thrashing = parse_colon_split(lower, "(thrash");
         thrashing >= 0) {
       vol.set_thrashing(true);
       duration.set_attacking(thrashing);
