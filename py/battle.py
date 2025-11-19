@@ -304,7 +304,7 @@ def main():
         with open(args.net_path, "rb") as f:
             network.read_parameters(f)
 
-    data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
+    data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
     print("Saving base network in working dir.")
     with open(os.path.join(working_dir, "random.battle.net"), "wb") as f:
         network.write_parameters(f)
@@ -325,7 +325,7 @@ def main():
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):
-        data_files = py_oak.find_data_files(args.data_dir, ext=".battle")
+        data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
         if args.data_window > 0:
             data_files = data_files[: args.data_window]
         encoded_frames.clear()

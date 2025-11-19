@@ -261,7 +261,7 @@ class OutputBuffers:
         self.size = size
         self.pokemon_out_dim = pod
         self.active_out_dim = aod
-        self.side_out_dim = aod + 5 * pod
+        self.side_out_dim = (1 + aod) + 5 * (1 + pod)
         self.pokemon = torch.zeros(
             (size, 2, 5, self.pokemon_out_dim), dtype=torch.float32
         )
@@ -310,7 +310,7 @@ class BattleNetwork(torch.nn.Module):
         self.active_hidden_dim = ahd
         self.pokemon_out_dim = pod
         self.active_out_dim = aod
-        self.side_out_dim = aod + 5 * pod
+        self.side_out_dim = (1 + aod) + 5 * (1 + pod)
         self.hidden_dim = hd
         self.value_hidden_dim = vhd
         self.policy_hidden_dim = pohd
