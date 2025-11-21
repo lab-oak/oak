@@ -30,6 +30,7 @@ template <typename T, int dim = 0> struct PokemonCache {
       Status::Paralysis, Status::Rest1,  Status::Rest2, Status::Rest3};
 
   static constexpr bool is_dynamic{dim <= 0};
+  static constexpr bool is_integral{std::is_integral_v<T>};
   using Embedding = EmbeddingT<T, dim>;
   using Key = uint8_t;
 
@@ -44,9 +45,23 @@ template <typename T, int dim = 0> struct PokemonCache {
         embedding = new T[embedding_size];
       }
     }
-    if constexpr (std::is_integral_v<T>) {
+    if constexpr (is_integral) {
       embedding.resize(embedding_size);
     }
+  }
+
+  PokemonCache(const PokemonCache &other) {
+    if constexpr (is_dynamic) {
+      embedding_size = other.embedding_size;
+      for (auto i = 0; i < n_embeddings; ++i) {
+        embeddings[i] = new T[embedding_size];
+        const auto *source = other.embeddings[i];
+        std::copy(source, source + embedding_size, embeddings[i]);
+      }
+    } else {
+      embeddings = other.embeddings;
+    }
+    embedding = other.embedding;
   }
 
   ~PokemonCache() {
@@ -86,7 +101,7 @@ template <typename T, int dim = 0> struct PokemonCache {
         auto *embedding_data =
             this->data(Encode::Battle::pokemon_key(pokemon, sleep));
 
-        if constexpr (std::is_integral_v<T>) {
+        if constexpr (is_integral) {
           pokemon_net.propagate(encoding.data(), embedding.data());
           std::transform(embedding.begin(), embedding.end(), embedding_data,
                          [](const auto f) {
@@ -121,6 +136,7 @@ template <typename T, int dim = 0> struct PokemonCache {
 template <typename T, int dim = 0> struct ActivePokemonCache {
 
   static constexpr bool is_dynamic{dim <= 0};
+  static constexpr bool is_integral{std::is_integral_v<T>};
   using Embedding = EmbeddingT<T, dim>;
   using Key = std::pair<PKMN::ActivePokemon, uint8_t>;
 
@@ -134,7 +150,7 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     if constexpr (is_dynamic) {
       embedding_size = d;
     }
-    if constexpr (std::is_integral_v<T>) {
+    if constexpr (is_integral) {
       embedding.resize(embedding_size);
     }
   }
@@ -144,6 +160,19 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
       for (auto p : embeddings) {
         delete[] p.second;
       }
+    }
+  }
+
+  ActivePokemonCache(const ActivePokemonCache &other) {
+    if constexpr (is_dynamic) {
+      embedding_size = other.embedding_size;
+      for (const auto &p : other.embeddings) {
+        embeddings[p.first] = new T[embedding_size];
+        const auto *source = p.second;
+        std::copy(source, source + embedding_size, embeddings[p.first]);
+      }
+    } else {
+      embeddings = other.embeddings;
     }
   }
 
@@ -163,15 +192,19 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{
         active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
     if (embeddings.find(key) != embeddings.end()) {
-      return data(key);
+      const auto embedding_data = data(key);
+      assert(embedding_data != nullptr);
+      return embedding_data;
     } else {
-
       std::fill(encoding.begin(), encoding.end(), 0);
       Encode::Battle::Active::write(pokemon, active, duration, encoding.data());
 
+      if constexpr (is_dynamic) {
+        embeddings[key] = new T[embedding_size];
+      }
       auto *embedding_data = data(key);
 
-      if constexpr (std::is_integral_v<T>) {
+      if constexpr (is_integral) {
         active_net.propagate(encoding.data(), embedding.data());
         std::transform(embedding.begin(), embedding.end(), embedding_data,
                        [](const auto f) {

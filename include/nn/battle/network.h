@@ -21,6 +21,7 @@ struct Network {
   MainNet main_net;
   std::shared_ptr<Stockfish::Network> discrete_main_net;
 
+  template <typename T> using SideSet = std::array<T, 6>;
   template <typename T> using BattleSet = std::array<std::array<T, 6>, 2>;
   BattleSet<PokemonCache<float>> pokemon_caches;
   BattleSet<ActivePokemonCache<float>> active_caches;
@@ -45,8 +46,48 @@ struct Network {
         active_net{Encode::Battle::Active::n_dim, ahd, aod},
         side_embedding_dim{(1 + aod) + 5 * (1 + pod)},
         main_net{2 * side_embedding_dim, hd, vhd, pohd}, discrete_main_net{},
-        pokemon_caches{pod}, active_caches{aod}, pokemon_caches_d{pod},
-        active_caches_d{aod}, use_discrete{false} {
+        pokemon_caches{SideSet<PokemonCache<float>>{
+                           PokemonCache<float>(pod), PokemonCache<float>(pod),
+                           PokemonCache<float>(pod), PokemonCache<float>(pod),
+                           PokemonCache<float>(pod), PokemonCache<float>(pod)},
+                       SideSet<PokemonCache<float>>{
+                           PokemonCache<float>(pod), PokemonCache<float>(pod),
+                           PokemonCache<float>(pod), PokemonCache<float>(pod),
+                           PokemonCache<float>(pod), PokemonCache<float>(pod)}},
+        active_caches{
+            SideSet<ActivePokemonCache<float>>{
+                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
+                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
+                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod)},
+            SideSet<ActivePokemonCache<float>>{
+                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
+                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
+                ActivePokemonCache<float>(aod),
+                ActivePokemonCache<float>(aod)}},
+        pokemon_caches_d{
+            SideSet<PokemonCache<uint8_t>>{
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod)},
+            SideSet<PokemonCache<uint8_t>>{
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
+                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod)}},
+        active_caches_d{SideSet<ActivePokemonCache<uint8_t>>{
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod)},
+                        SideSet<ActivePokemonCache<uint8_t>>{
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod),
+                            ActivePokemonCache<uint8_t>(aod)}},
+        use_discrete{false} {
     battle_embedding.resize(2 * side_embedding_dim);
     battle_embedding_d.resize(2 * side_embedding_dim);
   }
