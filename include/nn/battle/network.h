@@ -92,7 +92,6 @@ struct Network {
   }
 
   void enable_discrete() {
-    // TODO call make_network
     discrete_main_net = Stockfish::make_network(
         main_net.fc0.in_dim, main_net.fc0.out_dim, main_net.value_fc1.out_dim);
     discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
@@ -202,42 +201,24 @@ struct Network {
     return value;
   }
 
-  static void print_battle_embedding(float *input) {
-    // for (auto s = 0; s < 2; ++s) {
-    //   std::cout << "Active " << (int)(100 * input[s][0]) << "%\n";
-    //   for (auto i = 0; i < active_out_dim; ++i) {
-    //     std::cout << input[s][1 + i] << ' ';
-    //   }
-    //   std::cout << std::endl;
+  void print_battle_embedding(const float *input) const {
+    for (auto s = 0; s < 2; ++s) {
+      const auto *side_embedding = input + s * side_embedding_index(6);
+      std::cout << "Active " << (int)(100 * side_embedding[0]) << "%\n";
+      for (auto i = 0; i < active_out_dim; ++i) {
+        std::cout << side_embedding[1 + i] << ' ';
+      }
+      std::cout << std::endl;
 
-    //   for (auto p = 1; p < 6; ++p) {
-    //     auto p_input = input[s] + side_embedding_index(p);
-    //     std::cout << "Pokemon " << (int)(100 * p_input[0]) << "%\n";
-    //     for (auto i = 0; i < pokemon_out_dim; ++i) {
-    //       std::cout << p_input[1 + i] << ' ';
-    //     }
-    //     std::cout << std::endl;
-    //   }
-    // }
-  }
-
-  static void print_battle_embedding(uint8_t *input) {
-    // for (auto s = 0; s < 2; ++s) {
-    //   std::cout << "Active " << input[s][0] * 100.0 / 127.0 << "%\n";
-    //   for (auto i = 0; i < active_out_dim; ++i) {
-    //     std::cout << input[s][1 + i] / 127.0 << ' ';
-    //   }
-    //   std::cout << std::endl;
-
-    //   for (auto p = 1; p < 6; ++p) {
-    //     auto p_input = input[s] + side_embedding_index(p);
-    //     std::cout << "Pokemon " << (p_input[0] * 100.0 / 127.0) << "%\n";
-    //     for (auto i = 0; i < pokemon_out_dim; ++i) {
-    //       std::cout << p_input[1 + i] / 127.0 << ' ';
-    //     }
-    //     std::cout << std::endl;
-    //   }
-    // }
+      for (auto p = 1; p < 6; ++p) {
+        const auto *p_input = side_embedding + side_embedding_index(p);
+        std::cout << "Pokemon " << (int)(100 * p_input[0]) << "%\n";
+        for (auto i = 0; i < pokemon_out_dim; ++i) {
+          std::cout << p_input[1 + i] << ' ';
+        }
+        std::cout << std::endl;
+      }
+    }
   }
 };
 

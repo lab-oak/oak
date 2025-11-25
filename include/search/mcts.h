@@ -24,6 +24,7 @@ struct MonteCarlo {
   mt19937 device;
 };
 
+// wrapper to use for enabling matrix ucb at root node
 template <typename BanditParams> struct MatrixUCBParams {
   static constexpr bool matrix_ucb{true};
 
@@ -38,6 +39,7 @@ struct Output {
   uint8_t m;
   uint8_t n;
   size_t iterations;
+  std::chrono::milliseconds duration;
   double total_value;
   double empirical_value;
   double nash_value;
@@ -49,7 +51,6 @@ struct Output {
   std::array<double, 9> p2_nash;
   std::array<std::array<size_t, 9>, 9> visit_matrix;
   std::array<std::array<double, 9>, 9> value_matrix;
-  std::chrono::milliseconds duration;
 };
 
 using Obs = std::array<uint8_t, 16>;
@@ -93,9 +94,9 @@ template <typename Options = SearchOptions<>> struct Search {
     output.n = pkmn_gen1_battle_choices(
         &input.battle, PKMN_PLAYER_P2, pkmn_result_p2(input.result),
         output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-    // if constexpr (Options::root_matrix_ucb) {
-    ucb_weight = std::log(2 * output.m * output.n);
-    // }
+    if constexpr (requires { params.bandit_params; }) {
+      ucb_weight = std::log(2 * output.m * output.n);
+    }
 
     if (!node.is_init()) {
 
@@ -166,13 +167,8 @@ template <typename Options = SearchOptions<>> struct Search {
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
     // check if we are passing MatrixUCB param wrapper
-    if constexpr (requires {
-                    std::remove_cvref_t<decltype(params)>::matrix_ucb == true;
-                  }) {
-      // if constexpr (true) {
-
+    if constexpr (requires { params.bandit_params; }) {
       if ((output.iterations >= params.delay)) {
-
         uint8_t p1_index{}, p2_index{};
 
         if (output.iterations % params.interval == 0) {

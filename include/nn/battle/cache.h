@@ -142,7 +142,6 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
 
   uint32_t embedding_size;
   std::map<Key, Embedding> embeddings;
-  // this is done at runtime for ActiveCache so it's a member
   std::array<float, Encode::Battle::Active::n_dim> encoding;
   std::vector<float> embedding;
 
@@ -173,6 +172,9 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
       }
     } else {
       embeddings = other.embeddings;
+    }
+    if constexpr (is_integral) {
+      embedding.resize(embedding_size);
     }
   }
 

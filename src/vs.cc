@@ -262,12 +262,10 @@ void thread_fn(uint64_t seed) {
     auto p1_agent_local = RuntimeOptions::p1_agent;
     auto p2_agent_local = RuntimeOptions::p2_agent;
     if (p1_agent_local.uses_network()) {
-      p1_agent_local.read_network_parameters();
-      p1_agent_local.network.value().fill_pokemon_caches(battle);
+      p1_agent_local.initialize_network(battle);
     }
     if (p2_agent_local.uses_network()) {
-      p2_agent_local.read_network_parameters();
-      p2_agent_local.network.value().fill_pokemon_caches(battle);
+      p2_agent_local.initialize_network(battle);
     }
 
     Train::Battle::CompressedFrames p1_battle_frames{battle};

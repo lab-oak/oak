@@ -1,8 +1,6 @@
 #pragma once
 
-namespace PKMN {
-
-namespace Layout {
+namespace PKMN::Layout {
 
 namespace Sizes {
 constexpr auto Battle = 384;
@@ -134,6 +132,4 @@ constexpr auto binding = 28;
 
 } // namespace Offsets
 
-} // namespace Layout
-
-} // namespace PKMN
+} // namespace PKMN::Layout
