@@ -7,14 +7,9 @@
 namespace Learnset {
 // the 'learnset data' of all mons at level 100.
 // these structs cannot encode move conflicts. This is all we use for now, so we
-// ignore move conflicts
+// ignore move conflicts (TODO)
 using Data = std::array<std::array<bool, PKMN::Data::all_moves.size()>,
                         PKMN::Data::all_species.size()>;
-
-// TODO some format the mimics Showdowns move conflict storage for easy
-// conversion
-
-// TODO some more efficient way to check for conflicts.
 
 struct Cart {
 

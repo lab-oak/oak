@@ -21,12 +21,8 @@ struct Network {
   MainNet main_net;
   std::shared_ptr<Stockfish::Network> discrete_main_net;
 
-  template <typename T> using SideSet = std::array<T, 6>;
-  template <typename T> using BattleSet = std::array<std::array<T, 6>, 2>;
-  BattleSet<PokemonCache<float>> pokemon_caches;
-  BattleSet<ActivePokemonCache<float>> active_caches;
-  BattleSet<PokemonCache<uint8_t>> pokemon_caches_d;
-  BattleSet<ActivePokemonCache<uint8_t>> active_caches_d;
+  BattleCaches<float> battle_cache;
+  BattleCaches<uint8_t> discrete_battle_cache;
 
   uint32_t pokemon_out_dim;
   uint32_t active_out_dim;
@@ -46,47 +42,7 @@ struct Network {
         active_net{Encode::Battle::Active::n_dim, ahd, aod},
         side_embedding_dim{(1 + aod) + 5 * (1 + pod)},
         main_net{2 * side_embedding_dim, hd, vhd, pohd}, discrete_main_net{},
-        pokemon_caches{SideSet<PokemonCache<float>>{
-                           PokemonCache<float>(pod), PokemonCache<float>(pod),
-                           PokemonCache<float>(pod), PokemonCache<float>(pod),
-                           PokemonCache<float>(pod), PokemonCache<float>(pod)},
-                       SideSet<PokemonCache<float>>{
-                           PokemonCache<float>(pod), PokemonCache<float>(pod),
-                           PokemonCache<float>(pod), PokemonCache<float>(pod),
-                           PokemonCache<float>(pod), PokemonCache<float>(pod)}},
-        active_caches{
-            SideSet<ActivePokemonCache<float>>{
-                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
-                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
-                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod)},
-            SideSet<ActivePokemonCache<float>>{
-                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
-                ActivePokemonCache<float>(aod), ActivePokemonCache<float>(aod),
-                ActivePokemonCache<float>(aod),
-                ActivePokemonCache<float>(aod)}},
-        pokemon_caches_d{
-            SideSet<PokemonCache<uint8_t>>{
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod)},
-            SideSet<PokemonCache<uint8_t>>{
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod),
-                PokemonCache<uint8_t>(pod), PokemonCache<uint8_t>(pod)}},
-        active_caches_d{SideSet<ActivePokemonCache<uint8_t>>{
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod)},
-                        SideSet<ActivePokemonCache<uint8_t>>{
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod),
-                            ActivePokemonCache<uint8_t>(aod)}},
+        battle_cache{pod, aod}, discrete_battle_cache{pod, aod},
         use_discrete{false} {
     battle_embedding.resize(2 * side_embedding_dim);
     battle_embedding_d.resize(2 * side_embedding_dim);
@@ -96,12 +52,13 @@ struct Network {
     const auto &battle = PKMN::view(b);
     for (auto s = 0; s < 2; ++s) {
       for (auto p = 0; p < 6; ++p) {
-        pokemon_caches[s][p].fill(pokemon_net, battle.sides[s].pokemon[p]);
+        battle_cache.pokemon[s][p].fill(pokemon_net,
+                                        battle.sides[s].pokemon[p]);
         // rather than calling fill again, just copy
         for (auto j = 0; j < PokemonCache<float>::n_embeddings; ++j) {
           for (auto i = 0; i < pokemon_out_dim; ++i) {
-            pokemon_caches_d[s][p].embeddings[j][i] =
-                pokemon_caches[s][p].embeddings[j][i] * 127;
+            discrete_battle_cache.pokemon[s][p].embeddings[j][i] =
+                battle_cache.pokemon[s][p].embeddings[j][i] * 127;
           }
         }
       }
@@ -159,12 +116,13 @@ struct Network {
         std::fill(side_embedding, side_embedding + (active_out_dim + 1), 0);
       } else {
         if constexpr (std::is_integral_v<T>) {
-          const T *embedding = active_caches_d[s][side.order[0] - 1].get(
-              active_net, side.active, stored, duration);
+          const T *embedding =
+              discrete_battle_cache.active[s][side.order[0] - 1].get(
+                  active_net, side.active, stored, duration);
           std::copy(embedding, embedding + active_out_dim, side_embedding + 1);
           side_embedding[0] = (float)stored.hp / stored.stats.hp * 127;
         } else {
-          const T *embedding = active_caches[s][side.order[0] - 1].get(
+          const T *embedding = battle_cache.active[s][side.order[0] - 1].get(
               active_net, side.active, stored, duration);
           std::copy(embedding, embedding + active_out_dim, side_embedding + 1);
           side_embedding[0] = (float)stored.hp / stored.stats.hp;
@@ -185,13 +143,13 @@ struct Network {
             const auto sleep = duration.sleep(slot - 1);
             if constexpr (std::is_integral_v<T>) {
               const T *embedding =
-                  pokemon_caches_d[s][id - 1].get(pokemon, sleep);
+                  discrete_battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
               std::copy(embedding, embedding + pokemon_out_dim,
                         slot_embedding + 1);
               side_embedding[0] = (float)stored.hp / stored.stats.hp * 127;
             } else {
               const T *embedding =
-                  pokemon_caches[s][id - 1].get(pokemon, sleep);
+                  battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
               std::copy(embedding, embedding + pokemon_out_dim,
                         slot_embedding + 1);
               side_embedding[0] = (float)stored.hp / stored.stats.hp;

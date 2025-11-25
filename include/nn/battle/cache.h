@@ -184,7 +184,7 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     }
   }
 
-  // TODO
+  // TODO warm start
   void fill(auto &, const PKMN::Pokemon &) {}
 
   const T *get(auto &active_net, const auto &active, const auto &pokemon,
@@ -218,6 +218,32 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
       return embedding_data;
     }
   }
+};
+
+template <typename T> struct BattleCaches {
+
+  template <typename U> using SideSet = std::array<U, 6>;
+  template <typename U> using BattleSet = std::array<std::array<U, 6>, 2>;
+  BattleSet<PokemonCache<T>> pokemon;
+  BattleSet<ActivePokemonCache<T>> active;
+
+  BattleCaches(uint32_t pod, uint32_t aod)
+      : pokemon{SideSet<PokemonCache<T>>{
+                    PokemonCache<T>(pod), PokemonCache<T>(pod),
+                    PokemonCache<T>(pod), PokemonCache<T>(pod),
+                    PokemonCache<T>(pod), PokemonCache<T>(pod)},
+                SideSet<PokemonCache<T>>{
+                    PokemonCache<T>(pod), PokemonCache<T>(pod),
+                    PokemonCache<T>(pod), PokemonCache<T>(pod),
+                    PokemonCache<T>(pod), PokemonCache<T>(pod)}},
+        active{SideSet<ActivePokemonCache<T>>{
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)},
+               SideSet<ActivePokemonCache<T>>{
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
+                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)}} {}
 };
 
 } // namespace NN::Battle
