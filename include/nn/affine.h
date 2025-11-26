@@ -18,6 +18,17 @@ public:
   WeightMatrix weights;
   OutputVector biases;
 
+  void propagate(const float *input_data, float *output_data) const {
+    const auto input = Eigen::Map<const InputVector>(input_data, in_dim);
+    Eigen::Map<OutputVector> output(output_data, out_dim);
+    output.noalias() = weights * input + biases;
+    if constexpr (clamp) {
+      for (std::size_t i = 0; i < out_dim; ++i) {
+        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+      }
+    }
+  }
+
   Affine(uint32_t in_dim, uint32_t out_dim)
       : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
         biases(out_dim) {}
@@ -56,6 +67,23 @@ public:
     const auto input = Eigen::Map<const InputVector>(input_data, in_dim);
     Eigen::Map<OutputVector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
+    if constexpr (clamp) {
+      for (std::size_t i = 0; i < out_dim; ++i) {
+        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+      }
+    }
+  }
+
+  void propagate(const uint32_t *index_data, const float *input_data,
+                 float *output_data, size_t n) const {
+    Eigen::Map<OutputVector> output(output_data, out_dim);
+    output = biases;
+
+    for (std::size_t k = 0; k < n; ++k) {
+      uint32_t idx = index_data[k];
+      float val = input_data[k];
+      output.noalias() += weights.col(idx) * val;
+    }
     if constexpr (clamp) {
       for (std::size_t i = 0; i < out_dim; ++i) {
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
