@@ -4,10 +4,12 @@
 #include <encode/battle/policy.h>
 #include <nn/battle/cache.h>
 #include <nn/battle/main-net.h>
-#include <nn/battle/stockfish/network.h>
+// #include <nn/battle/stockfish/network.h>
 #include <nn/default-hyperparameters.h>
 #include <nn/embedding-net.h>
 #include <util/random.h>
+
+#include <memory>
 
 namespace NN::Battle {
 
@@ -19,7 +21,7 @@ struct Network {
   EmbeddingNet<> pokemon_net;
   EmbeddingNet<> active_net;
   MainNet main_net;
-  std::shared_ptr<Stockfish::Network> discrete_main_net;
+  std::shared_ptr<int> discrete_main_net;
 
   BattleCaches<float> battle_cache;
   BattleCaches<uint8_t> discrete_battle_cache;
@@ -92,11 +94,12 @@ struct Network {
   }
 
   void enable_discrete() {
-    discrete_main_net = Stockfish::make_network(
-        main_net.fc0.in_dim, main_net.fc0.out_dim, main_net.value_fc1.out_dim);
-    discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
-                                       main_net.value_fc2);
-    use_discrete = true;
+    throw std::runtime_error{"No AVX2"};
+    // discrete_main_net = Stockfish::make_network(
+    //     main_net.fc0.in_dim, main_net.fc0.out_dim, main_net.value_fc1.out_dim);
+    // discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
+    //                                    main_net.value_fc2);
+    // use_discrete = true;
   }
 
   template <typename T>
@@ -163,8 +166,9 @@ struct Network {
                   const pkmn_gen1_chance_durations &d) {
     float value;
     if (use_discrete) {
-      write_battle_embedding<uint8_t>(battle_embedding_d.data(), b, d);
-      value = sigmoid(discrete_main_net->propagate(battle_embedding_d.data()));
+      throw std::runtime_error{"No AVX2"};
+      // write_battle_embedding<uint8_t>(battle_embedding_d.data(), b, d);
+      // value = sigmoid(discrete_main_net->propagate(battle_embedding_d.data()));
     } else {
       write_battle_embedding<float>(battle_embedding.data(), b, d);
       value = sigmoid(main_net.propagate(battle_embedding.data()));
