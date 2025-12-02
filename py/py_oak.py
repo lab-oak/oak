@@ -3,6 +3,8 @@ import os
 
 import numpy as np
 
+from typing import List
+
 lib = ctypes.CDLL("./release/libpyoak.so")
 
 # battle net hyperparams
@@ -359,6 +361,50 @@ def encode_buffers(
     ) + encoded_frame_input.raw_pointers(start_index)
     count = lib.encode_buffer_multithread(*args)
     return count
+
+
+class SampleIndexer:
+
+    def __init__(self, paths: List[str]):
+        self.data: Dict[str, List[[int, int]]] = {}
+
+    def get(self, path: str) -> list[[int, int]]:
+
+        if path in self.data:
+            return self.data[path]
+        else:
+            output = []
+            battle_data = read_battle_data(path)
+            total_offset = 0
+
+            for b, frames in battle_data:
+                output.append(tuple(total_offset, frames))
+                total_offset += len(b)
+
+            self.data[path] = output
+            return self.data[path]
+
+
+def encode_buffers_2(
+    indexer: SampleIndexer,
+    encoded_frames: EncodedBattleFrames,
+    threads: int,
+    max_game_length: int = 10000,
+    minimum_iterations: int = 1,
+):
+
+    n: int = 0
+    paths: List[str] = []
+    offsets: List[int] = []
+    frames = List[int] = []
+
+    for key, value in SampleIndexer:
+        paths.append(key.encode("utf-8"))
+        o, f = value
+        offsets.append(o)
+        frames.append(f)
+
+    pass
 
 
 # Get all files in all subdirs or root_dir with the specificed extension.

@@ -92,7 +92,7 @@ extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
     return -1;
   }
 
-  int n_games = 0;
+  int n_battles = 0;
   size_t total_offset = 0;
   while (true) {
 
@@ -124,13 +124,13 @@ extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
     }
 
     std::memcpy(out_data + total_offset, buffer.data(), offset);
-    offsets[n_games] = offset;
-    frame_counts[n_games] = frame_count;
+    offsets[n_battles] = offset;
+    frame_counts[n_battles] = frame_count;
     total_offset += offset;
-    ++n_games;
+    ++n_battles;
   }
 
-  return n_games;
+  return n_battles;
 }
 
 extern "C" void uncompress_training_frames(
@@ -196,6 +196,153 @@ extern "C" void uncompress_and_encode_training_frames(
     Encode::Battle::Frame encoded{frame};
     input.write(encoded, frame.target);
   }
+}
+
+extern "C" size_t
+encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
+                size_t min_interations, // params
+                size_t n_paths, const char *const *paths, const int *n_battles,
+                const int *const *offsets,
+                const int *const *n_frames, // input
+                uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
+                int64_t *p2_choice_indices, float *pokemon, float *active,
+                float *hp, uint32_t *iterations, float *p1_empirical,
+                float *p1_nash, float *p2_empirical, float *p2_nash,
+                float *empirical_value, float *nash_value, float *score
+
+) {
+
+  const Encode::Battle::FrameInput input{.m = m,
+                                         .n = n,
+                                         .p1_choice_indices = p1_choice_indices,
+                                         .p2_choice_indices = p2_choice_indices,
+                                         .pokemon = pokemon,
+                                         .active = active,
+                                         .hp = hp,
+                                         .iterations = iterations,
+                                         .p1_empirical = p1_empirical,
+                                         .p1_nash = p1_nash,
+                                         .p2_empirical = p2_empirical,
+                                         .p2_nash = p2_nash,
+                                         .empirical_value = empirical_value,
+                                         .nash_value = nash_value,
+                                         .score = score};
+
+  const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
+  if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; })) {
+    std::cerr << "null pointer in input" << std::endl;
+    return 0;
+  }
+
+  size_t total_battles = 0;
+  for (auto i = 0; i < n_paths; ++i) {
+    total_battles += n_battles[i];
+  }
+
+  std::atomic<size_t> count{};
+
+  const auto start_reading = [&]() -> void {
+    std::mt19937 mt{std::random_device{}()};
+    std::uniform_real_distribution<float> dist_real{0, 1};
+    std::uniform_int_distribution<size_t> dist_int{0, total_battles - 1};
+    std::vector<char> buffer{};
+
+    // read path
+    while (true) {
+
+      auto battle_index = dist_int(mt);
+      auto path_index = 0;
+
+      while (battle_index >= 0) {
+        const auto n_battles_in_path = n_battles[path_index];
+
+        if (n_battles_in_path > battle_index) {
+          break;
+        } else {
+          battle_index -= n_battles_in_path;
+          ++path_index;
+        }
+      }
+      assert(path_index < n_paths);
+      const char *path = paths[path_index];
+      std::ifstream file(path, std::ios::binary);
+      if (!file) {
+        throw std::runtime_error{"Unable to open path: " + std::string{path}};
+        return;
+      }
+
+      const auto battle_offset = offsets[path_index][battle_index];
+
+      file.seekg(battle_offset, std::ios::beg);
+
+      using Offset = Train::Battle::CompressedFrames::Offset;
+      using FrameCount = Train::Battle::CompressedFrames::FrameCount;
+
+      Offset offset;
+      FrameCount n_frames;
+
+      file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
+      if (file.gcount() < sizeof(Offset)) {
+        throw std::runtime_error{"Bad offset read"};
+        return;
+      }
+      file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
+      if (file.gcount() < sizeof(FrameCount)) {
+        throw std::runtime_error{"Bad frame count read"};
+        return;
+      }
+
+      if (n_frames > max_battle_length) {
+        continue;
+      } else {
+
+        file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
+        if (offset > 200000) {
+          throw std::runtime_error{"Offset too long, likely a bad read: " +
+                                   std::to_string(offset)};
+          return;
+        }
+        buffer.resize(offset);
+        buffer.clear();
+
+        const auto selected_frame_index =
+            std::uniform_int_distribution<size_t>{0, n_frames - 1}(mt);
+
+        char *buf = buffer.data();
+        file.read(buf, offset);
+        // parse buffer to compressed
+        Train::Battle::CompressedFrames battle_frames{};
+        battle_frames.read(buf);
+
+        // uncompress
+        const auto frames = battle_frames.uncompress();
+        const auto &frame = frames[selected_frame_index];
+
+        const auto cur = count.fetch_add(1);
+        if (cur >= max_count) {
+          return;
+        } else {
+          auto input_correct = input.index(cur);
+          Encode::Battle::Frame encoded{frame};
+          input_correct.write(encoded, frame.target);
+        }
+      }
+    }
+  };
+
+  try {
+    std::vector<std::thread> thread_pool{};
+    for (auto i = 0; i < threads; ++i) {
+      thread_pool.emplace_back(std::thread{start_reading});
+    }
+    for (auto i = 0; i < threads; ++i) {
+      thread_pool[i].join();
+    }
+  } catch (...) {
+    return 0;
+  }
+
+  return std::min(count.load(), max_count);
 }
 
 extern "C" size_t encode_buffer_multithread(
