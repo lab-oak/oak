@@ -18,6 +18,8 @@ public:
   WeightMatrix weights;
   OutputVector biases;
 
+  Affine() = default;
+
   Affine(uint32_t in_dim, uint32_t out_dim)
       : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
         biases(out_dim) {}

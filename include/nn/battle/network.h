@@ -40,12 +40,14 @@ struct Network {
       : pokemon_out_dim{pod}, active_out_dim{aod},
         pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pod},
         active_net{Encode::Battle::Active::n_dim, ahd, aod},
-        side_embedding_dim{(1 + aod) + 5 * (1 + pod)},
-        main_net{2 * side_embedding_dim, hd, vhd, pohd}, discrete_main_net{},
+        side_embedding_dim{(1 + aod) + 5 * (1 + pod)}, discrete_main_net{},
         battle_cache{pod, aod}, discrete_battle_cache{pod, aod},
         use_discrete{false} {
+    // std::cout << pokemon_out_dim << ' ' << active_out_dim << ' '
+              // << side_embedding_dim << std::endl;
     battle_embedding.resize(2 * side_embedding_dim);
     battle_embedding_d.resize(2 * side_embedding_dim);
+    main_net = MainNet{2 * side_embedding_dim, hd, vhd, pohd};
   }
 
   void fill_pokemon_caches(const pkmn_gen1_battle &b) {

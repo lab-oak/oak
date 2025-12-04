@@ -27,6 +27,8 @@ struct MainNet {
   std::vector<float> p1_policy_buffer;
   std::vector<float> p2_policy_buffer;
 
+  MainNet() = default;
+
   MainNet(uint32_t in_dim, uint32_t hidden_dim, uint32_t value_hidden_dim,
           uint32_t policy_hidden_dim)
       : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
