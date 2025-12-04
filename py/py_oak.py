@@ -480,7 +480,7 @@ def find_data_files(root_dir, ext):
 
 def save_args(namespace, path):
     os.makedirs(path, exist_ok=True)
-    out_path = os.path.join(path, "args.txt")
+    out_path = os.path.join(path, "args")
 
     with open(out_path, "w") as f:
         for key, value in vars(namespace).items():
