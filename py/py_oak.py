@@ -424,8 +424,6 @@ def encode_buffers_2(
     minimum_iterations: int = 1,
 ):
 
-    print(threads)
-
     paths: List[str] = []
     n_battles: List[int] = []
     offsets: List[List[int]] = []
