@@ -39,6 +39,14 @@ public:
                      out_dim * in_dim * sizeof(float))) {
       return false;
     }
+
+    for (auto i = 0; i < out_dim; ++i) {
+      assert(!std::isnan(biases(i)));
+      for (auto j = 0; j < in_dim; ++j) {
+        assert(!std::isnan(weights(i, j)));
+      }
+    }
+
     return true;
   }
 
