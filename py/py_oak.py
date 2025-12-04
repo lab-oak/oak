@@ -75,6 +75,16 @@ frame_target_types = [
     ctypes.POINTER(ctypes.c_float),  # score
 ]
 
+encoded_frame_input_types = [
+    ctypes.POINTER(ctypes.c_uint8),  # m
+    ctypes.POINTER(ctypes.c_uint8),  # n
+    ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
+    ctypes.POINTER(ctypes.c_int64),  # p2_choice_indices
+    ctypes.POINTER(ctypes.c_float),  # pokemon
+    ctypes.POINTER(ctypes.c_float),  # active
+    ctypes.POINTER(ctypes.c_float),  # hp
+]
+
 lib.index_compressed_battle_frames.argtypes = [
     ctypes.c_char_p,
     ctypes.c_char_p,
@@ -115,8 +125,25 @@ lib.read_build_trajectories.argtypes = [
 ]
 lib.read_build_trajectories.restype = ctypes.c_int
 
+lib.encode_buffer_2.argtypes = (
+    [
+        ctypes.c_uint64,  # max_count
+        ctypes.c_uint64,  # threads
+        ctypes.c_uint64,  # max_battle_length
+        ctypes.c_uint64,  # min_iterations
+        ctypes.c_uint64,  # n_paths
+        ctypes.POINTER(ctypes.c_char_p),  # paths
+        ctypes.POINTER(ctypes.c_int32),  # n_battles
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_int32)),  # offsets
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_int32)),  # n_frames
+    ]
+    + encoded_frame_input_types
+    + frame_target_types
+)
+lib.encode_buffer_2.restype = ctypes.c_uint64
+
 lib.encode_buffer_multithread.argtypes = [
-    ctypes.POINTER(ctypes.c_char_p),
+    ctypes.c_uint64,
     ctypes.c_uint64,
     ctypes.c_uint64,
     ctypes.c_uint64,
@@ -363,10 +390,14 @@ def encode_buffers(
     return count
 
 
+Offset = int
+Frames = int
+
+
 class SampleIndexer:
 
-    def __init__(self, paths: List[str]):
-        self.data: Dict[str, List[[int, int]]] = {}
+    def __init__(self):
+        self.data: Dict[str, List[[Offset, Frames]]] = {}
 
     def get(self, path: str) -> list[[int, int]]:
 
@@ -378,7 +409,7 @@ class SampleIndexer:
             total_offset = 0
 
             for b, frames in battle_data:
-                output.append(tuple(total_offset, frames))
+                output.append((total_offset, frames))
                 total_offset += len(b)
 
             self.data[path] = output
@@ -393,18 +424,47 @@ def encode_buffers_2(
     minimum_iterations: int = 1,
 ):
 
-    n: int = 0
+    print(threads)
+
     paths: List[str] = []
-    offsets: List[int] = []
-    frames = List[int] = []
+    n_battles: List[int] = []
+    offsets: List[List[int]] = []
+    frames: List[List[int]] = []
 
-    for key, value in SampleIndexer:
-        paths.append(key.encode("utf-8"))
-        o, f = value
-        offsets.append(o)
-        frames.append(f)
+    for p, offset_frames_list in indexer.data.items():
+        paths.append(p.encode("utf-8"))
+        n_battles.append(len(offset_frames_list))
+        offsets.append([])
+        frames.append([])
+        for o, f in offset_frames_list:
+            offsets[-1].append(o)
+            frames[-1].append(f)
 
-    pass
+    def lists_to_int_pp(lists: list[list[int]]):
+        inner_arrays = [(ctypes.c_int32 * len(inner))(*inner) for inner in lists]
+        outer_array = (ctypes.POINTER(ctypes.c_int32) * len(inner_arrays))(
+            *[ctypes.cast(arr, ctypes.POINTER(ctypes.c_int32)) for arr in inner_arrays]
+        )
+
+        return inner_arrays, outer_array
+
+    offset_inner, offsets_pp = lists_to_int_pp(offsets)
+    frame_inner, frames_pp = lists_to_int_pp(frames)
+
+    args = (
+        ctypes.c_uint64(encoded_frames.size),
+        ctypes.c_uint64(threads),
+        ctypes.c_uint64(max_game_length),
+        ctypes.c_uint64(minimum_iterations),
+        ctypes.c_uint64(len(indexer.data)),
+        (ctypes.c_char_p * len(paths))(*paths),
+        (ctypes.c_int32 * len(n_battles))(*n_battles),
+        offsets_pp,
+        frames_pp,
+    ) + encoded_frames.raw_pointers(0)
+
+    count = lib.encode_buffer_2(*args)
+    return count
 
 
 # Get all files in all subdirs or root_dir with the specificed extension.

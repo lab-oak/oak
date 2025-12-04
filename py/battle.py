@@ -43,6 +43,12 @@ parser.add_argument(
     help="Ignore games past this length (in updates not turns.)",
 )
 parser.add_argument(
+    "--min-iterations",
+    type=int,
+    default=1,
+    help="Ignore frames with fewer than these iterations.",
+)
+parser.add_argument(
     "--clamp-parameters",
     type=bool,
     default=True,
@@ -305,6 +311,12 @@ def main():
             network.read_parameters(f)
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
+
+    sample_indexer = py_oak.SampleIndexer()
+
+    for file in data_files:
+        sample_indexer.get(file)
+
     print("Saving base network in working dir.")
     with open(os.path.join(working_dir, "random.battle.net"), "wb") as f:
         network.write_parameters(f)
@@ -331,15 +343,7 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        py_oak.encode_buffers(
-            data_files,
-            args.threads,
-            args.batch_size,
-            encoded_frames,
-            start_index=0,
-            write_prob=args.write_prob,
-            max_game_length=args.max_game_length,
-        )
+        py_oak.encode_buffers_2(sample_indexer, encoded_frames, args.threads, args.max_battle_length, args.min_iterations)
 
         # apply symmetries for more varied data
         encoded_frames_torch.permute_pokemon()

@@ -254,6 +254,7 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
       auto path_index = 0;
 
       while (battle_index >= 0) {
+
         const auto n_battles_in_path = n_battles[path_index];
 
         if (n_battles_in_path > battle_index) {
@@ -263,6 +264,7 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
           ++path_index;
         }
       }
+
       assert(path_index < n_paths);
       const char *path = paths[path_index];
       std::ifstream file(path, std::ios::binary);
@@ -294,38 +296,47 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
 
       if (n_frames > max_battle_length) {
         continue;
+      }
+
+      file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
+      if (offset > 200000) {
+        throw std::runtime_error{"Offset too long, likely a bad read: " +
+                                 std::to_string(offset)};
+        return;
+      }
+      buffer.resize(offset);
+      buffer.clear();
+
+      file.read(buffer.data(), offset);
+      Train::Battle::CompressedFrames compressed_frames{};
+      compressed_frames.read(buffer.data());
+
+      std::vector<int> valid_frame_indices{};
+      for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
+        const auto &update = compressed_frames.updates[i];
+        if (update.iterations >= min_interations) {
+          valid_frame_indices.push_back(i);
+        }
+      }
+
+      if (valid_frame_indices.size() == 0) {
+        continue;
+      }
+
+      const auto selected_frame_index =
+          valid_frame_indices[std::uniform_int_distribution<size_t>{
+              0, valid_frame_indices.size() - 1}(mt)];
+
+      const auto frames = compressed_frames.uncompress();
+      const auto &frame = frames[selected_frame_index];
+
+      const auto cur = count.fetch_add(1);
+      if (cur >= max_count) {
+        return;
       } else {
-
-        file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
-        if (offset > 200000) {
-          throw std::runtime_error{"Offset too long, likely a bad read: " +
-                                   std::to_string(offset)};
-          return;
-        }
-        buffer.resize(offset);
-        buffer.clear();
-
-        const auto selected_frame_index =
-            std::uniform_int_distribution<size_t>{0, n_frames - 1}(mt);
-
-        char *buf = buffer.data();
-        file.read(buf, offset);
-        // parse buffer to compressed
-        Train::Battle::CompressedFrames battle_frames{};
-        battle_frames.read(buf);
-
-        // uncompress
-        const auto frames = battle_frames.uncompress();
-        const auto &frame = frames[selected_frame_index];
-
-        const auto cur = count.fetch_add(1);
-        if (cur >= max_count) {
-          return;
-        } else {
-          auto input_correct = input.index(cur);
-          Encode::Battle::Frame encoded{frame};
-          input_correct.write(encoded, frame.target);
-        }
+        auto input_correct = input.index(cur);
+        Encode::Battle::Frame encoded{frame};
+        input_correct.write(encoded, frame.target);
       }
     }
   };
