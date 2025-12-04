@@ -476,3 +476,12 @@ def find_data_files(root_dir, ext):
                 files.append(full_path)
     files.sort(key=os.path.getctime, reverse=True)
     return files
+
+
+def save_args(namespace, path):
+    os.makedirs(path, exist_ok=True)
+    out_path = os.path.join(path, "args.txt")
+
+    with open(out_path, "w") as f:
+        for key, value in vars(namespace).items():
+            f.write(f"--{key}={value}\n")

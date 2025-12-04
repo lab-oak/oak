@@ -31,12 +31,6 @@ parser.add_argument(
 )
 parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
 parser.add_argument(
-    "--write-prob",
-    type=float,
-    default=1 / 100,
-    help="Write probability for encode_buffers. A lower value means less correlated samples.",
-)
-parser.add_argument(
     "--max-battle-length",
     type=int,
     default=10000,
@@ -102,6 +96,12 @@ parser.add_argument(
     type=int,
     default=0,
     help="The first step to begin applying lr decay",
+)
+parser.add_argument(
+    "--lr-decay-interval",
+    type=int,
+    default=1,
+    help="TODO. Interval at which to apply decay",
 )
 
 # Network hyperparameters
@@ -296,6 +296,7 @@ def main():
         now = datetime.datetime.now()
         working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
         os.makedirs(working_dir, exist_ok=False)
+    py_oak.save_args(args, working_dir)
 
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
@@ -343,7 +344,13 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        py_oak.encode_buffers_2(sample_indexer, encoded_frames, args.threads, args.max_battle_length, args.min_iterations)
+        py_oak.encode_buffers_2(
+            sample_indexer,
+            encoded_frames,
+            args.threads,
+            args.max_battle_length,
+            args.min_iterations,
+        )
 
         # apply symmetries for more varied data
         encoded_frames_torch.permute_pokemon()
