@@ -94,9 +94,9 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
 };
 
 namespace Impl {
-std::shared_ptr<Network> invalid(const std::string& msg) {
-  throw std::runtime_error{
-      "Invalid layer size for quantized net " + msg + " (check code for valid sizes)."};
+std::shared_ptr<Network> invalid(const std::string &msg) {
+  throw std::runtime_error{"Invalid layer size for quantized net " + msg +
+                           " (check code for valid sizes)."};
   return std::shared_ptr<Network>{nullptr};
 }
 template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {

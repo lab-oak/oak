@@ -17,10 +17,6 @@ struct Network {
   EmbeddingNet<true, false> policy_net;
   EmbeddingNet<true, false> value_net;
 
-  Network()
-      : policy_net{T::n_dim, NN::Build::Default::policy_hidden_dim, T::n_dim},
-        value_net{T::n_dim, NN::Build::Default::value_hidden_dim, 1} {}
-
   void initialize(auto &device) {
     policy_net.initialize(device);
     value_net.initialize(device);

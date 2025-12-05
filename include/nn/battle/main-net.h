@@ -27,23 +27,6 @@ struct MainNet {
   std::vector<float> p1_policy_buffer;
   std::vector<float> p2_policy_buffer;
 
-  MainNet() = default;
-
-  MainNet(uint32_t in_dim, uint32_t hidden_dim, uint32_t value_hidden_dim,
-          uint32_t policy_hidden_dim)
-      : fc0(in_dim, hidden_dim), value_fc1(hidden_dim, value_hidden_dim),
-        value_fc2(value_hidden_dim, 1),
-        p1_policy_fc1(hidden_dim, policy_hidden_dim),
-        p1_policy_fc2(policy_hidden_dim, Encode::Battle::Policy::n_dim),
-        p2_policy_fc1(hidden_dim, policy_hidden_dim),
-        p2_policy_fc2(policy_hidden_dim, Encode::Battle::Policy::n_dim),
-        buffer{}, value_buffer{}, p1_policy_buffer{}, p2_policy_buffer{} {
-    buffer.resize(hidden_dim);
-    value_buffer.resize(value_hidden_dim);
-    p1_policy_buffer.resize(policy_hidden_dim);
-    p2_policy_buffer.resize(policy_hidden_dim);
-  }
-
   bool read_parameters(std::istream &stream) {
     const bool ok = fc0.read_parameters(stream) &&
                     value_fc1.read_parameters(stream) &&

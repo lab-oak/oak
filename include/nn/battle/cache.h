@@ -64,6 +64,21 @@ template <typename T, int dim = 0> struct PokemonCache {
     embedding = other.embedding;
   }
 
+  PokemonCache &operator=(const PokemonCache &other) {
+    if constexpr (is_dynamic) {
+      embedding_size = other.embedding_size;
+      for (auto i = 0; i < n_embeddings; ++i) {
+        embeddings[i] = new T[embedding_size];
+        const auto *source = other.embeddings[i];
+        std::copy(source, source + embedding_size, embeddings[i]);
+      }
+    } else {
+      embeddings = other.embeddings;
+    }
+    embedding = other.embedding;
+    return *this;
+  }
+
   ~PokemonCache() {
     if constexpr (is_dynamic) {
       for (auto &embedding : embeddings) {
@@ -154,14 +169,6 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     }
   }
 
-  ~ActivePokemonCache() {
-    if constexpr (is_dynamic) {
-      for (auto p : embeddings) {
-        delete[] p.second;
-      }
-    }
-  }
-
   ActivePokemonCache(const ActivePokemonCache &other) {
     if constexpr (is_dynamic) {
       embedding_size = other.embedding_size;
@@ -175,6 +182,31 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     }
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
+    }
+  }
+
+  ActivePokemonCache &operator=(const ActivePokemonCache &other) {
+    if constexpr (is_dynamic) {
+      embedding_size = other.embedding_size;
+      for (const auto &p : other.embeddings) {
+        embeddings[p.first] = new T[embedding_size];
+        const auto *source = p.second;
+        std::copy(source, source + embedding_size, embeddings[p.first]);
+      }
+    } else {
+      embeddings = other.embeddings;
+    }
+    if constexpr (is_integral) {
+      embedding.resize(embedding_size);
+    }
+    return *this;
+  }
+
+  ~ActivePokemonCache() {
+    if constexpr (is_dynamic) {
+      for (auto p : embeddings) {
+        delete[] p.second;
+      }
     }
   }
 

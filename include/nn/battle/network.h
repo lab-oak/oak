@@ -30,26 +30,6 @@ struct Network {
   std::vector<float> battle_embedding;
   std::vector<uint8_t> battle_embedding_d;
 
-  Network(uint32_t phd = Default::pokemon_hidden_dim,
-          uint32_t ahd = Default::active_hidden_dim,
-          uint32_t pod = Default::pokemon_out_dim,
-          uint32_t aod = Default::active_out_dim,
-          uint32_t hd = Default::hidden_dim,
-          uint32_t vhd = Default::value_hidden_dim,
-          uint32_t pohd = Default::policy_hidden_dim)
-      : pokemon_out_dim{pod}, active_out_dim{aod},
-        pokemon_net{Encode::Battle::Pokemon::n_dim, phd, pod},
-        active_net{Encode::Battle::Active::n_dim, ahd, aod},
-        side_embedding_dim{(1 + aod) + 5 * (1 + pod)}, discrete_main_net{},
-        battle_cache{pod, aod}, discrete_battle_cache{pod, aod},
-        use_discrete{false} {
-    // std::cout << pokemon_out_dim << ' ' << active_out_dim << ' '
-              // << side_embedding_dim << std::endl;
-    battle_embedding.resize(2 * side_embedding_dim);
-    battle_embedding_d.resize(2 * side_embedding_dim);
-    main_net = MainNet{2 * side_embedding_dim, hd, vhd, pohd};
-  }
-
   void fill_pokemon_caches(const pkmn_gen1_battle &b) {
     const auto &battle = PKMN::view(b);
     for (auto s = 0; s < 2; ++s) {
@@ -78,6 +58,14 @@ struct Network {
     if (stream.read(&dummy, 1)) {
       return false;
     } else {
+      pokemon_out_dim = pokemon_net.fc1.out_dim;
+      active_out_dim = active_net.fc1.out_dim;
+      side_embedding_dim = (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
+      battle_embedding.resize(2 * side_embedding_dim);
+      battle_embedding_d.resize(2 * side_embedding_dim);
+      battle_cache = BattleCaches<float>{pokemon_out_dim, active_out_dim};
+      discrete_battle_cache =
+          BattleCaches<uint8_t>{pokemon_out_dim, active_out_dim};
       return true;
     }
   }
@@ -171,6 +159,7 @@ struct Network {
       write_battle_embedding<float>(battle_embedding.data(), b, d);
       value = sigmoid(main_net.propagate(battle_embedding.data()));
     }
+    assert(!std::isnan(value));
     return value;
   }
 
