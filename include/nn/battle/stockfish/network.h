@@ -94,9 +94,9 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
 };
 
 namespace Impl {
-std::shared_ptr<Network> invalid() {
+std::shared_ptr<Network> invalid(const std::string& msg) {
   throw std::runtime_error{
-      "Invalid layer size for quantized net (check code for valid sizes)."};
+      "Invalid layer size for quantized net " + msg + " (check code for valid sizes)."};
   return std::shared_ptr<Network>{nullptr};
 }
 template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {
@@ -111,7 +111,7 @@ template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {
   case 64:
     return std::make_shared<NetworkArchitecture<In, H1, 64>>();
   default:
-    return invalid();
+    return Impl::invalid("H2: " + std::to_string(h2));
   }
 }
 template <int In> std::shared_ptr<Network> make_network_1(int h1, int h2) {
@@ -120,8 +120,10 @@ template <int In> std::shared_ptr<Network> make_network_1(int h1, int h2) {
     return make_network_2<In, 32>(h2);
   case 64:
     return make_network_2<In, 64>(h2);
+  case 128:
+    return make_network_2<In, 128>(h2);
   default:
-    return invalid();
+    return Impl::invalid("H1: " + std::to_string(h1));
   }
 }
 } // namespace Impl
@@ -130,11 +132,11 @@ std::shared_ptr<Network> make_network(int in, int h1, int h2) {
   switch (in) {
   case 512:
     return Impl::make_network_1<512>(h1, h2);
-  case 786:
-    return Impl::make_network_1<768>(h2, h2);
+  case 768:
+    return Impl::make_network_1<768>(h1, h2);
   case 1024:
   default:
-    return Impl::invalid();
+    return Impl::invalid("Side dim: " + std::to_string(in));
   }
 }
 
