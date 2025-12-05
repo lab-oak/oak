@@ -7,22 +7,14 @@
 
 template <bool clamp = true> class Affine {
 public:
-  uint32_t in_dim;
-  uint32_t out_dim;
-
-  using InputVector = Eigen::VectorXf;
-  using OutputVector = Eigen::VectorXf;
-  using WeightMatrix =
+  using Vector = Eigen::VectorXf;
+  using Matrix =
       Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-  WeightMatrix weights;
-  OutputVector biases;
-
-  Affine() = default;
-
-  Affine(uint32_t in_dim, uint32_t out_dim)
-      : in_dim{in_dim}, out_dim{out_dim}, weights(out_dim, in_dim),
-        biases(out_dim) {}
+  uint32_t in_dim;
+  uint32_t out_dim;
+  Matrix weights;
+  Vector biases;
 
   bool read_parameters(std::istream &stream) {
     if (!stream.read(reinterpret_cast<char *>(&in_dim), sizeof(uint32_t))) {
@@ -63,8 +55,8 @@ public:
   }
 
   void propagate(const float *input_data, float *output_data) const {
-    const auto input = Eigen::Map<const InputVector>(input_data, in_dim);
-    Eigen::Map<OutputVector> output(output_data, out_dim);
+    const auto input = Eigen::Map<const Vector>(input_data, in_dim);
+    Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
     if constexpr (clamp) {
       for (std::size_t i = 0; i < out_dim; ++i) {
@@ -75,7 +67,7 @@ public:
 
   void propagate(const uint32_t *index_data, const float *input_data,
                  float *output_data, size_t n) const {
-    Eigen::Map<OutputVector> output(output_data, out_dim);
+    Eigen::Map<Vector> output(output_data, out_dim);
     output = biases;
 
     for (std::size_t k = 0; k < n; ++k) {
