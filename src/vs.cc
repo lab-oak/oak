@@ -104,6 +104,10 @@ bool parse_options(int argc, char **argv) {
       p1_policy_options.temp = stod(arg.substr(17));
     } else if (arg.starts_with("--p2-policy-temp=")) {
       p2_policy_options.temp = stod(arg.substr(17));
+    } else if (arg.starts_with("--p1-enable-discrete")) {
+      p1_agent.discrete_network = true;
+    } else if (arg.starts_with("--p2-enable-discrete")) {
+      p2_agent.discrete_network = true;
 
     } else if (arg.starts_with("--max-pokemon=")) {
       provider.omitter.max_pokemon = std::stoul(arg.substr(14));

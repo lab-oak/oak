@@ -198,6 +198,8 @@ bool parse_options(int argc, char **argv) {
       agent.bandit_name = arg.substr(14);
     } else if (arg.starts_with("--battle-network-path=")) {
       agent.network_path = arg.substr(22);
+    } else if (arg.starts_with("--enable-discrete")) {
+      agent.discrete_network = true;
     } else if (arg.starts_with("--policy-mode=")) {
       policy_options.mode = arg[14];
     } else if (arg.starts_with("--policy-temp=")) {
