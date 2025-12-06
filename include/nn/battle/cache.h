@@ -261,6 +261,8 @@ template <typename T> struct BattleCaches {
   BattleSet<PokemonCache<T>> pokemon;
   BattleSet<ActivePokemonCache<T>> active;
 
+  BattleCaches() = default;
+
   BattleCaches(uint32_t pod, uint32_t aod)
       : pokemon{SideSet<PokemonCache<T>>{
                     PokemonCache<T>(pod), PokemonCache<T>(pod),
