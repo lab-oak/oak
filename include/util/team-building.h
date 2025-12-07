@@ -21,51 +21,6 @@ const auto team_string(const auto &team) {
   return ss.str();
 };
 
-auto load_teams(std::string path) {
-  std::vector<std::vector<PKMN::Set>> teams{};
-
-  if (!path.empty()) {
-
-    // read teams file
-    const auto side_to_team = [](const PKMN::Side &side) {
-      std::vector<PKMN::Set> team{};
-      for (const auto &pokemon : side.pokemon) {
-        if (pokemon.species != PKMN::Data::Species::None) {
-          PKMN::Set set{};
-          set.species = pokemon.species;
-          std::transform(pokemon.moves.begin(), pokemon.moves.end(),
-                         set.moves.begin(),
-                         [](const auto ms) { return ms.id; });
-          team.emplace_back(set);
-        }
-      }
-      return team;
-    };
-
-    std::ifstream file{path};
-    while (true) {
-      std::string line{};
-      std::getline(file, line);
-      if (line.empty()) {
-        break;
-      }
-      const auto [side, _] = Parse::parse_side(line);
-      teams.push_back(side_to_team(side));
-    }
-    if (teams.size() == 0) {
-      throw std::runtime_error{"Could not parse teams"};
-    }
-  } else {
-    // use sample teams
-    std::transform(Teams::ou_sample_teams.begin(), Teams::ou_sample_teams.end(),
-                   std::back_inserter(teams), [](const auto &team) {
-                     std::vector<PKMN::Set> t{team.begin(), team.end()};
-                     return t;
-                   });
-  }
-  return teams;
-}
-
 auto softmax(auto &x) {
   auto y = x;
   std::transform(y.begin(), y.end(), y.begin(),
@@ -175,12 +130,57 @@ struct Provider {
   std::string network_path;
   double team_modify_prob;
 
+  Provider() = default;
+
   Provider(const std::string &teams_path)
       : rb{false}, teams{}, omitter{}, network_path{} {
     if ((teams_path == "random-battles") || (teams_path == "randbats")) {
       rb = true;
     } else {
-      teams = load_teams(teams_path);
+      load_teams(teams_path);
+    }
+  }
+
+  void load_teams(const std::string &path) {
+    if (!path.empty()) {
+
+      // read teams file
+      const auto side_to_team = [](const PKMN::Side &side) {
+        std::vector<PKMN::Set> team{};
+        for (const auto &pokemon : side.pokemon) {
+          if (pokemon.species != PKMN::Data::Species::None) {
+            PKMN::Set set{};
+            set.species = pokemon.species;
+            std::transform(pokemon.moves.begin(), pokemon.moves.end(),
+                           set.moves.begin(),
+                           [](const auto ms) { return ms.id; });
+            team.emplace_back(set);
+          }
+        }
+        return team;
+      };
+
+      std::ifstream file{path};
+      while (true) {
+        std::string line{};
+        std::getline(file, line);
+        if (line.empty()) {
+          break;
+        }
+        const auto [side, _] = Parse::parse_side(line);
+        teams.push_back(side_to_team(side));
+      }
+      if (teams.size() == 0) {
+        throw std::runtime_error{"Team Provider: Did not read any teams from path: " + path};
+      }
+    } else {
+      // use sample teams
+      std::transform(Teams::ou_sample_teams.begin(),
+                     Teams::ou_sample_teams.end(), std::back_inserter(teams),
+                     [](const auto &team) {
+                       std::vector<PKMN::Set> t{team.begin(), team.end()};
+                       return t;
+                     });
     }
   }
 
@@ -237,7 +237,7 @@ struct Provider {
     }
   }
 
-  void try_read_parameters() const {
+  void read_network_parameters() const {
     const bool can_build =
         (team_modify_prob > 0) &&
         ((omitter.pokemon_delete_prob > 0) || (omitter.move_delete_prob > 0));

@@ -80,7 +80,7 @@ template <typename F = Format::OU> struct Actions {
     using Train::Build::BasicAction;
 
     std::vector<Train::Build::Action> actions{};
-    for (auto i = 1; i < team.size(); ++i) {
+    for (unsigned int i = 1; i < team.size(); ++i) {
       const auto &set = team[i];
       if (set.species != Species::None) {
         actions.emplace_back(

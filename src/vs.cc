@@ -483,7 +483,7 @@ void setup(auto &device) {
 
   // teams
   RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
-  RuntimeOptions::provider.try_read_parameters();
+  RuntimeOptions::provider.read_network_parameters();
 }
 
 int main(int argc, char **argv) {

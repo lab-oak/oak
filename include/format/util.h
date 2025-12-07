@@ -1,8 +1,10 @@
 #pragma once
 
 #include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 
 #include <array>
+#include <algorithm>
 
 /*
 
