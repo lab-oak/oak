@@ -20,45 +20,36 @@
 struct ProgramArgs : public VsAgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
   size_t &threads =
-      kwarg("threads", "Number of parallel self-play games to run")
+      kwarg("threads",
+            "Number of parallel eval game pairs (players swap teams) to run")
           .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
   size_t &max_games =
       kwarg("max-games", "Number of games to play before program termination")
-          .set_default(1 << 30);
-  bool &save =
-      flag("save", "Whether to create directory and save battle frames");
-  size_t &buffer_size =
-      kwarg("buffer-size", "Size of battle buffer (Mb) before write")
-          .set_default(8);
-
-  std::optional<std::string> &working_dir = 
-  kwarg
-  size_t &max_build_traj =
-      kwarg("max-build-traj",
-            "Size of build buffer (No. of traj's) before write")
-          .set_default(1 << 10);
+          .set_default(1 << 14);
+  bool &save = flag("save", "Sets --dir to a timestamp");
+  std::string &teams_path =
+      kwarg("teams", "Path to teams file").set_default("");
+  std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
+  double &early_stop =
+      kwarg("early-stop", "Forfeit when inverse sigmoid of score exceeds "
+                          "this value for both players")
+          .set_default(10.0);
   double &print_prob =
       kwarg("print-prob", "Probabilty to print any given battle state")
           .set_default(0);
-  double &early_stop_log =
-      kwarg("early-stop-log", "Forfeit when inverse sigmoid of score exceeds "
-                              "this value for both players")
-          .set_default(10.0);
-  // bool &debug_print =
-  //     kwarg("debug-print", "Enable verbose prints (debug build only)")
-  //         .set_default(true);
-  // bool &keep_node = kwarg("keep-node", "Use the applicable child node for the
-  // "
-  //                                      "next search instead of a new node.")
-  //                       .set_default(true);
-
   int &max_battle_length =
       kwarg("max-battle-length",
             "Battles exceeding this many updates are dropped")
           .set_default(-1);
+  int &print_interval = kwarg("print-interval", "Seconds").set_default(15);
 
-  std::string &teams_path =
-      kwarg("teams", "Path to teams file").set_default("");
+  size_t &buffer_size =
+      kwarg("buffer-size", "Size of battle buffer (Mb) before write")
+          .set_default(8);
+  size_t &max_build_traj =
+      kwarg("max-build-traj",
+            "Size of build buffer (No. of traj's) before write")
+          .set_default(1 << 10);
 };
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
@@ -77,9 +68,6 @@ bool suspended = false;
 std::atomic<size_t> score{};
 std::atomic<size_t> n{};
 
-std::filesystem::path working_dir = std::format(
-    "vs-{:%F-%T}",
-    std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
 // filenames
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
@@ -107,7 +95,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
   std::vector<Train::Build::Trajectory> build_buffer{};
 
   const auto save_build_buffer_to_disk = [&build_buffer, &args]() {
-    if (args.save == false) {
+    if (args.working_dir.has_value() == false) {
       return;
     }
     if (build_buffer.size() == 0) {
@@ -116,7 +104,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
     const auto filename =
         std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
         ".build.data";
-    const auto full_path = RuntimeData::working_dir / filename;
+    const auto full_path =
+        std::filesystem::path{args.working_dir.value()} / filename;
 
     const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
@@ -140,30 +129,13 @@ void thread_fn(const ProgramArgs *args_ptr) {
     build_buffer.clear();
   };
 
-  const auto play = [&](auto p1_build_traj, auto p2_build_traj) -> int {
-    int score_2;
-
-    const auto &p1_team = p1_build_traj.terminal;
-    const auto &p2_team = p2_build_traj.terminal;
-
-    auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
-    auto options = PKMN::options();
-    const auto result = PKMN::update(battle, 0, 0, options);
-    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
-
+  const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
     auto p1_agent = RuntimeSearch::Agent{.search_time = args.p1_search_time,
                                          .bandit_name = args.p1_bandit_name,
                                          .network_path = args.p1_network_path};
     auto p2_agent = RuntimeSearch::Agent{.search_time = args.p2_search_time,
                                          .bandit_name = args.p2_bandit_name,
                                          .network_path = args.p2_network_path};
-    if (p1_agent.uses_network()) {
-      p1_agent.initialize_network(battle);
-    }
-    if (p2_agent.uses_network()) {
-      p2_agent.initialize_network(battle);
-    }
-
     const auto p1_policy_options =
         RuntimePolicy::Options{.mode = args.p1_policy_mode,
                                .temp = args.p1_policy_temp,
@@ -173,11 +145,25 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                .temp = args.p2_policy_temp,
                                .min_prob = args.p2_policy_min};
 
+    const auto &p1_team = p1_build_traj.terminal;
+    const auto &p2_team = p2_build_traj.terminal;
+
+    auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
+    auto options = PKMN::options();
+    const auto result = PKMN::update(battle, 0, 0, options);
+    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
+
+    if (p1_agent.uses_network()) {
+      p1_agent.initialize_network(battle);
+    }
+    if (p2_agent.uses_network()) {
+      p2_agent.initialize_network(battle);
+    }
+
     Train::Battle::CompressedFrames p1_battle_frames{battle};
     Train::Battle::CompressedFrames p2_battle_frames{battle};
 
-    int p1_early_stop = 0;
-    int p2_early_stop = 0;
+    int p1_early_stop{}, p2_early_stop{};
     bool early_stop = false;
     size_t updates = 0;
     try {
@@ -196,27 +182,23 @@ void thread_fn(const ProgramArgs *args_ptr) {
         const auto [p1_choices, p2_choices] =
             PKMN::choices(battle_data.battle, battle_data.result);
 
-        MCTS::Output p1_output, p2_output;
-        int p1_index = 0;
-        int p2_index = 0;
+        MCTS::Output p1_output{}, p2_output{};
+        int p1_index{}, p2_index{};
         p1_early_stop = 0;
         p2_early_stop = 0;
-        // TODO - make up your mind how this is going to be handled
-        // if (p1_choices.size() > 1) {
-        {
+        if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
           p1_early_stop =
-              inverse_sigmoid(p1_output.empirical_value) / args.early_stop_log;
+              inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
                                         p1_output.p1_nash, p1_policy_options);
         }
-        // if (p2_choices.size() > 1) {
-        {
+        if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
           p2_early_stop =
-              inverse_sigmoid(p2_output.empirical_value) / args.early_stop_log;
+              inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash, p2_policy_options);
         }
@@ -252,14 +234,10 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
       if (early_stop) {
         if (p1_early_stop > 0) {
-          score_2 = 2;
           battle_data.result = PKMN::result(PKMN::Result::Win);
         } else {
-          score_2 = 0;
           battle_data.result = PKMN::result(PKMN::Result::Lose);
         }
-      } else {
-        score_2 = PKMN::score2(battle_data.result);
       }
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
@@ -271,22 +249,28 @@ void thread_fn(const ProgramArgs *args_ptr) {
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
-    if (score_2 == 0) {
-      RuntimeData::loss.fetch_add(1);
-    } else if (score_2 == 1) {
-      RuntimeData::draw.fetch_add(1);
-    } else if (score_2 == 2) {
+    switch (battle_data.result) {
+    case PKMN_RESULT_WIN: {
       RuntimeData::win.fetch_add(1);
-    } else {
-      assert(false);
+      return 2;
     }
-
-    return score_2;
+    case PKMN_RESULT_LOSE: {
+      RuntimeData::loss.fetch_add(1);
+      return 0;
+    }
+    case PKMN_RESULT_TIE: {
+      RuntimeData::draw.fetch_add(1);
+      return 1;
+    }
+    default: {
+      assert(false);
+      return 0;
+    }
+    }
   };
 
   while ((args.max_games < 0) ||
          (RuntimeData::match_counter.fetch_add(1) < args.max_games)) {
-    // std::cout << RuntimeData::match_counter.load() << std::endl;
 
     auto [p1_build_traj, p1_team_index] =
         RuntimeData::provider.get_trajectory(device);
@@ -300,21 +284,26 @@ void thread_fn(const ProgramArgs *args_ptr) {
       RuntimeData::score.fetch_add(s1 + s2);
       RuntimeData::n.fetch_add(2);
     }
-
-    if (p1_battle_frame_buffer.write_index >= training_frames_target_size) {
-      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1",
-                                          RuntimeData::battle_buffer_counter);
-    }
-    if (p2_battle_frame_buffer.write_index >= training_frames_target_size) {
-      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2",
-                                          RuntimeData::battle_buffer_counter);
+    if (args.working_dir.has_value()) {
+      std::filesystem::path working_dir{args.working_dir.value()};
+      if (p1_battle_frame_buffer.write_index >= training_frames_target_size) {
+        p1_battle_frame_buffer.save_to_disk(working_dir / "p1",
+                                            RuntimeData::battle_buffer_counter);
+      }
+      if (p2_battle_frame_buffer.write_index >= training_frames_target_size) {
+        p2_battle_frame_buffer.save_to_disk(working_dir / "p2",
+                                            RuntimeData::battle_buffer_counter);
+      }
     }
 
     if (RuntimeData::terminated) {
-      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1",
-                                          RuntimeData::battle_buffer_counter);
-      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2",
-                                          RuntimeData::battle_buffer_counter);
+      if (args.working_dir.has_value()) {
+        std::filesystem::path working_dir{args.working_dir.value()};
+        p1_battle_frame_buffer.save_to_disk(working_dir / "p1",
+                                            RuntimeData::battle_buffer_counter);
+        p2_battle_frame_buffer.save_to_disk(working_dir / "p2",
+                                            RuntimeData::battle_buffer_counter);
+      }
       save_build_buffer_to_disk();
       return;
     }
@@ -358,29 +347,34 @@ void handle_terminate(int signal) {
   std::cout << "Terminated." << std::endl;
 }
 
-void setup(auto &device) {
-
+void setup(auto &args) {
+  if (!args.seed.has_value()) {
+    args.seed.emplace(std::random_device{}());
+  }
+  // args
+  if (args.save && !args.working_dir.has_value()) {
+    args.working_dir.emplace(
+        std::format("vs-{:%F-%T}", std::chrono::floor<std::chrono::seconds>(
+                                       std::chrono::system_clock::now())));
+  }
   // create working dir
-  if (args.save) {
+  if (args.working_dir.has_value()) {
+    const std::filesystem::path working_dir = args.working_dir.value();
     std::error_code ec;
-    bool created =
-        std::filesystem::create_directory(RuntimeData::working_dir, ec) &&
-        std::filesystem::create_directory(RuntimeData::working_dir / "p1",
-                                          ec) &&
-        std::filesystem::create_directory(RuntimeData::working_dir / "p2", ec);
+    bool created = std::filesystem::create_directory(working_dir, ec) &&
+                   std::filesystem::create_directory(working_dir / "p1", ec) &&
+                   std::filesystem::create_directory(working_dir / "p2", ec);
     if (ec) {
       std::cerr << "Error creating directory: " << ec.message() << '\n';
       throw std::runtime_error("Could not create working dir.");
     } else if (created) {
-      std::cout << "Created directory " << RuntimeData::working_dir.string()
-                << std::endl;
+      std::cout << "Created directory " << working_dir.string() << std::endl;
     } else {
       throw std::runtime_error("Could not create working dir.");
     }
 
     // save args
-    const auto args_path = working_dir / "args";
-    std::ofstream args_file(args_path);
+    std::ofstream args_file(std::filesystem::path{working_dir} / "args");
     if (!args_file) {
       throw std::runtime_error("Failed to open args file for writing.");
     }
@@ -389,6 +383,10 @@ void setup(auto &device) {
 
   // teams
   RuntimeData::provider = TeamBuilding::Provider{args.teams_path};
+  RuntimeData::provider.omitter = {args.max_pokemon, args.pokemon_delete_prob,
+                                   args.move_delete_prob};
+  RuntimeData::provider.network_path = args.build_network_path;
+  RuntimeData::provider.team_modify_prob = args.team_modify_prob;
   RuntimeData::provider.read_network_parameters();
 }
 
@@ -399,9 +397,7 @@ int main(int argc, char **argv) {
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
-  mt19937 device{args.seed.value()};
-
-  setup(device);
+  setup(args);
 
   std::vector<std::thread> thread_pool{};
   for (auto t = 0; t < args.threads; ++t) {

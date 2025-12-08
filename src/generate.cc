@@ -477,6 +477,10 @@ void setup(const auto &args) {
 
   // teams
   RuntimeData::provider = TeamBuilding::Provider{args.teams_path};
+  RuntimeData::provider.omitter = {args.max_pokemon, args.pokemon_delete_prob,
+                                   args.move_delete_prob};
+  RuntimeData::provider.network_path = args.build_network_path;
+  RuntimeData::provider.team_modify_prob = args.team_modify_prob;
   RuntimeData::provider.read_network_parameters();
   RuntimeData::matchup_matrix.resize(RuntimeData::provider.teams.size());
 
