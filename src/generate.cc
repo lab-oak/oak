@@ -1,12 +1,10 @@
 #include <nn/build/network.h>
 #include <train/battle/compressed-frame.h>
-#include <util/parse.h>
+#include <util/argparse.h>
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
 #include <util/team-building.h>
-
-#include "../extern/argparse/include/argparse/argparse.hpp"
 
 #include <atomic>
 #include <csignal>
@@ -21,12 +19,11 @@ constexpr bool debug = false;
 constexpr bool debug = true;
 #endif
 
-struct ProgramArgs : public argparse::Args {
-  uint64_t &seed = kwarg("seed", "Global program seed");
+struct ProgramArgs : public SelfPlayAgentArgs {
+  std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
   size_t &threads =
-      kwarg("seed", "Number of parallel self-play games to run")
-          .set_default(
-              std::max(unsigned{1}, std::thread::hardware_concurrency() - 1));
+      kwarg("threads", "Number of parallel self-play games to run")
+          .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
   size_t &max_samples =
       kwarg("max-samples",
             "Number of samples to generate before program termination")
@@ -47,21 +44,10 @@ struct ProgramArgs : public argparse::Args {
   bool &keep_node = kwarg("keep-node", "Use the applicable child node for the "
                                        "next search instead of a new node.")
                         .set_default(true);
-  std::string &search_time =
-      kwarg("search-time", "Search time").set_default("4096");
-  std::string &bandit_name =
-      kwarg("bandit-name", "Bandit algorithm").set_default("ucb-0.173");
-  std::string &network_path =
-      kwarg("network-path", "Network path").set_default("mc");
-  char &policy_mode = kwarg("policy-mode", "Policy mode").set_default('e');
-  double &policy_temp =
-      kwarg("policy-temp", "P-norm when using (e)mpirical mode")
-          .set_default(2.5);
-  double &policy_min =
-      kwarg("policy-min", "Probs below this will be zerod").set_default(.001);
 
   double &fast_search_prob =
-      kwarg("fast-search-prob", "Probability that a quick search is performed")
+      kwarg("fast-search-prob",
+            "Probability a search with only fast-search-time is used")
           .set_default(0);
   int &max_battle_length =
       kwarg("max-battle-length",
@@ -182,12 +168,12 @@ bool endless_battle_check(const auto &p1, const auto &p2) {
 
 void generate(const ProgramArgs *args_ptr) {
   const auto &args = *args_ptr;
-  mt19937 device{args.seed};
+  mt19937 device{args.seed.value()};
   const auto id = RuntimeData::thread_id.fetch_add(1) % args.threads;
   auto &battle_length = RuntimeData::battle_lengths[id];
 
-  const size_t training_frames_target_size = args.buffer_size_mb << 20;
-  const size_t thread_frame_buffer_size = (args.buffer_size_mb + 1) << 20;
+  const size_t training_frames_target_size = args.buffer_size << 20;
+  const size_t thread_frame_buffer_size = (args.buffer_size + 1) << 20;
   auto buffer = new char[thread_frame_buffer_size]{};
   size_t frame_buffer_write_index = 0;
   // These are generated slowly so a vector is fine
@@ -280,10 +266,10 @@ void generate(const ProgramArgs *args_ptr) {
 
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
-    auto agent = RuntimeSearch::Agent{
-        .search_time = args.search_time,
-        .network_path = args.network_path,
-        .bandit_name = args.bandit_name,
+    auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
+                                      .bandit_name = args.bandit_name,
+                                      .network_path = args.network_path
+
     };
     // if the std::optional<NN::Network> is not set then the params/cache will
     // be loaded/filled before every turn.
@@ -297,7 +283,7 @@ void generate(const ProgramArgs *args_ptr) {
     const auto policy_options =
         RuntimePolicy::Options{.mode = args.policy_mode,
                                .temp = args.policy_temp,
-                               .min_prob = args.policy_min_prob};
+                               .min_prob = args.policy_min};
 
     battle_length = 0;
     try {
@@ -326,8 +312,8 @@ void generate(const ProgramArgs *args_ptr) {
         const bool use_fast = device.uniform() < args.fast_search_prob;
         agent.search_time =
             (battle_length == 0)
-                ? args.t1_search_time
-                : (use_fast ? args.fast_search_time : args.search_time);
+                ? args.t1_search_time.value()
+                : (use_fast ? args.fast_search_time.value() : args.search_time);
         const auto output = RuntimeSearch::run(battle_data, nodes, agent);
         if (battle_length == 0) {
           p1_matchup = output.empirical_value;
@@ -336,9 +322,9 @@ void generate(const ProgramArgs *args_ptr) {
             break;
           }
         }
-        const auto p1_index = process_and_sample(
+        const auto p1_index = RuntimePolicy::process_and_sample(
             device, output.p1_empirical, output.p1_nash, policy_options);
-        const auto p2_index = process_and_sample(
+        const auto p2_index = RuntimePolicy::process_and_sample(
             device, output.p2_empirical, output.p2_nash, policy_options);
         const auto p1_choice = output.p1_choices[p1_index];
         const auto p2_choice = output.p2_choices[p2_index];
@@ -347,8 +333,7 @@ void generate(const ProgramArgs *args_ptr) {
         // update battle, durations, result (state info)
         battle_data.result =
             PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
-        battle_data.durations =
-            PKMN::durations(options);
+        battle_data.durations = PKMN::durations(options);
 
         // set nodes
         const auto &obs = *reinterpret_cast<const MCTS::Obs *>(
@@ -379,7 +364,7 @@ void generate(const ProgramArgs *args_ptr) {
       frame_buffer_write_index += n_bytes_frames;
       // data
       if (RuntimeData::frame_counter.fetch_add(training_frames.updates.size()) >
-          args.max_frames) {
+          args.max_samples) {
         RuntimeData::terminated = true;
       }
       if (frame_buffer_write_index >= training_frames_target_size) {
@@ -391,7 +376,8 @@ void generate(const ProgramArgs *args_ptr) {
     }
 
     // build
-    const bool used_matrix_teams = !p1_built && !p2_built && !RuntimeData::provider.rb;
+    const bool used_matrix_teams =
+        !p1_built && !p2_built && !RuntimeData::provider.rb;
     if (used_matrix_teams) {
       assert(p1_team_index >= 0);
       assert(p2_team_index >= 0);
@@ -415,11 +401,11 @@ void generate(const ProgramArgs *args_ptr) {
 }
 
 void print_thread_fn(const ProgramArgs *args_ptr) {
-  const auto& args = *args_ptr;
+  const auto &args = *args_ptr;
   size_t frames_done = 0;
   size_t traj_done = 0;
   while (true) {
-    for (int i = 0; i < args.print_interval_sec; ++i) {
+    for (int i = 0; i < args.print_interval; ++i) {
       if (RuntimeData::terminated) {
         return;
       }
@@ -427,12 +413,10 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
     }
     const auto frames_more = RuntimeData::frame_counter.load();
     const auto traj_more = RuntimeData::traj_counter.load();
-    std::cout << (frames_more - frames_done) /
-                     (float)args.print_interval_sec
+    std::cout << (frames_more - frames_done) / (float)args.print_interval
               << " battle frames/sec." << std::endl;
     if (RuntimeData::provider.team_modify_prob > 0) {
-      std::cout << (traj_more - traj_done) /
-                       (float)args.print_interval_sec
+      std::cout << (traj_more - traj_done) / (float)args.print_interval
                 << " build traj./sec." << std::endl;
     }
     if (args.keep_node) {
@@ -441,8 +425,7 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
           (double)RuntimeData::update_counter.load();
       std::cout << "keep node ratio: " << keep_node_ratio << std::endl;
     }
-    const auto progress =
-        (double)frames_more / args.max_frames * 100;
+    const auto progress = (double)frames_more / args.max_samples * 100;
     std::cout << "progress: " << progress << "%" << std::endl;
 
     frames_done = frames_more;
@@ -457,6 +440,17 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
 }
 
 void setup(const auto &args) {
+  // optional args
+  if (!args.seed.has_value()) {
+    args.seed.emplace(std::random_device{}());
+  }
+  if (!args.t1_search_time.has_value()) {
+    args.t1_search_time.emplace(args.search_time);
+  }
+  if (!args.fast_search_time.has_value()) {
+    args.fast_search_time.emplace(args.search_time);
+  }
+
   // create working dir
   const std::filesystem::path working_dir = RuntimeData::start_datetime;
   std::error_code ec;
@@ -537,7 +531,7 @@ int main(int argc, char **argv) {
 
   setup(args);
 
-  mt19937 device{args.seed};
+  mt19937 device{args.seed.value()};
 
   std::vector<std::thread> thread_pool;
   for (int t = 0; t < args.threads; ++t) {

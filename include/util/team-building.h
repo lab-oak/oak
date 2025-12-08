@@ -4,6 +4,7 @@
 #include <format/random-battles/randbat.h>
 #include <nn/build/network.h>
 #include <train/build/trajectory.h>
+#include <util/parse.h>
 
 #include <unistd.h>
 
@@ -171,7 +172,8 @@ struct Provider {
         teams.push_back(side_to_team(side));
       }
       if (teams.size() == 0) {
-        throw std::runtime_error{"Team Provider: Did not read any teams from path: " + path};
+        throw std::runtime_error{
+            "Team Provider: Did not read any teams from path: " + path};
       }
     } else {
       // use sample teams

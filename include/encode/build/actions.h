@@ -59,13 +59,14 @@ template <typename F = Format::OU> struct Actions {
           for (const auto move : set.moves) {
             end = std::remove(start, end, move);
           }
-          std::transform(start, end, std::back_inserter(actions),
-                         [&team, &set, &empty](const auto move) {
-                           return Action{BasicAction{
-                               0, std::distance(&team[0], &set),
-                               std::distance(set.moves.begin(), empty),
-                               set.species, move}};
-                         });
+          std::transform(
+              start, end, std::back_inserter(actions),
+              [&team, &set, &empty](const auto move) {
+                return Action{BasicAction{
+                    0, static_cast<uint>(std::distance(&team[0], &set)),
+                    static_cast<uint>(std::distance(set.moves.begin(), empty)),
+                    set.species, move}};
+              });
         }
       }
     }

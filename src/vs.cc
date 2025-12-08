@@ -1,10 +1,6 @@
-#include <format/random-battles/randbat.h>
-#include <libpkmn/data.h>
-#include <libpkmn/strings.h>
-#include <nn/battle/network.h>
-#include <teams/ou-sample-teams.h>
 #include <train/battle/compressed-frame.h>
-#include <util/parse.h>
+#include <util/argparse.h>
+#include <util/battle-frame-buffer.h>
 #include <util/policy.h>
 #include <util/random.h>
 #include <util/search.h>
@@ -21,9 +17,49 @@
 #include <thread>
 #include <vector>
 
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
+struct ProgramArgs : public VsAgentArgs {
+  std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
+  size_t &threads =
+      kwarg("threads", "Number of parallel self-play games to run")
+          .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
+  size_t &max_games =
+      kwarg("max-games", "Number of games to play before program termination")
+          .set_default(1 << 30);
+  bool &save =
+      flag("save", "Whether to create directory and save battle frames");
+  size_t &buffer_size =
+      kwarg("buffer-size", "Size of battle buffer (Mb) before write")
+          .set_default(8);
+
+  std::optional<std::string> &working_dir = 
+  kwarg
+  size_t &max_build_traj =
+      kwarg("max-build-traj",
+            "Size of build buffer (No. of traj's) before write")
+          .set_default(1 << 10);
+  double &print_prob =
+      kwarg("print-prob", "Probabilty to print any given battle state")
+          .set_default(0);
+  double &early_stop_log =
+      kwarg("early-stop-log", "Forfeit when inverse sigmoid of score exceeds "
+                              "this value for both players")
+          .set_default(10.0);
+  // bool &debug_print =
+  //     kwarg("debug-print", "Enable verbose prints (debug build only)")
+  //         .set_default(true);
+  // bool &keep_node = kwarg("keep-node", "Use the applicable child node for the
+  // "
+  //                                      "next search instead of a new node.")
+  //                       .set_default(true);
+
+  int &max_battle_length =
+      kwarg("max-battle-length",
+            "Battles exceeding this many updates are dropped")
+          .set_default(-1);
+
+  std::string &teams_path =
+      kwarg("teams", "Path to teams file").set_default("");
+};
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
 
@@ -32,112 +68,6 @@ void print(const auto &data, const bool newline = true) {
   if (newline) {
     std::cout << '\n';
   }
-}
-
-namespace RuntimeOptions {
-size_t threads = 0;
-double print_prob = 0;
-double early_stop_log = 3.5;
-long long int max_games = -1;
-bool save_data = true;
-
-RuntimeSearch::Agent p1_agent{"4096", "exp3-0.03", "mc"};
-RuntimeSearch::Agent p2_agent{"4096", "exp3-0.03", "mc"};
-
-RuntimePolicy::Options p1_policy_options{};
-RuntimePolicy::Options p2_policy_options{};
-
-size_t buffer_size_mb = 8;
-size_t max_build_traj = 1 << 10;
-
-std::string teams_path = "";
-TeamBuilding::Provider provider{teams_path};
-
-} // namespace RuntimeOptions
-
-bool parse_options(int argc, char **argv) {
-  using namespace RuntimeOptions;
-
-  if (argc < 2) {
-    std::cout << "Usage: ./vs [OPTIONS]\nArg '--threads=' is "
-                 "required.\n--help for more."
-              << std::endl;
-    return true;
-  }
-
-  std::vector<char *> args(argv + 1, argv + argc);
-  assert(args.size() == argc - 1);
-
-  for (auto &a : args) {
-    if (a == nullptr) {
-      continue;
-    }
-    char *b = nullptr;
-    std::swap(a, b);
-    std::string arg{b};
-    if (arg.starts_with("--help")) {
-      std::cout << "TODO help text" << std::endl;
-      return true;
-    } else if (arg.starts_with("--threads=")) {
-      threads = std::stoul(arg.substr(10));
-    } else if (arg.starts_with("--max-games=")) {
-      max_games = std::stoll(arg.substr(12));
-    } else if (arg.starts_with("--skip-save")) {
-      save_data = false;
-    } else if (arg.starts_with("--p1-search-time=")) {
-      p1_agent.search_time = arg.substr(17);
-    } else if (arg.starts_with("--p2-search-time=")) {
-      p2_agent.search_time = arg.substr(17);
-    } else if (arg.starts_with("--p1-bandit-name=")) {
-      p1_agent.bandit_name = arg.substr(17);
-    } else if (arg.starts_with("--p2-bandit-name=")) {
-      p2_agent.bandit_name = arg.substr(17);
-    } else if (arg.starts_with("--p1-network-path=")) {
-      p1_agent.network_path = arg.substr(18);
-    } else if (arg.starts_with("--p2-network-path=")) {
-      p2_agent.network_path = arg.substr(18);
-    } else if (arg.starts_with("--p1-policy-mode=")) {
-      p1_policy_options.mode = arg[17];
-    } else if (arg.starts_with("--p2-policy-mode=")) {
-      p2_policy_options.mode = arg[17];
-    } else if (arg.starts_with("--p1-policy-temp=")) {
-      p1_policy_options.temp = stod(arg.substr(17));
-    } else if (arg.starts_with("--p2-policy-temp=")) {
-      p2_policy_options.temp = stod(arg.substr(17));
-    } else if (arg.starts_with("--p1-enable-discrete")) {
-      p1_agent.discrete_network = true;
-    } else if (arg.starts_with("--p2-enable-discrete")) {
-      p2_agent.discrete_network = true;
-
-    } else if (arg.starts_with("--max-pokemon=")) {
-      provider.omitter.max_pokemon = std::stoul(arg.substr(14));
-    } else if (arg.starts_with("--teams=")) {
-      teams_path = arg.substr(8);
-    } else if (arg.starts_with("--build-network-path=")) {
-      provider.network_path = arg.substr(21);
-    } else if (arg.starts_with("--team-modify-prob=")) {
-      provider.team_modify_prob = std::stod(arg.substr(19));
-    } else if (arg.starts_with("--pokemon-delete-prob=")) {
-      provider.omitter.pokemon_delete_prob = std::stod(arg.substr(22));
-    } else if (arg.starts_with("--move-delete-prob=")) {
-      provider.omitter.move_delete_prob = std::stod(arg.substr(19));
-
-    } else if (arg.starts_with("--print-prob=")) {
-      print_prob = std::stof(arg.substr(13));
-    } else if (arg.starts_with("--early-stop-log=")) {
-      early_stop_log = std::stof(arg.substr(17));
-    } else {
-      std::swap(a, b);
-    }
-  }
-
-  for (auto a : args) {
-    if (a != nullptr) {
-      throw std::runtime_error{"Unrecognized arg: " + std::string(a)};
-    }
-  }
-
-  return threads == 0;
 }
 
 namespace RuntimeData {
@@ -158,59 +88,17 @@ std::atomic<size_t> match_counter{};
 std::atomic<size_t> win{};
 std::atomic<size_t> loss{};
 std::atomic<size_t> draw{};
+
+TeamBuilding::Provider provider;
 } // namespace RuntimeData
 
-struct BattleFrameBuffer {
-
-  std::vector<char> buffer;
-  size_t write_index;
-
-  BattleFrameBuffer(size_t size) : buffer{}, write_index{} {
-    buffer.resize(size);
-  }
-
-  void clear() {
-    std::fill(buffer.begin(), buffer.end(), 0);
-    write_index = 0;
-  }
-
-  void save_to_disk(std::filesystem::path dir) {
-    if (RuntimeOptions::save_data == false) {
-      return;
-    }
-    if (write_index == 0) {
-      return;
-    }
-    const auto filename =
-        std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
-        ".battle.data";
-    const auto full_path = dir / filename;
-    int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-      const auto write_result = write(fd, buffer.data(), write_index);
-      close(fd);
-    } else {
-      std::cerr << "Failed to write buffer to " << full_path << std::endl;
-    }
-
-    clear();
-  }
-
-  void write_frames(const auto &training_frames) {
-    const auto n_bytes_frames = training_frames.n_bytes();
-    training_frames.write(buffer.data() + write_index);
-    write_index += n_bytes_frames;
-  }
-};
-
-void thread_fn(uint64_t seed) {
-  mt19937 device{seed};
+void thread_fn(const ProgramArgs *args_ptr) {
+  const auto &args = *args_ptr;
+  mt19937 device{args.seed.value()};
 
   // data gen
-  const size_t training_frames_target_size = RuntimeOptions::buffer_size_mb
-                                             << 20;
-  const size_t thread_frame_buffer_size = (RuntimeOptions::buffer_size_mb + 1)
-                                          << 20;
+  const size_t training_frames_target_size = args.buffer_size << 20;
+  const size_t thread_frame_buffer_size = (args.buffer_size + 1) << 20;
 
   BattleFrameBuffer p1_battle_frame_buffer{thread_frame_buffer_size};
   BattleFrameBuffer p2_battle_frame_buffer{thread_frame_buffer_size};
@@ -218,8 +106,8 @@ void thread_fn(uint64_t seed) {
   // These are generated slowly so a vector is fine
   std::vector<Train::Build::Trajectory> build_buffer{};
 
-  const auto save_build_buffer_to_disk = [&build_buffer]() {
-    if (RuntimeOptions::save_data == false) {
+  const auto save_build_buffer_to_disk = [&build_buffer, &args]() {
+    if (args.save == false) {
       return;
     }
     if (build_buffer.size() == 0) {
@@ -263,14 +151,27 @@ void thread_fn(uint64_t seed) {
     const auto result = PKMN::update(battle, 0, 0, options);
     MCTS::BattleData battle_data{battle, PKMN::durations(), result};
 
-    auto p1_agent_local = RuntimeOptions::p1_agent;
-    auto p2_agent_local = RuntimeOptions::p2_agent;
-    if (p1_agent_local.uses_network()) {
-      p1_agent_local.initialize_network(battle);
+    auto p1_agent = RuntimeSearch::Agent{.search_time = args.p1_search_time,
+                                         .bandit_name = args.p1_bandit_name,
+                                         .network_path = args.p1_network_path};
+    auto p2_agent = RuntimeSearch::Agent{.search_time = args.p2_search_time,
+                                         .bandit_name = args.p2_bandit_name,
+                                         .network_path = args.p2_network_path};
+    if (p1_agent.uses_network()) {
+      p1_agent.initialize_network(battle);
     }
-    if (p2_agent_local.uses_network()) {
-      p2_agent_local.initialize_network(battle);
+    if (p2_agent.uses_network()) {
+      p2_agent.initialize_network(battle);
     }
+
+    const auto p1_policy_options =
+        RuntimePolicy::Options{.mode = args.p1_policy_mode,
+                               .temp = args.p1_policy_temp,
+                               .min_prob = args.p1_policy_min};
+    const auto p2_policy_options =
+        RuntimePolicy::Options{.mode = args.p2_policy_mode,
+                               .temp = args.p2_policy_temp,
+                               .min_prob = args.p2_policy_min};
 
     Train::Battle::CompressedFrames p1_battle_frames{battle};
     Train::Battle::CompressedFrames p2_battle_frames{battle};
@@ -304,22 +205,20 @@ void thread_fn(uint64_t seed) {
         // if (p1_choices.size() > 1) {
         {
           RuntimeSearch::Nodes nodes{};
-          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent_local);
-          p1_early_stop = inverse_sigmoid(p1_output.empirical_value) /
-                          RuntimeOptions::early_stop_log;
+          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
+          p1_early_stop =
+              inverse_sigmoid(p1_output.empirical_value) / args.early_stop_log;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
-                                        p1_output.p1_nash,
-                                        RuntimeOptions::p1_policy_options);
+                                        p1_output.p1_nash, p1_policy_options);
         }
         // if (p2_choices.size() > 1) {
         {
           RuntimeSearch::Nodes nodes{};
-          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent_local);
-          p2_early_stop = inverse_sigmoid(p2_output.empirical_value) /
-                          RuntimeOptions::early_stop_log;
+          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
+          p2_early_stop =
+              inverse_sigmoid(p2_output.empirical_value) / args.early_stop_log;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
-                                        p2_output.p2_nash,
-                                        RuntimeOptions::p2_policy_options);
+                                        p2_output.p2_nash, p2_policy_options);
         }
 
         if (updates == 0) {
@@ -339,7 +238,7 @@ void thread_fn(uint64_t seed) {
         p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
         p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
 
-        if (device.uniform() < RuntimeOptions::print_prob) {
+        if (device.uniform() < args.print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
           print(PKMN::battle_data_to_string(battle_data.battle,
@@ -385,17 +284,14 @@ void thread_fn(uint64_t seed) {
     return score_2;
   };
 
-  // std::cout << RuntimeOptions::max_games << std::endl;
-
-  while (
-      (RuntimeOptions::max_games < 0) ||
-      (RuntimeData::match_counter.fetch_add(1) < RuntimeOptions::max_games)) {
+  while ((args.max_games < 0) ||
+         (RuntimeData::match_counter.fetch_add(1) < args.max_games)) {
     // std::cout << RuntimeData::match_counter.load() << std::endl;
 
     auto [p1_build_traj, p1_team_index] =
-        RuntimeOptions::provider.get_trajectory(device);
+        RuntimeData::provider.get_trajectory(device);
     auto [p2_build_traj, p2_team_index] =
-        RuntimeOptions::provider.get_trajectory(device);
+        RuntimeData::provider.get_trajectory(device);
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
     const auto s2 = play(p2_build_traj, p1_build_traj);
@@ -406,20 +302,24 @@ void thread_fn(uint64_t seed) {
     }
 
     if (p1_battle_frame_buffer.write_index >= training_frames_target_size) {
-      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1");
+      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1",
+                                          RuntimeData::battle_buffer_counter);
     }
     if (p2_battle_frame_buffer.write_index >= training_frames_target_size) {
-      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2");
+      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2",
+                                          RuntimeData::battle_buffer_counter);
     }
 
     if (RuntimeData::terminated) {
-      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1");
-      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2");
+      p1_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p1",
+                                          RuntimeData::battle_buffer_counter);
+      p2_battle_frame_buffer.save_to_disk(RuntimeData::working_dir / "p2",
+                                          RuntimeData::battle_buffer_counter);
       save_build_buffer_to_disk();
       return;
     }
 
-    if (build_buffer.size() >= RuntimeOptions::max_build_traj) {
+    if (build_buffer.size() >= args.max_build_traj) {
       save_build_buffer_to_disk();
     }
   }
@@ -427,14 +327,15 @@ void thread_fn(uint64_t seed) {
   return;
 }
 
-void progress_thread_fn(int sec) {
+void progress_thread_fn(const ProgramArgs *args_ptr) {
+  const auto &args = *args_ptr;
   while (true) {
-    for (int s = 0; s < sec; ++s) {
+    for (int s = 0; s < args.print_interval; ++s) {
       if (RuntimeData::terminated) {
         return;
       }
-      if ((RuntimeOptions::max_games > 0) &&
-          (RuntimeData::match_counter.load() >= RuntimeOptions::max_games)) {
+      if ((args.max_games > 0) &&
+          (RuntimeData::match_counter.load() >= args.max_games)) {
         return;
       }
       sleep(1);
@@ -460,7 +361,7 @@ void handle_terminate(int signal) {
 void setup(auto &device) {
 
   // create working dir
-  if (RuntimeOptions::save_data) {
+  if (args.save) {
     std::error_code ec;
     bool created =
         std::filesystem::create_directory(RuntimeData::working_dir, ec) &&
@@ -476,14 +377,19 @@ void setup(auto &device) {
     } else {
       throw std::runtime_error("Could not create working dir.");
     }
+
+    // save args
+    const auto args_path = working_dir / "args";
+    std::ofstream args_file(args_path);
+    if (!args_file) {
+      throw std::runtime_error("Failed to open args file for writing.");
+    }
+    args.print(args_file);
   }
 
-  // save args
-  // TODO
-
   // teams
-  RuntimeOptions::provider = TeamBuilding::Provider{RuntimeOptions::teams_path};
-  RuntimeOptions::provider.read_network_parameters();
+  RuntimeData::provider = TeamBuilding::Provider{args.teams_path};
+  RuntimeData::provider.read_network_parameters();
 }
 
 int main(int argc, char **argv) {
@@ -491,21 +397,17 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
   std::signal(SIGTSTP, handle_suspend);
 
-  if (const bool exit_early = parse_options(argc, argv)) {
-    return 1;
-  }
+  auto args = argparse::parse<ProgramArgs>(argc, argv);
 
-  size_t seed = std::random_device{}();
-
-  mt19937 device{seed};
+  mt19937 device{args.seed.value()};
 
   setup(device);
 
   std::vector<std::thread> thread_pool{};
-  for (auto t = 0; t < RuntimeOptions::threads; ++t) {
-    thread_pool.emplace_back(std::thread{&thread_fn, device.uniform_64()});
+  for (auto t = 0; t < args.threads; ++t) {
+    thread_pool.emplace_back(std::thread{&thread_fn, &args});
   }
-  auto progress_thread = std::thread(&progress_thread_fn, 30);
+  auto progress_thread = std::thread(&progress_thread_fn, &args);
   for (auto &thread : thread_pool) {
     thread.join();
   }
