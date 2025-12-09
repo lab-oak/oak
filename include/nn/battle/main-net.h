@@ -63,14 +63,17 @@ struct MainNet {
     return sigmoid(output);
   }
 
-  float propagate(const float *input_data, const auto m, const auto n,
-                  const auto *p1_choice_index, const auto *p2_choice_index,
-                  float *p1, float *p2) {
+  template <bool use_value = true>
+  auto propagate(const float *input_data, const auto m, const auto n,
+                 const auto *p1_choice_index, const auto *p2_choice_index,
+                 float *p1, float *p2)
+      -> std::conditional_t<use_value, float, void> {
     float output;
     fc0.propagate(input_data, buffer.data());
-    value_fc1.propagate(buffer.data(), value_buffer.data());
-    value_fc2.propagate(value_buffer.data(), &output);
-
+    if constexpr (use_value) {
+      value_fc1.propagate(buffer.data(), value_buffer.data());
+      value_fc2.propagate(value_buffer.data(), &output);
+    }
     p1_policy_fc1.propagate(buffer.data(), p1_policy_buffer.data());
     p2_policy_fc1.propagate(buffer.data(), p2_policy_buffer.data());
 
@@ -81,6 +84,7 @@ struct MainNet {
           p1_policy_fc2.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
               p1_policy_buffer.data(), p1_policy_fc1.out_dim)) +
           p1_policy_fc2.biases[p1_c];
+      assert(!std::isnan(logit));
       p1[i] = logit;
     }
 
@@ -91,10 +95,12 @@ struct MainNet {
           p2_policy_fc2.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
               p2_policy_buffer.data(), p2_policy_fc1.out_dim)) +
           p2_policy_fc2.biases[p2_c];
+      assert(!std::isnan(logit));
       p2[i] = logit;
     }
-
-    return sigmoid(output);
+    if constexpr (use_value) {
+      return sigmoid(output);
+    }
   }
 };
 

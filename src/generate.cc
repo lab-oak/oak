@@ -1,4 +1,4 @@
-#include <nn/build/network.h>
+#include <search/util/softmax.h>
 #include <train/battle/compressed-frame.h>
 #include <util/argparse.h>
 #include <util/policy.h>
@@ -268,9 +268,8 @@ void generate(const ProgramArgs *args_ptr) {
 
     auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
                                       .bandit_name = args.bandit_name,
-                                      .network_path = args.network_path
-
-    };
+                                      .network_path = args.network_path,
+                                      .discrete_network = args.use_discrete};
     // if the std::optional<NN::Network> is not set then the params/cache will
     // be loaded/filled before every turn.
     // don't need to preload t1 agent since its used only once
@@ -284,6 +283,8 @@ void generate(const ProgramArgs *args_ptr) {
         RuntimePolicy::Options{.mode = args.policy_mode,
                                .temp = args.policy_temp,
                                .min_prob = args.policy_min};
+    const auto rollout_policy_options = RuntimePolicy::Options{
+        .mode = 'e', .temp = 1.0, .min_prob = args.policy_min};
 
     battle_length = 0;
     try {
@@ -314,18 +315,44 @@ void generate(const ProgramArgs *args_ptr) {
             (battle_length == 0)
                 ? args.t1_search_time.value()
                 : (use_fast ? args.fast_search_time.value() : args.search_time);
-        const auto output = RuntimeSearch::run(battle_data, nodes, agent);
-        if (battle_length == 0) {
-          p1_matchup = output.empirical_value;
-          p2_matchup = 1 - output.empirical_value;
-          if (skip_battle) {
-            break;
+        MCTS::Output output{};
+
+        const bool policy_rollout_only =
+            agent.uses_network() && (agent.search_time == "1");
+
+        if (policy_rollout_only) {
+          std::array<float, 9> p1_logits{};
+          std::array<float, 9> p2_logits{};
+          const auto m = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+              output.p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          const auto n = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+              output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          agent.network.value().inference<false>(
+              battle_data.battle,
+              *pkmn_gen1_battle_options_chance_durations(&options), m, n,
+              output.p1_choices.data(), output.p2_choices.data(),
+              p1_logits.data(), p2_logits.data());
+          softmax(output.p1_empirical.data(), p1_logits.data(), m);
+          softmax(output.p2_empirical.data(), p2_logits.data(), n);
+        } else {
+          output = RuntimeSearch::run(battle_data, nodes, agent);
+          if (battle_length == 0) {
+            p1_matchup = output.empirical_value;
+            p2_matchup = 1 - output.empirical_value;
+            if (skip_battle) {
+              break;
+            }
           }
         }
+
         const auto p1_index = RuntimePolicy::process_and_sample(
-            device, output.p1_empirical, output.p1_nash, policy_options);
+            device, output.p1_empirical, output.p1_nash,
+            policy_rollout_only ? rollout_policy_options : policy_options);
         const auto p2_index = RuntimePolicy::process_and_sample(
-            device, output.p2_empirical, output.p2_nash, policy_options);
+            device, output.p2_empirical, output.p2_nash,
+            policy_rollout_only ? rollout_policy_options : policy_options);
         const auto p1_choice = output.p1_choices[p1_index];
         const auto p2_choice = output.p2_choices[p2_index];
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);

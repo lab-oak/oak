@@ -130,12 +130,16 @@ void thread_fn(const ProgramArgs *args_ptr) {
   };
 
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
-    auto p1_agent = RuntimeSearch::Agent{.search_time = args.p1_search_time,
-                                         .bandit_name = args.p1_bandit_name,
-                                         .network_path = args.p1_network_path};
-    auto p2_agent = RuntimeSearch::Agent{.search_time = args.p2_search_time,
-                                         .bandit_name = args.p2_bandit_name,
-                                         .network_path = args.p2_network_path};
+    auto p1_agent =
+        RuntimeSearch::Agent{.search_time = args.p1_search_time,
+                             .bandit_name = args.p1_bandit_name,
+                             .network_path = args.p1_network_path,
+                             .discrete_network = args.p1_use_discrete};
+    auto p2_agent =
+        RuntimeSearch::Agent{.search_time = args.p2_search_time,
+                             .bandit_name = args.p2_bandit_name,
+                             .network_path = args.p2_network_path,
+                             .discrete_network = args.p2_use_discrete};
     const auto p1_policy_options =
         RuntimePolicy::Options{.mode = args.p1_policy_mode,
                                .temp = args.p1_policy_temp,

@@ -163,18 +163,14 @@ struct Network {
     return value;
   }
 
-  float inference(const pkmn_gen1_battle &b,
-                  const pkmn_gen1_chance_durations &d, const auto m,
-                  const auto n, const auto *p1_choice, const auto *p2_choice,
-                  float *p1, float *p2) {
+  template <bool use_value = true>
+  auto inference(const pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d,
+                 const auto m, const auto n, const auto *p1_choice,
+                 const auto *p2_choice, float *p1, float *p2)
+      -> std::conditional_t<use_value, float, void> {
+
     static thread_local uint16_t p1_choice_index[9];
     static thread_local uint16_t p2_choice_index[9];
-
-    if (use_discrete) {
-      throw std::runtime_error(
-          "Policy output with discrete nets not supported.");
-      return -1;
-    }
 
     const auto &battle = PKMN::view(b);
     for (auto i = 0; i < m; ++i) {
@@ -185,11 +181,24 @@ struct Network {
       p2_choice_index[i] =
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
-    write_battle_embedding<float>(battle_embedding.data(), b, d);
-    float value = main_net.propagate(battle_embedding.data(), m, n,
-                                     p1_choice_index, p2_choice_index, p1, p2);
 
-    return value;
+    float value;
+    if constexpr (use_value) {
+      if (use_discrete) {
+        throw std::runtime_error(
+            "Value + Policy output with discrete nets not supported.");
+        return -1;
+      }
+      write_battle_embedding<float>(battle_embedding.data(), b, d);
+      value = main_net.propagate<use_value>(battle_embedding.data(), m, n,
+                                            p1_choice_index, p2_choice_index,
+                                            p1, p2);
+      return value;
+    } else {
+      write_battle_embedding<float>(battle_embedding.data(), b, d);
+      main_net.propagate<use_value>(battle_embedding.data(), m, n,
+                                    p1_choice_index, p2_choice_index, p1, p2);
+    }
   }
 
   void print_battle_embedding(const float *input) const {
