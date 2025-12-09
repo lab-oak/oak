@@ -357,7 +357,8 @@ template <typename Options = SearchOptions<>> struct Search {
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
           node.stats().init(m, n);
           if constexpr (requires {
-                          node.stats().softmax_logits(nullptr, nullptr);
+                          node.stats().softmax_logits(bandit_params, nullptr,
+                                                      nullptr);
                         }) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
@@ -366,7 +367,8 @@ template <typename Options = SearchOptions<>> struct Search {
                 *pkmn_gen1_battle_options_chance_durations(&options), m, n,
                 p1_choices.data(), p2_choices.data(), p1_logits.data(),
                 p2_logits.data());
-            node.stats().softmax_logits(p1_logits.data(), p2_logits.data());
+            node.stats().softmax_logits(bandit_params, p1_logits.data(),
+                                        p2_logits.data());
           } else {
             value = model.inference(
                 input.battle,

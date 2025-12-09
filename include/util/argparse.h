@@ -35,6 +35,9 @@ struct TeamBuildingArgs : public argparse::Args {
     std::string &A##network_path =                                             \
         kwarg(B "network-path", "Network path").set_default("mc");             \
                                                                                \
+    bool &A##use_discrete =                                                    \
+        flag(B "use-discrete", "Enable Stockfish discrete main subnet");       \
+                                                                               \
     char &A##policy_mode =                                                     \
         kwarg(B "policy-mode", "Policy mode").set_default('e');                \
                                                                                \

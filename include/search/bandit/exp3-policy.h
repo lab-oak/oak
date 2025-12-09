@@ -41,7 +41,7 @@ struct Bandit {
 
   bool is_init() const noexcept { return k; }
 
-  void softmax_logits(const float *logits) noexcept {
+  void softmax_logits(const Params &, const float *logits) noexcept {
     softmax(this->priors.data(), logits, k);
   }
 

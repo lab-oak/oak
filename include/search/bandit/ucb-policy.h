@@ -4,6 +4,7 @@
 
 #include <search/joint.h>
 #include <search/util/int.h>
+#include <search/util/softmax.h>
 
 #include <algorithm>
 #include <array>
@@ -38,8 +39,8 @@ struct Bandit {
 
   bool is_init() const noexcept { return k; }
 
-  void softmax_logits(const float *priors) noexcept {
-    std::memcpy(this->priors.data(), priors, k * sizeof(float));
+  void softmax_logits(const Params &, const float *logits) noexcept {
+    softmax(this->priors.data(), logits, k);
   }
 
   void update(const auto &outcome) noexcept {
