@@ -332,21 +332,21 @@ void generate(const ProgramArgs *args_ptr) {
 
           std::array<float, 9> p1_logits{};
           std::array<float, 9> p2_logits{};
-          const auto m = pkmn_gen1_battle_choices(
+          output.m = pkmn_gen1_battle_choices(
               &battle_data.battle, PKMN_PLAYER_P1,
               pkmn_result_p1(battle_data.result), output.p1_choices.data(),
               PKMN_GEN1_MAX_CHOICES);
-          const auto n = pkmn_gen1_battle_choices(
+          output.n = pkmn_gen1_battle_choices(
               &battle_data.battle, PKMN_PLAYER_P2,
               pkmn_result_p2(battle_data.result), output.p2_choices.data(),
               PKMN_GEN1_MAX_CHOICES);
           agent.network.value().inference<false>(
               battle_data.battle,
-              *pkmn_gen1_battle_options_chance_durations(&options), m, n,
+              *pkmn_gen1_battle_options_chance_durations(&options), output.m, output.n,
               output.p1_choices.data(), output.p2_choices.data(),
               p1_logits.data(), p2_logits.data());
-          softmax(output.p1_empirical.data(), p1_logits.data(), m);
-          softmax(output.p2_empirical.data(), p2_logits.data(), n);
+          softmax(output.p1_empirical.data(), p1_logits.data(), output.m);
+          softmax(output.p2_empirical.data(), p2_logits.data(), output.n);
         } else {
           output = RuntimeSearch::run(battle_data, nodes, agent);
           if (battle_length == 0) {
