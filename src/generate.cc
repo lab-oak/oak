@@ -21,7 +21,7 @@ constexpr bool debug = true;
 
 struct ProgramArgs : public SelfPlayAgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
-  std::optional<std::string> &working_dir = kwarg("dir", "Save directory");\
+  std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
   size_t &threads =
       kwarg("threads", "Number of parallel self-play games to run")
           .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
@@ -181,7 +181,7 @@ void generate(const ProgramArgs *args_ptr) {
   std::vector<Train::Build::Trajectory> build_buffer{};
 
   const auto save_battle_buffer_to_disk = [&buffer, thread_frame_buffer_size,
-                                           &frame_buffer_write_index]() {
+                                           &frame_buffer_write_index, &args]() {
     if (frame_buffer_write_index == 0) {
       return;
     }
@@ -189,7 +189,7 @@ void generate(const ProgramArgs *args_ptr) {
         std::to_string(RuntimeData::battle_buffer_counter.fetch_add(1)) +
         ".battle.data";
     const auto full_path =
-        std::filesystem::path{RuntimeData::start_datetime} / filename;
+        std::filesystem::path{args.working_dir.value()} / filename;
     int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
       const auto write_result = write(fd, buffer, frame_buffer_write_index);
@@ -202,7 +202,7 @@ void generate(const ProgramArgs *args_ptr) {
     frame_buffer_write_index = 0;
   };
 
-  const auto save_build_buffer_to_disk = [&build_buffer]() {
+  const auto save_build_buffer_to_disk = [&build_buffer, &args]() {
     if (build_buffer.size() == 0) {
       return;
     }
@@ -210,7 +210,7 @@ void generate(const ProgramArgs *args_ptr) {
         std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
         ".build.data";
     const auto full_path =
-        std::filesystem::path{RuntimeData::start_datetime} / filename;
+        std::filesystem::path{args.working_dir.value()} / filename;
 
     const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
@@ -324,7 +324,9 @@ void generate(const ProgramArgs *args_ptr) {
         if (policy_rollout_only) {
 
           if (args.keep_node) {
-            throw std::runtime_error{"--keep-node not allowed when using policy rollouts: there's a bug I don't understand just yet."};
+            throw std::runtime_error{
+                "--keep-node not allowed when using policy rollouts: there's a "
+                "bug I don't understand just yet."};
             return;
           }
 
@@ -499,8 +501,7 @@ void setup(const auto &args) {
     std::cerr << "Error creating directory: " << ec.message() << '\n';
     throw std::runtime_error("Could not create datetime dir.");
   } else if (created) {
-    std::cout << "Created directory " << RuntimeData::start_datetime
-              << std::endl;
+    std::cout << "Created directory " << working_dir.string() << std::endl;
   } else {
     throw std::runtime_error("Could not create datetime dir.");
   }
@@ -528,8 +529,8 @@ void setup(const auto &args) {
   RuntimeData::battle_lengths.resize(args.threads);
 }
 
-void cleanup() {
-  const std::filesystem::path working_dir = RuntimeData::start_datetime;
+void cleanup(const auto &args) {
+  const std::filesystem::path working_dir = args.working_dir.value();
   const auto matchup_matrix_path = working_dir / "matchup-matrix";
   std::ofstream matchup_matrix_file(matchup_matrix_path);
   if (!matchup_matrix_file) {
@@ -581,7 +582,7 @@ int main(int argc, char **argv) {
   }
   print_thread.join();
 
-  cleanup();
+  cleanup(args);
 
   return 0;
 }
