@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nn/battle/network.h>
+#include <search/bandit/exp3-policy-2.h>
 #include <search/bandit/exp3-policy.h>
 #include <search/bandit/exp3.h>
 #include <search/bandit/ucb-policy.h>
@@ -19,6 +20,7 @@ using UniqueNode = std::unique_ptr<Tree::Node<T, MCTS::Obs>>;
 struct Nodes {
   UniqueNode<Exp3::JointBandit> exp3;
   UniqueNode<PExp3::JointBandit> pexp3;
+  UniqueNode<PExp3_2::JointBandit> pexp3_2;
   UniqueNode<UCB::JointBandit> ucb;
   UniqueNode<PUCB::JointBandit> pucb;
   bool set;
@@ -28,6 +30,7 @@ struct Nodes {
   void reset() {
     exp3.release();
     pexp3.release();
+    pexp3_2.release();
     ucb.release();
     pucb.release();
     set = false;
@@ -42,6 +45,9 @@ struct Nodes {
     }
     if (pexp3) {
       pexp3->stats() = {};
+    }
+    if (pexp3_2) {
+      pexp3_2->stats() = {};
     }
     if (ucb) {
       ucb->stats() = {};
@@ -67,8 +73,8 @@ struct Nodes {
         return true;
       }
     };
-    return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
-           update_node(pucb);
+    return update_node(exp3) || update_node(pexp3) || update_node(pexp3_2) ||
+           update_node(ucb) || update_node(pucb);
   }
 };
 
@@ -187,6 +193,10 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       const float gamma = std::stof(bandit_name.substr(6));
       PExp3::Bandit::Params params{gamma};
       return run_3(dur, model, params, get(nodes.pexp3));
+    } else if (bandit_name.starts_with("p2exp3-")) {
+      const float gamma = std::stof(bandit_name.substr(7));
+      PExp3_2::Bandit::Params params{gamma};
+      return run_3(dur, model, params, get(nodes.pexp3_2));
     } else if (bandit_name.starts_with("pucb-")) {
       const float c = std::stof(bandit_name.substr(5));
       PUCB::Bandit::Params params{c};
