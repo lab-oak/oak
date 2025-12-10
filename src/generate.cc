@@ -21,6 +21,7 @@ constexpr bool debug = true;
 
 struct ProgramArgs : public SelfPlayAgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
+  std::optional<std::string> &working_dir = kwarg("dir", "Save directory");\
   size_t &threads =
       kwarg("threads", "Number of parallel self-play games to run")
           .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
@@ -321,6 +322,12 @@ void generate(const ProgramArgs *args_ptr) {
             agent.uses_network() && (agent.search_time == "1");
 
         if (policy_rollout_only) {
+
+          if (args.keep_node) {
+            throw std::runtime_error{"--keep-node not allowed when using policy rollouts: there's a bug I don't understand just yet."};
+            return;
+          }
+
           std::array<float, 9> p1_logits{};
           std::array<float, 9> p2_logits{};
           const auto m = pkmn_gen1_battle_choices(
@@ -370,6 +377,7 @@ void generate(const ProgramArgs *args_ptr) {
         if (args.keep_node) {
           const bool node_kept = nodes.update(p1_index, p2_index, obs);
           RuntimeData::update_with_node_counter.fetch_add(node_kept);
+          // TODO
           nodes.reset_stats();
         } else {
           nodes.reset();
@@ -473,6 +481,9 @@ void setup(const auto &args) {
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
   }
+  if (!args.working_dir.has_value()) {
+    args.working_dir.emplace(RuntimeData::start_datetime);
+  }
   if (!args.t1_search_time.has_value()) {
     args.t1_search_time.emplace(args.search_time);
   }
@@ -481,7 +492,7 @@ void setup(const auto &args) {
   }
 
   // create working dir
-  const std::filesystem::path working_dir = RuntimeData::start_datetime;
+  const std::filesystem::path working_dir = args.working_dir.value();
   std::error_code ec;
   const bool created = std::filesystem::create_directory(working_dir, ec);
   if (ec) {
