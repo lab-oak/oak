@@ -499,11 +499,11 @@ void setup(const auto &args) {
   const bool created = std::filesystem::create_directory(working_dir, ec);
   if (ec) {
     std::cerr << "Error creating directory: " << ec.message() << '\n';
-    throw std::runtime_error("Could not create datetime dir.");
+    throw std::runtime_error("Could not create working dir.");
   } else if (created) {
     std::cout << "Created directory " << working_dir.string() << std::endl;
   } else {
-    throw std::runtime_error("Could not create datetime dir.");
+    throw std::runtime_error("Could not create working dir.");
   }
 
   // save args
