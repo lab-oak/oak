@@ -324,11 +324,13 @@ void generate(const ProgramArgs *args_ptr) {
           std::array<float, 9> p1_logits{};
           std::array<float, 9> p2_logits{};
           const auto m = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
-              output.p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+              &battle_data.battle, PKMN_PLAYER_P1,
+              pkmn_result_p1(battle_data.result), output.p1_choices.data(),
+              PKMN_GEN1_MAX_CHOICES);
           const auto n = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
-              output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+              &battle_data.battle, PKMN_PLAYER_P2,
+              pkmn_result_p2(battle_data.result), output.p2_choices.data(),
+              PKMN_GEN1_MAX_CHOICES);
           agent.network.value().inference<false>(
               battle_data.battle,
               *pkmn_gen1_battle_options_chance_durations(&options), m, n,
@@ -552,13 +554,6 @@ int main(int argc, char **argv) {
   std::signal(SIGTSTP, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
-
-  if (true) {
-    std::ostringstream ss{};
-    args.print(ss); // prints all variables
-    std::cout << ss.str() << std::endl;
-    return 0;
-  }
 
   setup(args);
 
