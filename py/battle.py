@@ -2,6 +2,8 @@ import os
 import torch
 import argparse
 import random
+import time
+import datetime
 
 import py_oak
 import torch_oak
@@ -47,6 +49,18 @@ parser.add_argument(
     type=bool,
     default=True,
     help="Clamp parameters [-2, 2] to support Stockfish style quantization",
+)
+parser.add_argument(
+    "--sleep",
+    type=float,
+    default=0,
+    help="Number of seconds to sleep after parameter update",
+)
+parser.add_argument(
+    "--min-files",
+    type=int,
+    default=1,
+    help="Minimum number of .battle.files before learning begins",
 )
 
 # Loss options
@@ -172,6 +186,9 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+torch.set_num_threads(args.threads)
+torch.set_num_interop_threads(args.threads)
+
 
 # TODO accept other optims as arg
 class Optimizer:
@@ -290,12 +307,10 @@ def main():
     working_dir = ""
     if args.in_place:
         assert args.net_path
-    else:
-        import datetime
 
-        now = datetime.datetime.now()
-        working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
-        os.makedirs(working_dir, exist_ok=False)
+    now = datetime.datetime.now()
+    working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
+    os.makedirs(working_dir, exist_ok=False)
     py_oak.save_args(args, working_dir)
 
     network = torch_oak.BattleNetwork(
@@ -313,11 +328,6 @@ def main():
 
     data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
 
-    sample_indexer = py_oak.SampleIndexer()
-
-    for file in data_files:
-        sample_indexer.get(file)
-
     print("Saving base network in working dir.")
     with open(os.path.join(working_dir, "random.battle.net"), "wb") as f:
         network.write_parameters(f)
@@ -326,7 +336,7 @@ def main():
         print(
             f"No .battle.data files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
         )
-        exit()
+        # exit()
     else:
         print(f"{len(data_files)} data_files found")
 
@@ -339,8 +349,20 @@ def main():
 
     for step in range(args.steps):
         data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
+
+        if len(data_files) < args.min_files:
+            print("Minimum files not reached. Sleeping")
+            time.sleep(5)
+            continue
+
         if args.data_window > 0:
             data_files = data_files[: args.data_window]
+
+        sample_indexer = py_oak.SampleIndexer()
+
+        for file in data_files:
+            sample_indexer.get(file)
+
         encoded_frames.clear()
         output_buffer.clear()
 
@@ -376,11 +398,14 @@ def main():
             ckpt_path = ""
             if args.in_place:
                 ckpt_path = args.net_path
-            else:
-                ckpt_path = os.path.join(working_dir, f"{step + 1}.battle.net")
+                with open(ckpt_path, "wb") as f:
+                    network.write_parameters(f)
+            ckpt_path = os.path.join(working_dir, f"{step + 1}.battle.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
+
+        time.sleep(args.sleep)
 
 
 if __name__ == "__main__":
