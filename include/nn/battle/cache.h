@@ -42,8 +42,8 @@ template <typename T, int dim = 0> struct PokemonCache {
     if constexpr (is_dynamic) {
       embedding_size = d;
       if (d > 0) {
-      for (auto &embedding : embeddings) {
-        embedding = new T[embedding_size];
+        for (auto &embedding : embeddings) {
+          embedding = new T[embedding_size];
         }
       }
     }
