@@ -28,11 +28,11 @@ struct Nodes {
   Nodes() { reset(); }
 
   void reset() {
-    exp3.release();
-    pexp3.release();
-    pexp3_2.release();
-    ucb.release();
-    pucb.release();
+    exp3.reset();
+    pexp3.reset();
+    pexp3_2.reset();
+    ucb.reset();
+    pucb.reset();
     set = false;
   }
 
@@ -95,17 +95,25 @@ struct Agent {
 
   void initialize_network(const pkmn_gen1_battle &b) {
     network.emplace();
-    std::ifstream file{std::filesystem::path{network_path}};
-    if (file.fail() || !network.value().read_parameters(file)) {
-      network = std::nullopt;
-      throw std::runtime_error{"Agent could not read network parameters at: " +
-                               network_path};
-    } else {
-      if (discrete_network) {
-        network.value().enable_discrete();
+
+    constexpr auto tries = 3;
+    // sometimes reads fail because python is writing to that file. just retry
+    for (auto i = 0; i < tries; ++i) {
+      std::ifstream file{network_path};
+      if (network.value().read_parameters(file)) {
+        break;
+      } else {
+        if (i == (tries - 1)) {
+          throw std::runtime_error{
+              "Agent could not read network parameters at: " + network_path};
+        }
+        sleep(1);
       }
-      network.value().fill_pokemon_caches(b);
     }
+    if (discrete_network) {
+      network.value().enable_discrete();
+    }
+    network.value().fill_pokemon_caches(b);
   }
 
   std::string to_string() const {
