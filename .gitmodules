@@ -7,3 +7,6 @@
 [submodule "extern/eigen"]
 	path = extern/eigen
 	url = https://github.com/PX4/eigen
+[submodule "extern/argparse"]
+	path = extern/argparse
+	url = https://github.com/lab-oak/argparse
