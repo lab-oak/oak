@@ -342,8 +342,8 @@ void generate(const ProgramArgs *args_ptr) {
               PKMN_GEN1_MAX_CHOICES);
           agent.network.value().inference<false>(
               battle_data.battle,
-              *pkmn_gen1_battle_options_chance_durations(&options), output.m, output.n,
-              output.p1_choices.data(), output.p2_choices.data(),
+              *pkmn_gen1_battle_options_chance_durations(&options), output.m,
+              output.n, output.p1_choices.data(), output.p2_choices.data(),
               p1_logits.data(), p2_logits.data());
           softmax(output.p1_empirical.data(), p1_logits.data(), output.m);
           softmax(output.p2_empirical.data(), p2_logits.data(), output.n);
