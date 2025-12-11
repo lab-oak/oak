@@ -187,7 +187,7 @@ parser.add_argument(
     "--delete-window",
     type=int,
     default=0,
-    help="Anything outside the most recent \{n\} files is deleted",
+    help="Anything outside the most recent N files is deleted",
 )
 args = parser.parse_args()
 
@@ -361,7 +361,7 @@ def main():
             continue
 
         if args.delete_window > 0:
-            to_delete = data_files[args.delete_window:]
+            to_delete = data_files[args.delete_window :]
             for file in to_delete:
                 os.remove(file)
 

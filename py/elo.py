@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description="Parameter testing for battle agent
 parser.add_argument("--working-dir", default=None, type=str)
 parser.add_argument("--net-path", default=".", type=str)
 parser.add_argument("--vs-path", default="./release/vs", type=str)
-parser.add_argument("--search-iterations", default=2**12, type=int)
+parser.add_argument("--search-time", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
@@ -106,7 +106,7 @@ class Global:
         self.directory: Dict[int, str] = {}
 
     def fill_from_path(self, path, n=args.max_agents):
-        net_files = py_oak.find_data_files(path, ext=".net")
+        net_files = py_oak.find_data_files(path, ext=".battle.net")
 
         for file in net_files:
             network = torch_oak.BattleNetwork()
@@ -131,11 +131,16 @@ class Global:
         base_bandits = ["exp3-", "ucb-"]
         if args.allow_policy:
             base_bandits.append("pexp3-")
+            base_bandits.append("p2exp3-")
             base_bandits.append("pucb-")
         bandit = random.choice(base_bandits)
 
         param = None
-        if bandit.startswith("pexp3") or bandit.startswith("exp3"):
+        if (
+            bandit.startswith("pexp3")
+            or bandit.startswith("p2exp3")
+            or bandit.startswith("exp3")
+        ):
             param = random.uniform(args.exp3_param_min, args.exp3_param_max)
         elif bandit.startswith("pucb") or bandit.startswith("ucb"):
             param = random.uniform(args.ucb_param_min, args.ucb_param_max)
@@ -146,7 +151,7 @@ class Global:
         selection_modes = ["n", "e", "x"]
         selection_mode = random.choice(selection_modes)
 
-        return ID(net_hash, bandit_name, selection_mode, 4096)
+        return ID(net_hash, bandit_name, selection_mode, args.search_time)
 
     def remove_id(self, target_id: ID):
         return NotImplemented
