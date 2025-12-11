@@ -13,7 +13,7 @@ parser.add_argument(
     "--in-place",
     action="store_true",
     dest="in_place",
-    help="Used for RL.",
+    help="The parameters saved in --net-path will be updated after every step.",
 )
 parser.add_argument("--net-path", default="", help="Read directory for network weights")
 parser.add_argument(
@@ -25,11 +25,11 @@ parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 
 # General training
 parser.add_argument(
-    "--threads", type=int, default=1, help="Number of threads for data loading"
+    "--threads", type=int, default=1, help="Number of threads for data loading/training"
 )
-parser.add_argument("--steps", type=int, default=2**16, help="Total training steps")
+parser.add_argument("--steps", type=int, default=2**30, help="Total training steps")
 parser.add_argument(
-    "--checkpoint", type=int, default=500, help="Checkpoint interval (steps)"
+    "--checkpoint", type=int, default=50, help="Checkpoint interval (steps)"
 )
 parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
 parser.add_argument(
@@ -42,7 +42,7 @@ parser.add_argument(
     "--min-iterations",
     type=int,
     default=1,
-    help="Ignore frames with fewer than these iterations.",
+    help="Ignore samples with fewer than these iterations.",
 )
 parser.add_argument(
     "--clamp-parameters",
@@ -60,7 +60,7 @@ parser.add_argument(
     "--min-files",
     type=int,
     default=1,
-    help="Minimum number of .battle.files before learning begins",
+    help="Minimum number of .battle.data files before learning begins",
 )
 
 # Loss options
@@ -73,11 +73,11 @@ parser.add_argument(
 parser.add_argument(
     "--w-empirical",
     type=float,
-    default=1.0,
+    default=0.0,
     help="Weight for empirical value in value target",
 )
 parser.add_argument(
-    "--w-score", type=float, default=0.0, help="Weight for score in value target"
+    "--w-score", type=float, default=1.0, help="Weight for score in value target"
 )
 parser.add_argument(
     "--w-nash-p",
@@ -89,6 +89,7 @@ parser.add_argument(
     "--no-value-loss",
     action="store_true",
     dest="no_value_loss",
+    help="Disable value loss computation",
 )
 parser.add_argument(
     "--no-policy-loss",
@@ -100,7 +101,7 @@ parser.add_argument(
     "--w-policy-loss",
     type=float,
     default=1.0,
-    help=".",
+    help="Weight for policy loss relative to value loss",
 )
 parser.add_argument(
     "--lr-decay", type=float, default=1.0, help="Applied each step after decay begins"
@@ -115,7 +116,7 @@ parser.add_argument(
     "--lr-decay-interval",
     type=int,
     default=1,
-    help="TODO. Interval at which to apply decay",
+    help="Interval at which to apply decay",
 )
 
 # Network hyperparameters
@@ -368,6 +369,7 @@ def main():
         if args.data_window > 0:
             data_files = data_files[: args.data_window]
 
+        # TODO wasteful
         sample_indexer = py_oak.SampleIndexer()
 
         for file in data_files:
@@ -401,8 +403,9 @@ def main():
             network.clamp_parameters()
 
         if step >= args.lr_decay_start:
-            for group in optimizer.opt.param_groups:
-                group["lr"] *= args.lr_decay
+            if (step % args.lr_decay_interval) == 0:
+                for group in optimizer.opt.param_groups:
+                    group["lr"] *= args.lr_decay
 
         if ((step + 1) % args.checkpoint) == 0:
             ckpt_path = ""
