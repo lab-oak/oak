@@ -9,12 +9,15 @@
 
 struct ProgramArgs : public AgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
+  bool &use_search_time =
+      flag("--use-search-time",
+           "Use --search-time value instead of ctrl+z to end search");
 };
 
 bool search_flag = true;
 
 void handle_suspend(int signal) {
-  std::cout << 'Search Suspended.' << std::endl;
+  std::cout << "Search Suspended." << std::endl;
   search_flag = false;
 }
 
@@ -30,10 +33,12 @@ int main(int argc, char **argv) {
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
-  auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
-                                    .bandit_name = args.bandit_name,
-                                    .network_path = args.network_path,
-                                    .discrete_network = args.use_discrete};
+  auto agent = RuntimeSearch::Agent{
+      .search_time = args.search_time,
+      .bandit_name = args.bandit_name,
+      .network_path = args.network_path,
+      .discrete_network = args.use_discrete,
+      .flag = args.use_search_time ? nullptr : &search_flag};
 
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
