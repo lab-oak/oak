@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 add_subdirectory(extern/lrsnash EXCLUDE_FROM_ALL)
 add_subdirectory(extern/eigen EXCLUDE_FROM_ALL)
+add_subdirectory(extern/argparse EXCLUDE_FROM_ALL)
 
 # Libpkmn
 
@@ -45,38 +46,38 @@ target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC)
 
 # Targets
 
-add_executable(benchmark src/benchmark.cc)
-target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
-
 add_executable(search-test src/search-test.cc)
 target_include_directories(search-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(search-test PRIVATE libpkmn_chance lrslib128 eigen)
 
-# add_executable(dur src/dur.cc)
-# target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-# target_link_libraries(dur PRIVATE libpkmn_client lrslib128)
-
 add_executable(chall src/chall.cc)
 target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(chall PRIVATE libpkmn_chance lrslib128 eigen)
-
-add_executable(debug-log src/debug-log.cc)
-target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(debug-log PRIVATE libpkmn_client)
+target_link_libraries(chall PRIVATE libpkmn_chance lrslib128 eigen argparse)
 
 add_executable(generate src/generate.cc)
 target_include_directories(generate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(generate PRIVATE libpkmn_chance lrslib128 eigen)
+target_link_libraries(generate PRIVATE libpkmn_chance lrslib128 eigen argparse)
+
+add_executable(vs src/vs.cc)
+target_include_directories(vs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(vs PRIVATE libpkmn_chance lrslib128 eigen argparse)
 
 add_library(pyoak SHARED src/pyoak.cc)
 target_include_directories(pyoak PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(pyoak PRIVATE libpkmn_chance)
 
-add_executable(vs src/vs.cc)
-target_include_directories(vs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(vs PRIVATE libpkmn_chance lrslib128 eigen)
+# add_executable(benchmark src/benchmark.cc)
+# target_include_directories(benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# target_link_libraries(benchmark PRIVATE libpkmn_chance lrslib128 eigen)
 
-add_executable(randbat src/randbat.cc)
-target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(randbat PRIVATE libpkmn_chance)
+# add_executable(debug-log src/debug-log.cc)
+# target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# target_link_libraries(debug-log PRIVATE libpkmn_client)
+
+# add_executable(randbat src/randbat.cc)
+# target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# target_link_libraries(randbat PRIVATE libpkmn_chance)
+
+# add_executable(dur src/dur.cc)
+# target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# target_link_libraries(dur PRIVATE libpkmn_client lrslib128)

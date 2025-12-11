@@ -1,3 +1,4 @@
+#include <util/argparse.h>
 #include <util/parse.h>
 #include <util/policy.h>
 #include <util/random.h>
@@ -6,10 +7,14 @@
 #include <csignal>
 #include <iostream>
 
+struct ProgramArgs : public AgentArgs {
+  std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
+};
+
 bool search_flag = true;
 
 void handle_suspend(int signal) {
-  std::cout << '!' << std::endl;
+  std::cout << 'Search Suspended.' << std::endl;
   search_flag = false;
 }
 
@@ -21,38 +26,25 @@ MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
 
 int main(int argc, char **argv) {
 
-  std::string default_bandit = "exp3-0.03";
-  std::string default_search_time = "0";
-  RuntimeSearch::Agent agent{.search_time = default_search_time,
-                             .bandit_name = default_bandit,
-                             .network_path = "mc",
-                             .flag = &search_flag};
-  uint64_t seed = mt19937{std::random_device{}()}.uniform_64();
-
-  if (argc > 1) {
-    agent.network_path = argv[1];
-  }
-  if (argc > 2) {
-    agent.bandit_name = argv[2];
-  }
-  if (argc > 3) {
-    agent.search_time = argv[3];
-    agent.flag = nullptr;
-  }
-  if (argc > 4) {
-    seed = std::atoll(argv[4]);
-    std::cout << "seed: " << seed << std::endl;
-  }
-
-  std::cout << "network path: " << agent.network_path << std::endl;
-  std::cout << "bandit algorithm: " << agent.bandit_name << std::endl;
-  std::cout << "search time: " << agent.search_time << std::endl;
-
-  RuntimePolicy::Options policy_options{};
-
   std::signal(SIGTSTP, handle_suspend);
 
-  mt19937 device{std::random_device{}()};
+  auto args = argparse::parse<ProgramArgs>(argc, argv);
+
+  auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
+                                    .bandit_name = args.bandit_name,
+                                    .network_path = args.network_path,
+                                    .discrete_network = args.use_discrete};
+
+  if (!args.seed.has_value()) {
+    args.seed.emplace(std::random_device{}());
+  }
+
+  const auto policy_options =
+      RuntimePolicy::Options{.mode = args.policy_mode,
+                             .temp = args.policy_temp,
+                             .min_prob = args.policy_min};
+
+  mt19937 device{args.seed.value()};
   MCTS::BattleData battle_data;
 
   while (true) {
@@ -60,7 +52,7 @@ int main(int argc, char **argv) {
     std::cout << "Input: battle-string" << std::endl;
     std::getline(std::cin, line);
     try {
-      battle_data = parse_input(line, seed);
+      battle_data = parse_input(line, args.seed.value());
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
       continue;

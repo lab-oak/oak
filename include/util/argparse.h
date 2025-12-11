@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../extern/argparse/include/argparse/argparse.hpp"
+#include "argparse/argparse.hpp"
 
 struct TeamBuildingArgs : public argparse::Args {
   double &team_modify_prob =
@@ -50,6 +50,7 @@ struct TeamBuildingArgs : public argparse::Args {
             .set_default(.001);                                                \
   };
 
+MAKE_AGENT_ARGS(AgentArgs, argparse::Args, , "")
 MAKE_AGENT_ARGS(SelfPlayAgentArgs, TeamBuildingArgs, , "")
 MAKE_AGENT_ARGS(P1AgentArgs, TeamBuildingArgs, p1_, "p1-")
 MAKE_AGENT_ARGS(VsAgentArgs, P1AgentArgs, p2_, "p2-")
