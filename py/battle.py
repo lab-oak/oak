@@ -183,11 +183,16 @@ parser.add_argument(
     default=0,
     help="Only use the n-most recent files for freshness",
 )
-
+parser.add_argument(
+    "--delete-window",
+    type=int,
+    default=0,
+    help="Anything outside the most recent \{n\} files is deleted",
+)
 args = parser.parse_args()
 
-torch.set_num_threads(args.threads)
-torch.set_num_interop_threads(args.threads)
+# torch.set_num_threads(args.threads)
+# torch.set_num_interop_threads(args.threads)
 
 
 # TODO accept other optims as arg
@@ -354,6 +359,11 @@ def main():
             print("Minimum files not reached. Sleeping")
             time.sleep(5)
             continue
+
+        if args.delete_window > 0:
+            to_delete = data_files[args.delete_window:]
+            for file in to_delete:
+                os.remove(file)
 
         if args.data_window > 0:
             data_files = data_files[: args.data_window]
