@@ -32,7 +32,7 @@ std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
   const auto choice_data = choice >> 2;
   switch (choice_type) {
   case 0: {
-    return "pass";
+    return "Pass";
   }
   case 1: {
     if (choice_data == 0) {
