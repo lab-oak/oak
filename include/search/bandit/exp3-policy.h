@@ -15,6 +15,7 @@ namespace PExp3 {
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
+#pragma pack(push, 1)
 struct Bandit {
 
   struct Outcome {
@@ -74,7 +75,10 @@ struct Bandit {
     }
   }
 };
+#pragma pack(pop)
 
 using JointBandit = Joint<Bandit>;
+
+static_assert(sizeof(JointBandit) == 146);
 
 }; // namespace PExp3

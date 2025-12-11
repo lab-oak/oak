@@ -80,4 +80,6 @@ struct Bandit {
 
 using JointBandit = Joint<Bandit>;
 
+static_assert(sizeof(JointBandit) == 200);
+
 }; // namespace PUCB

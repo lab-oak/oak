@@ -15,7 +15,7 @@ namespace PExp3_2 {
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct Bandit {
 
   struct Outcome {
