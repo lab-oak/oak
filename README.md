@@ -37,7 +37,7 @@ chmod +x dev/libpkmn && ./dev/libpkmn
 mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
 ```
 
-If the installation fails, it is likely that the wrong version of Zig was used. The following command set `zig` to the a non-installed compiler for the duration of the terminal session. Be sure to change the path to the folder containing the zig compiler binary.
+If the installation fails, it is likely that the wrong version of Zig was used. The following command sets `zig` to the a non-installed compiler for the duration of the terminal session. Be sure to change the path to the folder containing the zig compiler binary.
 
 ```
 export PATH="/home/user/Downloads/zig11/:$PATH"
