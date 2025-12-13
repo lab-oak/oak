@@ -396,7 +396,6 @@ def main():
             continue
 
         if args.apply_symmetries:
-            print("REMOVE symm")
             encoded_frames_torch.permute_pokemon()
             encoded_frames_torch.permute_sides()
 
