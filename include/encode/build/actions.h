@@ -43,7 +43,7 @@ template <typename F = Format::OU> struct Actions {
       std::transform(ls.begin(), ls_end, std::back_inserter(actions),
                      [&team, &empty_slot](const auto species) {
                        return Action{BasicAction{
-                           0, std::distance(team.begin(), empty_slot), 0,
+                           0, static_cast<uint>(std::distance(team.begin(), empty_slot)), 0,
                            species, Move::None}};
                      });
     }
