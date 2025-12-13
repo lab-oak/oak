@@ -42,8 +42,13 @@ struct TeamBuildingArgs : public argparse::Args {
         kwarg(B "policy-mode", "Policy mode").set_default('e');                \
                                                                                \
     double &A##policy_temp =                                                   \
-        kwarg(B "policy-temp", "P-norm when using (e)mpirical mode")           \
+        kwarg(B "policy-temp", "P-norm just before clipping/sampling")         \
             .set_default(2.5);                                                 \
+                                                                               \
+    double &A##policy_nash_weight =                                            \
+        kwarg(B "policy-nash-weight",                                          \
+              "Weight of nash policy when using (m)ixed mode")                 \
+            .set_default(.5);                                                  \
                                                                                \
     double &A##policy_min =                                                    \
         kwarg(B "policy-min", "Probs below this will be zerod")                \

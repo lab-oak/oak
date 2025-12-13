@@ -68,6 +68,23 @@ class EncodedBattleFrames:
         swap(mask, self.p1_empirical, self.p2_empirical)
         swap(mask, self.p1_nash, self.p2_nash)
 
+    def to(self, device):
+        self.m = self.m.to(device)
+        self.n = self.n.to(device)
+        self.p1_choice_indices = self.p1_choice_indices.to(device)
+        self.p2_choice_indices = self.p2_choice_indices.to(device)
+        self.pokemon = self.pokemon.to(device)
+        self.active = self.active.to(device)
+        self.hp = self.hp.to(device)
+        self.p1_empirical = self.p1_empirical.to(device)
+        self.p1_nash = self.p1_nash.to(device)
+        self.p2_empirical = self.p2_empirical.to(device)
+        self.p2_nash = self.p2_nash.to(device)
+        self.empirical_value = self.empirical_value.to(device)
+        self.nash_value = self.nash_value.to(device)
+        self.score = self.score.to(device)
+        return self
+
 
 def hash_bytes(data: bytes) -> int:
     return int.from_bytes(hashlib.blake2b(data, digest_size=8).digest(), "little")
@@ -287,6 +304,17 @@ class OutputBuffers:
         self.p2_policy_logit[:, -1] = -torch.inf
         self.p1_policy.detach_().zero_()
         self.p2_policy.detach_().zero_()
+
+    def to(self, device):
+        self.pokemon.to(device)
+        self.active.to(device)
+        self.sides.to(device)
+        self.value.to(device)
+        self.p1_policy_logit.to(device)
+        self.p2_policy_logit.to(device)
+        self.p1_policy.to(device)
+        self.p2_policy.to(device)
+        return self
 
 
 class BattleNetwork(torch.nn.Module):

@@ -316,6 +316,9 @@ def main():
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    device = torch.device(args.device)
+    print(f"Using device: {device}")
+
     working_dir = ""
     if args.in_place:
         assert args.net_path
@@ -333,7 +336,8 @@ def main():
         args.hidden_dim,
         args.value_hidden_dim,
         args.policy_hidden_dim,
-    )
+    ).to(device)
+
     if args.net_path:
         with open(args.net_path, "rb") as f:
             network.read_parameters(f)
@@ -353,10 +357,12 @@ def main():
         print(f"{len(data_files)} data_files found")
 
     encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
-    encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames)
+    encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames).to(device)
+
     output_buffer = torch_oak.OutputBuffers(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
-    )
+    ).to(device)
+
     optimizer = Optimizer(network, args.lr)
 
     for step in range(args.steps):

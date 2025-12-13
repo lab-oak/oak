@@ -72,6 +72,18 @@ void print(const auto &data, const bool newline = true) {
   }
 }
 
+void print_vec(const auto &data, const bool newline = true) {
+  if constexpr (!debug) {
+    return;
+  }
+  for (const auto &x : data) {
+    std::cout << x << ' ';
+  }
+  if (newline) {
+    std::cout << '\n';
+  }
+}
+
 // Stats for sample team matchup matrix
 struct MatchupMatrix {
 
@@ -283,7 +295,8 @@ void generate(const ProgramArgs *args_ptr) {
     const auto policy_options =
         RuntimePolicy::Options{.mode = args.policy_mode,
                                .temp = args.policy_temp,
-                               .min_prob = args.policy_min};
+                               .min_prob = args.policy_min,
+                               .nash_weight = args.policy_nash_weight};
     const auto rollout_policy_options = RuntimePolicy::Options{
         .mode = 'e', .temp = 1.0, .min_prob = args.policy_min};
 
@@ -347,6 +360,24 @@ void generate(const ProgramArgs *args_ptr) {
               p1_logits.data(), p2_logits.data());
           softmax(output.p1_empirical.data(), p1_logits.data(), output.m);
           softmax(output.p2_empirical.data(), p2_logits.data(), output.n);
+
+          if constexpr (debug) {
+            const auto [p1_labels, p2_labels] =
+                PKMN::choice_labels(battle_data.battle, battle_data.result);
+
+            std::cout << "\nP1 policy:" << std::endl;
+            for (auto i = 0; i < output.m; ++i) {
+              std::cout << p1_labels[i] << ": " << output.p1_empirical[i]
+                        << ' ';
+            }
+            std::cout << std::endl;
+            std::cout << "P2 policy:" << std::endl;
+            for (auto i = 0; i < output.n; ++i) {
+              std::cout << p2_labels[i] << ": " << output.p2_empirical[i]
+                        << ' ';
+            }
+            std::cout << std::endl;
+          }
         } else {
           output = RuntimeSearch::run(battle_data, nodes, agent);
           if (battle_length == 0) {
