@@ -58,6 +58,7 @@ struct CompressedFramesImpl {
 
     static constexpr size_t n_bytes_static(auto m, auto n) {
       // The leading byte is the combination m/n
+      // Max: 1 + 2 + 4 + 4 + 72 = 83
       return sizeof(MN) + 2 * sizeof(pkmn_choice) +
              (new_format ? sizeof(Iter) : 0) + 2 * sizeof(value_type) +
              2 * (m + n) * sizeof(policy_type);

@@ -142,23 +142,6 @@ lib.encode_buffer_2.argtypes = (
 )
 lib.encode_buffer_2.restype = ctypes.c_uint64
 
-lib.encode_buffer_multithread.argtypes = [
-    ctypes.c_uint64,
-    ctypes.c_uint64,
-    ctypes.c_uint64,
-    ctypes.c_uint64,
-    ctypes.c_float,
-    ctypes.c_uint64,
-    ctypes.POINTER(ctypes.c_uint8),  # m
-    ctypes.POINTER(ctypes.c_uint8),  # n
-    ctypes.POINTER(ctypes.c_int64),  # p1_choice_indices
-    ctypes.POINTER(ctypes.c_int64),  # p2_choice_indices
-    ctypes.POINTER(ctypes.c_float),  # pokemon
-    ctypes.POINTER(ctypes.c_float),  # active
-    ctypes.POINTER(ctypes.c_float),  # hp
-] + frame_target_types
-lib.encode_buffer_multithread.restype = ctypes.c_uint64
-
 lib.print_battle_data.argtypes = [
     ctypes.POINTER(ctypes.c_uint8),  # battle
     ctypes.POINTER(ctypes.c_uint8),  # durations

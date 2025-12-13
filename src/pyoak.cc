@@ -240,6 +240,7 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
   }
 
   std::atomic<size_t> count{};
+  std::atomic<size_t> errors{};
 
   const auto start_reading = [&]() -> void {
     std::mt19937 mt{std::random_device{}()};
@@ -248,7 +249,7 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
     std::vector<char> buffer{};
 
     // read path
-    while (true) {
+    while (errors.load() == 0) {
 
       auto battle_index = dist_int(mt);
       auto path_index = 0;
@@ -269,7 +270,9 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
       const char *path = paths[path_index];
       std::ifstream file(path, std::ios::binary);
       if (!file) {
-        throw std::runtime_error{"Unable to open path: " + std::string{path}};
+        const std::string error_msg{"Unable to open file"};
+        std::cerr << path << ": " << error_msg << std::endl;
+        errors.fetch_add(1);
         return;
       }
 
@@ -285,12 +288,16 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
 
       file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
       if (file.gcount() < sizeof(Offset)) {
-        throw std::runtime_error{"Bad offset read"};
+        const std::string error_msg{"Bad offset read"};
+        std::cerr << path << ": " << error_msg << std::endl;
+        errors.fetch_add(1);
         return;
       }
       file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
       if (file.gcount() < sizeof(FrameCount)) {
-        throw std::runtime_error{"Bad frame count read"};
+        const std::string error_msg{"Bad frame count read"};
+        std::cerr << path << ": " << error_msg << std::endl;
+        errors.fetch_add(1);
         return;
       }
 
@@ -300,8 +307,11 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
 
       file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
       if (offset > 200000) {
-        throw std::runtime_error{"Offset too long, likely a bad read: " +
-                                 std::to_string(offset)};
+        const std::string error_msg{
+            "Offset too long, likely a bad read: " + std::to_string(offset) +
+            "; Frames: " + std::to_string(n_frames)};
+        std::cerr << path << ": " << error_msg << std::endl;
+        errors.fetch_add(1);
         return;
       }
       buffer.resize(offset);
@@ -330,138 +340,13 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
       const auto frames = compressed_frames.uncompress();
       const auto &frame = frames[selected_frame_index];
 
-      const auto cur = count.fetch_add(1);
-      if (cur >= max_count) {
+      const auto write_index = count.fetch_add(1);
+      if (write_index >= max_count) {
         return;
       } else {
-        auto input_correct = input.index(cur);
+        auto input_correct = input.index(write_index);
         Encode::Battle::Frame encoded{frame};
         input_correct.write(encoded, frame.target);
-      }
-    }
-  };
-
-  try {
-    std::vector<std::thread> thread_pool{};
-    for (auto i = 0; i < threads; ++i) {
-      thread_pool.emplace_back(std::thread{start_reading});
-    }
-    for (auto i = 0; i < threads; ++i) {
-      thread_pool[i].join();
-    }
-  } catch (...) {
-    return 0;
-  }
-
-  return std::min(count.load(), max_count);
-}
-
-extern "C" size_t encode_buffer_multithread(
-    const char *const *paths, size_t n_paths, size_t threads, size_t max_count,
-    float write_prob, size_t max_game_length, uint8_t *m, uint8_t *n,
-    int64_t *p1_choice_indices, int64_t *p2_choice_indices, float *pokemon,
-    float *active, float *hp, uint32_t *iterations, float *p1_empirical,
-    float *p1_nash, float *p2_empirical, float *p2_nash, float *empirical_value,
-    float *nash_value, float *score) {
-
-  const Encode::Battle::FrameInput input{.m = m,
-                                         .n = n,
-                                         .p1_choice_indices = p1_choice_indices,
-                                         .p2_choice_indices = p2_choice_indices,
-                                         .pokemon = pokemon,
-                                         .active = active,
-                                         .hp = hp,
-                                         .iterations = iterations,
-                                         .p1_empirical = p1_empirical,
-                                         .p1_nash = p1_nash,
-                                         .p2_empirical = p2_empirical,
-                                         .p2_nash = p2_nash,
-                                         .empirical_value = empirical_value,
-                                         .nash_value = nash_value,
-                                         .score = score};
-
-  const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
-  for (const auto *x : ptrs) {
-    if (!x) {
-      std::cerr << "encode_buffer: null pointer in input" << std::endl;
-      return 0;
-    }
-  }
-
-  std::atomic<size_t> count{};
-
-  const auto start_reading = [&]() -> void {
-    std::mt19937 mt{std::random_device{}()};
-    std::uniform_real_distribution<float> dist_real{0, 1};
-    std::uniform_int_distribution<size_t> dist_int{0, n_paths - 1};
-    std::vector<char> buffer{};
-
-    // read path
-    while (true) {
-
-      const auto path_index = dist_int(mt);
-      const char *path = paths[path_index];
-      std::ifstream file(path, std::ios::binary);
-      if (!file) {
-        std::cerr << "Failed to open file: " << path << std::endl;
-        return;
-      }
-
-      // parse file
-      while (true) {
-
-        if (file.peek() == EOF) {
-          break;
-        }
-
-        // read to buffer
-        uint32_t offset;
-        uint16_t n_frames;
-        file.read(reinterpret_cast<char *>(&offset), 4);
-        if (file.gcount() < 4) {
-          std::cerr << "Bad offset read" << std::endl;
-          return;
-        }
-        file.read(reinterpret_cast<char *>(&n_frames), 2);
-        if (file.gcount() < 2) {
-          std::cerr << "Bad n_frames read" << std::endl;
-          return;
-        }
-        file.seekg(-6, std::ios::cur);
-        if (offset > 200000) {
-          throw std::runtime_error{"Too long"};
-          return;
-        }
-        buffer.resize(offset);
-
-        buffer.clear();
-        char *buf = buffer.data();
-        file.read(buf, offset);
-        // parse buffer to compressed
-        Train::Battle::CompressedFrames battle_frames{};
-        battle_frames.read(buf);
-
-        if (battle_frames.updates.size() > max_game_length) {
-          continue;
-        }
-
-        // uncompress
-        const auto frames = battle_frames.uncompress();
-
-        // sample, write to encoded_input
-        for (const auto frame : frames) {
-          const auto r = dist_real(mt);
-          if (r >= write_prob) {
-            continue;
-          }
-          const auto cur = count.fetch_add(1);
-          if (cur >= max_count) {
-            return;
-          }
-          auto input_correct = input.index(cur);
-          Encode::Battle::Frame encoded{frame};
-          input_correct.write(encoded, frame.target);
-        }
       }
     }
   };
@@ -474,7 +359,7 @@ extern "C" size_t encode_buffer_multithread(
     thread_pool[i].join();
   }
 
-  return std::min(count.load(), max_count);
+  return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
 extern "C" int read_build_trajectories(const char *path, int64_t *action,
