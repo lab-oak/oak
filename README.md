@@ -31,7 +31,7 @@ These programs were all built from a shared header library that is easy to exten
 Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
 ```
-git clone --recurse-submodules https://github.com/lab-oak/oak
+git clone --recurse-submodules --shallow-submodules https://github.com/lab-oak/oak
 cd oak && git submodule update --recursive
 chmod +x dev/libpkmn && ./dev/libpkmn
 mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd ..
