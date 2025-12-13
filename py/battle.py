@@ -118,6 +118,12 @@ parser.add_argument(
     default=1,
     help="Interval at which to apply decay",
 )
+parser.add_argument(
+    "--apply-symmetries",
+    type=bool,
+    default=True,
+    help="Whether to permute party Pokemon/Sides",
+)
 
 # Network hyperparameters
 parser.add_argument(
@@ -378,7 +384,7 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        py_oak.encode_buffers_2(
+        samples_read = py_oak.encode_buffers_2(
             sample_indexer,
             encoded_frames,
             args.threads,
@@ -386,9 +392,13 @@ def main():
             args.min_iterations,
         )
 
-        # apply symmetries for more varied data
-        encoded_frames_torch.permute_pokemon()
-        encoded_frames_torch.permute_sides()
+        if samples_read != args.batch_size:
+            continue
+
+        if args.apply_symmetries:
+            print("REMOVE symm")
+            encoded_frames_torch.permute_pokemon()
+            encoded_frames_torch.permute_sides()
 
         network.inference(encoded_frames_torch, output_buffer, not args.no_policy_loss)
 
