@@ -54,6 +54,8 @@ struct ProgramArgs : public VsAgentArgs {
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
 
+constexpr float elo_conversion_factor = 400.0 / std::log(10);
+
 void print(const auto &data, const bool newline = true) {
   std::cout << data;
   if (newline) {
@@ -333,9 +335,14 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
       }
       sleep(1);
     }
-    std::cout << "score: "
-              << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
-              << " over " << RuntimeData::n.load() << " games." << std::endl;
+
+    const double average_score =
+        RuntimeData::score.load() / 2.0 / RuntimeData::n.load();
+    const double elo_difference =
+        inverse_sigmoid(average_score) * elo_conversion_factor;
+
+    std::cout << "score: " << average_score << " over " << RuntimeData::n.load()
+              << " games; Elo diff: " << elo_difference << std::endl;
   }
 }
 
