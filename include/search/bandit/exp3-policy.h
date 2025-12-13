@@ -61,7 +61,7 @@ struct Bandit {
             return params.one_minus_gamma * value + params.gamma * prior;
           });
       // TODO policy has eta as prob for invalid actions
-      outcome.index = std::min(device.sample_pdf(policy), k - 1);
+      outcome.index = std::min(static_cast<uint8_t>(device.sample_pdf(policy)), static_cast<uint8_t>(k - 1));
       outcome.prob = policy[outcome.index];
     }
   }
