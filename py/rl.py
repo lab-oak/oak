@@ -9,7 +9,9 @@ import subprocess
 import py_oak
 import torch_oak
 
-parser = argparse.ArgumentParser(description="Train an Oak battle network.")
+parser = argparse.ArgumentParser(
+    description="Reinforcement learning using a generate process and battle.py."
+)
 
 parser.add_argument(
     "--generate-path",
@@ -26,69 +28,56 @@ parser.add_argument(
 
 # Shared options
 parse.add_argument(
-    "--max-battle-length",
-    type=int,
-    default=200,
-    help="Max battle length"
+    "--max-battle-length", type=int, default=200, help="Max battle length"
 )
 
 # Worker options
-parse.add_argument(
-    "--search-time",
-    type=str,
-    default=2**12,
-    help="Full search time"
+parser.add_argument(
+    "--self-play-threads",
+    type=int,
+    default=(os.cpu_count() - 1),
+    help="Number of threads for self-play data generation",
 )
+parse.add_argument("--search-time", type=str, default=2**12, help="Full search time")
 parse.add_argument(
-    "--fast-search-time",
-    type=str,
-    default=2**10,
-    help="Full search time"
+    "--fast-search-time", type=str, default=2**10, help="Full search time"
 )
 parse.add_argument(
     "--fast-search-prob",
     type=float,
-    default=7/8,
-    help="Probability that only a fast search is used"
+    default=7 / 8,
+    help="Probability that only a fast search is used",
 )
-parse.add_argument(
-    "--teams",
-    type=str,
-    default="",
-    help="Path to teams file"
-)
+parse.add_argument("--teams", type=str, default="", help="Path to teams file")
 parse.add_argument(
     "--bandit-name",
     type=str,
     default="p2exp3-.1",
-    help="Bandit algorithm and parameters"
+    help="Bandit algorithm and parameters",
 )
 parse.add_argument(
-    "--policy-mode",
-    type=str,
-    default="m",
-    help="Mode for move selection"
+    "--policy-mode", type=str, default="m", help="Mode for move selection"
 )
 parse.add_argument(
     "--policy-nash-weight",
     type=float,
-    default=.9,
-    help="Weight of nash policy when using mixed policy mode (default)"
+    default=0.9,
+    help="Weight of nash policy when using mixed policy mode (default)",
 )
 parse.add_argument(
     "--policy-min",
     type=float,
-    default=.001,
-    help="Min prob of action before clamping to 0"
+    default=0.001,
+    help="Min prob of action before clamping to 0",
 )
 
 # General training
 parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 parser.add_argument(
-    "--self-play-threads", type=int, default=(os.cpu_count() - 1), help="Number of threads for self-play data generation"
-)
-parser.add_argument(
-    "--learn-threads", type=int, default=1, help="Number of threads for data loading/training"
+    "--learn-threads",
+    type=int,
+    default=1,
+    help="Number of threads for data loading/training",
 )
 parser.add_argument("--steps", type=int, default=2**30, help="Total training steps")
 parser.add_argument(
@@ -258,24 +247,44 @@ def main():
     os.makedirs(working_dir, exist_ok=False)
     py_oak.save_args(args, working_dir)
 
+    network = torch_oak.BattleNetwork(
+        args.pokemon_hidden_dim,
+        args.active_hidden_dim,
+        args.pokemon_out_dim,
+        args.active_out_dim,
+        args.hidden_dim,
+        args.value_hidden_dim,
+        args.policy_hidden_dim,
+    )
+
+    network_path = os.path.join(working_dir, "random.battle.net")
+    with open(network_path, "wb") as f:
+        network.write_parameters(f)
+
+    data_dir = os.path.join(working_dir, "data")
+
     generate_cmd = [
-        "",
-        "--threads=1",
-        "--max-games=1",
-        "--skip-save",
+        f"./{args.generate_path}",
+        f"--threads={args.self_play_threads}",
+        f"--network-path={network_path}",
+        f"--search-time={args.search_time}",
+        f"--fast-search-time={args.fast_search_time}",
+        f"--fast-search-prob={args.fast_search_prob}",
         f"--teams={args.teams}",
-        f"--p1-network-path={glob.directory[lesserID.net_hash]}",
-        f"--p2-network-path={glob.directory[greaterID.net_hash]}",
-        f"--p1-search-time={lesserID.iterations}",
-        f"--p2-search-time={greaterID.iterations}",
-        f"--p1-bandit-name={lesserID.bandit_name}",
-        f"--p2-bandit-name={greaterID.bandit_name}",
-        f"--p1-policy-mode={lesserID.policy_mode}",
-        f"--p2-policy-mode={greaterID.policy_mode}",
+        f"--bandit-name={args.bandit_name}",
+        f"--policy-mode={args.policy_mode}",
+        f"--policy-nash-weight={args.policy_nash_weight}",
+        f"--policy-min={args.policy_min}",
+        "--buffer-size=1",
+        "--keep-node=false",
     ]
 
     result = subprocess.run(cmd, text=True, capture_output=True)
+    print("Generate process started, sleeping for 5 seconds.")
 
+    sleep(5)
+
+    print("Train process started.")
 
 
 if __name__ == "__main__":
