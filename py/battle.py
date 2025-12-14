@@ -4,6 +4,7 @@ import argparse
 import random
 import time
 import datetime
+import itertools
 
 import py_oak
 import torch_oak
@@ -375,7 +376,7 @@ def main():
 
     optimizer = Optimizer(network, args.lr)
 
-    step_iterator = range(arg.steps) if arg.steps > 0 else count()
+    step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
     for step in step_iterator:
         data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")

@@ -6,6 +6,8 @@ import time
 import datetime
 import subprocess
 import signal
+import threading
+import sys
 
 import py_oak
 import torch_oak
@@ -37,7 +39,7 @@ parser.add_argument(
 
 # Worker options
 parser.add_argument(
-    "--self-play-threads",
+    "--generate-threads",
     type=int,
     default=((os.cpu_count() - 1) or 1),
     help="Number of threads for self-play data generation",
@@ -49,7 +51,10 @@ parser.add_argument(
     required=True,
 )
 parser.add_argument(
-    "--fast-search-time", type=int, help="Number of iterations for non-training frames", required=True
+    "--fast-search-time",
+    type=int,
+    help="Number of iterations for non-training frames",
+    required=True,
 )
 parser.add_argument(
     "--fast-search-prob",
@@ -238,7 +243,15 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-assert args.policy_mode != "m" or args.policy_nash_weight, "Missing --policy-nash-weight while using (m)ixed -policy_mode"
+assert (
+    args.policy_mode != "m" or args.policy_nash_weight
+), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
+
+
+def stream(prefix, pipe):
+    for line in iter(pipe.readline, b""):
+        print(f"[{prefix}] {line.decode()}", end="")
+    pipe.close()
 
 
 def main():
@@ -265,12 +278,12 @@ def main():
     with open(network_path, "wb") as f:
         network.write_parameters(f)
 
-    data_dir = os.path.join(working_dir, "data")
+    data_dir = os.path.join(working_dir, "generate")
     nets_dir = os.path.join(working_dir, "nets")
 
     generate_cmd = [
         f"./{args.generate_path}",
-        f"--threads={args.self_play_threads}",
+        f"--threads={args.generate_threads}",
         f"--network-path={network_path}",
         f"--search-time={args.search_time}",
         f"--fast-search-time={args.fast_search_time}",
@@ -291,21 +304,11 @@ def main():
     if args.no_clamp_parameters:
         generate_cmd.append("--no-clamp-parameters")
 
-    generate_proc = subprocess.Popen(
-        generate_cmd,
-        start_new_session=True,
-        # stdout=subprocess.PIPE,
-        # stderr=subprocess.STDOUT,
-        # text=True,
-    )
-    print("Generate process started, sleeping for 5 seconds.")
-
-    # time.sleep(5)
-
     train_cmd = [
-        f"python3",
+        f"{sys.executable}",
+        "-u",
         f"{args.train_path}",
-        f"--device={args.device}"
+        f"--device={args.device}",
         f"--dir={nets_dir}",
         f"--threads={args.learn_threads}",
         f"--batch-size={args.batch_size}",
@@ -326,14 +329,28 @@ def main():
         "--in-place",
     ]
 
+    generate_proc = subprocess.Popen(
+        generate_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=False,
+        bufsize=1,
+    )
+
     train_proc = subprocess.Popen(
         train_cmd,
-        start_new_session=True,
-        # stdout=subprocess.PIPE,
-        # stderr=subprocess.STDOUT,
-        # text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=False,
+        bufsize=1,
     )
-    print("Train process started.")
+
+    threading.Thread(
+        target=stream, args=("GENERATE", generate_proc.stdout), daemon=True
+    ).start()
+    threading.Thread(
+        target=stream, args=("TRAIN", train_proc.stdout), daemon=True
+    ).start()
 
     try:
         generate_proc.wait()
