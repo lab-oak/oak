@@ -8,11 +8,13 @@ import datetime
 import py_oak
 import torch_oak
 
-parser = argparse.ArgumentParser(description="Train an Oak battle network.")
+parser = argparse.ArgumentParser(
+    description="Train an Oak battle network.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
 parser.add_argument(
     "--in-place",
     action="store_true",
-    dest="in_place",
     help="The parameters saved in --net-path will be updated after every step.",
 )
 parser.add_argument(
@@ -32,7 +34,12 @@ parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 parser.add_argument(
     "--threads", type=int, default=1, help="Number of threads for data loading/training"
 )
-parser.add_argument("--steps", type=int, default=2**30, help="Total training steps")
+parser.add_argument(
+    "--steps",
+    type=int,
+    default=0,
+    help="Total training steps. A value of 0 is treated as infinity",
+)
 parser.add_argument(
     "--checkpoint", type=int, default=50, help="Checkpoint interval (steps)"
 )
@@ -50,9 +57,8 @@ parser.add_argument(
     help="Ignore samples with fewer than these iterations.",
 )
 parser.add_argument(
-    "--clamp-parameters",
-    type=bool,
-    default=True,
+    "--no-clamp-parameters",
+    action="store_true",
     help="Clamp parameters [-2, 2] to support Stockfish style quantization",
 )
 parser.add_argument(
@@ -124,10 +130,9 @@ parser.add_argument(
     help="Interval at which to apply decay",
 )
 parser.add_argument(
-    "--apply-symmetries",
-    type=bool,
-    default=True,
-    help="Whether to permute party Pokemon/Sides",
+    "--no-apply-symmetries",
+    action="store_true",
+    help="Whether to skip permuting Bench/Sides",
 )
 
 # Network hyperparameters
@@ -370,7 +375,9 @@ def main():
 
     optimizer = Optimizer(network, args.lr)
 
-    for step in range(args.steps):
+    step_iterator = range(arg.steps) if arg.steps > 0 else count()
+
+    for step in step_iterator:
         data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
 
         if len(data_files) < args.min_files:
@@ -406,7 +413,7 @@ def main():
         if samples_read != args.batch_size:
             continue
 
-        if args.apply_symmetries:
+        if not args.no_apply_symmetries:
             encoded_frames_torch.permute_pokemon()
             encoded_frames_torch.permute_sides()
 
@@ -419,7 +426,7 @@ def main():
         loss_value.backward()
         optimizer.step()
 
-        if args.clamp_parameters:
+        if not args.no_clamp_parameters:
             network.clamp_parameters()
 
         if step >= args.lr_decay_start:

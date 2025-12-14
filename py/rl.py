@@ -5,18 +5,19 @@ import random
 import time
 import datetime
 import subprocess
+import signal
 
 import py_oak
 import torch_oak
 
 parser = argparse.ArgumentParser(
-    description="Reinforcement learning using a generate process and battle.py."
+    description="Reinforcement learning using a generate process and battle.py",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-
 parser.add_argument(
     "--generate-path",
     type=str,
-    default="./release/generate",
+    default="release/generate",
     help="Path to generate binary",
 )
 parser.add_argument(
@@ -28,66 +29,74 @@ parser.add_argument(
 
 # Shared options
 parser.add_argument(
-    "--max-battle-length", type=int, default=200, help="Max battle length"
+    "--max-battle-length",
+    type=int,
+    default=2000,
+    help="Max battle length in updates (not turns)",
 )
 
 # Worker options
 parser.add_argument(
     "--self-play-threads",
     type=int,
-    default=(os.cpu_count() - 1),
+    default=((os.cpu_count() - 1) or 1),
     help="Number of threads for self-play data generation",
 )
-parser.add_argument("--search-time", type=str, default=2**12, help="Full search time")
 parser.add_argument(
-    "--fast-search-time", type=str, default=2**10, help="Full search time"
+    "--search-time",
+    type=int,
+    help="Number of iterations for training frames",
+    required=True,
+)
+parser.add_argument(
+    "--fast-search-time", type=int, help="Number of iterations for non-training frames", required=True
 )
 parser.add_argument(
     "--fast-search-prob",
     type=float,
-    default=7 / 8,
-    help="Probability that only a fast search is used",
+    help="Probability that fast-search-time is used instead of search-time",
+    required=True,
 )
 parser.add_argument("--teams", type=str, default="", help="Path to teams file")
 parser.add_argument(
     "--bandit-name",
     type=str,
-    default="p2exp3-.1",
-    help="Bandit algorithm and parameters",
+    help="Bandit algorithm and parameters (exp3/pexp3/p2exp3/ucb/pucb)-(exp3 'gamma'/ucb 'c')",
+    required=True,
 )
 parser.add_argument(
-    "--policy-mode", type=str, default="m", help="Mode for move selection"
+    "--policy-mode", type=str, help="Mode for move selection (n/e/x/m)", required=True
 )
 parser.add_argument(
     "--policy-nash-weight",
     type=float,
-    default=0.9,
-    help="Weight of nash policy when using mixed policy mode (default)",
+    help="Weight of nash policy when using mixed policy mode (m)",
 )
 parser.add_argument(
     "--policy-min",
     type=float,
-    default=0.001,
+    default=0,
     help="Min prob of action before clamping to 0",
 )
 
 # General training
-parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
+parser.add_argument("--batch-size", type=int, help="Batch size", required=True)
 parser.add_argument(
     "--learn-threads",
     type=int,
     default=1,
     help="Number of threads for data loading/training",
 )
-parser.add_argument("--steps", type=int, default=2**30, help="Total training steps")
+parser.add_argument("--steps", type=int, default=0, help="Total training steps")
 parser.add_argument(
-    "--checkpoint", type=int, default=50, help="Checkpoint interval (steps)"
+    "--checkpoint", type=int, default=50, help="Checkpoint save interval (steps)"
 )
-parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
 parser.add_argument(
-    "--clamp-parameters",
-    type=bool,
-    default=True,
+    "--lr", type=float, default=0.001, help="Learning rate", required=True
+)
+parser.add_argument(
+    "--no-clamp-parameters",
+    action="store_true",
     help="Clamp parameters [-2, 2] to support Stockfish style quantization",
 )
 parser.add_argument(
@@ -159,9 +168,8 @@ parser.add_argument(
     help="Interval at which to apply decay",
 )
 parser.add_argument(
-    "--apply-symmetries",
-    type=bool,
-    default=True,
+    "--no-apply-symmetries",
+    action="store_true",
     help="Whether to permute party Pokemon/Sides",
 )
 parser.add_argument(
@@ -230,6 +238,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+assert args.policy_mode != "m" or args.policy_nash_weight, "Missing --policy-nash-weight while using (m)ixed -policy_mode"
+
 
 def main():
 
@@ -276,6 +286,11 @@ def main():
         "--keep-node=false",
     ]
 
+    if args.no_apply_symmetries:
+        generate_cmd.append("--no-apply-symmetries")
+    if args.no_clamp_parameters:
+        generate_cmd.append("--no-clamp-parameters")
+
     generate_proc = subprocess.Popen(
         generate_cmd,
         start_new_session=True,
@@ -285,11 +300,12 @@ def main():
     )
     print("Generate process started, sleeping for 5 seconds.")
 
-    time.sleep(5)
+    # time.sleep(5)
 
     train_cmd = [
         f"python3",
         f"{args.train_path}",
+        f"--device={args.device}"
         f"--dir={nets_dir}",
         f"--threads={args.learn_threads}",
         f"--batch-size={args.batch_size}",
@@ -306,6 +322,7 @@ def main():
         f"--lr-decay-start={args.lr_decay_start}",
         f"--data-dir={data_dir}",
         f"--net-path={network_path}",
+        f"--delete-window={args.delete_window}",
         "--in-place",
     ]
 
