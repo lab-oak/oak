@@ -1,5 +1,4 @@
 import os
-import torch
 import argparse
 import random
 import time
@@ -7,44 +6,16 @@ import datetime
 import itertools
 
 import py_oak
-import torch_oak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak battle network.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument(
-    "--in-place",
-    action="store_true",
-    help="The parameters saved in --net-path will be updated after every step.",
-)
-parser.add_argument(
-    "--dir",
-    default=None,
-    help="Output directory for .battle.net files",
-)
-parser.add_argument("--net-path", default="", help="Read directory for network weights")
-parser.add_argument(
-    "--data-dir",
-    default=".",
-    help="Read directory for battle files. All subdirectories are scanned.",
-)
-parser.add_argument("--batch-size", default=2**10, type=int, help="Batch size")
 
-# General training
-parser.add_argument(
-    "--threads", type=int, default=1, help="Number of threads for data loading/training"
-)
-parser.add_argument(
-    "--steps",
-    type=int,
-    default=0,
-    help="Total training steps. A value of 0 is treated as infinity",
-)
-parser.add_argument(
-    "--checkpoint", type=int, default=50, help="Checkpoint interval (steps)"
-)
-parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+import common_args
+
+common_args.add_common_args(parser)
+
 parser.add_argument(
     "--max-battle-length",
     type=int,
@@ -62,20 +33,6 @@ parser.add_argument(
     action="store_true",
     help="Clamp parameters [-2, 2] to support Stockfish style quantization",
 )
-parser.add_argument(
-    "--sleep",
-    type=float,
-    default=0,
-    help="Number of seconds to sleep after parameter update",
-)
-parser.add_argument(
-    "--min-files",
-    type=int,
-    default=1,
-    help="Minimum number of .battle.data files before learning begins",
-)
-
-# Loss options
 parser.add_argument(
     "--w-nash",
     type=float,
@@ -114,21 +71,6 @@ parser.add_argument(
     type=float,
     default=1.0,
     help="Weight for policy loss relative to value loss",
-)
-parser.add_argument(
-    "--lr-decay", type=float, default=1.0, help="Applied each step after decay begins"
-)
-parser.add_argument(
-    "--lr-decay-start",
-    type=int,
-    default=0,
-    help="The first step to begin applying lr decay",
-)
-parser.add_argument(
-    "--lr-decay-interval",
-    type=int,
-    default=1,
-    help="Interval at which to apply decay",
 )
 parser.add_argument(
     "--no-apply-symmetries",
@@ -176,154 +118,135 @@ parser.add_argument(
     default=py_oak.policy_hidden_dim,
     help="Policy head hidden dim",
 )
-
-# Hardware and reproducibility
-parser.add_argument(
-    "--seed", type=int, default=None, help="Random seed for determinism"
-)
-parser.add_argument(
-    "--device",
-    type=str,
-    default=None,
-    help='"cpu" or "cuda". Defaults to CUDA if available.',
-)
-
-# Debug / printing
 parser.add_argument(
     "--print-window",
     type=int,
     default=5,
     help="Number of samples to print for debug output",
 )
-parser.add_argument(
-    "--data-window",
-    type=int,
-    default=0,
-    help="Only use the n-most recent files for freshness",
-)
-parser.add_argument(
-    "--delete-window",
-    type=int,
-    default=0,
-    help="Anything outside the most recent N files is deleted",
-)
-args = parser.parse_args()
-
-# torch.set_num_threads(args.threads)
-# torch.set_num_interop_threads(args.threads)
-
-
-# TODO accept other optims as arg
-class Optimizer:
-    def __init__(self, network: torch.nn.Module, lr):
-        self.opt = torch.optim.Adam(network.parameters(), lr=lr)
-
-    def step(self):
-        self.opt.step()
-
-    def zero_grad(self):
-        self.opt.zero_grad()
-
-
-def masked_kl_div(logit, target):
-    log_probs = torch.log_softmax(logit, dim=-1)
-    log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
-    log_target = torch.log(target)
-    log_target = log_target.masked_fill(torch.isneginf(log_target), 0)
-    kl = target * (log_target - log_probs)
-    # kl = kl.masked_fill(torch.isneginf(logit), 0)
-    return kl.sum(dim=1).mean(dim=0)
-
-
-def masked_cross_entropy(logit, target):
-    log_probs = torch.log_softmax(logit, dim=-1)
-    log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
-    ce = -target * log_probs
-    return ce.sum(dim=1).mean(dim=0)
-
-
-def loss(
-    input: torch_oak.EncodedBattleFrames,
-    output: torch_oak.OutputBuffers,
-    args,
-    print_flag=False,
-):
-    size = min(input.size, output.size)
-
-    # Value target
-    w_nash = args.w_nash
-    w_empirical = args.w_empirical
-    w_score = args.w_score
-
-    assert (w_nash + w_empirical + w_score) == 1, "value target weights don't sum to 1"
-    value_target = (
-        w_nash * input.nash_value[:size]
-        + w_empirical * input.empirical_value[:size]
-        + w_score * input.score[:size]
-    )
-
-    # Policy target
-    w_nash_p = args.w_nash_p
-    w_empirical_p = 1 - w_nash_p
-    assert (w_nash_p + w_empirical_p) == 1
-
-    p1_policy_target = (
-        w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
-    )
-    p2_policy_target = (
-        w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
-    )
-
-    loss = torch.zeros((1,))
-
-    if not args.no_value_loss:
-        loss += torch.nn.functional.mse_loss(output.value[:size], value_target)
-    value_loss = loss.detach().clone()
-
-    if not args.no_policy_loss:
-        p1_policy_loss = masked_cross_entropy(output.p1_policy[:size], p1_policy_target)
-        p2_policy_loss = masked_cross_entropy(output.p2_policy[:size], p2_policy_target)
-        loss += args.w_policy_loss * (p1_policy_loss + p2_policy_loss)
-
-    if print_flag:
-        window = args.print_window
-        print(
-            torch.cat(
-                [
-                    output.value[:window],
-                    value_target[:window],
-                    input.empirical_value[:window],
-                    input.nash_value[:window],
-                    input.score[:window],
-                ],
-                dim=1,
-            )
-        )
-        if not args.no_policy_loss:
-            print("P1 policy inference/target")
-            x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
-                window, 1, 9
-            )
-            y = p1_policy_target[:window].view(window, 1, 9)
-            print(torch.cat([x, y], dim=1))
-            print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
-        if not args.no_value_loss:
-            print(f"loss: v:{value_loss.mean()}")
-
-    return loss
-
-
-def set_seed(seed):
-    random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
 
 
 def main():
-    # Device
+
+    args = parser.parse_args()
+
+    assert (
+        not args.in_place or args.network_path
+    ), "--network-path must be provided when --in-place is used."
+
+    import torch
+    import torch_oak
+
+    torch.set_num_threads(args.threads)
+    torch.set_num_interop_threads(args.threads)
+
+    class Optimizer:
+        def __init__(self, network: torch.nn.Module, lr):
+            self.opt = torch.optim.Adam(network.parameters(), lr=lr)
+
+        def step(self):
+            self.opt.step()
+
+        def zero_grad(self):
+            self.opt.zero_grad()
+
+    def masked_kl_div(logit, target):
+        log_probs = torch.log_softmax(logit, dim=-1)
+        log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
+        log_target = torch.log(target)
+        log_target = log_target.masked_fill(torch.isneginf(log_target), 0)
+        kl = target * (log_target - log_probs)
+        # kl = kl.masked_fill(torch.isneginf(logit), 0)
+        return kl.sum(dim=1).mean(dim=0)
+
+    def masked_cross_entropy(logit, target):
+        log_probs = torch.log_softmax(logit, dim=-1)
+        log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
+        ce = -target * log_probs
+        return ce.sum(dim=1).mean(dim=0)
+
+    def loss(
+        input: torch_oak.EncodedBattleFrames,
+        output: torch_oak.OutputBuffers,
+        args,
+        print_flag=False,
+    ):
+        size = min(input.size, output.size)
+
+        # Value target
+        w_nash = args.w_nash
+        w_empirical = args.w_empirical
+        w_score = args.w_score
+
+        assert (
+            w_nash + w_empirical + w_score
+        ) == 1, "value target weights don't sum to 1"
+        value_target = (
+            w_nash * input.nash_value[:size]
+            + w_empirical * input.empirical_value[:size]
+            + w_score * input.score[:size]
+        )
+
+        # Policy target
+        w_nash_p = args.w_nash_p
+        w_empirical_p = 1 - w_nash_p
+        assert (w_nash_p + w_empirical_p) == 1
+
+        p1_policy_target = (
+            w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
+        )
+        p2_policy_target = (
+            w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
+        )
+
+        loss = torch.zeros((1,))
+
+        if not args.no_value_loss:
+            loss += torch.nn.functional.mse_loss(output.value[:size], value_target)
+        value_loss = loss.detach().clone()
+
+        if not args.no_policy_loss:
+            p1_policy_loss = masked_cross_entropy(
+                output.p1_policy[:size], p1_policy_target
+            )
+            p2_policy_loss = masked_cross_entropy(
+                output.p2_policy[:size], p2_policy_target
+            )
+            loss += args.w_policy_loss * (p1_policy_loss + p2_policy_loss)
+
+        if print_flag:
+            window = args.print_window
+            print(
+                torch.cat(
+                    [
+                        output.value[:window],
+                        value_target[:window],
+                        input.empirical_value[:window],
+                        input.nash_value[:window],
+                        input.score[:window],
+                    ],
+                    dim=1,
+                )
+            )
+            if not args.no_policy_loss:
+                print("P1 policy inference/target")
+                x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
+                    window, 1, 9
+                )
+                y = p1_policy_target[:window].view(window, 1, 9)
+                print(torch.cat([x, y], dim=1))
+                print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
+            if not args.no_value_loss:
+                print(f"loss: v:{value_loss.mean()}")
+
+        return loss
+
     if args.seed is not None:
-        set_seed(args.seed)
+        random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
     device = torch.device(args.device)
@@ -336,9 +259,6 @@ def main():
     os.makedirs(args.dir, exist_ok=False)
     py_oak.save_args(args, args.dir)
 
-    if args.in_place:
-        assert args.net_path
-
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
         args.active_hidden_dim,
@@ -349,23 +269,13 @@ def main():
         args.policy_hidden_dim,
     ).to(device)
 
-    if args.net_path:
-        with open(args.net_path, "rb") as f:
+    if args.network_path:
+        with open(args.network_path, "rb") as f:
             network.read_parameters(f)
 
-    data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
-
-    print("Saving base network in working dir.")
-    with open(os.path.join(args.dir, "random.battle.net"), "wb") as f:
+    with open(os.path.join(args.dir, "initial.battle.net"), "wb") as f:
         network.write_parameters(f)
-
-    if len(data_files) == 0:
-        print(
-            f"No .battle.data files found in {args.data_dir}. Run ./release/generate with appropriate options to make them."
-        )
-        # exit()
-    else:
-        print(f"{len(data_files)} data_files found")
+        print("Saved initial network in output directory.")
 
     encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
     encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames).to(device)
@@ -412,6 +322,7 @@ def main():
         )
 
         if samples_read != args.batch_size:
+            print("Error during sampling, continuing...")
             continue
 
         if not args.no_apply_symmetries:
@@ -438,7 +349,7 @@ def main():
         if ((step + 1) % args.checkpoint) == 0:
             ckpt_path = ""
             if args.in_place:
-                ckpt_path = args.net_path
+                ckpt_path = args.network_path
                 with open(ckpt_path, "wb") as f:
                     network.write_parameters(f)
             ckpt_path = os.path.join(args.dir, f"{step + 1}.battle.net")

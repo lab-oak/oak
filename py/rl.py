@@ -1,8 +1,5 @@
 import os
-import torch
 import argparse
-import random
-import time
 import datetime
 import subprocess
 import signal
@@ -10,7 +7,6 @@ import threading
 import sys
 
 import py_oak
-import torch_oak
 
 parser = argparse.ArgumentParser(
     description="Reinforcement learning using a generate process and battle.py",
@@ -41,7 +37,7 @@ parser.add_argument(
 parser.add_argument(
     "--generate-threads",
     type=int,
-    default=((os.cpu_count() - 1) or 1),
+    default=(((os.cpu_count() or 2) - 1) or 1),
     help="Number of threads for self-play data generation",
 )
 parser.add_argument(
@@ -256,6 +252,9 @@ def stream(prefix, pipe):
 
 def main():
 
+    import torch
+    import torch_oak
+
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -291,18 +290,18 @@ def main():
         f"--teams={args.teams}",
         f"--bandit-name={args.bandit_name}",
         f"--policy-mode={args.policy_mode}",
-        f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
         f"--dir={data_dir}",
         f"--max-battle-length={args.max_battle_length}",
         "--buffer-size=1",
         "--keep-node=false",
     ]
-
     if args.no_apply_symmetries:
         generate_cmd.append("--no-apply-symmetries")
     if args.no_clamp_parameters:
         generate_cmd.append("--no-clamp-parameters")
+    if args.policy_nash_weight is not None:
+        generate_cmd.append(f"--policy-nash-weight={args.policy_nash_weight}")
 
     train_cmd = [
         f"{sys.executable}",
@@ -324,7 +323,7 @@ def main():
         f"--lr-decay={args.lr_decay}",
         f"--lr-decay-start={args.lr_decay_start}",
         f"--data-dir={data_dir}",
-        f"--net-path={network_path}",
+        f"--network-path={network_path}",
         f"--delete-window={args.delete_window}",
         "--in-place",
     ]
