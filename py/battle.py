@@ -15,6 +15,11 @@ parser.add_argument(
     dest="in_place",
     help="The parameters saved in --net-path will be updated after every step.",
 )
+parser.add_argument(
+    "--dir",
+    default=None,
+    help="Output directory for .battle.net files",
+)
 parser.add_argument("--net-path", default="", help="Read directory for network weights")
 parser.add_argument(
     "--data-dir",
@@ -315,18 +320,18 @@ def main():
         set_seed(args.seed)
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
-
     device = torch.device(args.device)
     print(f"Using device: {device}")
 
-    working_dir = ""
+    if args.dir is None:
+        now = datetime.datetime.now()
+        args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
+
+    os.makedirs(args.dir, exist_ok=False)
+    py_oak.save_args(args, args.dir)
+
     if args.in_place:
         assert args.net_path
-
-    now = datetime.datetime.now()
-    working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
-    os.makedirs(working_dir, exist_ok=False)
-    py_oak.save_args(args, working_dir)
 
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
@@ -345,7 +350,7 @@ def main():
     data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
 
     print("Saving base network in working dir.")
-    with open(os.path.join(working_dir, "random.battle.net"), "wb") as f:
+    with open(os.path.join(args.dir, "random.battle.net"), "wb") as f:
         network.write_parameters(f)
 
     if len(data_files) == 0:
@@ -428,7 +433,7 @@ def main():
                 ckpt_path = args.net_path
                 with open(ckpt_path, "wb") as f:
                     network.write_parameters(f)
-            ckpt_path = os.path.join(working_dir, f"{step + 1}.battle.net")
+            ckpt_path = os.path.join(args.dir, f"{step + 1}.battle.net")
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
             print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
