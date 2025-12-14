@@ -333,7 +333,7 @@ def main():
         # optional escalation
         for p in (generate_proc, train_proc):
             try:
-                os.killpg(p.pid, signal.SIGKILL)
+                os.killpg(p.pid, signal.SIGINT)
             except ProcessLookupError:
                 pass
 
