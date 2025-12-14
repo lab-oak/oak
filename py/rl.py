@@ -27,7 +27,7 @@ parser.add_argument(
 )
 
 # Shared options
-parse.add_argument(
+parser.add_argument(
     "--max-battle-length", type=int, default=200, help="Max battle length"
 )
 
@@ -38,33 +38,33 @@ parser.add_argument(
     default=(os.cpu_count() - 1),
     help="Number of threads for self-play data generation",
 )
-parse.add_argument("--search-time", type=str, default=2**12, help="Full search time")
-parse.add_argument(
+parser.add_argument("--search-time", type=str, default=2**12, help="Full search time")
+parser.add_argument(
     "--fast-search-time", type=str, default=2**10, help="Full search time"
 )
-parse.add_argument(
+parser.add_argument(
     "--fast-search-prob",
     type=float,
     default=7 / 8,
     help="Probability that only a fast search is used",
 )
-parse.add_argument("--teams", type=str, default="", help="Path to teams file")
-parse.add_argument(
+parser.add_argument("--teams", type=str, default="", help="Path to teams file")
+parser.add_argument(
     "--bandit-name",
     type=str,
     default="p2exp3-.1",
     help="Bandit algorithm and parameters",
 )
-parse.add_argument(
+parser.add_argument(
     "--policy-mode", type=str, default="m", help="Mode for move selection"
 )
-parse.add_argument(
+parser.add_argument(
     "--policy-nash-weight",
     type=float,
     default=0.9,
     help="Weight of nash policy when using mixed policy mode (default)",
 )
-parse.add_argument(
+parser.add_argument(
     "--policy-min",
     type=float,
     default=0.001,
@@ -84,12 +84,6 @@ parser.add_argument(
     "--checkpoint", type=int, default=50, help="Checkpoint interval (steps)"
 )
 parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-parser.add_argument(
-    "--max-battle-length",
-    type=int,
-    default=10000,
-    help="Ignore games past this length (in updates not turns.)",
-)
 parser.add_argument(
     "--clamp-parameters",
     type=bool,
@@ -243,7 +237,7 @@ def main():
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     now = datetime.datetime.now()
-    working_dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
+    working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
     py_oak.save_args(args, working_dir)
 
@@ -262,6 +256,7 @@ def main():
         network.write_parameters(f)
 
     data_dir = os.path.join(working_dir, "data")
+    nets_dir = os.path.join(working_dir, "nets")
 
     generate_cmd = [
         f"./{args.generate_path}",
@@ -275,16 +270,74 @@ def main():
         f"--policy-mode={args.policy_mode}",
         f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
+        f"--dir={data_dir}",
+        f"--max-battle-length={args.max_battle_length}",
         "--buffer-size=1",
         "--keep-node=false",
     ]
 
-    result = subprocess.run(cmd, text=True, capture_output=True)
+    generate_proc = subprocess.Popen(
+        generate_cmd,
+        start_new_session=True,
+        # stdout=subprocess.PIPE,
+        # stderr=subprocess.STDOUT,
+        # text=True,
+    )
     print("Generate process started, sleeping for 5 seconds.")
 
-    sleep(5)
+    time.sleep(5)
 
+    train_cmd = [
+        f"python3",
+        f"{args.train_path}",
+        f"--dir={nets_dir}",
+        f"--threads={args.learn_threads}",
+        f"--batch-size={args.batch_size}",
+        f"--lr={args.lr}",
+        f"--max-battle-length={args.max_battle_length}",
+        f"--min-iterations={args.search_time}",
+        f"--sleep={args.sleep}",
+        f"--min-files={args.min_files}",
+        f"--data-window={args.data_window}",
+        f"--w-nash={args.w_nash}",
+        f"--w-empirical={args.w_empirical}",
+        f"--w-score={args.w_score}",
+        f"--lr-decay={args.lr_decay}",
+        f"--lr-decay-start={args.lr_decay_start}",
+        f"--data-dir={data_dir}",
+        f"--net-path={network_path}",
+        "--in-place",
+    ]
+
+    train_proc = subprocess.Popen(
+        train_cmd,
+        start_new_session=True,
+        # stdout=subprocess.PIPE,
+        # stderr=subprocess.STDOUT,
+        # text=True,
+    )
     print("Train process started.")
+
+    try:
+        generate_proc.wait()
+        train_proc.wait()
+    except KeyboardInterrupt:
+        print("\nCtrl-C received, killing children...")
+
+        for p in (generate_proc, train_proc):
+            try:
+                os.killpg(p.pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass
+
+        # optional escalation
+        for p in (generate_proc, train_proc):
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    print("Finished.")
 
 
 if __name__ == "__main__":
