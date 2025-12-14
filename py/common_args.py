@@ -3,9 +3,9 @@ import argparse
 
 def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
 
-    prefix = "--" + prefix
     if prefix:
         prefix = prefix + "-"
+    prefix = "--" + prefix
 
     # Program
     parser.add_argument(

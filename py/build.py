@@ -4,10 +4,11 @@ import argparse
 import random
 import time
 
-import py_oak
-import torch_oak
 
-parser = argparse.ArgumentParser(description="Train an Oak build network with PPO.")
+parser = argparse.ArgumentParser(
+    description="Train an Oak build network.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
 
 import common_args
 
@@ -35,6 +36,16 @@ parser.add_argument(
 def main():
 
     args = parser.parse_args()
+
+    assert (
+        not args.in_place or args.network_path
+    ), "--network-path must be provided when --in-place is used."
+
+    import torch
+    import torch_oak
+
+    torch.set_num_threads(args.threads)
+    torch.set_num_interop_threads(args.threads)
 
     # Turn [b, T, 1] actions into [b, T, N] state
     def get_state(actions):
