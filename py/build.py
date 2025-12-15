@@ -17,8 +17,9 @@ common_args.add_common_args(parser)
 parser.add_argument(
     "--keep-prob",
     type=float,
+    required=True,
     default=1.0,
-    help=".",
+    help="The concatenated trajectories are sampled from at this rate to produce a minibatch",
 )
 parser.add_argument(
     "--value-weight",
@@ -27,12 +28,41 @@ parser.add_argument(
     help="Value vs Score weighting.",
 )
 parser.add_argument(
-    "--entropy-weight",
+    "--policy-loss-weight",
+    type=float,
+    default=1.0,
+    help="Coeff to. KLdiv in the loss",
+)
+parser.add_argument(
+    "--value-loss-weight",
+    type=float,
+    default=0.5,
+    help="Coeff. to value head MSE in the loss",
+)
+parser.add_argument(
+    "--entropy-loss-weight",
     type=float,
     default=0.01,
+    help="Coeff. to entropy in the loss",
 )
-
-
+parser.add_argument(
+    "--gamma",
+    type=float,
+    default=0.99,
+    help="PPO",
+)
+parser.add_argument(
+    "--lam",
+    type=float,
+    default=0.95,
+    help="PPO",
+)
+parser.add_argument(
+    "--clip-eps",
+    type=float,
+    default=0.3,
+    help="PPO",
+)
 def main():
 
     args = parser.parse_args()
@@ -59,11 +89,6 @@ def main():
         state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
         return state
 
-    class PPO:
-        def __init__(self):
-            self.gamma = 0.99
-            self.lam = 0.95
-            self.clip_eps = 0.2
 
     def process_targets(
         network: torch_oak.BuildNetwork,
@@ -98,7 +123,7 @@ def main():
         valid_old_logp = torch.log(traj.policy[valid])
         valid_ratio = torch.exp(valid_logp - valid_old_logp)
 
-        # [b, T, 1]
+        # [b, T, 1]W
         ratio = torch.ones_like(traj.policy)
         ratio[valid] = valid_ratio
         score_weight = 1 - args.value_weight
@@ -111,7 +136,7 @@ def main():
         next_value_full = torch.cat(
             [value_full[:, 1:], torch.zeros_like(value_full[:, -1:])], dim=1
         )
-        deltas = rewards + ppo.gamma * next_value_full - value_full
+        deltas = rewards + args.gamma * next_value_full - value_full
 
         advantages = []
         advantage = torch.zeros((b, 1))
@@ -119,14 +144,14 @@ def main():
             # Only update advantage if step is valid
             advantage = (
                 deltas[:, t, :] * valid[:, t].unsqueeze(-1)
-                + ppo.gamma * ppo.lam * advantage
+                + args.gamma * args.lam * advantage
             )
             advantages.insert(0, advantage)
         gae = torch.stack(advantages, dim=1)  # [b, T, 1]
         returns = gae + value_full
 
         surr1 = ratio * gae
-        surr2 = torch.clamp(ratio, 1 - ppo.clip_eps, 1 + ppo.clip_eps) * gae
+        surr2 = torch.clamp(ratio, 1 - args.clip_eps, 1 + args.clip_eps) * gae
         surr = torch.min(surr1, surr2)
         logp = torch.ones_like(traj.policy)
         logp[valid] = valid_logp
@@ -140,7 +165,7 @@ def main():
         return valid_data
 
     def compute_loss_from_targets(
-        surr, returns, values, logp_actions, total, remaining, entropy_weight=0.01
+        surr, returns, values, logp_actions, total, remaining
     ) -> torch.Tensor:
         b = surr.shape[0]
         n = min(b, remaining)
@@ -149,7 +174,9 @@ def main():
         entropy = (
             -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True)[:n].mean()
         )
-        loss = (n / total) * (policy_loss + 0.5 * value_loss - entropy_weight * entropy)
+        loss = (n / total) * (
+            args.policy_loss_weight * policy_loss + args.value_loss_weight * value_loss - entropy_loss_weight * entropy
+        )
         return loss
 
     if args.seed is not None:
@@ -182,18 +209,21 @@ def main():
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
 
-    ppo = PPO()
-
     step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
-    for step in step_iterator:
-        data_files = py_oak.find_data_files(args.data_dir, ext=".build.data")
-        if args.data_window > 0:
-            data_files = data_files[: args.data_window]
+    skipped_steps = 0
+
+    for s in step_iterator:
+
+        step = s - skipped_steps
+
+        data_files, enough = common_args.get_files(args, ".build.data")
+        if not enough:
+            skipped_steps += 1
+            continue
 
         optimizer.zero_grad()
         b = 0
-
         # break batches up by file to limit memory use
         while b < args.batch_size:
             file = random.sample(data_files, 1)[0]
@@ -225,7 +255,7 @@ def main():
                 logp,
                 args.batch_size,
                 args.batch_size - b,
-                args.entropy_weight,
+                args.entropy_loss_weight,
             )
             loss.backward()
 
@@ -233,18 +263,7 @@ def main():
 
         optimizer.step()
 
-        if ((step + 1) % args.checkpoint) == 0:
-            ckpt_path = ""
-            if args.in_place:
-                ckpt_path = args.network_path
-            else:
-                ckpt_path = os.path.join(working_dir, f"{step}.build.net")
-            with open(ckpt_path, "wb") as f:
-                network.write_parameters(f)
-            print(f"Checkpoint saved at step {step}: {ckpt_path}")
-
-        time.sleep(args.sleep)
-
+        common_args.save_and_decay(args, step)
 
 if __name__ == "__main__":
     main()

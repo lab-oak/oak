@@ -288,21 +288,16 @@ def main():
 
     step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
-    for step in step_iterator:
-        data_files = py_oak.find_data_files(args.data_dir, ext=".battle.data")
+    skipped_steps = 0
 
-        if len(data_files) < args.min_files:
-            print("Minimum files not reached. Sleeping")
-            time.sleep(5)
+    for s in step_iterator:
+
+        step = s - skipped_steps
+
+        data_files, enough = common_args.get_files(args)
+        if not enough:
+            skipped_steps += 1
             continue
-
-        if args.delete_window > 0:
-            to_delete = data_files[args.delete_window :]
-            for file in to_delete:
-                os.remove(file)
-
-        if args.data_window > 0:
-            data_files = data_files[: args.data_window]
 
         # TODO wasteful
         sample_indexer = py_oak.SampleIndexer()
@@ -321,7 +316,8 @@ def main():
             args.min_iterations,
         )
 
-        if samples_read != args.batch_size:
+        if samples_read < args.batch_size:\
+            skipped_steps += 1
             print("Error during sampling, continuing...")
             continue
 
@@ -341,24 +337,7 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        if step >= args.lr_decay_start:
-            if (step % args.lr_decay_interval) == 0:
-                for group in optimizer.opt.param_groups:
-                    group["lr"] *= args.lr_decay
-
-        if ((step + 1) % args.checkpoint) == 0:
-            ckpt_path = ""
-            if args.in_place:
-                ckpt_path = args.network_path
-                with open(ckpt_path, "wb") as f:
-                    network.write_parameters(f)
-            ckpt_path = os.path.join(args.dir, f"{step + 1}.battle.net")
-            with open(ckpt_path, "wb") as f:
-                network.write_parameters(f)
-            print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
-
-        time.sleep(args.sleep)
-
+        common_args.save_and_decay(args, step)
 
 if __name__ == "__main__":
     main()

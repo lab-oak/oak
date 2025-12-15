@@ -198,17 +198,17 @@ extern "C" void uncompress_and_encode_training_frames(
   }
 }
 
-extern "C" size_t
-encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
-                size_t min_interations, // params
-                size_t n_paths, const char *const *paths, const int *n_battles,
-                const int *const *offsets,
-                const int *const *n_frames, // input
-                uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
-                int64_t *p2_choice_indices, float *pokemon, float *active,
-                float *hp, uint32_t *iterations, float *p1_empirical,
-                float *p1_nash, float *p2_empirical, float *p2_nash,
-                float *empirical_value, float *nash_value, float *score
+extern "C" size_t sample_from_battle_data_files(
+    size_t max_count, size_t threads, size_t max_battle_length,
+    size_t min_interations, // params
+    size_t n_paths, const char *const *paths, const int *n_battles,
+    const int *const *offsets,
+    const int *const *n_frames, // input
+    uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
+    int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
+    uint32_t *iterations, float *p1_empirical, float *p1_nash,
+    float *p2_empirical, float *p2_nash, float *empirical_value,
+    float *nash_value, float *score
 
 ) {
 
@@ -244,36 +244,42 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
 
   const auto start_reading = [&]() -> void {
     std::mt19937 mt{std::random_device{}()};
-    std::uniform_real_distribution<float> dist_real{0, 1};
     std::uniform_int_distribution<size_t> dist_int{0, total_battles - 1};
     std::vector<char> buffer{};
 
-    // read path
-    while (errors.load() == 0) {
+    const auto report_error = [&](const auto &msg) -> void {
+      std::cerr << msg << std::endl;
+      errors.fetch_add(1);
+      return;
+    };
 
-      auto battle_index = dist_int(mt);
-      auto path_index = 0;
+    while (!errors.load()) {
 
-      while (battle_index >= 0) {
-
-        const auto n_battles_in_path = n_battles[path_index];
-
-        if (n_battles_in_path > battle_index) {
-          break;
-        } else {
-          battle_index -= n_battles_in_path;
-          ++path_index;
+      const auto get_indices = [&]() -> std::pair<uint, uint> {
+        auto bi = dist_int(mt);
+        auto pi = 0;
+        while (bi >= 0) {
+          const auto n_battles_in_path = n_battles[pi];
+          if (n_battles_in_path > bi) {
+            break;
+          } else {
+            bi -= n_battles_in_path;
+            ++pi;
+          }
         }
+        return {bi, pi};
+      };
+
+      const auto [battle_index, path_index] = get_indices();
+
+      if (path_index >= n_paths) {
+        return report_error("bad path index");
       }
 
-      assert(path_index < n_paths);
       const char *path = paths[path_index];
       std::ifstream file(path, std::ios::binary);
       if (!file) {
-        const std::string error_msg{"Unable to open file"};
-        std::cerr << path << ": " << error_msg << std::endl;
-        errors.fetch_add(1);
-        return;
+        return report_error("unable to open file");
       }
 
       const auto battle_offset = offsets[path_index][battle_index];
@@ -288,17 +294,11 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
 
       file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
       if (file.gcount() < sizeof(Offset)) {
-        const std::string error_msg{"Bad offset read"};
-        std::cerr << path << ": " << error_msg << std::endl;
-        errors.fetch_add(1);
-        return;
+        return report_error("bad offset read");
       }
       file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
       if (file.gcount() < sizeof(FrameCount)) {
-        const std::string error_msg{"Bad frame count read"};
-        std::cerr << path << ": " << error_msg << std::endl;
-        errors.fetch_add(1);
-        return;
+        return report_error("bad frame count read");
       }
 
       if (n_frames > max_battle_length) {
@@ -306,17 +306,12 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
       }
 
       file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
-      if (offset > 200000) {
-        const std::string error_msg{
-            "Offset too long, likely a bad read: " + std::to_string(offset) +
-            "; Frames: " + std::to_string(n_frames)};
-        std::cerr << path << ": " << error_msg << std::endl;
-        errors.fetch_add(1);
-        return;
+      if ((offset > 200000) || (offset < sizeof(pkmn_gen1_battle))) {
+        return report_error("Bad offset length: " + std::to_string(offset) +
+                            "; frames: " + std::to_string(n_frames));
       }
       buffer.resize(offset);
       buffer.clear();
-
       file.read(buffer.data(), offset);
       Train::Battle::CompressedFrames compressed_frames{};
       compressed_frames.read(buffer.data());
@@ -344,9 +339,8 @@ encode_buffer_2(size_t max_count, size_t threads, size_t max_battle_length,
       if (write_index >= max_count) {
         return;
       } else {
-        auto input_correct = input.index(write_index);
-        Encode::Battle::Frame encoded{frame};
-        input_correct.write(encoded, frame.target);
+        input.index(write_index)
+            .write(Encode::Battle::Frame{frame}, frame.target);
       }
     }
   };

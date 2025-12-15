@@ -9,10 +9,10 @@ struct TeamBuildingArgs : public argparse::Args {
           .set_default(0);
   double &pokemon_delete_prob =
       kwarg("pokemon-delete-prob",
-            "Probability a set (species/moves) are omitted")
+            "Probability a set (species + moveset) is omitted")
           .set_default(0);
   double &move_delete_prob =
-      kwarg("move-delete-prob", "Probability a move is deleted").set_default(0);
+      kwarg("move-delete-prob", "Probability a move is omitted").set_default(0);
   std::string &build_network_path =
       kwarg("build-network-path", "").set_default("");
   int &max_pokemon = kwarg("max-pokemon", "Max team size").set_default(6);

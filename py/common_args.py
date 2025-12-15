@@ -1,5 +1,8 @@
 import argparse
+import time
+from typing import List
 
+import py_oak
 
 def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
 
@@ -99,3 +102,72 @@ def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
         help="Anything outside the most recent N files is deleted",
     )
     parser.add_argument(prefix + "seed", type=int, help="Random seed for determinism")
+
+
+def namespace_to_cli_args(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> list[str]:
+    result = []
+
+    for action in parser._actions:
+        if not action.option_strings:
+            continue  # positional args
+
+        dest = action.dest
+        value = getattr(args, dest)
+
+        # pick the long option if it exists
+        opt = next(
+            (s for s in action.option_strings if s.startswith("--")),
+            action.option_strings[0],
+        )
+
+        if isinstance(action, argparse._StoreTrueAction):
+            if value:
+                result.append(opt)
+
+        elif isinstance(action, argparse._StoreAction):
+            if value is not None:
+                result.append(f"{opt}={value}")
+
+        # add more action types here if needed
+
+    return result
+
+def get_files(args : argparse.ArgumentParser, ext : str) -> [List[str], bool] :
+    data_files = py_oak.find_data_files(args.data_dir, ext)
+
+    if len(data_files) < args.min_files:
+        print("Minimum files not reached. Sleeping")
+        time.sleep(5)
+        return data_files, False
+
+    if args.delete_window > 0:
+        to_delete = data_files[args.delete_window :]
+        for file in to_delete:
+            os.remove(file)
+
+    if args.data_window > 0:
+        data_files = data_files[: args.data_window]
+
+    return data_files, True
+
+def save_and_decay(args : argparse.ArgumentParser, step : int):
+    if step >= args.lr_decay_start:
+        if (step % args.lr_decay_interval) == 0:
+            for group in opt.param_groups:
+                group["lr"] *= args.lr_decay
+
+    if ((step + 1) % args.checkpoint) == 0:
+        ckpt_path = ""
+        if args.in_place:
+            ckpt_path = args.network_path
+            with open(ckpt_path, "wb") as f:
+                network.write_parameters(f)
+        ckpt_path = os.path.join(args.dir, f"{step + 1}.battle.net")
+        with open(ckpt_path, "wb") as f:
+            network.write_parameters(f)
+        print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
+
+    time.sleep(args.sleep)
+

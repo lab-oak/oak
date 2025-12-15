@@ -125,7 +125,7 @@ lib.read_build_trajectories.argtypes = [
 ]
 lib.read_build_trajectories.restype = ctypes.c_int
 
-lib.encode_buffer_2.argtypes = (
+lib.sample_from_battle_data_files.argtypes = (
     [
         ctypes.c_uint64,  # max_count
         ctypes.c_uint64,  # threads
@@ -140,7 +140,7 @@ lib.encode_buffer_2.argtypes = (
     + encoded_frame_input_types
     + frame_target_types
 )
-lib.encode_buffer_2.restype = ctypes.c_uint64
+lib.sample_from_battle_data_files.restype = ctypes.c_uint64
 
 lib.print_battle_data.argtypes = [
     ctypes.POINTER(ctypes.c_uint8),  # battle
@@ -444,7 +444,7 @@ def encode_buffers_2(
         frames_pp,
     ) + encoded_frames.raw_pointers(0)
 
-    count = lib.encode_buffer_2(*args)
+    count = lib.sample_from_battle_data_files(*args)
     return count
 
 
