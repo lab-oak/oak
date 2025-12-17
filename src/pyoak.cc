@@ -413,6 +413,7 @@ extern "C" size_t read_build_trajectories(const char *path, int64_t *action,
       }
     }
   } catch (const std::exception &e) {
+    std::cerr << e.what() << std::endl;
     return 0;
   }
 }
