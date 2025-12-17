@@ -130,7 +130,7 @@ def get_files(args: argparse.ArgumentParser, ext: str) -> [List[str], bool]:
     return data_files, True
 
 
-def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int):
+def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int, ext: str):
     if step >= args.lr_decay_start:
         if (step % args.lr_decay_interval) == 0:
             for group in opt.param_groups:
@@ -142,7 +142,7 @@ def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int):
             ckpt_path = args.network_path
             with open(ckpt_path, "wb") as f:
                 network.write_parameters(f)
-        ckpt_path = os.path.join(args.dir, f"{step + 1}.battle.net")
+        ckpt_path = os.path.join(args.dir, f"{step + 1}{ext}")
         with open(ckpt_path, "wb") as f:
             network.write_parameters(f)
         print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")

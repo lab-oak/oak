@@ -2,7 +2,10 @@ import os
 import argparse
 import random
 import time
+import datetime
+import itertools
 
+import py_oak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak build network.",
@@ -69,6 +72,9 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     )
 
 
+add_local_args(parser)
+
+
 def main():
 
     args = parser.parse_args()
@@ -98,8 +104,6 @@ def main():
     def process_targets(
         network: torch_oak.BuildNetwork,
         traj: torch_oak.BuildTrajectories,
-        ppo: PPO,
-        value_weight=1,
     ):
         b, T, _ = traj.mask.shape
         # only do up to max traj length
@@ -132,7 +136,7 @@ def main():
         ratio = torch.ones_like(traj.policy)
         ratio[valid] = valid_ratio
         score_weight = 1 - args.value_weight
-        r = value_weight * traj.value + score_weight * traj.score
+        r = args.value_weight * traj.value + score_weight * traj.score
         rewards = torch.zeros_like(traj.policy).scatter(
             1, traj.end.unsqueeze(-1) - 1, r.unsqueeze(-1)
         )
@@ -182,7 +186,7 @@ def main():
         loss = (n / total) * (
             args.policy_loss_weight * policy_loss
             + args.value_loss_weight * value_loss
-            - entropy_loss_weight * entropy
+            - args.entropy_loss_weight * entropy
         )
         return loss
 
@@ -233,9 +237,7 @@ def main():
             # here is where we trunacte the episode length for 1v1, etc
             traj = torch_oak.BuildTrajectories(trajectories, n=T)
 
-            surr, returns, values, logp = process_targets(
-                network, traj, ppo, args.value_weight
-            )
+            surr, returns, values, logp = process_targets(network, traj)
 
             mask = torch.rand(surr.shape) < args.keep_prob
             surr, returns, values, logp = (
@@ -255,7 +257,6 @@ def main():
                 logp,
                 args.batch_size,
                 args.batch_size - b,
-                args.entropy_loss_weight,
             )
             loss.backward()
 
@@ -263,7 +264,7 @@ def main():
 
         optimizer.step()
 
-        common_args.save_and_decay(args, network, optimizer, step)
+        common_args.save_and_decay(args, network, optimizer, step, ".build.net")
 
 
 if __name__ == "__main__":
