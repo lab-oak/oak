@@ -57,6 +57,7 @@ generate_parser.add_argument(
 generate_parser.add_argument(
     "--policy-nash-weight",
     type=float,
+    default=1.0,
     help="Weight of nash policy when using mixed policy mode (m)",
 )
 generate_parser.add_argument(
@@ -67,15 +68,15 @@ generate_parser.add_argument(
 )
 generate_parser.add_argument("--teams", type=str, default="", help="Path to teams file")
 
-# get args from battle.py
+# get args from battle.py/build.py
 
+import common_args
 import battle
-
+common_args.add_common_args(battle_parser, "", True)
 battle.add_local_args(battle_parser, "", True)
 
-import build
-
-build.add_local_args(build_parser, "build", True)
+# import build
+# build.add_local_args(build_parser, "build", True)
 
 parser.add_argument(
     "--generate-path",
@@ -97,38 +98,16 @@ parser.add_argument(
 )
 
 
-def stream(prefix, pipe):
-    for line in iter(pipe.readline, b""):
-        print(f"[{prefix}] {line.decode()}", end="")
-    pipe.close()
-
-
 def main():
 
     args = parser.parse_args()
 
-    use_build: bool = (args.team_modify_prob > 0) and (
-        (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
-    )
-
-    assert (
-        args.policy_mode != "m" or args.policy_nash_weight
-    ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
-
-    # core_battle_args = {}
-    # network_path = None
-    # dir = None
-    # data_dir = .
-    # steps = 0
-    # in_place = False
-
-    # [
-    #     f"network-path={}",
-    #     f"dir={}",
-    #     f"data_dir={}",
-    #     f"steps={}",
-    #     "--in-place",
-    # ]
+    # use_build: bool = (args.team_modify_prob > 0) and (
+    #     (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
+    # )
+    # assert (
+    #     args.policy_mode != "m" or args.policy_nash_weight
+    # ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
     import torch
     import torch_oak
@@ -160,53 +139,61 @@ def main():
 
     generate_cmd = [
         f"./{args.generate_path}",
-        f"--threads={args.generate_threads}",
-        f"--network-path={network_path}",
         f"--search-time={args.search_time}",
         f"--fast-search-time={args.fast_search_time}",
-        f"--fast-search-prob={args.fast_search_prob}",
-        f"--teams={args.teams}",
+        # f"--t1-search-time={args.t1_search_time}",
         f"--bandit-name={args.bandit_name}",
+        f"--network-path={network_path}",
         f"--policy-mode={args.policy_mode}",
+        # f"--policy-temp={args.policy_temp}",
+        f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
         f"--dir={data_dir}",
-        f"--max-battle-length={args.max_battle_length}",
+        f"--threads={args.generate_threads}",
         "--buffer-size=1",
         "--keep-node=false",
+        f"--max-battle-length={args.max_battle_length}",
+        f"--fast-search-prob={args.fast_search_prob}",
+        f"--teams={args.teams}",
     ]
-    if args.no_apply_symmetries:
-        generate_cmd.append("--no-apply-symmetries")
-    if args.no_clamp_parameters:
-        generate_cmd.append("--no-clamp-parameters")
-    if args.policy_nash_weight is not None:
-        generate_cmd.append(f"--policy-nash-weight={args.policy_nash_weight}")
 
-    train_cmd = [
+    # if args.no_apply_symmetries:
+    #     generate_cmd.append("--no-apply-symmetries")
+    # if args.no_clamp_parameters:
+    #     generate_cmd.append("--no-clamp-parameters")
+    # if args.policy_nash_weight is not None:
+    #     generate_cmd.append(f"--policy-nash-weight={args.policy_nash_weight}")
+
+    battle_cmd = [
         f"{sys.executable}",
         "-u",
-        f"{args.train_path}",
-        f"--device={args.device}",
+        f"{args.battle_path}",
+        f"--network-path={network_path}",
         f"--dir={nets_dir}",
-        f"--threads={args.learn_threads}",
+        f"--data-dir={data_dir}",
+        "--in-place",
+        "--steps=0",
+        f"--device={args.device}",
+        f"--threads={args.threads}",
         f"--batch-size={args.batch_size}",
         f"--lr={args.lr}",
-        f"--max-battle-length={args.max_battle_length}",
-        f"--min-iterations={args.search_time}",
-        f"--sleep={args.sleep}",
-        f"--min-files={args.min_files}",
+        f"--lr-decay={args.lr_decay}",
+        f"--lr-decay-start={args.lr_decay_start}",
+        f"--lr-decay-interval={args.lr_decay_interval}",
         f"--data-window={args.data_window}",
+        f"--min-files={args.min_files}",
+        f"--sleep={args.sleep}",
+        f"--checkpoint={args.checkpoint}",
+        f"--delete-window={args.delete_window}",
+        f"--max-battle-length={args.max_battle_length}",
+        f"--min-iterations={args.fast_search_time + 1}",
         f"--w-nash={args.w_nash}",
         f"--w-empirical={args.w_empirical}",
         f"--w-score={args.w_score}",
-        f"--lr-decay={args.lr_decay}",
-        f"--lr-decay-start={args.lr_decay_start}",
-        f"--data-dir={data_dir}",
-        f"--network-path={network_path}",
-        f"--delete-window={args.delete_window}",
-        "--in-place",
+        f"--w-nash-p={args.w_nash_p}",
+        f"--w-policy-loss={args.w_policy_loss}",
+        # Don't need to pass network hyperparams since those are overwritten by the read
     ]
-
-    exit()
 
     generate_proc = subprocess.Popen(
         generate_cmd,
@@ -216,28 +203,33 @@ def main():
         bufsize=1,
     )
 
-    train_proc = subprocess.Popen(
-        train_cmd,
+    battle_proc = subprocess.Popen(
+        battle_cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=False,
         bufsize=1,
     )
 
+    def stream(prefix, pipe):
+        for line in iter(pipe.readline, b""):
+            print(f"[{prefix}] {line.decode()}", end="")
+        pipe.close()
+
     threading.Thread(
         target=stream, args=("GENERATE", generate_proc.stdout), daemon=True
     ).start()
     threading.Thread(
-        target=stream, args=("TRAIN", train_proc.stdout), daemon=True
+        target=stream, args=("TRAIN", battle_proc.stdout), daemon=True
     ).start()
 
     try:
         generate_proc.wait()
-        train_proc.wait()
+        battle_proc.wait()
     except KeyboardInterrupt:
         print("\nCtrl-C received, killing children...")
 
-        for p in (generate_proc, train_proc):
+        for p in (generate_proc, battle_proc):
             try:
                 os.killpg(p.pid, signal.SIGINT)
             except ProcessLookupError:
