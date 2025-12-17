@@ -263,7 +263,7 @@ def main():
 
         optimizer.step()
 
-        common_args.save_and_decay(args, optimizer, step)
+        common_args.save_and_decay(args, network, optimizer, step)
 
 
 if __name__ == "__main__":

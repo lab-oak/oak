@@ -352,7 +352,7 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        common_args.save_and_decay(args, optimizer.opt, step)
+        common_args.save_and_decay(args, network, optimizer.opt, step)
 
 
 if __name__ == "__main__":

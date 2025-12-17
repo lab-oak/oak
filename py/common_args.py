@@ -1,5 +1,6 @@
 import argparse
 import time
+import os
 from typing import List
 
 import py_oak
@@ -129,7 +130,7 @@ def get_files(args: argparse.ArgumentParser, ext: str) -> [List[str], bool]:
     return data_files, True
 
 
-def save_and_decay(args: argparse.ArgumentParser, opt, step: int):
+def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int):
     if step >= args.lr_decay_start:
         if (step % args.lr_decay_interval) == 0:
             for group in opt.param_groups:
