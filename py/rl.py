@@ -55,6 +55,12 @@ generate_parser.add_argument(
     "--policy-mode", type=str, help="Mode for move selection (n/e/x/m)", required=True
 )
 generate_parser.add_argument(
+    "--policy-temp",
+    type=float,
+    default=1,
+    help="P-norm exponent applied just before clipping and sampling",
+)
+generate_parser.add_argument(
     "--policy-nash-weight",
     type=float,
     default=1.0,
@@ -145,7 +151,7 @@ def main():
         f"--bandit-name={args.bandit_name}",
         f"--network-path={network_path}",
         f"--policy-mode={args.policy_mode}",
-        # f"--policy-temp={args.policy_temp}",
+        f"--policy-temp={args.policy_temp}",
         f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
         f"--dir={data_dir}",
@@ -187,11 +193,11 @@ def main():
         f"--delete-window={args.delete_window}",
         f"--max-battle-length={args.max_battle_length}",
         f"--min-iterations={args.fast_search_time + 1}",
-        f"--w-nash={args.w_nash}",
-        f"--w-empirical={args.w_empirical}",
-        f"--w-score={args.w_score}",
-        f"--w-nash-p={args.w_nash_p}",
-        f"--w-policy-loss={args.w_policy_loss}",
+        f"--value-nash-weight={args.value_nash_weight}",
+        f"--value-empirical-weight={args.value_empirical_weight}",
+        f"--value-score-weight={args.value_score_weight}",
+        f"--p-nash-weight={args.p_nash_weight}",
+        f"--policy-loss-weight={args.policy_loss_weight}",
         # Don't need to pass network hyperparams since those are overwritten by the read
     ]
 

@@ -40,28 +40,28 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         help="Clamp parameters [-2, 2] to support Stockfish style quantization",
     )
     parser.add_argument(
-        prefix + "w-nash",
+        prefix + "value-nash-weight",
         type=float,
         default=0.0,
         help="Weight for Nash value in value target",
     )
     parser.add_argument(
-        prefix + "w-empirical",
+        prefix + "value-empirical-weight",
         type=float,
         default=0.0,
         help="Weight for empirical value in value target",
     )
     parser.add_argument(
-        prefix + "w-score",
+        prefix + "value-score-weight",
         type=float,
         default=1.0,
         help="Weight for score in value target",
     )
     parser.add_argument(
-        prefix + "w-nash-p",
+        prefix + "p-nash-weight",
         type=float,
         default=0.0,
-        help="Weight for Nash in policy target (empirical = 1 - this)",
+        help="Weight for Nash in policy target (empirical weight = 1 - this)",
     )
     parser.add_argument(
         prefix + "no-value-loss",
@@ -76,7 +76,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         help="Disable policy loss computation",
     )
     parser.add_argument(
-        prefix + "w-policy-loss",
+        prefix + "policy-loss-weight",
         type=float,
         default=1.0,
         help="Weight for policy loss relative to value loss",
@@ -189,29 +189,29 @@ def main():
         size = min(input.size, output.size)
 
         # Value target
-        w_nash = args.w_nash
-        w_empirical = args.w_empirical
-        w_score = args.w_score
+        value_nash_weight = args.value_nash_weight
+        value_empirical_weight = args.value_empirical_weight
+        value_score_weight = args.value_score_weight
 
         assert (
-            w_nash + w_empirical + w_score
+            value_nash_weight + value_empirical_weight + value_score_weight
         ) == 1, "value target weights don't sum to 1"
         value_target = (
-            w_nash * input.nash_value[:size]
-            + w_empirical * input.empirical_value[:size]
-            + w_score * input.score[:size]
+            value_nash_weight * input.nash_value[:size]
+            + value_empirical_weight * input.empirical_value[:size]
+            + value_score_weight * input.score[:size]
         )
 
         # Policy target
-        w_nash_p = args.w_nash_p
-        w_empirical_p = 1 - w_nash_p
-        assert (w_nash_p + w_empirical_p) == 1
+        p_nash_weight = args.p_nash_weight
+        value_empirical_weight_p = 1 - p_nash_weight
+        assert (p_nash_weight + value_empirical_weight_p) == 1
 
         p1_policy_target = (
-            w_empirical_p * input.p1_empirical[:size] + w_nash_p * input.p1_nash[:size]
+            value_empirical_weight_p * input.p1_empirical[:size] + p_nash_weight * input.p1_nash[:size]
         )
         p2_policy_target = (
-            w_empirical_p * input.p2_empirical[:size] + w_nash_p * input.p2_nash[:size]
+            value_empirical_weight_p * input.p2_empirical[:size] + p_nash_weight * input.p2_nash[:size]
         )
 
         loss = torch.zeros((1,))
@@ -227,7 +227,7 @@ def main():
             p2_policy_loss = masked_cross_entropy(
                 output.p2_policy[:size], p2_policy_target
             )
-            loss += args.w_policy_loss * (p1_policy_loss + p2_policy_loss)
+            loss += args.policy_loss_weight * (p1_policy_loss + p2_policy_loss)
 
         if print_flag:
             window = args.print_window

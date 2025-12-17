@@ -320,8 +320,8 @@ TODO is a simple script for training using [PPO](https://en.wikipedia.org/wiki/P
 ```
 ~/oak$ python3 py/train.py
 usage: train.py [-h] [--threads THREADS] [--steps STEPS] [--checkpoint CHECKPOINT] [--lr LR]
-                [--write-prob WRITE_PROB] [--w-nash W_NASH] [--w-empirical W_EMPIRICAL]
-                [--w-score W_SCORE] [--w-nash-p W_NASH_P] [--no-policy-loss] [--seed SEED]
+                [--write-prob WRITE_PROB] [--value-nash-weight W_NASH] [--value-empirical-weight W_EMPIRICAL]
+                [--value-score-weight W_SCORE] [--p-nash-weight W_NASH_P] [--no-policy-loss] [--seed SEED]
                 [--device DEVICE] [--print-window PRINT_WINDOW]
                 net_dir battle_dir batch_size
 train.py: error: the following arguments are required: net_dir, battle_dir, batch_size
@@ -331,7 +331,7 @@ A few kargs deserve some explanation
 
 * `--write-prob=`
 
-* `--w-score`/`--w-nash`/`--w-empirical`
+* `--value-score-weight`/`--value-nash-weight`/`--value-empirical-weight`
 
 * `--threads`
 
@@ -350,7 +350,7 @@ Directory to recursively scan for battle files. Simply `.` will scan the current
 Batch size for the optimizer.
 
 ```
-~/oak$ python3 py/train.py --steps=2000 --w-empirical=1 --
+~/oak$ python3 py/train.py --steps=2000 --value-empirical-weight=1 --
 ```
 
 ## Iteration
