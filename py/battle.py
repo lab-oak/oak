@@ -16,114 +16,129 @@ import common_args
 
 common_args.add_common_args(parser)
 
-parser.add_argument(
-    "--max-battle-length",
-    type=int,
-    default=10000,
-    help="Ignore games past this length (in updates not turns.)",
-)
-parser.add_argument(
-    "--min-iterations",
-    type=int,
-    default=1,
-    help="Ignore samples with fewer than these iterations.",
-)
-parser.add_argument(
-    "--no-clamp-parameters",
-    action="store_true",
-    help="Clamp parameters [-2, 2] to support Stockfish style quantization",
-)
-parser.add_argument(
-    "--w-nash",
-    type=float,
-    default=0.0,
-    help="Weight for Nash value in value target",
-)
-parser.add_argument(
-    "--w-empirical",
-    type=float,
-    default=0.0,
-    help="Weight for empirical value in value target",
-)
-parser.add_argument(
-    "--w-score", type=float, default=1.0, help="Weight for score in value target"
-)
-parser.add_argument(
-    "--w-nash-p",
-    type=float,
-    default=0.0,
-    help="Weight for Nash in policy target (empirical = 1 - this)",
-)
-parser.add_argument(
-    "--no-value-loss",
-    action="store_true",
-    dest="no_value_loss",
-    help="Disable value loss computation",
-)
-parser.add_argument(
-    "--no-policy-loss",
-    action="store_true",
-    dest="no_policy_loss",
-    help="Disable policy loss computation",
-)
-parser.add_argument(
-    "--w-policy-loss",
-    type=float,
-    default=1.0,
-    help="Weight for policy loss relative to value loss",
-)
-parser.add_argument(
-    "--no-apply-symmetries",
-    action="store_true",
-    help="Whether to skip permuting Bench/Sides",
-)
 
-# Network hyperparameters
-parser.add_argument(
-    "--pokemon-hidden-dim",
-    type=int,
-    default=py_oak.pokemon_hidden_dim,
-    help="Pokemon encoding net hidden dim",
-)
-parser.add_argument(
-    "--active-hidden-dim",
-    type=int,
-    default=py_oak.active_hidden_dim,
-    help="ActivePokemon encoding net hidden dim",
-)
-parser.add_argument(
-    "--pokemon-out-dim",
-    type=int,
-    default=py_oak.pokemon_out_dim,
-    help="Pokemon encoding net output dim",
-)
-parser.add_argument(
-    "--active-out-dim",
-    type=int,
-    default=py_oak.active_out_dim,
-    help="ActivePokemon encoding net output dim",
-)
-parser.add_argument(
-    "--hidden-dim", type=int, default=py_oak.hidden_dim, help="Main subnet hidden dim"
-)
-parser.add_argument(
-    "--value-hidden-dim",
-    type=int,
-    default=py_oak.value_hidden_dim,
-    help="Value head hidden dim",
-)
-parser.add_argument(
-    "--policy-hidden-dim",
-    type=int,
-    default=py_oak.policy_hidden_dim,
-    help="Policy head hidden dim",
-)
-parser.add_argument(
-    "--print-window",
-    type=int,
-    default=5,
-    help="Number of samples to print for debug output",
-)
+def add_local_args(parser, prefix: str = "", rl: bool = False):
+    if prefix:
+        prefix = prefix + "-"
+    prefix = "--" + prefix
+
+    parser.add_argument(
+        prefix + "max-battle-length",
+        type=int,
+        default=10000,
+        help="Ignore games past this length (in updates not turns.)",
+    )
+    parser.add_argument(
+        prefix + "min-iterations",
+        type=int,
+        default=1,
+        help="Ignore samples with fewer than these iterations.",
+    )
+    parser.add_argument(
+        prefix + "no-clamp-parameters",
+        action="store_true",
+        help="Clamp parameters [-2, 2] to support Stockfish style quantization",
+    )
+    parser.add_argument(
+        prefix + "w-nash",
+        type=float,
+        default=0.0,
+        help="Weight for Nash value in value target",
+    )
+    parser.add_argument(
+        prefix + "w-empirical",
+        type=float,
+        default=0.0,
+        help="Weight for empirical value in value target",
+    )
+    parser.add_argument(
+        prefix + "w-score",
+        type=float,
+        default=1.0,
+        help="Weight for score in value target",
+    )
+    parser.add_argument(
+        prefix + "w-nash-p",
+        type=float,
+        default=0.0,
+        help="Weight for Nash in policy target (empirical = 1 - this)",
+    )
+    parser.add_argument(
+        prefix + "no-value-loss",
+        action="store_true",
+        dest="no_value_loss",
+        help="Disable value loss computation",
+    )
+    parser.add_argument(
+        prefix + "no-policy-loss",
+        action="store_true",
+        dest="no_policy_loss",
+        help="Disable policy loss computation",
+    )
+    parser.add_argument(
+        prefix + "w-policy-loss",
+        type=float,
+        default=1.0,
+        help="Weight for policy loss relative to value loss",
+    )
+    parser.add_argument(
+        prefix + "no-apply-symmetries",
+        action="store_true",
+        help="Whether to skip permuting Bench/Sides",
+    )
+
+    # Network hyperparameters
+    parser.add_argument(
+        prefix + "pokemon-hidden-dim",
+        type=int,
+        default=py_oak.pokemon_hidden_dim,
+        help="Pokemon encoding net hidden dim",
+    )
+    parser.add_argument(
+        prefix + "active-hidden-dim",
+        type=int,
+        default=py_oak.active_hidden_dim,
+        help="ActivePokemon encoding net hidden dim",
+    )
+    parser.add_argument(
+        prefix + "pokemon-out-dim",
+        type=int,
+        default=py_oak.pokemon_out_dim,
+        help="Pokemon encoding net output dim",
+    )
+    parser.add_argument(
+        prefix + "active-out-dim",
+        type=int,
+        default=py_oak.active_out_dim,
+        help="ActivePokemon encoding net output dim",
+    )
+    parser.add_argument(
+        prefix + "hidden-dim",
+        type=int,
+        default=py_oak.hidden_dim,
+        help="Main subnet hidden dim",
+    )
+    parser.add_argument(
+        prefix + "value-hidden-dim",
+        type=int,
+        default=py_oak.value_hidden_dim,
+        help="Value head hidden dim",
+    )
+    parser.add_argument(
+        prefix + "policy-hidden-dim",
+        type=int,
+        default=py_oak.policy_hidden_dim,
+        help="Policy head hidden dim",
+    )
+    parser.add_argument(
+        prefix + "print-window",
+        type=int,
+        default=5,
+        help="Number of samples to print for debug output",
+    )
+
+
+add_local_args(parser)
 
 
 def main():
@@ -294,7 +309,7 @@ def main():
 
         step = s - skipped_steps
 
-        data_files, enough = common_args.get_files(args)
+        data_files, enough = common_args.get_files(args, ".battle.data")
         if not enough:
             skipped_steps += 1
             continue
@@ -308,7 +323,7 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        samples_read = py_oak.encode_buffers_2(
+        samples_read = py_oak.sample_from_battle_data_files(
             sample_indexer,
             encoded_frames,
             args.threads,
@@ -316,7 +331,7 @@ def main():
             args.min_iterations,
         )
 
-        if samples_read < args.batch_size:\
+        if samples_read < args.batch_size:
             skipped_steps += 1
             print("Error during sampling, continuing...")
             continue
@@ -337,7 +352,8 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        common_args.save_and_decay(args, step)
+        common_args.save_and_decay(args, optimizer.opt, step)
+
 
 if __name__ == "__main__":
     main()

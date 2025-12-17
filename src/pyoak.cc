@@ -28,8 +28,8 @@ constexpr auto dim_labels_to_c(const auto &data) {
 
 const auto move_names_ptrs = dim_labels_to_c(PKMN::Data::MOVE_CHAR_ARRAY);
 const auto species_names_ptrs = dim_labels_to_c(PKMN::Data::SPECIES_CHAR_ARRAY);
-extern "C" const char *const *move_names = move_names_ptrs.data();
-extern "C" const char *const *species_names = species_names_ptrs.data();
+const char *const *move_names = move_names_ptrs.data();
+const char *const *species_names = species_names_ptrs.data();
 
 using Tensorizer = Encode::Build::Tensorizer<>;
 
@@ -48,7 +48,7 @@ consteval auto get_species_move_list_py() {
 
 const auto species_move_list_py = get_species_move_list_py();
 
-extern "C" const int *species_move_list_ptrs = species_move_list_py.data();
+const int *species_move_list_ptrs = species_move_list_py.data();
 
 const auto pokemon_dim_label_ptrs =
     dim_labels_to_c(Encode::Battle::Pokemon::dim_labels);
@@ -57,10 +57,9 @@ const auto active_dim_label_ptrs =
 const auto policy_dim_label_ptrs =
     dim_labels_to_c(Encode::Battle::Policy::dim_labels);
 
-extern "C" const char *const *pokemon_dim_labels =
-    pokemon_dim_label_ptrs.data();
-extern "C" const char *const *active_dim_labels = active_dim_label_ptrs.data();
-extern "C" const char *const *policy_dim_labels = policy_dim_label_ptrs.data();
+const char *const *pokemon_dim_labels = pokemon_dim_label_ptrs.data();
+const char *const *active_dim_labels = active_dim_label_ptrs.data();
+const char *const *policy_dim_labels = policy_dim_label_ptrs.data();
 
 extern "C" const int pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
 extern "C" const int active_in_dim = Encode::Battle::Active::n_dim;
@@ -143,21 +142,22 @@ extern "C" void uncompress_training_frames(
   Train::Battle::CompressedFrames compressed_frames{};
   compressed_frames.read(data);
 
-  Train::Battle::FrameInput input{.m = m,
-                                  .n = n,
-                                  .battle = battle,
-                                  .durations = durations,
-                                  .result = result,
-                                  .p1_choices = p1_choices,
-                                  .p2_choices = p2_choices,
-                                  .iterations = iterations,
-                                  .p1_empirical = p1_empirical,
-                                  .p1_nash = p1_nash,
-                                  .p2_empirical = p2_empirical,
-                                  .p2_nash = p2_nash,
-                                  .empirical_value = empirical_value,
-                                  .nash_value = nash_value,
-                                  .score = score};
+  using In = Train::Battle::FrameInput;
+  In input{.m = m,
+           .n = n,
+           .battle = battle,
+           .durations = durations,
+           .result = result,
+           .p1_choices = p1_choices,
+           .p2_choices = p2_choices,
+           .iterations = iterations,
+           .p1_empirical = p1_empirical,
+           .p1_nash = p1_nash,
+           .p2_empirical = p2_empirical,
+           .p2_nash = p2_nash,
+           .empirical_value = empirical_value,
+           .nash_value = nash_value,
+           .score = score};
 
   const auto frames = compressed_frames.uncompress();
   for (const auto frame : frames) {
@@ -211,22 +211,22 @@ extern "C" size_t sample_from_battle_data_files(
     float *nash_value, float *score
 
 ) {
-
-  const Encode::Battle::FrameInput input{.m = m,
-                                         .n = n,
-                                         .p1_choice_indices = p1_choice_indices,
-                                         .p2_choice_indices = p2_choice_indices,
-                                         .pokemon = pokemon,
-                                         .active = active,
-                                         .hp = hp,
-                                         .iterations = iterations,
-                                         .p1_empirical = p1_empirical,
-                                         .p1_nash = p1_nash,
-                                         .p2_empirical = p2_empirical,
-                                         .p2_nash = p2_nash,
-                                         .empirical_value = empirical_value,
-                                         .nash_value = nash_value,
-                                         .score = score};
+  using Input = Encode::Battle::FrameInput;
+  Input input{m,
+              n,
+              p1_choice_indices,
+              p2_choice_indices,
+              pokemon,
+              active,
+              hp,
+              iterations,
+              p1_empirical,
+              p1_nash,
+              p2_empirical,
+              p2_nash,
+              empirical_value,
+              nash_value,
+              score};
 
   const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
   if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; })) {
@@ -253,95 +253,101 @@ extern "C" size_t sample_from_battle_data_files(
       return;
     };
 
-    while (!errors.load()) {
+    try {
 
-      const auto get_indices = [&]() -> std::pair<uint, uint> {
-        auto bi = dist_int(mt);
-        auto pi = 0;
-        while (bi >= 0) {
-          const auto n_battles_in_path = n_battles[pi];
-          if (n_battles_in_path > bi) {
-            break;
-          } else {
-            bi -= n_battles_in_path;
-            ++pi;
+      while (!errors.load()) {
+
+        const auto get_indices = [&]() -> std::pair<uint, uint> {
+          auto bi = dist_int(mt);
+          auto pi = 0;
+          while (bi >= 0) {
+            const auto n_battles_in_path = n_battles[pi];
+            if (n_battles_in_path > bi) {
+              break;
+            } else {
+              bi -= n_battles_in_path;
+              ++pi;
+            }
+          }
+          return {bi, pi};
+        };
+
+        const auto [battle_index, path_index] = get_indices();
+
+        if (path_index >= n_paths) {
+          return report_error("bad path index");
+        }
+
+        const char *path = paths[path_index];
+        std::ifstream file(path, std::ios::binary);
+        if (!file) {
+          return report_error("unable to open file");
+        }
+
+        const auto battle_offset = offsets[path_index][battle_index];
+
+        file.seekg(battle_offset, std::ios::beg);
+
+        using Offset = Train::Battle::CompressedFrames::Offset;
+        using FrameCount = Train::Battle::CompressedFrames::FrameCount;
+
+        Offset offset;
+        FrameCount n_frames;
+
+        file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
+        if (file.gcount() < sizeof(Offset)) {
+          return report_error("bad offset read");
+        }
+        file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
+        if (file.gcount() < sizeof(FrameCount)) {
+          return report_error("bad frame count read");
+        }
+
+        if (n_frames > max_battle_length) {
+          continue;
+        }
+
+        file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
+        if ((offset > 200000) || (offset < sizeof(pkmn_gen1_battle))) {
+          return report_error("Bad offset length: " + std::to_string(offset) +
+                              "; frames: " + std::to_string(n_frames));
+        }
+        buffer.resize(offset);
+        buffer.clear();
+        file.read(buffer.data(), offset);
+        Train::Battle::CompressedFrames compressed_frames{};
+        compressed_frames.read(buffer.data());
+
+        std::vector<int> valid_frame_indices{};
+        for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
+          const auto &update = compressed_frames.updates[i];
+          if (update.iterations >= min_interations) {
+            valid_frame_indices.push_back(i);
           }
         }
-        return {bi, pi};
-      };
 
-      const auto [battle_index, path_index] = get_indices();
+        if (valid_frame_indices.size() == 0) {
+          continue;
+        }
 
-      if (path_index >= n_paths) {
-        return report_error("bad path index");
-      }
+        const auto selected_frame_index =
+            valid_frame_indices[std::uniform_int_distribution<size_t>{
+                0, valid_frame_indices.size() - 1}(mt)];
 
-      const char *path = paths[path_index];
-      std::ifstream file(path, std::ios::binary);
-      if (!file) {
-        return report_error("unable to open file");
-      }
+        const auto frames = compressed_frames.uncompress();
+        const auto &frame = frames[selected_frame_index];
 
-      const auto battle_offset = offsets[path_index][battle_index];
-
-      file.seekg(battle_offset, std::ios::beg);
-
-      using Offset = Train::Battle::CompressedFrames::Offset;
-      using FrameCount = Train::Battle::CompressedFrames::FrameCount;
-
-      Offset offset;
-      FrameCount n_frames;
-
-      file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
-      if (file.gcount() < sizeof(Offset)) {
-        return report_error("bad offset read");
-      }
-      file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
-      if (file.gcount() < sizeof(FrameCount)) {
-        return report_error("bad frame count read");
-      }
-
-      if (n_frames > max_battle_length) {
-        continue;
-      }
-
-      file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
-      if ((offset > 200000) || (offset < sizeof(pkmn_gen1_battle))) {
-        return report_error("Bad offset length: " + std::to_string(offset) +
-                            "; frames: " + std::to_string(n_frames));
-      }
-      buffer.resize(offset);
-      buffer.clear();
-      file.read(buffer.data(), offset);
-      Train::Battle::CompressedFrames compressed_frames{};
-      compressed_frames.read(buffer.data());
-
-      std::vector<int> valid_frame_indices{};
-      for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
-        const auto &update = compressed_frames.updates[i];
-        if (update.iterations >= min_interations) {
-          valid_frame_indices.push_back(i);
+        const auto write_index = count.fetch_add(1);
+        if (write_index >= max_count) {
+          return;
+        } else {
+          input.index(write_index)
+              .write(Encode::Battle::Frame{frame}, frame.target);
         }
       }
 
-      if (valid_frame_indices.size() == 0) {
-        continue;
-      }
-
-      const auto selected_frame_index =
-          valid_frame_indices[std::uniform_int_distribution<size_t>{
-              0, valid_frame_indices.size() - 1}(mt)];
-
-      const auto frames = compressed_frames.uncompress();
-      const auto &frame = frames[selected_frame_index];
-
-      const auto write_index = count.fetch_add(1);
-      if (write_index >= max_count) {
-        return;
-      } else {
-        input.index(write_index)
-            .write(Encode::Battle::Frame{frame}, frame.target);
-      }
+    } catch (const std::exception &e) {
+      report_error(e.what());
     }
   };
 
@@ -356,10 +362,10 @@ extern "C" size_t sample_from_battle_data_files(
   return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
-extern "C" int read_build_trajectories(const char *path, int64_t *action,
-                                       int64_t *mask, float *policy,
-                                       float *value, float *score,
-                                       int64_t *start, int64_t *end) {
+extern "C" size_t read_build_trajectories(const char *path, int64_t *action,
+                                          int64_t *mask, float *policy,
+                                          float *value, float *score,
+                                          int64_t *start, int64_t *end) {
 
   std::ifstream file(path, std::ios::binary);
   if (!file) {
@@ -367,47 +373,48 @@ extern "C" int read_build_trajectories(const char *path, int64_t *action,
     return -1;
   }
 
-  Encode::Build::TrajectoryInput input{.action = action,
-                                       .mask = mask,
-                                       .policy = policy,
-                                       .value = value,
-                                       .score = score,
-                                       .start = start,
-                                       .end = end};
+  using In = Encode::Build::TrajectoryInput;
+  In input{.action = action,
+           .mask = mask,
+           .policy = policy,
+           .value = value,
+           .score = score,
+           .start = start,
+           .end = end};
 
   const auto ptrs = std::bit_cast<std::array<void *, 7>>(input);
-  for (const auto *x : ptrs) {
-    if (!x) {
-      std::cerr << "read_build_trajectories: null pointer in input"
-                << std::endl;
-      return -1;
-    }
+  if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; })) {
+    std::cerr << "null pointer in input" << std::endl;
+    return 0;
   }
 
-  int count = 0;
+  try {
+    size_t count = 0;
+    while (true) {
+      Encode::Build::CompressedTrajectory<> traj;
+      file.read(reinterpret_cast<char *>(&traj),
+                Encode::Build::CompressedTrajectory<>::size_no_team);
+      if (file.gcount() < Encode::Build::CompressedTrajectory<>::size_no_team) {
+        std::cerr << "bad build trajectory read" << std::endl;
+        return 0;
+      }
+      const auto format = static_cast<uint8_t>(traj.header.format);
+      if (format != 0) {
+        std::cerr << "only NoTeam trajectories can be read this way"
+                  << std::endl;
+        return 0;
+      }
 
-  while (true) {
-    Encode::Build::CompressedTrajectory<> traj;
-    file.read(reinterpret_cast<char *>(&traj),
-              Encode::Build::CompressedTrajectory<>::size_no_team);
-    if (file.gcount() < Encode::Build::CompressedTrajectory<>::size_no_team) {
-      std::cerr << "bad build trajectory read" << std::endl;
-      return -1;
-    }
-    const auto format = static_cast<uint8_t>(traj.header.format);
-    if (format != 0) {
-      std::cerr << "only NoTeam trajectories can be read this way" << std::endl;
-      return -1;
-    }
+      input.write(traj);
+      ++count;
 
-    input.write(traj);
-    ++count;
-
-    if (file.peek() == EOF) {
-      return count;
+      if (file.peek() == EOF) {
+        return count;
+      }
     }
+  } catch (const std::exception &e) {
+    return 0;
   }
-  return -1;
 }
 
 extern "C" void print_battle_data(uint8_t *battle_bytes,

@@ -5,13 +5,78 @@ import subprocess
 import signal
 import threading
 import sys
+from typing import Dict
 
 import py_oak
 
+
 parser = argparse.ArgumentParser(
-    description="Reinforcement learning using a generate process and battle.py",
+    description="Reinforcement learning using a generate process and battle.py (and optionally build.py)",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
+
+
+generate_parser = parser.add_argument_group("Data generation training arguments")
+battle_parser = parser.add_argument_group("Battle network training arguments")
+build_parser = parser.add_argument_group("Build network training arguments")
+
+
+generate_parser.add_argument(
+    "--generate-threads",
+    type=int,
+    default=(((os.cpu_count() or 2) - 1) or 1),
+    help="Number of threads for self-play data generation",
+)
+generate_parser.add_argument(
+    "--search-time",
+    type=int,
+    help="Number of iterations for training frames",
+    required=True,
+)
+generate_parser.add_argument(
+    "--fast-search-time",
+    type=int,
+    help="Number of iterations for non-training frames",
+    required=True,
+)
+generate_parser.add_argument(
+    "--fast-search-prob",
+    type=float,
+    help="Probability that fast-search-time is used instead of search-time",
+    required=True,
+)
+generate_parser.add_argument(
+    "--bandit-name",
+    type=str,
+    help="Bandit algorithm and parameters (exp3/pexp3/p2exp3/ucb/pucb)-(exp3 'gamma'/ucb 'c')",
+    required=True,
+)
+generate_parser.add_argument(
+    "--policy-mode", type=str, help="Mode for move selection (n/e/x/m)", required=True
+)
+generate_parser.add_argument(
+    "--policy-nash-weight",
+    type=float,
+    help="Weight of nash policy when using mixed policy mode (m)",
+)
+generate_parser.add_argument(
+    "--policy-min",
+    type=float,
+    default=0,
+    help="Min prob of action before clamping to 0",
+)
+generate_parser.add_argument("--teams", type=str, default="", help="Path to teams file")
+
+# get args from battle.py
+
+import battle
+
+battle.add_local_args(battle_parser, "", True)
+
+import build
+
+build.add_local_args(build_parser, "build", True)
+
 parser.add_argument(
     "--generate-path",
     type=str,
@@ -19,229 +84,17 @@ parser.add_argument(
     help="Path to generate binary",
 )
 parser.add_argument(
-    "--train-path",
+    "--battle-path",
     type=str,
     default="py/battle.py",
     help="Path to battle.py script",
 )
-
-# Shared options
 parser.add_argument(
-    "--max-battle-length",
-    type=int,
-    default=2000,
-    help="Max battle length in updates (not turns)",
-)
-
-# Worker options
-parser.add_argument(
-    "--generate-threads",
-    type=int,
-    default=(((os.cpu_count() or 2) - 1) or 1),
-    help="Number of threads for self-play data generation",
-)
-parser.add_argument(
-    "--search-time",
-    type=int,
-    help="Number of iterations for training frames",
-    required=True,
-)
-parser.add_argument(
-    "--fast-search-time",
-    type=int,
-    help="Number of iterations for non-training frames",
-    required=True,
-)
-parser.add_argument(
-    "--fast-search-prob",
-    type=float,
-    help="Probability that fast-search-time is used instead of search-time",
-    required=True,
-)
-parser.add_argument("--teams", type=str, default="", help="Path to teams file")
-parser.add_argument(
-    "--bandit-name",
+    "--build-path",
     type=str,
-    help="Bandit algorithm and parameters (exp3/pexp3/p2exp3/ucb/pucb)-(exp3 'gamma'/ucb 'c')",
-    required=True,
+    default="py/build.py",
+    help="Path to build.py script",
 )
-parser.add_argument(
-    "--policy-mode", type=str, help="Mode for move selection (n/e/x/m)", required=True
-)
-parser.add_argument(
-    "--policy-nash-weight",
-    type=float,
-    help="Weight of nash policy when using mixed policy mode (m)",
-)
-parser.add_argument(
-    "--policy-min",
-    type=float,
-    default=0,
-    help="Min prob of action before clamping to 0",
-)
-
-# General training
-parser.add_argument("--batch-size", type=int, help="Batch size", required=True)
-parser.add_argument(
-    "--learn-threads",
-    type=int,
-    default=1,
-    help="Number of threads for data loading/training",
-)
-parser.add_argument("--steps", type=int, default=0, help="Total training steps")
-parser.add_argument(
-    "--checkpoint", type=int, default=50, help="Checkpoint save interval (steps)"
-)
-parser.add_argument(
-    "--lr", type=float, default=0.001, help="Learning rate", required=True
-)
-parser.add_argument(
-    "--no-clamp-parameters",
-    action="store_true",
-    help="Clamp parameters [-2, 2] to support Stockfish style quantization",
-)
-parser.add_argument(
-    "--sleep",
-    type=float,
-    default=0,
-    help="Number of seconds to sleep after parameter update",
-)
-parser.add_argument(
-    "--min-files",
-    type=int,
-    default=1,
-    help="Minimum number of .battle.data files before learning begins",
-)
-
-# Loss options
-parser.add_argument(
-    "--w-nash",
-    type=float,
-    default=0.0,
-    help="Weight for Nash value in value target",
-)
-parser.add_argument(
-    "--w-empirical",
-    type=float,
-    default=0.0,
-    help="Weight for empirical value in value target",
-)
-parser.add_argument(
-    "--w-score", type=float, default=1.0, help="Weight for score in value target"
-)
-parser.add_argument(
-    "--w-nash-p",
-    type=float,
-    default=0.0,
-    help="Weight for Nash in policy target (empirical = 1 - this)",
-)
-parser.add_argument(
-    "--no-value-loss",
-    action="store_true",
-    dest="no_value_loss",
-    help="Disable value loss computation",
-)
-parser.add_argument(
-    "--no-policy-loss",
-    action="store_true",
-    dest="no_policy_loss",
-    help="Disable policy loss computation",
-)
-parser.add_argument(
-    "--w-policy-loss",
-    type=float,
-    default=1.0,
-    help="Weight for policy loss relative to value loss",
-)
-parser.add_argument(
-    "--lr-decay", type=float, default=1.0, help="Applied each step after decay begins"
-)
-parser.add_argument(
-    "--lr-decay-start",
-    type=int,
-    default=0,
-    help="The first step to begin applying lr decay",
-)
-parser.add_argument(
-    "--lr-decay-interval",
-    type=int,
-    default=1,
-    help="Interval at which to apply decay",
-)
-parser.add_argument(
-    "--no-apply-symmetries",
-    action="store_true",
-    help="Whether to permute party Pokemon/Sides",
-)
-parser.add_argument(
-    "--pokemon-hidden-dim",
-    type=int,
-    default=py_oak.pokemon_hidden_dim,
-    help="Pokemon encoding net hidden dim",
-)
-parser.add_argument(
-    "--active-hidden-dim",
-    type=int,
-    default=py_oak.active_hidden_dim,
-    help="ActivePokemon encoding net hidden dim",
-)
-parser.add_argument(
-    "--pokemon-out-dim",
-    type=int,
-    default=py_oak.pokemon_out_dim,
-    help="Pokemon encoding net output dim",
-)
-parser.add_argument(
-    "--active-out-dim",
-    type=int,
-    default=py_oak.active_out_dim,
-    help="ActivePokemon encoding net output dim",
-)
-parser.add_argument(
-    "--hidden-dim", type=int, default=py_oak.hidden_dim, help="Main subnet hidden dim"
-)
-parser.add_argument(
-    "--value-hidden-dim",
-    type=int,
-    default=py_oak.value_hidden_dim,
-    help="Value head hidden dim",
-)
-parser.add_argument(
-    "--policy-hidden-dim",
-    type=int,
-    default=py_oak.policy_hidden_dim,
-    help="Policy head hidden dim",
-)
-parser.add_argument(
-    "--device",
-    type=str,
-    default=None,
-    help='"cpu" or "cuda". Defaults to CUDA if available.',
-)
-parser.add_argument(
-    "--print-window",
-    type=int,
-    default=5,
-    help="Number of samples to print for debug output",
-)
-parser.add_argument(
-    "--data-window",
-    type=int,
-    default=0,
-    help="Only use the n-most recent files for freshness",
-)
-parser.add_argument(
-    "--delete-window",
-    type=int,
-    default=0,
-    help="Anything outside the most recent N files is deleted",
-)
-
-args = parser.parse_args()
-
-assert (
-    args.policy_mode != "m" or args.policy_nash_weight
-), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
 
 def stream(prefix, pipe):
@@ -251,6 +104,31 @@ def stream(prefix, pipe):
 
 
 def main():
+
+    args = parser.parse_args()
+
+    use_build: bool = (args.team_modify_prob > 0) and (
+        (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
+    )
+
+    assert (
+        args.policy_mode != "m" or args.policy_nash_weight
+    ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
+
+    # core_battle_args = {}
+    # network_path = None
+    # dir = None
+    # data_dir = .
+    # steps = 0
+    # in_place = False
+
+    # [
+    #     f"network-path={}",
+    #     f"dir={}",
+    #     f"data_dir={}",
+    #     f"steps={}",
+    #     "--in-place",
+    # ]
 
     import torch
     import torch_oak
@@ -328,6 +206,8 @@ def main():
         "--in-place",
     ]
 
+    exit()
+
     generate_proc = subprocess.Popen(
         generate_cmd,
         stdout=subprocess.PIPE,
@@ -357,13 +237,6 @@ def main():
     except KeyboardInterrupt:
         print("\nCtrl-C received, killing children...")
 
-        for p in (generate_proc, train_proc):
-            try:
-                os.killpg(p.pid, signal.SIGINT)
-            except ProcessLookupError:
-                pass
-
-        # optional escalation
         for p in (generate_proc, train_proc):
             try:
                 os.killpg(p.pid, signal.SIGINT)

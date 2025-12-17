@@ -123,7 +123,7 @@ lib.read_build_trajectories.argtypes = [
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
 ]
-lib.read_build_trajectories.restype = ctypes.c_int
+lib.read_build_trajectories.restype = ctypes.c_uint64
 
 lib.sample_from_battle_data_files.argtypes = (
     [
@@ -339,14 +339,13 @@ def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrames:
 
 
 # convert bytes object into BattleFrames
-def read_build_trajectories(path) -> BuildTrajectories:
+def read_build_trajectories(path) -> [BuildTrajectories, int]:
     buffer_size = int(os.path.getsize(path) / 128)
     path_bytes = path.encode("utf-8")
-
     trajectories = BuildTrajectories(buffer_size)
     args = (ctypes.c_char_p(path_bytes),) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
-    return trajectories
+    return trajectories, count
 
 
 def encode_buffers(
@@ -399,7 +398,7 @@ class SampleIndexer:
             return self.data[path]
 
 
-def encode_buffers_2(
+def sample_from_battle_data_files(
     indexer: SampleIndexer,
     encoded_frames: EncodedBattleFrames,
     threads: int,

@@ -4,11 +4,40 @@ from typing import List
 
 import py_oak
 
-def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
+
+def add_common_args(
+    parser: argparse.ArgumentParser, prefix: str = "", rl: bool = False
+):
 
     if prefix:
         prefix = prefix + "-"
     prefix = "--" + prefix
+
+    if not rl:
+        parser.add_argument(
+            prefix + "network-path", type=str, help="Path for initial network weights"
+        )
+        parser.add_argument(
+            prefix + "dir",
+            type=str,
+            help="Output directory. Timestamp if not provided",
+        )
+        parser.add_argument(
+            prefix + "data-dir",
+            default=".",
+            help="Read directory for data files. All subdirectories are scanned",
+        )
+        parser.add_argument(
+            prefix + "in-place",
+            action="store_true",
+            help="The parameters saved in --network-path will be updated after every step",
+        )
+        parser.add_argument(
+            prefix + "steps",
+            type=int,
+            default=0,
+            help="Total training steps. A value of 0 is treated as infinity",
+        )
 
     # Program
     parser.add_argument(
@@ -21,19 +50,6 @@ def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
         type=int,
         default=1,
         help="Number of threads for data loading/training",
-    )
-    parser.add_argument(
-        prefix + "network-path", type=str, help="Path for initial network weights"
-    )
-    parser.add_argument(
-        prefix + "dir",
-        type=str,
-        help="Output directory. Timestamp if not provided",
-    )
-    parser.add_argument(
-        prefix + "data-dir",
-        default=".",
-        help="Read directory for data files. All subdirectories are scanned",
     )
 
     # Basic Training
@@ -59,19 +75,9 @@ def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
         default=1,
         help="Interval at which to apply decay",
     )
-    parser.add_argument(
-        prefix + "steps",
-        type=int,
-        default=0,
-        help="Total training steps. A value of 0 is treated as infinity",
-    )
 
     # Train/Generate interop
-    parser.add_argument(
-        prefix + "in-place",
-        action="store_true",
-        help="The parameters saved in --network-path will be updated after every step",
-    )
+
     parser.add_argument(
         prefix + "data-window",
         type=int,
@@ -104,37 +110,7 @@ def add_common_args(parser: argparse.ArgumentParser, prefix: str = ""):
     parser.add_argument(prefix + "seed", type=int, help="Random seed for determinism")
 
 
-def namespace_to_cli_args(
-    parser: argparse.ArgumentParser, args: argparse.Namespace
-) -> list[str]:
-    result = []
-
-    for action in parser._actions:
-        if not action.option_strings:
-            continue  # positional args
-
-        dest = action.dest
-        value = getattr(args, dest)
-
-        # pick the long option if it exists
-        opt = next(
-            (s for s in action.option_strings if s.startswith("--")),
-            action.option_strings[0],
-        )
-
-        if isinstance(action, argparse._StoreTrueAction):
-            if value:
-                result.append(opt)
-
-        elif isinstance(action, argparse._StoreAction):
-            if value is not None:
-                result.append(f"{opt}={value}")
-
-        # add more action types here if needed
-
-    return result
-
-def get_files(args : argparse.ArgumentParser, ext : str) -> [List[str], bool] :
+def get_files(args: argparse.ArgumentParser, ext: str) -> [List[str], bool]:
     data_files = py_oak.find_data_files(args.data_dir, ext)
 
     if len(data_files) < args.min_files:
@@ -152,7 +128,8 @@ def get_files(args : argparse.ArgumentParser, ext : str) -> [List[str], bool] :
 
     return data_files, True
 
-def save_and_decay(args : argparse.ArgumentParser, step : int):
+
+def save_and_decay(args: argparse.ArgumentParser, opt, step: int):
     if step >= args.lr_decay_start:
         if (step % args.lr_decay_interval) == 0:
             for group in opt.param_groups:
@@ -170,4 +147,3 @@ def save_and_decay(args : argparse.ArgumentParser, step : int):
         print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
 
     time.sleep(args.sleep)
-

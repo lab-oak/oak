@@ -1,5 +1,4 @@
 import os
-import torch
 import argparse
 import random
 import time
@@ -14,55 +13,62 @@ import common_args
 
 common_args.add_common_args(parser)
 
-parser.add_argument(
-    "--keep-prob",
-    type=float,
-    required=True,
-    default=1.0,
-    help="The concatenated trajectories are sampled from at this rate to produce a minibatch",
-)
-parser.add_argument(
-    "--value-weight",
-    type=float,
-    default=1.0,
-    help="Value vs Score weighting.",
-)
-parser.add_argument(
-    "--policy-loss-weight",
-    type=float,
-    default=1.0,
-    help="Coeff to. KLdiv in the loss",
-)
-parser.add_argument(
-    "--value-loss-weight",
-    type=float,
-    default=0.5,
-    help="Coeff. to value head MSE in the loss",
-)
-parser.add_argument(
-    "--entropy-loss-weight",
-    type=float,
-    default=0.01,
-    help="Coeff. to entropy in the loss",
-)
-parser.add_argument(
-    "--gamma",
-    type=float,
-    default=0.99,
-    help="PPO",
-)
-parser.add_argument(
-    "--lam",
-    type=float,
-    default=0.95,
-    help="PPO",
-)
-parser.add_argument(
-    "--clip-eps",
-    type=float,
-    default=0.3,
-    help="PPO",
-)
+
+def add_local_args(parser, prefix: str = "", rl: bool = False):
+    if prefix:
+        prefix = prefix + "-"
+    prefix = "--" + prefix
+    parser.add_argument(
+        prefix + "keep-prob",
+        type=float,
+        required=True,
+        default=1.0,
+        help="The concatenated trajectories are sampled from at this rate to produce a minibatch",
+    )
+    parser.add_argument(
+        prefix + "value-weight",
+        type=float,
+        default=1.0,
+        help="Value vs Score weighting.",
+    )
+    parser.add_argument(
+        prefix + "policy-loss-weight",
+        type=float,
+        default=1.0,
+        help="Coeff to. KLdiv in the loss",
+    )
+    parser.add_argument(
+        prefix + "value-loss-weight",
+        type=float,
+        default=0.5,
+        help="Coeff. to value head MSE in the loss",
+    )
+    parser.add_argument(
+        prefix + "entropy-loss-weight",
+        type=float,
+        default=0.01,
+        help="Coeff. to entropy in the loss",
+    )
+    parser.add_argument(
+        prefix + "gamma",
+        type=float,
+        default=0.99,
+        help="PPO",
+    )
+    parser.add_argument(
+        prefix + "lam",
+        type=float,
+        default=0.95,
+        help="PPO",
+    )
+    parser.add_argument(
+        prefix + "clip-eps",
+        type=float,
+        default=0.3,
+        help="PPO",
+    )
+
+
 def main():
 
     args = parser.parse_args()
@@ -88,7 +94,6 @@ def main():
         state = state[:, :-1, 1:]  # [b, T, N]
         state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
         return state
-
 
     def process_targets(
         network: torch_oak.BuildNetwork,
@@ -175,20 +180,11 @@ def main():
             -(logp_actions * logp_actions.exp()).sum(dim=-1, keepdim=True)[:n].mean()
         )
         loss = (n / total) * (
-            args.policy_loss_weight * policy_loss + args.value_loss_weight * value_loss - entropy_loss_weight * entropy
+            args.policy_loss_weight * policy_loss
+            + args.value_loss_weight * value_loss
+            - entropy_loss_weight * entropy
         )
         return loss
-
-    if args.seed is not None:
-        random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(args.seed)
-
-    if args.device is None:
-        args.device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = torch.device(args.device)
-    print(f"Using device: {device}")
 
     if args.dir is None:
         now = datetime.datetime.now()
@@ -227,7 +223,11 @@ def main():
         # break batches up by file to limit memory use
         while b < args.batch_size:
             file = random.sample(data_files, 1)[0]
-            trajectories = py_oak.read_build_trajectories(file)
+            trajectories, n_read = py_oak.read_build_trajectories(file)
+
+            if n_read < trajectories.size:
+                print(f"Error reading file {file}")
+                continue
 
             T = trajectories.end.max()
             # here is where we trunacte the episode length for 1v1, etc
@@ -263,7 +263,8 @@ def main():
 
         optimizer.step()
 
-        common_args.save_and_decay(args, step)
+        common_args.save_and_decay(args, optimizer, step)
+
 
 if __name__ == "__main__":
     main()
