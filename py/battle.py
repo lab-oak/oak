@@ -28,12 +28,14 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         default=10000,
         help="Ignore games past this length (in updates not turns.)",
     )
-    parser.add_argument(
-        prefix + "min-iterations",
-        type=int,
-        default=1,
-        help="Ignore samples with fewer than these iterations.",
-    )
+
+    if not rl:
+        parser.add_argument(
+            prefix + "min-iterations",
+            type=int,
+            default=1,
+            help="Ignore samples with fewer than these iterations.",
+        )
     parser.add_argument(
         prefix + "no-clamp-parameters",
         action="store_true",
@@ -208,10 +210,12 @@ def main():
         assert (p_nash_weight + value_empirical_weight_p) == 1
 
         p1_policy_target = (
-            value_empirical_weight_p * input.p1_empirical[:size] + p_nash_weight * input.p1_nash[:size]
+            value_empirical_weight_p * input.p1_empirical[:size]
+            + p_nash_weight * input.p1_nash[:size]
         )
         p2_policy_target = (
-            value_empirical_weight_p * input.p2_empirical[:size] + p_nash_weight * input.p2_nash[:size]
+            value_empirical_weight_p * input.p2_empirical[:size]
+            + p_nash_weight * input.p2_nash[:size]
         )
 
         loss = torch.zeros((1,))

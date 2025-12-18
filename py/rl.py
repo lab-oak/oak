@@ -78,6 +78,7 @@ generate_parser.add_argument("--teams", type=str, default="", help="Path to team
 
 import common_args
 import battle
+
 common_args.add_common_args(battle_parser, "", True)
 battle.add_local_args(battle_parser, "", True)
 
