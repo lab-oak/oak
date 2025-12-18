@@ -70,6 +70,18 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         default=0.3,
         help="PPO",
     )
+    parser.add_argument(
+        prefix + "policy-hidden-dim",
+        type=int,
+        default=py_oak.build_policy_hidden_dim,
+        help="Policy head hidden dim",
+    )
+    parser.add_argument(
+        prefix + "value-hidden-dim",
+        type=int,
+        default=py_oak.build_value_hidden_dim,
+        help="Value head hidden dim",
+    )
 
 
 add_local_args(parser)
@@ -197,7 +209,7 @@ def main():
     os.makedirs(args.dir, exist_ok=False)
     py_oak.save_args(args, args.dir)
 
-    network = torch_oak.BuildNetwork()
+    network = torch_oak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
 
     if args.network_path:
         with open(args.network_path, "rb") as f:

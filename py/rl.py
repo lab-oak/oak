@@ -7,8 +7,6 @@ import threading
 import sys
 from typing import Dict
 
-import py_oak
-
 
 parser = argparse.ArgumentParser(
     description="Reinforcement learning using a generate process and battle.py (and optionally build.py)",
@@ -73,17 +71,43 @@ generate_parser.add_argument(
     help="Min prob of action before clamping to 0",
 )
 generate_parser.add_argument("--teams", type=str, default="", help="Path to teams file")
+generate_parser.add_argument(
+    "--max-pokemon",
+    type=int,
+    default=6,
+    # help="Min prob of action before clamping to 0",
+)
+generate_parser.add_argument(
+    "--pokemon-delete-prob",
+    type=float,
+    default=0,
+)
+generate_parser.add_argument(
+    "--team-modify-prob",
+    type=float,
+    default=0,
+)
+generate_parser.add_argument(
+    "--move-delete-prob",
+    type=float,
+    default=0,
+)
+generate_parser.add_argument(
+    "--battle-skip-prob",
+    type=float,
+    default=0,
+)
 
 # get args from battle.py/build.py
-
 import common_args
 import battle
+import build
 
 common_args.add_common_args(battle_parser, "", True)
 battle.add_local_args(battle_parser, "", True)
 
-# import build
-# build.add_local_args(build_parser, "build", True)
+common_args.add_common_args(build_parser, "build", True)
+build.add_local_args(build_parser, "build", True)
 
 parser.add_argument(
     "--generate-path",
@@ -109,13 +133,14 @@ def main():
 
     args = parser.parse_args()
 
-    # use_build: bool = (args.team_modify_prob > 0) and (
-    #     (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
-    # )
-    # assert (
-    #     args.policy_mode != "m" or args.policy_nash_weight
-    # ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
+    use_build: bool = (args.team_modify_prob > 0) and (
+        (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
+    )
+    assert (
+        args.policy_mode != "m" or args.policy_nash_weight
+    ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
+    import py_oak
     import torch
     import torch_oak
 
@@ -126,23 +151,30 @@ def main():
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
     py_oak.save_args(args, working_dir)
-
-    network = torch_oak.BattleNetwork(
-        args.pokemon_hidden_dim,
-        args.active_hidden_dim,
-        args.pokemon_out_dim,
-        args.active_out_dim,
-        args.hidden_dim,
-        args.value_hidden_dim,
-        args.policy_hidden_dim,
-    )
-
     network_path = os.path.join(working_dir, "random.battle.net")
-    with open(network_path, "wb") as f:
-        network.write_parameters(f)
-
+    build_network_path = os.path.join(working_dir, "random.build.net")
     data_dir = os.path.join(working_dir, "generate")
     nets_dir = os.path.join(working_dir, "nets")
+    build_nets_dir = os.path.join(working_dir, "build_nets")
+
+    with open(network_path, "wb") as f:
+        network = torch_oak.BattleNetwork(
+            args.pokemon_hidden_dim,
+            args.active_hidden_dim,
+            args.pokemon_out_dim,
+            args.active_out_dim,
+            args.hidden_dim,
+            args.value_hidden_dim,
+            args.policy_hidden_dim,
+        )
+        network.write_parameters(f)
+
+    if use_build:
+        with open(build_network_path, "wb") as f:
+            build_network = torch_oak.BuildNetwork(
+                args.build_policy_hidden_dim, args.build_value_hidden_dim
+            )
+            build_network.write_parameters(f)
 
     generate_cmd = [
         f"./{args.generate_path}",
@@ -162,6 +194,12 @@ def main():
         f"--max-battle-length={args.max_battle_length}",
         f"--fast-search-prob={args.fast_search_prob}",
         f"--teams={args.teams}",
+        f"--max-pokemon={args.max_pokemon}",
+        f"--team-modify-prob={args.team_modify_prob}",
+        f"--pokemon-delete-prob={args.pokemon_delete_prob}",
+        f"--move-delete-prob={args.move_delete_prob}",
+        f"--battle-skip-prob={args.battle_skip_prob}",
+        f"--build-network-path={build_network_path}"
     ]
 
     # if args.no_apply_symmetries:
@@ -202,6 +240,30 @@ def main():
         # Don't need to pass network hyperparams since those are overwritten by the read
     ]
 
+    build_cmd = [
+        f"{sys.executable}",
+        "-u",
+        f"{args.build_path}",
+        f"--network-path={build_network_path}",
+        f"--dir={build_nets_dir}",
+        f"--data-dir={data_dir}",
+        "--in-place",
+        "--steps=0",
+        f"--device={args.build_device}",
+        f"--threads={args.build_threads}",
+        f"--batch-size={args.batch_size}",
+        f"--lr={args.build_lr}",
+        f"--lr-decay={args.build_lr_decay}",
+        f"--lr-decay-start={args.build_lr_decay_start}",
+        f"--lr-decay-interval={args.build_lr_decay_interval}",
+        f"--data-window={args.build_data_window}",
+        f"--min-files={args.build_min_files}",
+        f"--sleep={args.build_sleep}",
+        f"--checkpoint={args.build_checkpoint}",
+        f"--delete-window={args.build_delete_window}",
+        f"--keep-prob={args.build_keep_prob}",
+    ]
+
     generate_proc = subprocess.Popen(
         generate_cmd,
         stdout=subprocess.PIPE,
@@ -218,6 +280,16 @@ def main():
         bufsize=1,
     )
 
+    build_proc = None
+    if use_build:
+        build_proc = subprocess.Popen(
+            build_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=False,
+            bufsize=1,
+        )
+
     def stream(prefix, pipe):
         for line in iter(pipe.readline, b""):
             print(f"[{prefix}] {line.decode()}", end="")
@@ -229,6 +301,10 @@ def main():
     threading.Thread(
         target=stream, args=("TRAIN", battle_proc.stdout), daemon=True
     ).start()
+    if use_build:
+        threading.Thread(
+            target=stream, args=("BUILD", build_proc.stdout), daemon=True
+        ).start()
 
     try:
         generate_proc.wait()
@@ -236,9 +312,10 @@ def main():
     except KeyboardInterrupt:
         print("\nCtrl-C received, killing children...")
 
-        for p in (generate_proc, battle_proc):
+        for p in (generate_proc, battle_proc, build_proc):
             try:
-                os.killpg(p.pid, signal.SIGINT)
+                if p is not None:
+                    os.killpg(p.pid, signal.SIGINT)
             except ProcessLookupError:
                 pass
 
