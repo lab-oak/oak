@@ -75,10 +75,9 @@ def read_build_trajectories():
 
     from random import sample
 
-    file = sample(files, 1)[0]
-    build_trajectories = py_oak.read_build_trajectories(file)
-
-    assert build_trajectories.size > 0, f"No data found in {file}."
+    build_trajectories, read = py_oak.read_build_trajectories(files, 1024, 1)
+    print(build_trajectories.size, read)
+    assert build_trajectories.size == read, f"Bad read from {file}."
     for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
