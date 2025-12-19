@@ -133,6 +133,7 @@ def main():
 
     args = parser.parse_args()
 
+    use_battle: bool = True
     use_build: bool = (args.team_modify_prob > 0) and (
         (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
     )
@@ -199,70 +200,73 @@ def main():
         f"--pokemon-delete-prob={args.pokemon_delete_prob}",
         f"--move-delete-prob={args.move_delete_prob}",
         f"--battle-skip-prob={args.battle_skip_prob}",
-        f"--build-network-path={build_network_path}"
+        f"--build-network-path={build_network_path}",
     ]
 
-    # if args.no_apply_symmetries:
-    #     generate_cmd.append("--no-apply-symmetries")
-    # if args.no_clamp_parameters:
-    #     generate_cmd.append("--no-clamp-parameters")
-    # if args.policy_nash_weight is not None:
-    #     generate_cmd.append(f"--policy-nash-weight={args.policy_nash_weight}")
+    if args.no_apply_symmetries:
+        generate_cmd.append("--no-apply-symmetries")
+    if args.no_clamp_parameters:
+        generate_cmd.append("--no-clamp-parameters")
 
-    battle_cmd = [
-        f"{sys.executable}",
-        "-u",
-        f"{args.battle_path}",
-        f"--network-path={network_path}",
-        f"--dir={nets_dir}",
-        f"--data-dir={data_dir}",
-        "--in-place",
-        "--steps=0",
-        f"--device={args.device}",
-        f"--threads={args.threads}",
-        f"--batch-size={args.batch_size}",
-        f"--lr={args.lr}",
-        f"--lr-decay={args.lr_decay}",
-        f"--lr-decay-start={args.lr_decay_start}",
-        f"--lr-decay-interval={args.lr_decay_interval}",
-        f"--data-window={args.data_window}",
-        f"--min-files={args.min_files}",
-        f"--sleep={args.sleep}",
-        f"--checkpoint={args.checkpoint}",
-        f"--delete-window={args.delete_window}",
-        f"--max-battle-length={args.max_battle_length}",
-        f"--min-iterations={args.fast_search_time + 1}",
-        f"--value-nash-weight={args.value_nash_weight}",
-        f"--value-empirical-weight={args.value_empirical_weight}",
-        f"--value-score-weight={args.value_score_weight}",
-        f"--p-nash-weight={args.p_nash_weight}",
-        f"--policy-loss-weight={args.policy_loss_weight}",
-        # Don't need to pass network hyperparams since those are overwritten by the read
-    ]
+    def get_common_cmd(args, prefix):
+        p = prefix or ""
+        return [
+            f"--network-path={network_path}",
+            f"--data-dir={data_dir}",
+            "--in-place",
+            f"--device={getattr(args, f'{p}device')}",
+            f"--threads={getattr(args, f'{p}threads')}",
+            f"--batch-size={getattr(args, f'{p}batch_size')}",
+            f"--lr={getattr(args, f'{p}lr')}",
+            f"--lr-decay={getattr(args, f'{p}lr_decay')}",
+            f"--lr-decay-start={getattr(args, f'{p}lr_decay_start')}",
+            f"--lr-decay-interval={getattr(args, f'{p}lr_decay_interval')}",
+            f"--data-window={getattr(args, f'{p}data_window')}",
+            f"--min-files={getattr(args, f'{p}min_files')}",
+            f"--sleep={getattr(args, f'{p}sleep')}",
+            f"--checkpoint={getattr(args, f'{p}checkpoint')}",
+            f"--delete-window={getattr(args, f'{p}delete_window')}",
+        ]
 
-    build_cmd = [
-        f"{sys.executable}",
-        "-u",
-        f"{args.build_path}",
-        f"--network-path={build_network_path}",
-        f"--dir={build_nets_dir}",
-        f"--data-dir={data_dir}",
-        "--in-place",
-        "--steps=0",
-        f"--device={args.build_device}",
-        f"--threads={args.build_threads}",
-        f"--batch-size={args.batch_size}",
-        f"--lr={args.build_lr}",
-        f"--lr-decay={args.build_lr_decay}",
-        f"--lr-decay-start={args.build_lr_decay_start}",
-        f"--lr-decay-interval={args.build_lr_decay_interval}",
-        f"--data-window={args.build_data_window}",
-        f"--min-files={args.build_min_files}",
-        f"--sleep={args.build_sleep}",
-        f"--checkpoint={args.build_checkpoint}",
-        f"--delete-window={args.build_delete_window}",
-        f"--keep-prob={args.build_keep_prob}",
-    ]
+    battle_cmd = (
+        [
+            f"{sys.executable}",
+            "-u",
+            f"{args.battle_path}",
+            f"--dir={nets_dir}",
+        ]
+        + get_common_cmd(args, "")
+        + [
+            f"--max-battle-length={args.max_battle_length}",
+            f"--min-iterations={args.fast_search_time + 1}",
+            f"--value-nash-weight={args.value_nash_weight}",
+            f"--value-empirical-weight={args.value_empirical_weight}",
+            f"--value-score-weight={args.value_score_weight}",
+            f"--p-nash-weight={args.p_nash_weight}",
+            f"--policy-loss-weight={args.policy_loss_weight}",
+            # Don't need to pass network hyperparams since those are overwritten by the read
+        ]
+    )
+
+    build_cmd = (
+        [
+            f"{sys.executable}",
+            "-u",
+            f"{args.build_path}",
+            f"--dir={build_nets_dir}",
+        ]
+        + get_common_cmd(args, "build_")
+        + [
+            f"--keep-prob={args.build_keep_prob}",
+            f"--value-weight={args.build_value_weight}",
+            f"--entropy-loss-weight={args.build_entropy_loss_weight}",
+            f"--value-loss-weight={args.build_value_loss_weight}",
+            f"--entropy-loss-weight={args.build_entropy_loss_weight}",
+            f"--gamma={args.build_gamma}",
+            f"--lam={args.build_lam}",
+            f"--clip-eps={args.build_clip_eps}",
+        ]
+    )
 
     generate_proc = subprocess.Popen(
         generate_cmd,
@@ -272,13 +276,15 @@ def main():
         bufsize=1,
     )
 
-    battle_proc = subprocess.Popen(
-        battle_cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=False,
-        bufsize=1,
-    )
+    battle_proc = None
+    if use_battle:
+        battle_proc = subprocess.Popen(
+            battle_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=False,
+            bufsize=1,
+        )
 
     build_proc = None
     if use_build:
@@ -290,25 +296,20 @@ def main():
             bufsize=1,
         )
 
+    procs = [(generate_proc, "GEN"), (battle_proc, "BATTLE"), (build_proc, "TEAM")]
+
     def stream(prefix, pipe):
         for line in iter(pipe.readline, b""):
             print(f"[{prefix}] {line.decode()}", end="")
         pipe.close()
-
-    threading.Thread(
-        target=stream, args=("GENERATE", generate_proc.stdout), daemon=True
-    ).start()
-    threading.Thread(
-        target=stream, args=("TRAIN", battle_proc.stdout), daemon=True
-    ).start()
-    if use_build:
-        threading.Thread(
-            target=stream, args=("BUILD", build_proc.stdout), daemon=True
-        ).start()
+    for p, s in procs:
+        if p is not None:
+            threading.Thread(
+                target=stream, args=(s, p.stdout), daemon=True
+            ).start()
 
     try:
         generate_proc.wait()
-        battle_proc.wait()
     except KeyboardInterrupt:
         print("\nCtrl-C received, killing children...")
 
