@@ -326,7 +326,7 @@ void generate(const ProgramArgs *args_ptr) {
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
         agent.search_time =
-            (battle_length == 0)
+            ((battle_length == 0) && skip_battle)
                 ? args.t1_search_time.value()
                 : (use_fast ? args.fast_search_time.value() : args.search_time);
         MCTS::Output output{};
