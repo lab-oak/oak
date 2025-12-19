@@ -65,15 +65,30 @@ public:
     }
   }
 
-  void propagate(const uint32_t *index_data, const float *input_data,
+  void propagate(const auto *index_data, const float *input_data,
                  float *output_data, size_t n) const {
     Eigen::Map<Vector> output(output_data, out_dim);
     output = biases;
 
     for (std::size_t k = 0; k < n; ++k) {
-      uint32_t idx = index_data[k];
+      auto idx = index_data[k];
       float val = input_data[k];
       output.noalias() += weights.col(idx) * val;
+    }
+    if constexpr (clamp) {
+      for (std::size_t i = 0; i < out_dim; ++i) {
+        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+      }
+    }
+  }
+
+  void propagate(const auto *index_data, float *output_data, size_t n) const {
+    Eigen::Map<Vector> output(output_data, out_dim);
+    output = biases;
+
+    for (std::size_t k = 0; k < n; ++k) {
+      auto idx = index_data[k];
+      output.noalias() += weights.col(idx);
     }
     if constexpr (clamp) {
       for (std::size_t i = 0; i < out_dim; ++i) {
