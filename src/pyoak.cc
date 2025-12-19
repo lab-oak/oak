@@ -445,6 +445,8 @@ read_build_trajectories(size_t max_count, size_t threads, size_t n_paths,
     }
   };
 
+  const auto start_ = std::chrono::high_resolution_clock::now();
+
   std::vector<std::thread> thread_pool{};
   for (auto i = 0; i < threads; ++i) {
     thread_pool.emplace_back(std::thread{start_reading});
@@ -452,7 +454,10 @@ read_build_trajectories(size_t max_count, size_t threads, size_t n_paths,
   for (auto i = 0; i < threads; ++i) {
     thread_pool[i].join();
   }
-
+  
+  const auto end_ = std::chrono::high_resolution_clock::now();
+  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_ - start_);
+  // std::cout << ms.count() << std::endl;
   return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
