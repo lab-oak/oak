@@ -283,9 +283,6 @@ void generate(const ProgramArgs *args_ptr) {
                                       .bandit_name = args.bandit_name,
                                       .network_path = args.network_path,
                                       .discrete_network = args.use_discrete};
-    // if the std::optional<NN::Network> is not set then the params/cache will
-    // be loaded/filled before every turn.
-    // don't need to preload t1 agent since its used only once
     if (agent.uses_network()) {
       agent.initialize_network(battle_data.battle);
     }
