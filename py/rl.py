@@ -302,11 +302,10 @@ def main():
         for line in iter(pipe.readline, b""):
             print(f"[{prefix}] {line.decode()}", end="")
         pipe.close()
+
     for p, s in procs:
         if p is not None:
-            threading.Thread(
-                target=stream, args=(s, p.stdout), daemon=True
-            ).start()
+            threading.Thread(target=stream, args=(s, p.stdout), daemon=True).start()
 
     try:
         generate_proc.wait()
