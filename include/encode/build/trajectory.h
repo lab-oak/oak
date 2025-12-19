@@ -232,13 +232,13 @@ struct TrajectoryInput {
 
   TrajectoryInput index(auto i) const {
     auto copy = *this;
-    copy.action += 1;
-    copy.mask += Tensorizer<F>::max_actions;
-    copy.policy += 1;
-    copy.value += 1;
-    copy.score += 1;
-    copy.start += 1;
-    copy.end += 1;
+    copy.action += i;
+    copy.mask += i * Tensorizer<F>::max_actions;
+    copy.policy += i;
+    copy.value += i;
+    copy.score += i;
+    copy.start += i;
+    copy.end += i;
     return copy;
   }
 
