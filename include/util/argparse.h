@@ -41,6 +41,10 @@ struct TeamBuildingArgs : public argparse::Args {
     char &A##policy_mode =                                                     \
         kwarg(B "policy-mode", "Policy mode").set_default('e');                \
                                                                                \
+    char &A##fast_policy_mode =                                                \
+        kwarg(B "fast-policy-mode", "Policy mode after fast search")           \
+            .set_default('e');                                                 \
+                                                                               \
     double &A##policy_temp =                                                   \
         kwarg(B "policy-temp", "P-norm just before clipping/sampling")         \
             .set_default(2.5);                                                 \

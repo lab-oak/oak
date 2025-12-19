@@ -220,8 +220,7 @@ template <typename F = Format::OU> struct TeamHelper {
   }
 };
 
-template <typename F = Format::OU>
-struct TrajectoryInput {
+template <typename F = Format::OU> struct TrajectoryInput {
   int64_t *action;
   int64_t *mask;
   float *policy;

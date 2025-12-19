@@ -289,7 +289,7 @@ void generate(const ProgramArgs *args_ptr) {
 
     auto nodes = RuntimeSearch::Nodes{};
 
-    const auto policy_options =
+    auto policy_options =
         RuntimePolicy::Options{.mode = args.policy_mode,
                                .temp = args.policy_temp,
                                .min_prob = args.policy_min,
@@ -326,6 +326,8 @@ void generate(const ProgramArgs *args_ptr) {
             ((battle_length == 0) && skip_battle)
                 ? args.t1_search_time.value()
                 : (use_fast ? args.fast_search_time.value() : args.search_time);
+        policy_options.mode =
+            use_fast ? args.fast_policy_mode : args.policy_mode;
         MCTS::Output output{};
 
         const bool policy_rollout_only =

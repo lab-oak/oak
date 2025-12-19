@@ -26,6 +26,12 @@ generate_parser.add_argument(
     help="Number of threads for self-play data generation",
 )
 generate_parser.add_argument(
+    "--network-path",
+    type=str,
+    default="",
+    help="Initial network (mc = monte-carlo, no battle net training)",
+)
+generate_parser.add_argument(
     "--search-time",
     type=int,
     help="Number of iterations for training frames",
@@ -36,6 +42,12 @@ generate_parser.add_argument(
     type=int,
     help="Number of iterations for non-training frames",
     required=True,
+)
+generate_parser.add_argument(
+    "--t1-search-time",
+    type=int,
+    default=None,
+    help="Number of iterations for turn 1 search, used when skipping battles for build data generation",
 )
 generate_parser.add_argument(
     "--fast-search-prob",
@@ -50,7 +62,16 @@ generate_parser.add_argument(
     required=True,
 )
 generate_parser.add_argument(
-    "--policy-mode", type=str, help="Mode for move selection (n/e/x/m)", required=True
+    "--policy-mode",
+    type=str,
+    help="Mode for move selection (n/e/x/m)",
+    required=True,
+)
+generate_parser.add_argument(
+    "--fast-policy-mode",
+    type=str,
+    help="Mode for move selection (n/e/x/m)",
+    default="x",
 )
 generate_parser.add_argument(
     "--policy-temp",
@@ -133,10 +154,16 @@ def main():
 
     args = parser.parse_args()
 
-    use_battle: bool = True
+    use_battle: bool = args.network_path != "mc"
+    if not use_battle:
+        print("Skipping battle.py")
     use_build: bool = (args.team_modify_prob > 0) and (
         (args.pokemon_delete_prob > 0) or (args.move_delete_prob > 0)
     )
+    if not use_build:
+        print("Skipping build.py")
+
+    # arg check
     assert (
         args.policy_mode != "m" or args.policy_nash_weight
     ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
@@ -145,9 +172,13 @@ def main():
     import torch
     import torch_oak
 
+    # arg set
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    if args.t1_search_time is None:
+        args.t1_search_time = args.search_time
 
+    # paths set
     now = datetime.datetime.now()
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
@@ -158,17 +189,23 @@ def main():
     nets_dir = os.path.join(working_dir, "nets")
     build_nets_dir = os.path.join(working_dir, "build_nets")
 
-    with open(network_path, "wb") as f:
-        network = torch_oak.BattleNetwork(
-            args.pokemon_hidden_dim,
-            args.active_hidden_dim,
-            args.pokemon_out_dim,
-            args.active_out_dim,
-            args.hidden_dim,
-            args.value_hidden_dim,
-            args.policy_hidden_dim,
-        )
-        network.write_parameters(f)
+    # load/save initial dirs
+    if use_battle:
+        with open(network_path, "wb") as f:
+            network = torch_oak.BattleNetwork(
+                args.pokemon_hidden_dim,
+                args.active_hidden_dim,
+                args.pokemon_out_dim,
+                args.active_out_dim,
+                args.hidden_dim,
+                args.value_hidden_dim,
+                args.policy_hidden_dim,
+            )
+            if args.network_path != "":
+                print(f"Reading initial network from {args.network_path}")
+                with open(args.network_path, "rb") as g:
+                    network.read_parameters(g)
+            network.write_parameters(f)
 
     if use_build:
         with open(build_network_path, "wb") as f:
@@ -181,10 +218,11 @@ def main():
         f"./{args.generate_path}",
         f"--search-time={args.search_time}",
         f"--fast-search-time={args.fast_search_time}",
-        # f"--t1-search-time={args.t1_search_time}",
+        f"--t1-search-time={args.t1_search_time}",
         f"--bandit-name={args.bandit_name}",
-        f"--network-path={network_path}",
+        f"--network-path={network_path if use_battle else "mc"}",
         f"--policy-mode={args.policy_mode}",
+        f"--fast-policy-mode={args.fast_policy_mode}",
         f"--policy-temp={args.policy_temp}",
         f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
@@ -202,7 +240,6 @@ def main():
         f"--battle-skip-prob={args.battle_skip_prob}",
         f"--build-network-path={build_network_path}",
     ]
-
     if args.no_apply_symmetries:
         generate_cmd.append("--no-apply-symmetries")
     if args.no_clamp_parameters:
@@ -211,7 +248,7 @@ def main():
     def get_common_cmd(args, prefix):
         p = prefix or ""
         return [
-            f"--network-path={network_path}",
+            f"--network-path={network_path if prefix == "" else build_network_path}",
             f"--data-dir={data_dir}",
             "--in-place",
             f"--device={getattr(args, f'{p}device')}",
@@ -257,6 +294,7 @@ def main():
         ]
         + get_common_cmd(args, "build_")
         + [
+            f"--trajectories-per-step={args.build_trajectories_per_step}",
             f"--keep-prob={args.build_keep_prob}",
             f"--value-weight={args.build_value_weight}",
             f"--entropy-loss-weight={args.build_entropy_loss_weight}",
