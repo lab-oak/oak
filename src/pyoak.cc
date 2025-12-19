@@ -362,18 +362,16 @@ extern "C" size_t sample_from_battle_data_files(
   return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
-extern "C" size_t read_build_trajectories(const char *path, int64_t *action,
-                                          int64_t *mask, float *policy,
-                                          float *value, float *score,
-                                          int64_t *start, int64_t *end) {
+extern "C" size_t
+read_build_trajectories(size_t max_count, size_t threads, size_t n_paths,
+                        const char *const *paths, int64_t *action,
+                        int64_t *mask, float *policy, float *value,
+                        float *score, int64_t *start, int64_t *end) {
 
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    std::cerr << "Failed to open file: " << path << std::endl;
-    return -1;
-  }
+  constexpr auto traj_size =
+      Encode::Build::CompressedTrajectory<>::size_no_team;
 
-  using In = Encode::Build::TrajectoryInput;
+  using In = Encode::Build::TrajectoryInput<>;
   In input{.action = action,
            .mask = mask,
            .policy = policy,
@@ -388,34 +386,74 @@ extern "C" size_t read_build_trajectories(const char *path, int64_t *action,
     return 0;
   }
 
-  try {
-    size_t count = 0;
-    while (true) {
-      Encode::Build::CompressedTrajectory<> traj;
-      file.read(reinterpret_cast<char *>(&traj),
-                Encode::Build::CompressedTrajectory<>::size_no_team);
-      if (file.gcount() < Encode::Build::CompressedTrajectory<>::size_no_team) {
-        std::cerr << "bad build trajectory read" << std::endl;
-        return 0;
-      }
-      const auto format = static_cast<uint8_t>(traj.header.format);
-      if (format != 0) {
-        std::cerr << "only NoTeam trajectories can be read this way"
-                  << std::endl;
-        return 0;
-      }
+  std::atomic<size_t> count{};
+  std::atomic<size_t> errors{};
 
-      input.write(traj);
-      ++count;
+  const auto start_reading = [&]() {
+    std::mt19937 mt{std::random_device{}()};
+    std::uniform_int_distribution<size_t> file_dist{0, n_paths - 1};
 
-      if (file.peek() == EOF) {
-        return count;
+    const auto report_error = [&](const auto &msg) -> void {
+      std::cerr << msg << std::endl;
+      errors.fetch_add(1);
+      return;
+    };
+
+    try {
+      while (true) {
+
+        const auto path_index = file_dist(mt);
+        std::ifstream file(paths[path_index], std::ios::binary);
+        if (!file) {
+          return report_error("Failed to open file " +
+                              std::to_string(path_index));
+        }
+        file.seekg(0, std::ios::end);
+        auto size = file.tellg();
+        file.seekg(0);
+        if ((size % traj_size) != 0) {
+          return report_error("File " + std::to_string(path_index) + " size " +
+                              std::to_string(size) + " is not a multiple of " +
+                              std::to_string(traj_size));
+        }
+
+        const auto n_trajectories = size / traj_size;
+
+        const auto trajectory_index =
+            std::uniform_int_distribution<size_t>{0, n_trajectories - 1}(mt);
+        file.seekg(trajectory_index * traj_size);
+
+        Encode::Build::CompressedTrajectory<> traj;
+        file.read(reinterpret_cast<char *>(&traj), traj_size);
+        if (file.gcount() < traj_size) {
+          return report_error("Bad trajectory read");
+        }
+        const auto format = static_cast<uint8_t>(traj.header.format);
+        if (format != 0) {
+          return report_error("Only NoTeam trajectories are supported");
+        }
+
+        const auto write_index = count.fetch_add(1);
+        if (write_index >= max_count) {
+          return;
+        } else {
+          input.index(write_index).write(traj);
+        }
       }
+    } catch (const std::exception &e) {
+      return report_error(e.what());
     }
-  } catch (const std::exception &e) {
-    std::cerr << e.what() << std::endl;
-    return 0;
+  };
+
+  std::vector<std::thread> thread_pool{};
+  for (auto i = 0; i < threads; ++i) {
+    thread_pool.emplace_back(std::thread{start_reading});
   }
+  for (auto i = 0; i < threads; ++i) {
+    thread_pool[i].join();
+  }
+
+  return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
 extern "C" void print_battle_data(uint8_t *battle_bytes,

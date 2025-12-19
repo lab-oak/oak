@@ -220,6 +220,7 @@ template <typename F = Format::OU> struct TeamHelper {
   }
 };
 
+template <typename F = Format::OU>
 struct TrajectoryInput {
   int64_t *action;
   int64_t *mask;
@@ -229,7 +230,18 @@ struct TrajectoryInput {
   int64_t *start;
   int64_t *end;
 
-  template <typename F = Format::OU>
+  TrajectoryInput index(auto i) const {
+    auto copy = *this;
+    copy.action += 1;
+    copy.mask += Tensorizer<F>::max_actions;
+    copy.policy += 1;
+    copy.value += 1;
+    copy.score += 1;
+    copy.start += 1;
+    copy.end += 1;
+    return copy;
+  }
+
   void write(const CompressedTrajectory<F> &traj) {
     constexpr float den = std::numeric_limits<uint16_t>::max();
 

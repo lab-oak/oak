@@ -22,6 +22,12 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         prefix = prefix + "-"
     prefix = "--" + prefix
     parser.add_argument(
+        prefix + "trajectories-per-step",
+        type=int,
+        required=True,
+        help="How many trajectories to read from a single py_oak.read_build_trajectories call",
+    )
+    parser.add_argument(
         prefix + "keep-prob",
         type=float,
         required=True,
@@ -61,13 +67,13 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "lam",
         type=float,
-        default=0.95,
+        default=0.90,
         help="PPO",
     )
     parser.add_argument(
         prefix + "clip-eps",
         type=float,
-        default=0.3,
+        default=0.10,
         help="PPO",
     )
     parser.add_argument(
@@ -149,6 +155,7 @@ def main():
         ratio[valid] = valid_ratio
         score_weight = 1 - args.value_weight
         r = args.value_weight * traj.value + score_weight * traj.score
+        print(traj.end)
         rewards = torch.zeros_like(traj.policy).scatter(
             1, traj.end.unsqueeze(-1) - 1, r.unsqueeze(-1)
         )
@@ -239,7 +246,9 @@ def main():
         # break batches up by file to limit memory use
         while b < args.batch_size:
             file = random.sample(data_files, 1)[0]
-            trajectories, n_read = py_oak.read_build_trajectories(file)
+            trajectories, n_read = py_oak.read_build_trajectories(
+                data_files, args.trajectories_per_step, args.threads
+            )
 
             if n_read < trajectories.size:
                 print(f"Error reading file {file}")

@@ -116,12 +116,17 @@ lib.uncompress_and_encode_training_frames.argtypes = [
 ] + frame_target_types
 
 lib.read_build_trajectories.argtypes = [
-    ctypes.c_char_p,
+    ctypes.c_uint64,  # max_count
+    ctypes.c_uint64,  # threads
+    ctypes.c_uint64,  # n_paths
+    ctypes.POINTER(ctypes.c_char_p),  # paths
     ctypes.POINTER(ctypes.c_int64),
     ctypes.POINTER(ctypes.c_int64),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
     ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_int64),
+    ctypes.POINTER(ctypes.c_int64),
 ]
 lib.read_build_trajectories.restype = ctypes.c_uint64
 
@@ -339,11 +344,17 @@ def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrames:
 
 
 # convert bytes object into BattleFrames
-def read_build_trajectories(path) -> [BuildTrajectories, int]:
-    buffer_size = int(os.path.getsize(path) / 128)
-    path_bytes = path.encode("utf-8")
+def read_build_trajectories(
+    paths: List[str], buffer_size: int, threads: int
+) -> [BuildTrajectories, int]:
+    encoded_paths: List[str] = [p.encode("utf-8") for p in paths]
     trajectories = BuildTrajectories(buffer_size)
-    args = (ctypes.c_char_p(path_bytes),) + trajectories.raw_pointers(0)
+    args = (
+        ctypes.c_uint64(buffer_size),
+        ctypes.c_uint64(threads),
+        ctypes.c_uint64(len(paths)),
+        (ctypes.c_char_p * len(paths))(*encoded_paths),
+    ) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
     return trajectories, count
 
