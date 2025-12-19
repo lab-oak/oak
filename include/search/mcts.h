@@ -102,8 +102,17 @@ template <typename Options = SearchOptions<>> struct Search {
 
       node.init(output.m, output.n);
 
+      const auto get_params = [](const auto &params) -> const auto & {
+        if constexpr (requires { params.bandit_params; }) {
+          return params.bandit_params;
+        } else {
+          return params;
+        }
+      };
+
       if constexpr (requires {
-                      node.stats().softmax_logits(nullptr, nullptr);
+                      node.stats().softmax_logits(get_params(params), nullptr,
+                                                  nullptr);
                       model.inference(
                           input.battle,
                           *pkmn_gen1_battle_options_chance_durations(&options));
@@ -114,7 +123,8 @@ template <typename Options = SearchOptions<>> struct Search {
             input.battle, *pkmn_gen1_battle_options_chance_durations(&options),
             output.m, output.n, output.p1_choices.data(),
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
-        node.stats().softmax_logits(p1_logits.data(), p2_logits.data());
+        node.stats().softmax_logits(get_params(params), p1_logits.data(),
+                                    p2_logits.data());
       }
     }
 
