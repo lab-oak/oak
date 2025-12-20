@@ -29,7 +29,13 @@ generate_parser.add_argument(
     "--network-path",
     type=str,
     default="",
-    help="Initial network (mc = monte-carlo, no battle net training)",
+    help="Initial network ('mc' = monte-carlo, no battle net training/"" = random initial)",
+)
+generate_parser.add_argument(
+    "--build-network-path",
+    type=str,
+    default="",
+    help="Initial build network ('' = random initial)",
 )
 generate_parser.add_argument(
     "--search-time",
@@ -183,8 +189,8 @@ def main():
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
     py_oak.save_args(args, working_dir)
-    network_path = os.path.join(working_dir, "random.battle.net")
-    build_network_path = os.path.join(working_dir, "random.build.net")
+    network_path = os.path.join(working_dir, "current.battle.net")
+    build_network_path = os.path.join(working_dir, "current.build.net")
     data_dir = os.path.join(working_dir, "generate")
     nets_dir = os.path.join(working_dir, "nets")
     build_nets_dir = os.path.join(working_dir, "build_nets")
@@ -212,6 +218,10 @@ def main():
             build_network = torch_oak.BuildNetwork(
                 args.build_policy_hidden_dim, args.build_value_hidden_dim
             )
+            if args.build_network_path != "":
+                print(f"Reading initial build network from {args.build_network_path}")
+                with open(args.build_network_path, "rb") as g:
+                    build_network.read_parameters(g)
             build_network.write_parameters(f)
 
     generate_cmd = [
