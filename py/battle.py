@@ -39,7 +39,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "gamma",
         type=float,
-        default=.995,
+        default=0.995,
         help="Rolling average gamma",
     )
     parser.add_argument(
@@ -165,8 +165,7 @@ def main():
 
     @torch.no_grad()
     def rolling_average(average_network, network, gamma):
-        for avg_p, p in zip(average_network.parameters(),
-                            network.parameters()):
+        for avg_p, p in zip(average_network.parameters(), network.parameters()):
             avg_p.mul_(gamma).add_(p, alpha=1 - gamma)
 
     class Optimizer:

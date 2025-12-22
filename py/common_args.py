@@ -135,13 +135,12 @@ def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int, ext: 
         if (step % args.lr_decay_interval) == 0:
             for group in opt.param_groups:
                 group["lr"] *= args.lr_decay
-
+    if args.in_place:
+        ckpt_path = args.network_path
+        with open(ckpt_path, "wb") as f:
+            network.write_parameters(f)
     if ((step + 1) % args.checkpoint) == 0:
         ckpt_path = ""
-        if args.in_place:
-            ckpt_path = args.network_path
-            with open(ckpt_path, "wb") as f:
-                network.write_parameters(f)
         ckpt_path = os.path.join(args.dir, f"{step + 1}{ext}")
         with open(ckpt_path, "wb") as f:
             network.write_parameters(f)

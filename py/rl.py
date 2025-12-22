@@ -29,7 +29,8 @@ generate_parser.add_argument(
     "--network-path",
     type=str,
     default="",
-    help="Initial network ('mc' = monte-carlo, no battle net training/"" = random initial)",
+    help="Initial network ('mc' = monte-carlo, no battle net training/"
+    " = random initial)",
 )
 generate_parser.add_argument(
     "--build-network-path",
