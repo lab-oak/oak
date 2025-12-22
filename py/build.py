@@ -130,6 +130,28 @@ def main():
         state = torch.concat([torch.zeros(state[:, :1].shape), state], dim=1)
         return state
 
+    def apply_force_with_threshold(
+        decision_outputs: torch.Tensor,
+        force: torch.Tensor,
+        threshold: float,
+        threshold_center: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply the force with below a given threshold."""
+        can_decrease = decision_outputs - threshold_center > -threshold
+        can_increase = decision_outputs - threshold_center < threshold
+        force_negative = torch.clamp(force, max=0.0)
+        force_positive = torch.clamp(force, min=0.0)
+
+        # print("force")
+        # print(decision_outputs.shape)
+        # print(force.shape)
+
+        # print(can_decrease.shape)
+        # print(force_positive.shape)
+
+        clipped_force = can_decrease * force_negative + can_increase * force_positive
+        return decision_outputs * clipped_force.detach()
+
     def process_targets(
         network: torch_oak.BuildNetwork,
         traj: torch_oak.BuildTrajectories,
@@ -149,21 +171,25 @@ def main():
 
         # [v, 339]
         valid_mask = traj.mask[valid]
-        mask_weights = torch.where(
+        mask_logits = torch.where(
             valid_mask >= 0,
-            torch.exp(torch.gather(logits, 1, torch.clamp(valid_mask, min=0))),
-            torch.zeros_like(valid_mask),
+            torch.gather(logits, 1, torch.clamp(valid_mask, min=0)),
+            -torch.inf,
         )
+        # print(mask_logits.shape)
+        logits = mask_logits[:, 0]
+        # print(logits.shape)
+        mask_weights = torch.exp(mask_logits)
         mask_probs = torch.nn.functional.normalize(mask_weights, dim=1, p=1)
 
         # [v, 1]
         valid_logp = torch.log(mask_probs[:, 0]).unsqueeze(-1)
         valid_old_logp = torch.log(traj.policy[valid])
-        valid_ratio = torch.exp(valid_logp - valid_old_logp)
+        # valid_ratio = torch.exp(valid_logp - valid_old_logp)
 
-        # [b, T, 1]W
-        ratio = torch.ones_like(traj.policy)
-        ratio[valid] = valid_ratio
+        # [b, T, 1]
+        # ratio = torch.ones_like(traj.policy)
+        # ratio[valid] = valid_ratio
         score_weight = 1 - args.value_weight
         r = args.value_weight * traj.value + score_weight * traj.score
         rewards = torch.zeros_like(traj.policy).scatter(
@@ -188,18 +214,28 @@ def main():
         gae = torch.stack(advantages, dim=1)  # [b, T, 1]
         returns = gae + value_full
 
-        surr1 = ratio * gae
-        surr2 = torch.clamp(ratio, 1 - args.clip_eps, 1 + args.clip_eps) * gae
-        surr = torch.min(surr1, surr2)
+        # print(gae[valid].shape)
+        threshold_center = torch.zeros_like(logits)
+
+        forced = apply_force_with_threshold(
+            logits,
+            gae[valid].squeeze(-1),
+            2,
+            threshold_center
+        )
+
+        # surr1 = ratio * gae
+        # surr2 = torch.clamp(ratio, 1 - args.clip_eps, 1 + args.clip_eps) * gae
+        # surr = torch.min(surr1, surr2)
         logp = torch.ones_like(traj.policy)
         logp[valid] = valid_logp
         data = (
-            surr,
             returns,
             value_full,
             logp,
         )
-        valid_data = tuple(x[valid] for x in data)
+        valid_data = (forced,) + tuple(x[valid] for x in data)
+        # [print(x.shape) for x in valid_data]
         return valid_data
 
     def compute_loss_from_targets(
