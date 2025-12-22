@@ -11,7 +11,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace PExp3_2 {
+namespace P2Exp3 {
 
 constexpr float neg_inf = -std::numeric_limits<float>::infinity();
 
@@ -84,4 +84,4 @@ using JointBandit = Joint<Bandit>;
 
 static_assert(sizeof(JointBandit) == 74);
 
-} // namespace PExp3_2
+} // namespace P2Exp3

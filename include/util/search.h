@@ -20,7 +20,7 @@ using UniqueNode = std::unique_ptr<Tree::Node<T, MCTS::Obs>>;
 struct Nodes {
   UniqueNode<Exp3::JointBandit> exp3;
   UniqueNode<PExp3::JointBandit> pexp3;
-  UniqueNode<PExp3_2::JointBandit> pexp3_2;
+  UniqueNode<P2Exp3::JointBandit> p2exp3;
   UniqueNode<UCB::JointBandit> ucb;
   UniqueNode<PUCB::JointBandit> pucb;
   bool set;
@@ -30,7 +30,7 @@ struct Nodes {
   void reset() {
     exp3.reset();
     pexp3.reset();
-    pexp3_2.reset();
+    p2exp3.reset();
     ucb.reset();
     pucb.reset();
     set = false;
@@ -46,8 +46,8 @@ struct Nodes {
     if (pexp3) {
       pexp3->stats() = {};
     }
-    if (pexp3_2) {
-      pexp3_2->stats() = {};
+    if (p2exp3) {
+      p2exp3->stats() = {};
     }
     if (ucb) {
       ucb->stats() = {};
@@ -73,7 +73,7 @@ struct Nodes {
         return true;
       }
     };
-    return update_node(exp3) || update_node(pexp3) || update_node(pexp3_2) ||
+    return update_node(exp3) || update_node(pexp3) || update_node(p2exp3) ||
            update_node(ucb) || update_node(pucb);
   }
 };
@@ -203,8 +203,8 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       return run_3(dur, model, params, get(nodes.pexp3));
     } else if (bandit_name.starts_with("p2exp3-")) {
       const float gamma = std::stof(bandit_name.substr(7));
-      PExp3_2::Bandit::Params params{gamma};
-      return run_3(dur, model, params, get(nodes.pexp3_2));
+      P2Exp3::Bandit::Params params{gamma};
+      return run_3(dur, model, params, get(nodes.p2exp3));
     } else if (bandit_name.starts_with("pucb-")) {
       const float c = std::stof(bandit_name.substr(5));
       PUCB::Bandit::Params params{c};
