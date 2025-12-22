@@ -22,7 +22,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         prefix = prefix + "-"
     prefix = "--" + prefix
     parser.add_argument(
-        prefix + "gamma",
+        prefix + "avg-gamma",
         type=float,
         default=0.995,
         help="Rolling average gamma",
@@ -232,11 +232,14 @@ def main():
         with open(args.network_path, "rb") as f:
             network.read_parameters(f)
 
-    average_network = network.copy()
+    average_network = torch_oak.BuildNetwork()
 
     with open(os.path.join(args.dir, "initial.build.net"), "wb") as f:
         network.write_parameters(f)
         print("Saved initial network in output directory.")
+
+    with open(os.path.join(args.dir, "initial.build.net"), "rb") as f:
+        average_network.read_parameters(f)
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
 
@@ -300,10 +303,11 @@ def main():
 
         common_args.save_and_decay(args, network, optimizer, step, ".build.net")
 
-        rolling_average(average_network, network, args.gamma)
+        rolling_average(average_network, network, args.avg_gamma)
 
-        with open(os.path.join(args.dir, f"{step + 1}.avg.build.net")) as f:
-            average_network.write_parameters(f)
+        if ((step + 1) % args.checkpoint) == 0:
+            with open(os.path.join(args.dir, f"{step + 1}.avg.build.net"), "wb") as f:
+                average_network.write_parameters(f)
 
 
 if __name__ == "__main__":
