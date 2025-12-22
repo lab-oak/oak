@@ -37,6 +37,12 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
             help="Ignore samples with fewer than these iterations.",
         )
     parser.add_argument(
+        prefix + "gamma",
+        type=float,
+        default=.995,
+        help="Rolling average gamma",
+    )
+    parser.add_argument(
         prefix + "no-clamp-parameters",
         action="store_true",
         help="Clamp parameters [-2, 2] to support Stockfish style quantization",
@@ -156,6 +162,12 @@ def main():
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
+
+    @torch.no_grad()
+    def rolling_average(average_network, network, gamma):
+        for avg_p, p in zip(average_network.parameters(),
+                            network.parameters()):
+            avg_p.mul_(gamma).add_(p, alpha=1 - gamma)
 
     class Optimizer:
         def __init__(self, network: torch.nn.Module, lr):
@@ -292,6 +304,8 @@ def main():
         with open(args.network_path, "rb") as f:
             network.read_parameters(f)
 
+    average_network = network.copy()
+
     with open(os.path.join(args.dir, "initial.battle.net"), "wb") as f:
         network.write_parameters(f)
         print("Saved initial network in output directory.")
@@ -357,6 +371,11 @@ def main():
             network.clamp_parameters()
 
         common_args.save_and_decay(args, network, optimizer.opt, step, ".battle.net")
+
+        rolling_average(average_network, network, args.gamma)
+
+        with open(os.path.join(args.dir, f"{step + 1}.avg.build.net")) as f:
+            average_network.write_parameters(f)
 
 
 if __name__ == "__main__":
