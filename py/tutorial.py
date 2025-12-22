@@ -131,6 +131,7 @@ def show_species_probs():
         network.read_parameters(file)
 
     weights = dict()
+    logits_d = dict()
 
     logits, _ = network.forward(torch.zeros((1, py_oak.species_move_list_size)))
 
@@ -141,14 +142,15 @@ def show_species_probs():
 
         name = py_oak.species_names[s]
         weights[name] = math.exp(logits[0, index])
+        logits_d[name] = logits[0, index]
 
     s = 0
     for x in weights:
         s += weights[x]
-    probs = [(species, weights[species] / s) for species in weights]
+    probs = [(species, weights[species] / s, logits_d[species]) for species in weights]
     probs = sorted(probs, key=lambda x: x[1])
     for x in probs:
-        print(x[0], int(1000 * x[1]) / 1000)
+        print(x[0], int(1000 * x[1]) / 1000, x[2].item())
 
 
 def create_set():
