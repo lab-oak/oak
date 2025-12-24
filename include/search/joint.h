@@ -42,5 +42,15 @@ template <typename Bandit> struct Joint {
     p1.softmax_logits(params, p1_priors);
     p2.softmax_logits(params, p2_priors);
   }
+
+  void softmax_logits(const Params &params, const float *p1_priors,
+                      const float *p2_priors, const float baseline) noexcept
+    requires requires(const float *ptr) {
+      std::declval<Bandit>().softmax_logits(params, ptr, 0.0);
+    }
+  {
+    p1.softmax_logits(params, p1_priors, baseline);
+    p2.softmax_logits(params, p2_priors, 1 - baseline);
+  }
 };
 #pragma pack(pop)

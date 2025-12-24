@@ -74,12 +74,12 @@ The bandit algorithms are implemented in the typical 'single-player' fashion and
 ## search/bandits
 
 * bandits/ucb.h
-* bandits/ucb-policy.h
+* bandits/pucb.h
 
 A single modification to the `c` weight of the UCB algorithm so that it is equivalent to `PUCB` with uniform policy. This is soley to better test the efficacy of policy network inference rather than optimizing playing strength. 
 
 * bandits/exp3.h
-* bandits/exp3-policy.h
+* bandits/pexp3.h
 
 The `PExp3` algorithm is ad hoc and should be tested and improved.
 

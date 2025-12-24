@@ -31,7 +31,6 @@ struct Bandit {
   };
 
   std::array<float, 9> gains;
-  std::array<float, 9> priors;
   uint8_t k;
 
   void init(const auto k) noexcept {
@@ -42,8 +41,10 @@ struct Bandit {
 
   bool is_init() const noexcept { return k; }
 
-  void softmax_logits(const Params &, const float *logits) noexcept {
-    softmax(this->priors.data(), logits, k);
+  void softmax_logits(const Params &params, const float *logits) noexcept {
+    const float eta{params.gamma / k};
+    std::transform(logits, logits + k, this->gains.data(),
+                   [eta](const auto x) { return x / eta; });
   }
 
   void select(auto &device, const Params &params,
@@ -55,12 +56,13 @@ struct Bandit {
     } else {
       const float eta{params.gamma / k};
       softmax(policy, gains, eta);
-      std::transform(
-          policy.begin(), policy.end(), this->priors.begin(), policy.begin(),
-          [&params](const float value, const float prior) {
-            return params.one_minus_gamma * value + params.gamma * prior;
-          });
-      // TODO policy has eta as prob for invalid actions
+      std::transform(policy.begin(), policy.end(), policy.begin(),
+                     [eta, &params](const float value) {
+                       return params.one_minus_gamma * value + eta;
+                     });
+      // TODO policy has eta as prob for invalid actions/
+      // this was causing the only search code bug I can remember
+      // the std::min fixes it for now
       outcome.index = std::min(static_cast<uint8_t>(device.sample_pdf(policy)),
                                static_cast<uint8_t>(k - 1));
       outcome.prob = policy[outcome.index];
@@ -68,7 +70,7 @@ struct Bandit {
   }
 
   void update(const auto &outcome) noexcept {
-    if ((gains[outcome.index] += outcome.value / outcome.prob) >= 0) {
+    if ((gains[outcome.index] += (outcome.value - .5) / outcome.prob) >= 0) {
       const auto max = gains[outcome.index];
       for (auto &v : gains) {
         v -= max;
@@ -80,6 +82,6 @@ struct Bandit {
 
 using JointBandit = Joint<Bandit>;
 
-static_assert(sizeof(JointBandit) == 146);
+static_assert(sizeof(JointBandit) == 74);
 
-}; // namespace PExp3
+} // namespace PExp3
