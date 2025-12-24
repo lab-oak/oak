@@ -27,7 +27,6 @@ def read_battle_trajectories():
     if len(sys.argv) >= 3:
         path = sys.argv[2]
 
-
     # using only the head gives most recent files
     files = py_oak.find_data_files(path, ext=".battle.data")
 

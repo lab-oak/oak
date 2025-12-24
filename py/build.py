@@ -218,10 +218,7 @@ def main():
         threshold_center = torch.zeros_like(logits)
 
         forced = apply_force_with_threshold(
-            logits,
-            gae[valid].squeeze(-1),
-            2,
-            threshold_center
+            logits, gae[valid].squeeze(-1), 2, threshold_center
         )
 
         # surr1 = ratio * gae
