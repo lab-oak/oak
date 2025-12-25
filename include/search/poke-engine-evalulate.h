@@ -1,8 +1,13 @@
 #pragma once
-#include <bit>
-#include <cstdint>
+
+#include <libpkmn/pkmn.h>
+#include <util/random.h>
+
+#include <cmath>
 
 namespace PokeEngine {
+
+inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
 using namespace PKMN;
 
@@ -71,16 +76,17 @@ float get_boost_multiplier(int8_t boost) {
   case -6:
     return POKEMON_BOOST_MULTIPLIER_NEG_6;
   default:
+    assert(false);
     return 0;
   }
 }
 
-float evaluate_burned(const PKMN::Pokemon &pokemon) {
+float evaluate_burned(const PKMN::Pokemon &pokemon) noexcept {
   float multiplier = 0;
 
   for (int m = 0; m < 4; ++m) {
     auto moveid = pokemon.moves[m].id;
-    const auto &move = Data::get_move_data(moveid);
+    const auto &move = Data::move_data(moveid);
     if (move.bp > 0 && Data::is_physical(move.type)) {
       multiplier += 1.0f;
     }
@@ -93,32 +99,37 @@ float evaluate_burned(const PKMN::Pokemon &pokemon) {
   return multiplier * POKEMON_BURNED;
 }
 
-float evaluate_status(const PKMN::Pokemon &pokemon) {
+float evaluate_status(const PKMN::Pokemon &pokemon) noexcept {
   switch (pokemon.status) {
   case Status::Burn: {
     return evaluate_burned(pokemon);
   }
-  case Status::Freeze {
+  case Status::Freeze: {
     return POKEMON_FROZEN;
-  } case Status::Paralysis {
+  }
+  case Status::Paralysis: {
     return POKEMON_PARALYZED;
-  } case Status::Toxic {
+  }
+  case Status::Toxic: {
     return POKEMON_TOXIC;
-  } case Status::Poison {
+  }
+  case Status::Poison: {
     return POKEMON_POISONED;
-  } default: {
+  }
+  default: {
     if (is_sleep(pokemon.status)) {
       return POKEMON_ASLEEP;
+    } else {
+      return 0;
     }
   }
   }
-  return 0;
 }
 
-float evaluate_pokemon(const PKMN::Pokemon &pokemon) {
+float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
   float score = 0;
   if (pokemon.hp) {
-    score += POKEMON_HP * pokemon.hp();
+    score += POKEMON_HP * pokemon.hp / pokemon.stats.hp;
     score += evaluate_status(pokemon);
     if (score < 0.) {
       score = 0;
@@ -129,10 +140,10 @@ float evaluate_pokemon(const PKMN::Pokemon &pokemon) {
 }
 
 float evaluate_active(const PKMN::ActivePokemon &active,
-                      const PKMN::Pokemon &stored) {
+                      const PKMN::Pokemon &stored) noexcept {
   float score = 0;
   if (stored.hp) {
-    score += evaluate_pokemon(pokemon);
+    score += evaluate_pokemon(stored);
     const auto &vol = active.volatiles;
     if (vol.leech_seed()) {
       score += LEECH_SEED;
@@ -158,14 +169,19 @@ float evaluate_active(const PKMN::ActivePokemon &active,
   return score;
 }
 
-float evaluate_side(const PKMN::Side &side) {
+float evaluate_side(const PKMN::Side &side) noexcept {
   float score = 0;
-
+  score += evaluate_active(side.active, side.stored());
+  for (auto slot = 2; slot <= 6; ++slot) {
+    const auto id = side.order[slot - 1];
+    if (id != 0) {
+      score += evaluate_pokemon(side.pokemon[id - 1]);
+    }
+  }
   return score;
 }
 
-float evaluate(const pkmn_gen1_battle &b) {
-  const auto &battle = PKMN::view(b);
+float evaluate_battle(const PKMN::Battle &battle) noexcept {
   float score = evaluate_side(battle.sides[0]) - evaluate_side(battle.sides[1]);
   return score;
 }
@@ -173,6 +189,16 @@ float evaluate(const pkmn_gen1_battle &b) {
 struct Model {
   mt19937 device;
   float root_score;
+
+  void get_root_score(const pkmn_gen1_battle &b) noexcept {
+    const auto &battle = PKMN::view(b);
+    root_score = evaluate_battle(battle);
+  }
+
+  float evaluate(const pkmn_gen1_battle &b) const noexcept {
+    const auto &battle = PKMN::view(b);
+    return sigmoid(evaluate_battle(battle) - root_score);
+  }
 };
 
 } // namespace PokeEngine
