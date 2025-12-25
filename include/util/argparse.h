@@ -30,7 +30,7 @@ struct TeamBuildingArgs : public argparse::Args {
         kwarg(B "t1-search-time", "Search time on turn 0");                    \
                                                                                \
     std::string &A##bandit_name =                                              \
-        kwarg(B "bandit-name", "Bandit algorithm").set_default("p2exp3-0.1");  \
+        kwarg(B "bandit-name", "Bandit algorithm").set_default("pexp3-0.1");   \
                                                                                \
     std::string &A##network_path =                                             \
         kwarg(B "network-path", "Network path").set_default("mc");             \
