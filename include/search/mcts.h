@@ -97,6 +97,9 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (requires { params.bandit_params; }) {
       ucb_weight = std::log(2 * output.m * output.n);
     }
+    if constexpr (requires { model.get_root_score(input.battle); }) {
+      model.get_root_score(input.battle);
+    }
 
     if (!node.is_init()) {
 
