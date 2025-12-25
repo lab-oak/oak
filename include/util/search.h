@@ -6,6 +6,7 @@
 #include <search/bandit/pucb.h>
 #include <search/bandit/ucb.h>
 #include <search/mcts.h>
+#include <search/poke-engine-evalulate.h>
 
 #include <filesystem>
 #include <fstream>
@@ -84,7 +85,8 @@ struct Agent {
 
   bool uses_network() const {
     return !network_path.empty() && network_path != "mc" &&
-           network_path != "montecarlo" && network_path != "monte-carlo";
+           network_path != "montecarlo" && network_path != "monte-carlo" &&
+           network_path != "fp";
   }
 
   void initialize_network(const pkmn_gen1_battle &b) {
@@ -212,6 +214,9 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
         agent.initialize_network(battle_data.battle);
       }
       return run_2(dur, agent.network.value());
+    } else if (agent.network_path == "fp") {
+      PokeEngine::Model model{};
+      return run_2(dur, model);
     } else {
       MCTS::MonteCarlo model{std::random_device{}()};
       return run_2(dur, model);
