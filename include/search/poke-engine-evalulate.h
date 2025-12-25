@@ -129,7 +129,7 @@ float evaluate_status(const PKMN::Pokemon &pokemon) noexcept {
 float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
   float score = 0;
   if (pokemon.hp) {
-    score += POKEMON_HP * pokemon.hp / pokemon.stats.hp;
+    score += (POKEMON_HP * pokemon.hp) / pokemon.stats.hp;
     score += evaluate_status(pokemon);
     if (score < 0.) {
       score = 0;
