@@ -51,12 +51,9 @@ struct Bandit {
       const float eta{params.gamma / k};
       softmax(policy, gains, eta);
       std::transform(policy.begin(), policy.end(), policy.begin(),
-                     [eta, &params](const float value) {
-                       return params.one_minus_gamma * value + eta;
+                     [eta, &params](const float x) {
+                       return params.one_minus_gamma * x + eta;
                      });
-      // TODO policy has eta as prob for invalid actions/
-      // this was causing the only search code bug I can remember
-      // the std::min fixes it for now
       outcome.index = std::min(static_cast<uint8_t>(device.sample_pdf(policy)),
                                static_cast<uint8_t>(k - 1));
       outcome.prob = policy[outcome.index];
@@ -64,7 +61,7 @@ struct Bandit {
   }
 
   void update(const auto &outcome) noexcept {
-    if ((gains[outcome.index] += outcome.value / outcome.prob) >= 0) {
+    if ((gains[outcome.index] += (outcome.value - 0.5) / outcome.prob) > 0) {
       const auto max = gains[outcome.index];
       for (auto &v : gains) {
         v -= max;

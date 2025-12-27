@@ -163,8 +163,7 @@ float evaluate_active(const PKMN::ActivePokemon &active,
     const auto &boosts = active.boosts;
     score += POKEMON_ATTACK_BOOST * get_boost_multiplier(boosts.atk());
     score += POKEMON_DEFENSE_BOOST * get_boost_multiplier(boosts.def());
-    score +=
-        POKEMON_SPECIAL_ATTACK_BOOST * get_boost_multiplier(boosts.spc());
+    score += POKEMON_SPECIAL_ATTACK_BOOST * get_boost_multiplier(boosts.spc());
     score += POKEMON_SPEED_BOOST * get_boost_multiplier(boosts.spe());
   }
   return score;
