@@ -92,7 +92,7 @@ float evaluate_burned(const PKMN::Pokemon &pokemon) noexcept {
     }
   }
 
-  if (pokemon.stats.spe > pokemon.stats.atk) {
+  if (pokemon.stats.spc > pokemon.stats.atk) {
     multiplier *= 0.5f;
   }
 
@@ -161,10 +161,11 @@ float evaluate_active(const PKMN::ActivePokemon &active,
       score += LIGHT_SCREEN;
     }
     const auto &boosts = active.boosts;
-    score += get_boost_multiplier(boosts.atk());
-    score += get_boost_multiplier(boosts.def());
-    score += get_boost_multiplier(boosts.spc());
-    score += get_boost_multiplier(boosts.spe());
+    score += POKEMON_ATTACK_BOOST * get_boost_multiplier(boosts.atk());
+    score += POKEMON_DEFENSE_BOOST * get_boost_multiplier(boosts.def());
+    score +=
+        POKEMON_SPECIAL_ATTACK_BOOST * get_boost_multiplier(boosts.spc());
+    score += POKEMON_SPEED_BOOST * get_boost_multiplier(boosts.spe());
   }
   return score;
 }
