@@ -2,6 +2,7 @@
 #include <train/battle/compressed-frame.h>
 #include <util/argparse.h>
 #include <util/policy.h>
+#include <util/print.h>
 #include <util/random.h>
 #include <util/search.h>
 #include <util/team-building.h>
@@ -12,12 +13,6 @@
 
 #include <fcntl.h>
 #include <stdio.h>
-
-#ifdef NDEBUG
-constexpr bool debug = false;
-#else
-constexpr bool debug = true;
-#endif
 
 struct ProgramArgs : public SelfPlayAgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
@@ -61,28 +56,6 @@ struct ProgramArgs : public SelfPlayAgentArgs {
   std::string &teams_path =
       kwarg("teams", "Path to teams file").set_default("");
 };
-
-void print(const auto &data, const bool newline = true) {
-  if constexpr (!debug) {
-    return;
-  }
-  std::cout << data;
-  if (newline) {
-    std::cout << '\n';
-  }
-}
-
-void print_vec(const auto &data, const bool newline = true) {
-  if constexpr (!debug) {
-    return;
-  }
-  for (const auto &x : data) {
-    std::cout << x << ' ';
-  }
-  if (newline) {
-    std::cout << '\n';
-  }
-}
 
 // Stats for sample team matchup matrix
 struct MatchupMatrix {

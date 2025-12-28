@@ -231,6 +231,12 @@ void thread_fn(const ProgramArgs *args_ptr) {
           print(" UPDATE: " + std::to_string(updates));
           print(PKMN::battle_data_to_string(battle_data.battle,
                                             battle_data.durations));
+          const auto [p1_lables, p2_labels] =
+              PKMN::choice_labels(battle_data.battle, battle_data.result);
+          MCTS::print_output(p1_output, battle_data.battle, p1_labels,
+                             p2_labels);
+          MCTS::print_output(p2_output, battle_data.battle, p1_labels,
+                             p2_labels);
         }
         battle_data.result =
             PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
