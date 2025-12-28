@@ -7,7 +7,9 @@
 
 namespace PokeEngine {
 
-inline constexpr float scaled_sigmoid(const float x) { return 1 / (1 + std::exp(-0.0125 * x)); }
+inline constexpr float scaled_sigmoid(const float x) {
+  return 1 / (1 + std::exp(-0.0125 * x));
+}
 
 using namespace PKMN;
 
