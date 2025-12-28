@@ -7,7 +7,9 @@
 
 namespace PokeEngine {
 
-inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
+inline constexpr float scaled_sigmoid(const float x) {
+  return 1 / (1 + std::exp(-0.0125 * x));
+}
 
 using namespace PKMN;
 
@@ -131,9 +133,7 @@ float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
   if (pokemon.hp) {
     score += (POKEMON_HP * pokemon.hp) / pokemon.stats.hp;
     score += evaluate_status(pokemon);
-    if (score < 0.) {
-      score = 0;
-    }
+    score = std::max(score, 0.0f);
     score += POKEMON_ALIVE;
   }
   return score;
@@ -197,7 +197,10 @@ struct Model {
 
   float evaluate(const pkmn_gen1_battle &b) const noexcept {
     const auto &battle = PKMN::view(b);
-    return sigmoid(evaluate_battle(battle) - root_score);
+    const float score = evaluate_battle(battle);
+    const float value = scaled_sigmoid(score - root_score);
+    // std::cout << root_score << ' ' << score << ' ' << value << '\n';
+    return value;
   }
 };
 
