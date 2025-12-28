@@ -242,14 +242,11 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       if (!agent.network.has_value()) {
         agent.initialize_network(battle_data.battle);
       }
-      std::cout << "network\n";
       return run_2(dur, agent.network.value());
     } else if (agent.network_path == "fp") {
-      std::cout << "fp\n";
       PokeEngine::Model model{};
       return run_2(dur, model);
     } else {
-      std::cout << "mc\n";
       MCTS::MonteCarlo model{std::random_device{}()};
       return run_2(dur, model);
     }
