@@ -206,6 +206,7 @@ class MainNet(nn.Module):
     ):
         super().__init__()
         self.fc0 = Affine(in_dim, hidden_dim)
+        self.fc1 = Affine(hidden_dim, hidden_dim)
         self.value_fc1 = Affine(hidden_dim, value_hidden_dim)
         self.value_fc2 = Affine(value_hidden_dim, 1, clamp=False)
         self.policy1_fc1 = Affine(hidden_dim, policy_hidden_dim)
@@ -215,6 +216,7 @@ class MainNet(nn.Module):
 
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
+        self.fc1.read_parameters(f)
         self.value_fc1.read_parameters(f)
         self.value_fc2.read_parameters(f)
         self.policy1_fc1.read_parameters(f)
@@ -224,6 +226,7 @@ class MainNet(nn.Module):
 
     def write_parameters(self, f):
         self.fc0.write_parameters(f)
+        self.fc1.write_parameters(f)
         self.value_fc1.write_parameters(f)
         self.value_fc2.write_parameters(f)
         self.policy1_fc1.write_parameters(f)
@@ -233,6 +236,7 @@ class MainNet(nn.Module):
 
     def clamp_parameters(self):
         self.fc0.clamp_parameters()
+        self.fc1.clamp_parameters()
         self.value_fc1.clamp_parameters()
         self.value_fc2.clamp_parameters()
         self.policy1_fc1.clamp_parameters()
@@ -242,18 +246,20 @@ class MainNet(nn.Module):
 
     def forward(self, x):
         b0 = self.fc0(x)
-        value_b1 = self.value_fc1(b0)
+        b1 = self.fc1(b0)
+        value_b1 = self.value_fc1(b1)
         value_b2 = self.value_fc2(value_b1)
         value = torch.sigmoid(value_b2)
-        p1_policy_b1 = self.policy1_fc1(b0)
+        p1_policy_b1 = self.policy1_fc1(b1)
         p1_policy_b2 = self.policy1_fc2(p1_policy_b1)
-        p2_policy_b1 = self.policy2_fc1(b0)
+        p2_policy_b1 = self.policy2_fc1(b1)
         p2_policy_b2 = self.policy2_fc2(p2_policy_b1)
         return value, p1_policy_b2, p2_policy_b2
 
     def forward_value_only(self, x):
         b0 = self.fc0(x)
-        value_b1 = self.value_fc1(b0)
+        b1 = self.fc1(b0)
+        value_b1 = self.value_fc1(b1)
         value_b2 = self.value_fc2(value_b1)
         value = torch.sigmoid(value_b2)
         return value
@@ -261,6 +267,7 @@ class MainNet(nn.Module):
     def hash(self) -> int:
         h = self.fc0.hash()
         for sub in [
+            self.fc1,
             self.value_fc1,
             self.value_fc2,
             self.policy1_fc1,
