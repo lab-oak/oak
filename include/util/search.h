@@ -8,6 +8,7 @@
 #include <search/bandit/ucb1.h>
 #include <search/mcts.h>
 #include <search/poke-engine-evalulate.h>
+#include <util/strings.h>
 
 #include <filesystem>
 #include <fstream>
@@ -194,8 +195,6 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
   };
 
   const auto run_2 = [&](auto dur, auto &model) {
-    const auto &bandit_name = agent.bandit_name;
-
     const auto get = [&nodes](auto &node) -> auto & {
       using Node = std::remove_reference_t<decltype(*node)>;
       if (!node.get()) {
@@ -210,28 +209,47 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       return *node;
     };
 
-    if (bandit_name.starts_with("exp3-")) {
-      const float gamma = std::stof(bandit_name.substr(5));
-      Exp3::Bandit::Params params{gamma};
-      return run_3(dur, model, params, get(nodes.exp3));
-    } else if (bandit_name.starts_with("ucb-")) {
-      const float c = std::stof(bandit_name.substr(4));
-      UCB::Bandit::Params params{c};
+    const auto bandit_name_split = Parse::split(agent.bandit_name, '-');
+
+    if (bandit_name_split.size() < 2) {
+      throw std::runtime_error("Could not parse bandit string: " +
+                               agent.bandit_name);
+      return output;
+    }
+
+    const auto &name = bandit_name_split[0];
+    const float f1 = std::stof(bandit_name_split[1]);
+
+    if (name == "ucb") {
+      UCB::Bandit::Params params{.c = f1};
       return run_3(dur, model, params, get(nodes.ucb));
-    } else if (bandit_name.starts_with("ucb1-")) {
-      const float c = std::stof(bandit_name.substr(5));
-      UCB1::Bandit::Params params{c};
+    } else if (name == "ucb1") {
+      UCB1::Bandit::Params params{.c = f1};
       return run_3(dur, model, params, get(nodes.ucb1));
-    } else if (bandit_name.starts_with("pexp3-")) {
-      const float gamma = std::stof(bandit_name.substr(6));
-      PExp3::Bandit::Params params{gamma};
-      return run_3(dur, model, params, get(nodes.pexp3));
-    } else if (bandit_name.starts_with("pucb-")) {
-      const float c = std::stof(bandit_name.substr(5));
-      PUCB::Bandit::Params params{c};
+    } else if (name == "pucb") {
+      PUCB::Bandit::Params params{.c = f1};
       return run_3(dur, model, params, get(nodes.pucb));
+    }
+
+    float alpha = .05;
+    if (bandit_name_split.size() >= 3) {
+      alpha = std::stof(bandit_name_split[2]);
+    }
+
+    if (name == "exp3") {
+      Exp3::Bandit::Params params{.gamma = f1,
+                                  .one_minus_gamma = (1 - f1),
+                                  .alpha = alpha,
+                                  .one_minus_alpha = (1 - alpha)};
+      return run_3(dur, model, params, get(nodes.exp3));
+    } else if (name == "pexp3") {
+      PExp3::Bandit::Params params{.gamma = f1,
+                                   .one_minus_gamma = (1 - f1),
+                                   .alpha = alpha,
+                                   .one_minus_alpha = (1 - alpha)};
+      return run_3(dur, model, params, get(nodes.pexp3));
     } else {
-      throw std::runtime_error("Could not parse bandit string: " + bandit_name);
+      throw std::runtime_error("Could not parse bandit string: " + name);
       return output;
     }
   };

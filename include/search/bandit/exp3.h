@@ -25,9 +25,10 @@ struct Bandit {
   };
 
   struct Params {
-    Params(const float gamma) : gamma{gamma}, one_minus_gamma{1 - gamma} {}
     float gamma;
     float one_minus_gamma;
+    float alpha;
+    float one_minus_alpha;
   };
 
   std::array<float, 9> gains;
@@ -49,10 +50,11 @@ struct Bandit {
       outcome.prob = 1;
     } else {
       const float eta{params.gamma / k};
+      const float delta{params.alpha / k};
       softmax(policy, gains, eta);
       std::transform(policy.begin(), policy.end(), policy.begin(),
-                     [eta, &params](const float x) {
-                       return params.one_minus_gamma * x + eta;
+                     [eta, delta, &params](const float x) {
+                       return params.one_minus_alpha * x + delta;
                      });
       outcome.index = std::min(static_cast<uint8_t>(device.sample_pdf(policy)),
                                static_cast<uint8_t>(k - 1));
