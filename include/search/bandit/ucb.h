@@ -61,7 +61,7 @@ struct Bandit {
       float max = 0;
       const float p = 1.0 / k;
       for (auto i = 0; i < k; ++i) {
-        float e = params.c * p * sqrtN / (visits[i] + 1);
+        float e = params.c * p * sqrtN / visits[i];
         float a = e + q[i];
         if (a > max) {
           max = a;

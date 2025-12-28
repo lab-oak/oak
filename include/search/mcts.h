@@ -128,6 +128,10 @@ template <typename Options = SearchOptions<>> struct Search {
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
         node.stats().softmax_logits(get_params(params), p1_logits.data(),
                                     p2_logits.data());
+        // if constexpr (requires { node.stats().print_priors(); }) {
+        //   std::cout << "Root Priors" << std::endl;
+        //   node.stats().print_priors();
+        // }
       }
     }
 

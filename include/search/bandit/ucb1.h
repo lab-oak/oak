@@ -4,7 +4,6 @@
 
 #include <search/joint.h>
 #include <search/util/int.h>
-#include <search/util/softmax.h>
 
 #include <algorithm>
 #include <array>
@@ -12,7 +11,7 @@
 #include <cmath>
 #include <cstdint>
 
-namespace PUCB {
+namespace UCB1 {
 
 #pragma pack(push, 1)
 struct Bandit {
@@ -27,7 +26,6 @@ struct Bandit {
   };
 
   std::array<float, 9> scores;
-  std::array<float, 9> priors;
   std::array<uint24_t, 9> visits;
   uint8_t k;
 
@@ -38,10 +36,6 @@ struct Bandit {
   }
 
   bool is_init() const noexcept { return k; }
-
-  void softmax_logits(const Params &, const float *logits) noexcept {
-    softmax(this->priors.data(), logits, k);
-  }
 
   void update(const auto &outcome) noexcept {
     scores[outcome.index] += outcome.value;
@@ -63,10 +57,11 @@ struct Bandit {
         q[i] = (float)scores[i] / visits[i];
         N += visits[i];
       }
-      float sqrtN = std::sqrt(N);
+      float lnN = std::log(N);
       float max = 0;
+      const float p = 1.0 / k;
       for (auto i = 0; i < k; ++i) {
-        float e = params.c * priors[i] * sqrtN / visits[i];
+        float e = std::sqrt(params.c * lnN / visits[i]);
         float a = e + q[i];
         if (a > max) {
           max = a;
@@ -75,18 +70,11 @@ struct Bandit {
       }
     }
   }
-
-  void print_priors() const {
-    for (auto i = 0; i < 9; ++i) {
-      std::cout << priors[i] << ' ';
-    }
-    std::cout << std::endl;
-  }
 };
 #pragma pack(pop)
 
 using JointBandit = Joint<Bandit>;
 
-static_assert(sizeof(JointBandit) == 200);
+static_assert(sizeof(JointBandit) == 128);
 
-}; // namespace PUCB
+}; // namespace UCB1

@@ -5,6 +5,7 @@
 #include <search/bandit/pexp3.h>
 #include <search/bandit/pucb.h>
 #include <search/bandit/ucb.h>
+#include <search/bandit/ucb1.h>
 #include <search/mcts.h>
 #include <search/poke-engine-evalulate.h>
 
@@ -21,6 +22,7 @@ struct Nodes {
   UniqueNode<Exp3::JointBandit> exp3;
   UniqueNode<PExp3::JointBandit> pexp3;
   UniqueNode<UCB::JointBandit> ucb;
+  UniqueNode<UCB1::JointBandit> ucb1;
   UniqueNode<PUCB::JointBandit> pucb;
   bool set;
 
@@ -30,6 +32,7 @@ struct Nodes {
     exp3.reset();
     pexp3.reset();
     ucb.reset();
+    ucb1.reset();
     pucb.reset();
     set = false;
   }
@@ -46,6 +49,9 @@ struct Nodes {
     }
     if (ucb) {
       ucb->stats() = {};
+    }
+    if (ucb1) {
+      ucb1->stats() = {};
     }
     if (pucb) {
       pucb->stats() = {};
@@ -69,7 +75,7 @@ struct Nodes {
       }
     };
     return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
-           update_node(pucb);
+           update_node(ucb1) || update_node(pucb);
   }
 };
 
@@ -193,6 +199,10 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       const float c = std::stof(bandit_name.substr(4));
       UCB::Bandit::Params params{c};
       return run_3(dur, model, params, get(nodes.ucb));
+    } else if (bandit_name.starts_with("ucb1-")) {
+      const float c = std::stof(bandit_name.substr(5));
+      UCB1::Bandit::Params params{c};
+      return run_3(dur, model, params, get(nodes.ucb1));
     } else if (bandit_name.starts_with("pexp3-")) {
       const float gamma = std::stof(bandit_name.substr(6));
       PExp3::Bandit::Params params{gamma};

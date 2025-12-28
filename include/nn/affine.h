@@ -1,9 +1,17 @@
 #pragma once
 
-#include <Eigen/Core>
 #include <algorithm>
 #include <cstddef>
 #include <istream>
+
+#include <Eigen/Core>
+
+namespace NN {
+
+uint64_t combine_hash(uint64_t h1, uint64_t h2) {
+  return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) &
+         0xFFFFFFFFFFFFFFFF;
+}
 
 template <bool clamp = true> class Affine {
 public:
@@ -113,3 +121,5 @@ public:
     }
   }
 };
+
+} // namespace NN
