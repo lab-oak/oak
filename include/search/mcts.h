@@ -45,6 +45,8 @@ struct Output {
   double nash_value;
   std::array<pkmn_choice, 9> p1_choices;
   std::array<pkmn_choice, 9> p2_choices;
+  std::array<double, 9> p1_prior;
+  std::array<double, 9> p2_prior;
   std::array<double, 9> p1_empirical;
   std::array<double, 9> p2_empirical;
   std::array<double, 9> p1_nash;
@@ -97,6 +99,7 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (requires { params.bandit_params; }) {
       ucb_weight = std::log(2 * output.m * output.n);
     }
+    // poke-eval
     if constexpr (requires { model.get_root_score(input.battle); }) {
       model.get_root_score(input.battle);
     }
@@ -361,11 +364,11 @@ template <typename Options = SearchOptions<>> struct Search {
     case PKMN_RESULT_NONE:
       [[likely]] {
         print("Initializing node");
-        // model is a net
         float value;
         if constexpr (requires {
                         model.inference(input.battle, input.durations);
                       }) {
+          // model is a net
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
               p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
@@ -391,6 +394,17 @@ template <typename Options = SearchOptions<>> struct Search {
                 input.battle,
                 *pkmn_gen1_battle_options_chance_durations(&options));
           }
+          return {value, 1 - value};
+        } else if constexpr (requires { model.evaluate(input.battle); }) {
+          // poke-engine
+          const auto m = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+              p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          const auto n = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+              p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          node.stats().init(m, n);
+          value = model.evaluate(input.battle);
           return {value, 1 - value};
         } else {
           // model is monte-carlo
