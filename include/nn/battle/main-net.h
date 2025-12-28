@@ -15,6 +15,7 @@ inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 struct MainNet {
 
   Affine<> fc0;
+  Affine<> fc1;
   Affine<> value_fc1;
   Affine<false> value_fc2;
   Affine<> p1_policy_fc1;
@@ -23,12 +24,14 @@ struct MainNet {
   Affine<false> p2_policy_fc2;
 
   std::vector<float> buffer;
+  std::vector<float> buffer1;
   std::vector<float> value_buffer;
   std::vector<float> p1_policy_buffer;
   std::vector<float> p2_policy_buffer;
 
   bool read_parameters(std::istream &stream) {
     const bool ok = fc0.read_parameters(stream) &&
+                    fc1.read_parameters(stream) &&
                     value_fc1.read_parameters(stream) &&
                     value_fc2.read_parameters(stream) &&
                     p1_policy_fc1.read_parameters(stream) &&
@@ -40,6 +43,7 @@ struct MainNet {
       return false;
     }
     buffer.resize(fc0.out_dim);
+    buffer1.resize(fc1.out_dim);
     value_buffer.resize(value_fc1.out_dim);
     p1_policy_buffer.resize(p1_policy_fc1.out_dim);
     p2_policy_buffer.resize(p2_policy_fc1.out_dim);
@@ -47,7 +51,9 @@ struct MainNet {
   }
 
   bool write_parameters(std::ostream &stream) const {
-    return fc0.write_parameters(stream) && value_fc1.write_parameters(stream) &&
+    return fc0.write_parameters(stream) && 
+    fc1.write_parameters(stream) &&
+    value_fc1.write_parameters(stream) &&
            value_fc2.write_parameters(stream) &&
            p1_policy_fc1.write_parameters(stream) &&
            p1_policy_fc2.write_parameters(stream) &&
@@ -58,7 +64,8 @@ struct MainNet {
   float propagate(const float *input_data) {
     float output;
     fc0.propagate(input_data, buffer.data());
-    value_fc1.propagate(buffer.data(), value_buffer.data());
+    fc1.propagate(buffer.data(), buffer1.data());
+    value_fc1.propagate(buffer1.data(), value_buffer.data());
     value_fc2.propagate(value_buffer.data(), &output);
     return sigmoid(output);
   }
@@ -70,12 +77,13 @@ struct MainNet {
       -> std::conditional_t<use_value, float, void> {
     float output;
     fc0.propagate(input_data, buffer.data());
+    fc1.propagate(buffer.data(), buffer1.data());
     if constexpr (use_value) {
-      value_fc1.propagate(buffer.data(), value_buffer.data());
+      value_fc1.propagate(buffer1.data(), value_buffer.data());
       value_fc2.propagate(value_buffer.data(), &output);
     }
-    p1_policy_fc1.propagate(buffer.data(), p1_policy_buffer.data());
-    p2_policy_fc1.propagate(buffer.data(), p2_policy_buffer.data());
+    p1_policy_fc1.propagate(buffer1.data(), p1_policy_buffer.data());
+    p2_policy_fc1.propagate(buffer1.data(), p2_policy_buffer.data());
 
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];
