@@ -30,4 +30,12 @@ template <typename BanditData, typename Obs> struct Node {
   }
 };
 
+size_t count(const auto &node) {
+  size_t c = 1;
+  for (const auto &pair : node._map) {
+    c += count(pair.second);
+  }
+  return c;
+}
+
 }; // namespace Tree

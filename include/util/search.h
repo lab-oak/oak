@@ -77,6 +77,25 @@ struct Nodes {
     return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
            update_node(ucb1) || update_node(pucb);
   }
+
+  size_t count() const {
+    if (exp3) {
+      return Tree::count(*exp3);
+    }
+    if (pexp3) {
+      return Tree::count(*pexp3);
+    }
+    if (ucb) {
+      return Tree::count(*ucb);
+    }
+    if (ucb1) {
+      return Tree::count(*ucb1);
+    }
+    if (pucb) {
+      return Tree::count(*pucb);
+    }
+    return 0;
+  }
 };
 
 struct Agent {
@@ -223,11 +242,14 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       if (!agent.network.has_value()) {
         agent.initialize_network(battle_data.battle);
       }
+      std::cout << "network\n";
       return run_2(dur, agent.network.value());
     } else if (agent.network_path == "fp") {
+      std::cout << "fp\n";
       PokeEngine::Model model{};
       return run_2(dur, model);
     } else {
+      std::cout << "mc\n";
       MCTS::MonteCarlo model{std::random_device{}()};
       return run_2(dur, model);
     }
