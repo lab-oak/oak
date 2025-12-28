@@ -51,9 +51,8 @@ struct MainNet {
   }
 
   bool write_parameters(std::ostream &stream) const {
-    return fc0.write_parameters(stream) && 
-    fc1.write_parameters(stream) &&
-    value_fc1.write_parameters(stream) &&
+    return fc0.write_parameters(stream) && fc1.write_parameters(stream) &&
+           value_fc1.write_parameters(stream) &&
            value_fc2.write_parameters(stream) &&
            p1_policy_fc1.write_parameters(stream) &&
            p1_policy_fc2.write_parameters(stream) &&
