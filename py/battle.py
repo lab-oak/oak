@@ -179,8 +179,10 @@ def main():
     def masked_cross_entropy(logit, target):
         log_probs = torch.log_softmax(logit, dim=-1)
         log_probs = log_probs.masked_fill(torch.isneginf(log_probs), 0)
+        support_size = (target != 0).sum(dim=1).clamp_min(1)
         ce = -target * log_probs
-        return ce.sum(dim=1).mean(dim=0)
+        loss_per_sample = ce.sum(dim=1) / support_size
+        return loss_per_sample.mean()
 
     def loss(
         input: torch_oak.EncodedBattleFrames,
@@ -295,6 +297,8 @@ def main():
     with open(os.path.join(args.dir, "initial.battle.net"), "wb") as f:
         network.write_parameters(f)
         print("Saved initial network in output directory.")
+
+    print(f"Initial network hash: {network.hash()}")
 
     encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
     encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames).to(device)
