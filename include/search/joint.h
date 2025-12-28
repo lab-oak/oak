@@ -52,5 +52,12 @@ template <typename Bandit> struct Joint {
     p1.softmax_logits(params, p1_priors, baseline);
     p2.softmax_logits(params, p2_priors, 1 - baseline);
   }
+
+  void print_priors() const
+    requires requires { std::declval<Bandit>().print_priors(); }
+  {
+    p1.print_priors();
+    p2.print_priors();
+  }
 };
 #pragma pack(pop)
