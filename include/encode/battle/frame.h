@@ -12,8 +12,11 @@ namespace Battle {
 struct Frame {
   uint8_t m, n;
 
-  std::array<std::array<std::array<float, Pokemon::n_dim>, 5>, 2> pokemon;
-  std::array<std::array<std::array<float, Active::n_dim>, 1>, 2> active;
+  using PokemonEmbedding = std::array<float, Pokemon::n_dim>;
+  using ActiveEmbedding = std::array<float, Active::n_dim>;
+
+  std::array<std::array<PokemonEmbedding, 5>, 2> pokemon;
+  std::array<std::array<ActiveEmbedding, 1>, 2> active;
   std::array<std::array<float, 6>, 2> hp;
 
   std::array<int64_t, 9> p1_choice_indices;
@@ -29,25 +32,39 @@ struct Frame {
       const auto &side = battle.sides[s];
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
-      hp[s][0] = stored.stats.hp ? (float)stored.hp / stored.stats.hp : 0.0f;
-      Encode::Battle::Active::write(stored, side.active, duration,
-                                    active[s][0].data());
+
+      if (stored.hp == 0) {
+        hp[s][0] = 0;
+        std::fill(active[s][0].begin(), active[s][0].end(), 0);
+      } else {
+        hp[s][0] = (float)stored.hp / stored.stats.hp;
+        Encode::Battle::Active::write(stored, side.active, duration,
+                                      active[s][0].data());
+      }
 
       for (auto slot = 2; slot <= 6; ++slot) {
-        if (side.order[slot - 1] == 0) {
+        const auto id = side.order[slot - 1];
+        if (id == 0) {
           hp[s][slot - 1] = 0;
           std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
                     0);
         } else {
-          const auto &poke = side.get(slot);
-          const auto sleep = duration.sleep(slot - 1);
-          hp[s][slot - 1] =
-              poke.stats.hp ? (float)poke.hp / poke.stats.hp : 0.0f;
-          Encode::Battle::Pokemon::write(poke, sleep,
-                                         pokemon[s][slot - 2].data());
+          const auto &pokemon = side.pokemon[id - 1];
+          if (pokemon.hp == 0) {
+            hp[s][slot - 1] = 0;
+            std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
+                      0);
+          } else {
+            const auto &poke = side.get(slot);
+            const auto sleep = duration.sleep(slot - 1);
+            hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
+            Encode::Battle::Pokemon::write(poke, sleep,
+                                           pokemon[s][slot - 2].data());
+          }
         }
       }
     }
+
     m = frame.m;
     n = frame.n;
     for (auto i = 0; i < frame.m; ++i) {
