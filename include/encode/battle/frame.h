@@ -49,13 +49,12 @@ struct Frame {
           std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
                     0);
         } else {
-          const auto &pokemon = side.pokemon[id - 1];
-          if (pokemon.hp == 0) {
+          const auto &poke = side.pokemon[id - 1];
+          if (poke.hp == 0) {
             hp[s][slot - 1] = 0;
             std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
                       0);
           } else {
-            const auto &poke = side.get(slot);
             const auto sleep = duration.sleep(slot - 1);
             hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
             Encode::Battle::Pokemon::write(poke, sleep,
