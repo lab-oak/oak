@@ -135,13 +135,13 @@ struct Network {
                   discrete_battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
               std::copy(embedding, embedding + pokemon_out_dim,
                         slot_embedding + 1);
-              side_embedding[0] = (float)stored.hp / stored.stats.hp * 127;
+              slot_embedding[0] = (float)pokemon.hp / pokemon.stats.hp * 127;
             } else {
               const T *embedding =
                   battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
               std::copy(embedding, embedding + pokemon_out_dim,
                         slot_embedding + 1);
-              side_embedding[0] = (float)stored.hp / stored.stats.hp;
+              slot_embedding[0] = (float)pokemon.hp / pokemon.stats.hp;
             }
           }
         }
