@@ -216,6 +216,9 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
         // only if they have same sign and are both non zero
         if ((p1_early_stop * p2_early_stop) > 0) {
+          // std::cout << "Early stop: " << p1_output.empirical_value << ' '
+          //           << p2_output.empirical_value << std::endl;
+          // std::cout << p1_early_stop << ' ' << p2_early_stop << std::endl;
           early_stop = true;
           break;
         }
@@ -261,7 +264,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
-    switch (battle_data.result) {
+    switch (pkmn_result_type(battle_data.result)) {
     case PKMN_RESULT_WIN: {
       RuntimeData::win.fetch_add(1);
       return 2;
@@ -349,6 +352,8 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
 
     std::cout << "score: " << average_score << " over " << RuntimeData::n.load()
               << " games; Elo diff: " << elo_difference << std::endl;
+    std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load()
+              << ' ' << RuntimeData::loss.load() << std::endl;
   }
 }
 

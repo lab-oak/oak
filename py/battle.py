@@ -309,6 +309,8 @@ def main():
 
     optimizer = Optimizer(network, args.lr)
 
+    sample_indexer = py_oak.SampleIndexer()
+
     step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
     skipped_steps = 0
@@ -322,9 +324,7 @@ def main():
             skipped_steps += 1
             continue
 
-        # TODO wasteful
-        sample_indexer = py_oak.SampleIndexer()
-
+        sample_indexer.prune(data_files)
         for file in data_files:
             sample_indexer.get(file)
 

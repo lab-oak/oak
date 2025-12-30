@@ -408,6 +408,11 @@ class SampleIndexer:
             self.data[path] = output
             return self.data[path]
 
+    def prune(self, paths: List[str]):
+        for path in self.data:
+            if path not in paths:
+                del self.data[path]
+
 
 def sample_from_battle_data_files(
     indexer: SampleIndexer,
