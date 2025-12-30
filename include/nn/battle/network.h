@@ -11,6 +11,13 @@
 
 namespace NN::Battle {
 
+std::array<uint8_t, 5> &random_permutation_5() {
+  static thread_local std::array<uint8_t, 5> indices{1, 2, 3, 4, 5};
+  static thread_local std::mt19937 rng{std::random_device{}()};
+  std::shuffle(indices.begin(), indices.end(), rng);
+  return indices;
+}
+
 struct Network {
 
   mt19937 device;
@@ -118,9 +125,11 @@ struct Network {
         }
       }
 
+      const auto &permute = random_permutation_5();
+
       for (auto slot = 2; slot <= 6; ++slot) {
         auto *slot_embedding = side_embedding + side_embedding_index(slot - 1);
-        const auto id = side.order[slot - 1];
+        const auto id = side.order[permute[slot - 2]];
         if (id == 0) {
           std::fill(slot_embedding, slot_embedding + (pokemon_out_dim + 1), 0);
         } else {
