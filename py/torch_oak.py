@@ -221,6 +221,11 @@ class MainNet(nn.Module):
         self.policy1_fc2.read_parameters(f)
         self.policy2_fc1.read_parameters(f)
         self.policy2_fc2.read_parameters(f)
+        pos = f.tell()
+        f.seek(0, 2)
+        end = f.tell()
+        f.seek(pos)
+        assert pos == end
 
     def write_parameters(self, f):
         self.fc0.write_parameters(f)
