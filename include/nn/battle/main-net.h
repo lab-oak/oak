@@ -10,8 +10,6 @@
 
 namespace NN::Battle {
 
-inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
-
 struct MainNet {
 
   Affine<> fc0;
@@ -60,7 +58,7 @@ struct MainNet {
     fc0.propagate(input_data, buffer.data());
     value_fc1.propagate(buffer.data(), value_buffer.data());
     value_fc2.propagate(value_buffer.data(), &output);
-    return sigmoid(output);
+    return output;
   }
 
   template <bool use_value = true>
@@ -99,7 +97,7 @@ struct MainNet {
       p2[i] = logit;
     }
     if constexpr (use_value) {
-      return sigmoid(output);
+      return output;
     }
   }
 };

@@ -11,6 +11,8 @@
 
 namespace NN::Battle {
 
+inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
+
 std::array<uint8_t, 5> &random_permutation_5() {
   static thread_local std::array<uint8_t, 5> indices{1, 2, 3, 4, 5};
   static thread_local std::mt19937 rng{std::random_device{}()};
@@ -129,7 +131,9 @@ struct Network {
 
       for (auto slot = 2; slot <= 6; ++slot) {
         auto *slot_embedding = side_embedding + side_embedding_index(slot - 1);
-        const auto id = side.order[permute[slot - 2]];
+        // const auto id = side.order[permute[slot - 2]];
+        const auto id = side.order[slot - 1];
+
         if (id == 0) {
           std::fill(slot_embedding, slot_embedding + (pokemon_out_dim + 1), 0);
         } else {
@@ -199,14 +203,15 @@ struct Network {
         return -1;
       }
       write_battle_embedding<float>(battle_embedding.data(), b, d);
-      value = main_net.propagate<use_value>(battle_embedding.data(), m, n,
-                                            p1_choice_index, p2_choice_index,
-                                            p1, p2);
-      return value;
+      value =
+          main_net.propagate<true>(battle_embedding.data(), m, n,
+                                   p1_choice_index, p2_choice_index, p1, p2);
+      return sigmoid(value);
     } else {
       write_battle_embedding<float>(battle_embedding.data(), b, d);
-      main_net.propagate<use_value>(battle_embedding.data(), m, n,
-                                    p1_choice_index, p2_choice_index, p1, p2);
+      // won't use value layers or return anything
+      main_net.propagate<false>(battle_embedding.data(), m, n, p1_choice_index,
+                                p2_choice_index, p1, p2);
     }
   }
 
