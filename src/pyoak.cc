@@ -2,6 +2,7 @@
 #include <encode/battle/frame.h>
 #include <encode/battle/policy.h>
 #include <encode/build/trajectory.h>
+#include <nn/battle/network.h>
 #include <nn/default-hyperparameters.h>
 #include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
@@ -196,6 +197,111 @@ extern "C" void uncompress_and_encode_training_frames(
     Encode::Battle::Frame encoded{frame};
     input.write(encoded, frame.target);
   }
+}
+
+extern "C" int test_consistency(size_t max_games, const char *network_path,
+                                const char *path, char *out_data,
+                                uint16_t *offsets, uint16_t *frame_counts) {
+
+  std::ifstream network_params{network_path, std::ios::binary};
+  NN::Battle::Network network{};
+  if (!network.read_parameters(network_params)) {
+    return -1;
+  }
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    std::cerr << "Failed to open file: " << path << std::endl;
+    return -1;
+  }
+
+  int n_battles = 0;
+  size_t total_offset = 0;
+  for (auto i = 0; i < max_games; ++i) {
+
+    if (file.peek() == EOF) {
+      break;
+    }
+
+    uint32_t offset;
+    uint16_t frame_count;
+    file.read(reinterpret_cast<char *>(&offset), 4);
+    if (file.gcount() < 4) {
+      std::cerr << "bad offset read" << std::endl;
+      return -1;
+    }
+    file.read(reinterpret_cast<char *>(&frame_count), 2);
+    if (file.gcount() < 2) {
+      std::cerr << "bad frame count read" << std::endl;
+      return -1;
+    }
+    file.seekg(-6, std::ios::cur);
+
+    std::vector<char> buffer;
+    buffer.reserve(offset);
+    file.read(buffer.data(), offset);
+
+    if (file.gcount() < offset) {
+      std::cerr << "truncated battle frame" << std::endl;
+      return -1;
+    }
+
+    Train::Battle::CompressedFrames compressed_frames{};
+    compressed_frames.read(buffer.data());
+
+    auto battle = compressed_frames.battle;
+    auto options = PKMN::options();
+    auto result = PKMN::result();
+
+    network.fill_pokemon_caches(battle);
+
+    std::vector<float> network_values{};
+    network_values.reserve(compressed_frames.updates.size());
+
+    std::array<pkmn_choice, 9> p1_choices;
+    std::array<pkmn_choice, 9> p2_choices;
+
+    for (const auto &update : compressed_frames.updates) {
+      const auto m = pkmn_gen1_battle_choices(
+          &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), p1_choices.data(),
+          PKMN_GEN1_MAX_CHOICES);
+      const auto n = pkmn_gen1_battle_choices(
+          &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), p2_choices.data(),
+          PKMN_GEN1_MAX_CHOICES);
+      std::array<float, 9> p1_logits{};
+      std::array<float, 9> p2_logits{};
+
+      const auto durations = PKMN::durations(options);
+      const auto value = network.inference(battle, durations, m, n,
+                                           p1_choices.data(), p2_choices.data(),
+                                           p1_logits.data(), p2_logits.data());
+      network_values.push_back(value);
+      // std::cout << "____" << std::endl;
+      std::cout << value << ' ';
+      // for (auto i = 0; i < m; ++i) {
+      //   std::cout << p1_logits[i] << ' ';
+      // }
+      // std::cout << std::endl;
+      // for (auto i = 0; i < n; ++i) {
+      //   std::cout << p2_logits[i] << ' ';
+      // }
+      // std::cout << std::endl;
+
+      result = PKMN::update(battle, update.c1, update.c2, options);
+    }
+
+    std::cout << compressed_frames.updates.size() << std::endl;
+
+    std::memcpy(out_data + total_offset, buffer.data(), offset);
+    offsets[n_battles] = offset;
+    frame_counts[n_battles] = frame_count;
+    total_offset += offset;
+    ++n_battles;
+
+    // break;
+  }
+
+  return n_battles;
 }
 
 extern "C" size_t sample_from_battle_data_files(
