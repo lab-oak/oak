@@ -36,7 +36,7 @@ struct Network {
   virtual float
   propagate(const TransformedFeatureType *transformedFeatures) const = 0;
   virtual void copy_parameters(const Affine<> &, const Affine<> &,
-                               const Affine<false> &) = 0;
+                               const Affine<> &, const Affine<false> &) = 0;
 };
 
 template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
@@ -46,15 +46,18 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
 
   AffineTransform<ConcatenatedSidesDims, FC_0_OUTPUTS> fc_0;
   ClippedReLU<FC_0_OUTPUTS> ac_0;
-  AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_1;
-  ClippedReLU<FC_1_OUTPUTS> ac_1;
-  AffineTransform<FC_1_OUTPUTS, 1> fc_2;
+  AffineTransform<FC_0_OUTPUTS, FC_0_OUTPUTS> fc_1;
+  ClippedReLU<FC_0_OUTPUTS> ac_1;
+  AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_2;
+  ClippedReLU<FC_1_OUTPUTS> ac_2;
+  AffineTransform<FC_1_OUTPUTS, 1> fc_3;
 
   void copy_parameters(const Affine<> &affine0, const Affine<> &affine1,
-                       const Affine<false> &affine2) {
+                       const Affine<> &affine2, const Affine<false> &affine3) {
     fc_0.copy_parameters(affine0);
     fc_1.copy_parameters(affine1);
     fc_2.copy_parameters(affine2);
+    fc_3.copy_parameters(affine3);
   }
 
   float
@@ -65,6 +68,8 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
       alignas(CacheLineSize) typename decltype(fc_1)::OutputBuffer fc_1_out;
       alignas(CacheLineSize) typename decltype(ac_1)::OutputBuffer ac_1_out;
       alignas(CacheLineSize) typename decltype(fc_2)::OutputBuffer fc_2_out;
+      alignas(CacheLineSize) typename decltype(ac_2)::OutputBuffer ac_2_out;
+      alignas(CacheLineSize) typename decltype(fc_3)::OutputBuffer fc_3_out;
 
       Buffer() { std::memset(this, 0, sizeof(*this)); }
     };
@@ -83,11 +88,13 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
     fc_1.propagate(buffer.ac_0_out, buffer.fc_1_out);
     ac_1.propagate(buffer.fc_1_out, buffer.ac_1_out);
     fc_2.propagate(buffer.ac_1_out, buffer.fc_2_out);
+    ac_2.propagate(buffer.fc_2_out, buffer.ac_2_out);
+    fc_3.propagate(buffer.ac_2_out, buffer.fc_3_out);
 
     // buffer.fc_0_out[FC_0_OUTPUTS] is such that 1.0 is equal to
     // 127*(1<<WeightScaleBits) in quantized form, but we want 1.0 to be equal
     // to 600*OutputScale
-    auto outputValue = buffer.fc_2_out[0] / float(127 * (1 << 6));
+    auto outputValue = buffer.fc_3_out[0] / float(127 * (1 << 6));
 
     return outputValue;
   }

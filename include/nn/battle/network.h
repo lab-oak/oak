@@ -93,8 +93,8 @@ struct Network {
   void enable_discrete() {
     discrete_main_net = Stockfish::make_network(
         main_net.fc0.in_dim, main_net.fc0.out_dim, main_net.value_fc1.out_dim);
-    discrete_main_net->copy_parameters(main_net.fc0, main_net.value_fc1,
-                                       main_net.value_fc2);
+    discrete_main_net->copy_parameters(main_net.fc0, main_net.fc1,
+                                       main_net.value_fc1, main_net.value_fc2);
     use_discrete = true;
   }
 
