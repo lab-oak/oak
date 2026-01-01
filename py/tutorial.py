@@ -220,6 +220,43 @@ def create_set():
             mask[index] = 0
 
 
+def test_consistency():
+
+    if len(sys.argv) < 4:
+        print("Provide path to battle network and data file to test")
+        exit()
+
+    import torch
+    import py_oak
+    import torch_oak
+
+    network_path = sys.argv[2]
+    data_path = sys.argv[3]
+
+    network = torch_oak.BattleNetwork()
+
+    with open(network_path, "rb") as f:
+        network.read_parameters(f)
+
+    buffer_list = py_oak.read_battle_data(data_path)
+
+    max_games = 2
+
+    for buffer, n_frames in buffer_list[:max_games]:
+
+        encoded_frames = py_oak.get_encoded_frames(buffer, n_frames)
+        encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames)
+
+        output = torch_oak.OutputBuffers(encoded_frames.size)
+
+        network.inference(encoded_frames_torch, output)
+
+        print(output.value)
+        # policies = torch.cat([output.p1_policy.unsqueeze(1), output.p2_policy.unsqueeze(1)], dim=1)
+
+    py_oak.test_consistency(max_games, network_path, data_path)
+
+
 if __name__ == "__main__":
 
     key = sys.argv[1]
@@ -237,5 +274,7 @@ if __name__ == "__main__":
         show_species_probs()
     elif key == "battle-frame-stats":
         battle_frame_stats()
+    elif key == "test-consistency":
+        test_consistency()
     else:
         print("Invalid keyword. See TUTORIAL.md")

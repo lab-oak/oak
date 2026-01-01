@@ -93,6 +93,16 @@ lib.index_compressed_battle_frames.argtypes = [
 ]
 lib.index_compressed_battle_frames.restype = ctypes.c_int
 
+lib.test_consistency.argtypes = [
+    ctypes.c_uint64,
+    ctypes.c_char_p,
+    ctypes.c_char_p,
+    ctypes.c_char_p,
+    ctypes.POINTER(ctypes.c_uint16),
+    ctypes.POINTER(ctypes.c_uint16),
+]
+lib.test_consistency.restype = ctypes.c_int
+
 lib.uncompress_training_frames.argtypes = [
     ctypes.c_char_p,
     ctypes.POINTER(ctypes.c_uint8),  # m
@@ -228,6 +238,31 @@ def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]
     return result
 
 
+def test_consistency(
+    max_games: int, network_path: str, data_path: str, max_battles=1_000_000
+) -> list[tuple[bytes, int]]:
+    network_path_bytes = network_path.encode("utf-8")
+    path_bytes = data_path.encode("utf-8")
+
+    offsets = (ctypes.c_uint16 * max_battles)()
+    frame_counts = (ctypes.c_uint16 * max_battles)()
+    buffer_size = os.path.getsize(data_path)
+    buffer = (ctypes.c_char * int(buffer_size))()
+
+    args = (
+        ctypes.c_uint64(max_games),
+        ctypes.c_char_p(network_path_bytes),
+        ctypes.c_char_p(path_bytes),
+        ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char)),
+        ctypes.cast(offsets, ctypes.POINTER(ctypes.c_uint16)),
+        ctypes.cast(frame_counts, ctypes.POINTER(ctypes.c_uint16)),
+    )
+
+    n = lib.test_consistency(*args)
+
+    return n
+
+
 # convert bytes object into BattleFrames
 def get_frames(data: bytes, frame_count: int) -> BattleFrame:
     frames = BattleFrame(frame_count)
@@ -357,30 +392,6 @@ def read_build_trajectories(
     ) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
     return trajectories, count
-
-
-def encode_buffers(
-    paths: list[str],
-    threads: int,
-    max_count: int,
-    encoded_frame_input: BattleFrame,
-    start_index: int = 0,
-    write_prob: float = 1,
-    max_game_length: int = 10000,
-):
-    encoded_paths = [path.encode("utf-8") for path in paths]
-    arr = (ctypes.c_char_p * len(encoded_paths))(*encoded_paths)
-    max_count = min(max_count, encoded_frame_input.size)
-    args = (
-        arr,
-        ctypes.c_uint64(len(encoded_paths)),
-        ctypes.c_uint64(threads),
-        ctypes.c_uint64(max_count),
-        ctypes.c_float(write_prob),
-        ctypes.c_uint64(max_game_length),
-    ) + encoded_frame_input.raw_pointers(start_index)
-    count = lib.encode_buffer_multithread(*args)
-    return count
 
 
 Offset = int
