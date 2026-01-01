@@ -181,12 +181,17 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
     MCTS::Search search{};
     const auto &matrix_ucb_name = agent.matrix_ucb_name;
     if (!matrix_ucb_name.empty()) {
+      const auto matrix_ucb_name_split =
+          Parse::split(agent.matrix_ucb_name, '-');
+      if (matrix_ucb_name_split.size() != 3) {
+        throw std::runtime_error{"Could not parse MatrixUCB name: " +
+                                 agent.matrix_ucb_name};
+      }
       MCTS::MatrixUCBParams<std::remove_cvref_t<decltype(params)>>
           matrix_ucb_params{params};
-      // matrix_ucb_params.bandit_params = params;
-      matrix_ucb_params.delay = 1 << 12;
-      matrix_ucb_params.interval = 64;
-      matrix_ucb_params.c = 1.0;
+      matrix_ucb_params.delay = std::stoull(matrix_ucb_name_split[0]);
+      matrix_ucb_params.interval = std::stoull(matrix_ucb_name_split[1]);
+      matrix_ucb_params.c = std::stof(matrix_ucb_name_split[2]);
       return search.run(dur, matrix_ucb_params, node, model, battle_data,
                         output);
     } else {

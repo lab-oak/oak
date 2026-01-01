@@ -255,7 +255,8 @@ void generate(const ProgramArgs *args_ptr) {
     auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
                                       .bandit_name = args.bandit_name,
                                       .network_path = args.network_path,
-                                      .discrete_network = args.use_discrete};
+                                      .discrete_network = args.use_discrete,
+                                      .matrix_ucb_name = args.matrix_ucb_name};
     if (agent.uses_network()) {
       agent.initialize_network(battle_data.battle);
     }

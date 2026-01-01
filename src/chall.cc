@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
       .bandit_name = args.bandit_name,
       .network_path = args.network_path,
       .discrete_network = args.use_discrete,
+      .matrix_ucb_name = args.matrix_ucb_name,
       .flag = args.use_search_time ? nullptr : &search_flag};
 
   if (!args.seed.has_value()) {

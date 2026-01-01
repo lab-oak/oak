@@ -32,6 +32,10 @@ struct TeamBuildingArgs : public argparse::Args {
     std::string &A##bandit_name =                                              \
         kwarg(B "bandit-name", "Bandit algorithm").set_default("pexp3-0.1");   \
                                                                                \
+    std::string &A##matrix_ucb_name =                                          \
+        kwarg(B "matrix-ucb-name", "MatrixUCB start/interval/c")               \
+            .set_default("");                                                  \
+                                                                               \
     std::string &A##network_path =                                             \
         kwarg(B "network-path", "Network path").set_default("mc");             \
                                                                                \
