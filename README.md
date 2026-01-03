@@ -28,6 +28,12 @@ These programs were all built from a shared header library that is easy to exten
 
 **Note**: Eigen has failed to build with some versions of g++-15.
 
+The project uses the GNU Multiple Precision library to solve for Nash equilibrium. It can be installed with
+
+```
+sudo apt install libgmp3-dev
+```
+
 Must have Cmake and a Zig compiler installed. The script below clones the repo, builds the lipkmn libraries, and compiles the various programs in the `/src` directory
 
 ```
