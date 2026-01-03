@@ -207,8 +207,8 @@ void generate(const ProgramArgs *args_ptr) {
         const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
         written += write(fd, &traj, decltype(traj)::size_no_team);
       }
-      print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
-      print("build buffer - bytes written: " + std::to_string(written));
+      debug_print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
+      debug_print("build buffer - bytes written: " + std::to_string(written));
       close(fd);
       if (written != static_cast<ssize_t>(bytes_to_write)) {
         std::cerr << "Short write when flushing build buffer to " << full_path
@@ -292,7 +292,7 @@ void generate(const ProgramArgs *args_ptr) {
           return;
         }
 
-        print(PKMN::battle_data_to_string(battle_data.battle,
+        debug_print(PKMN::battle_data_to_string(battle_data.battle,
                                           battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
@@ -391,7 +391,7 @@ void generate(const ProgramArgs *args_ptr) {
         RuntimeData::update_counter.fetch_add(1);
 
         ++battle_length;
-        print("update: " + std::to_string(battle_length));
+        debug_print("update: " + std::to_string(battle_length));
       }
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
