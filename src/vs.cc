@@ -196,7 +196,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         p2_early_stop = 0;
         if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
+          p1_output = RuntimeSearch::run(device, battle_data, nodes, p1_agent);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
@@ -204,7 +204,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         }
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
+          p2_output = RuntimeSearch::run(device, battle_data, nodes, p2_agent);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,

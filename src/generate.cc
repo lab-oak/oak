@@ -207,7 +207,8 @@ void generate(const ProgramArgs *args_ptr) {
         const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
         written += write(fd, &traj, decltype(traj)::size_no_team);
       }
-      debug_print("build buffer - bytes to write: " + std::to_string(bytes_to_write));
+      debug_print("build buffer - bytes to write: " +
+                  std::to_string(bytes_to_write));
       debug_print("build buffer - bytes written: " + std::to_string(written));
       close(fd);
       if (written != static_cast<ssize_t>(bytes_to_write)) {
@@ -293,7 +294,7 @@ void generate(const ProgramArgs *args_ptr) {
         }
 
         debug_print(PKMN::battle_data_to_string(battle_data.battle,
-                                          battle_data.durations));
+                                                battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
         agent.search_time =
@@ -352,7 +353,7 @@ void generate(const ProgramArgs *args_ptr) {
             std::cout << std::endl;
           }
         } else {
-          output = RuntimeSearch::run(battle_data, nodes, agent);
+          output = RuntimeSearch::run(device, battle_data, nodes, agent);
           if (battle_length == 0) {
             p1_matchup = output.empirical_value;
             p2_matchup = 1 - output.empirical_value;

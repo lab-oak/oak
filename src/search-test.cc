@@ -20,13 +20,14 @@ struct Test {
   RuntimeSearch::Agent agent = default_agent;
 
   void operator()() {
+    mt19937 device{std::random_device{}()};
     auto battle_data = parse_input(position, std::random_device{}());
     auto options = PKMN::options();
     pkmn_gen1_chance_options chance_options{};
     chance_options.durations = battle_data.durations;
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     RuntimeSearch::Nodes nodes{};
-    auto output = RuntimeSearch::run(battle_data, nodes, agent);
+    auto output = RuntimeSearch::run(device, battle_data, nodes, agent);
     bool success = std::abs(output.empirical_value - expected) <= error;
     if (!success) {
       std::cerr << position << std::endl;

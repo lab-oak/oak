@@ -157,7 +157,8 @@ struct Agent {
   }
 };
 
-auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
+auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
+         MCTS::Output output = {}) {
 
   MCTS::BattleData battle_data{};
   using input_t = std::remove_cvref_t<decltype(input)>;
@@ -192,10 +193,10 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       matrix_ucb_params.delay = std::stoull(matrix_ucb_name_split[0]);
       matrix_ucb_params.interval = std::stoull(matrix_ucb_name_split[1]);
       matrix_ucb_params.c = std::stof(matrix_ucb_name_split[2]);
-      return search.run(dur, matrix_ucb_params, node, model, battle_data,
-                        output);
+      return search.run(device, dur, matrix_ucb_params, node, model,
+                        battle_data, output);
     } else {
-      return search.run(dur, params, node, model, battle_data, output);
+      return search.run(device, dur, params, node, model, battle_data, output);
     }
   };
 
@@ -270,7 +271,7 @@ auto run(auto &input, Nodes &nodes, Agent &agent, MCTS::Output output = {}) {
       PokeEngine::Model model{};
       return run_2(dur, model);
     } else {
-      MCTS::MonteCarlo model{std::random_device{}()};
+      MCTS::MonteCarlo model{};
       return run_2(dur, model);
     }
   };

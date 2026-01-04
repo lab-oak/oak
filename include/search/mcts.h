@@ -20,9 +20,7 @@ struct BattleData {
   pkmn_result result;
 };
 
-struct MonteCarlo {
-  mt19937 device;
-};
+struct MonteCarlo {};
 
 // wrapper to use for enabling matrix ucb at root node
 template <typename BanditParams> struct MatrixUCBParams {
@@ -83,8 +81,8 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p1_nash;
   std::array<float, 9 + 2> p2_nash;
 
-  Output run(const auto dur, const auto &params, auto &node, auto &model,
-             const MCTS::BattleData &input, Output output = {}) {
+  Output run(auto &device, const auto dur, const auto &params, auto &node,
+             auto &model, const MCTS::BattleData &input, Output output = {}) {
 
     // reset data members
     *this = {};
@@ -149,7 +147,7 @@ template <typename Options = SearchOptions<>> struct Search {
       std::chrono::milliseconds elapsed{};
       while (elapsed < duration) {
         output.total_value +=
-            run_root_iteration(params, node, input, model, output);
+            run_root_iteration(device, params, node, input, model, output);
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
@@ -159,13 +157,13 @@ template <typename Options = SearchOptions<>> struct Search {
       while (*dur) {
         ++output.iterations;
         output.total_value +=
-            run_root_iteration(params, node, input, model, output);
+            run_root_iteration(device, params, node, input, model, output);
       }
       // number of iterations
     } else {
       for (auto i = 0; i < dur; ++i) {
         output.total_value +=
-            run_root_iteration(params, node, input, model, output);
+            run_root_iteration(device, params, node, input, model, output);
         ++output.iterations;
       }
     }
@@ -176,12 +174,12 @@ template <typename Options = SearchOptions<>> struct Search {
     return process_output(output);
   }
 
-  float run_root_iteration(const auto &params, auto &node, const auto &input,
-                           auto &model, Output &output) {
+  float run_root_iteration(auto &device, const auto &params, auto &node,
+                           const auto &input, auto &model, Output &output) {
     auto copy = input;
     auto *rng = reinterpret_cast<uint64_t *>(
         copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
-    rng[0] = model.device.uniform_64();
+    rng[0] = device.uniform_64();
     chance_options.durations = copy.durations;
     apply_durations(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
@@ -247,7 +245,7 @@ template <typename Options = SearchOptions<>> struct Search {
         }
 
         {
-          float p = model.device.uniform();
+          float p = device.uniform();
           for (auto i = 0; i < output.m; ++i) {
             p -= p1_nash[i];
             if (p <= 0) {
@@ -258,7 +256,7 @@ template <typename Options = SearchOptions<>> struct Search {
         }
 
         {
-          float p = model.device.uniform();
+          float p = device.uniform();
           for (auto i = 0; i < output.n; ++i) {
             p -= p2_nash[i];
             if (p <= 0) {
@@ -277,31 +275,32 @@ template <typename Options = SearchOptions<>> struct Search {
         auto &child = node(p1_index, p2_index, obs);
 
         const auto value =
-            run_iteration(params.bandit_params, child, copy, model, 1).first;
+            run_iteration(device, params.bandit_params, child, copy, model, 1)
+                .first;
 
         ++visit_matrix[p1_index][p2_index];
         value_matrix[p1_index][p2_index] += value;
 
         return value;
       } else {
-        return run_iteration(params.bandit_params, node, copy, model).first;
+        return run_iteration(device, params.bandit_params, node, copy, model)
+            .first;
       }
     } else {
-      return run_iteration(params, node, copy, model).first;
+      return run_iteration(device, params, node, copy, model).first;
     }
   }
 
   // typical recursive mcts function
   // we return value for each player because it's slightly faster than calcing 1
   // - value at each node
-  std::pair<float, float> run_iteration(const auto &bandit_params, auto &node,
-                                        auto &input, auto &model,
+  std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
+                                        auto &node, auto &input, auto &model,
                                         size_t depth = 0) {
 
     auto &battle = input.battle;
     auto &durations = input.durations;
     auto &result = input.result;
-    auto &device = model.device;
 
     // debug print, optimized out if not enabled
     const auto print = [depth](const auto &data, bool new_line = true) -> void {
@@ -343,7 +342,7 @@ template <typename Options = SearchOptions<>> struct Search {
 
       auto &child = node(outcome.p1.index, outcome.p2.index, obs);
       const auto value =
-          run_iteration(bandit_params, child, input, model, depth + 1);
+          run_iteration(device, bandit_params, child, input, model, depth + 1);
       outcome.p1.value = value.first;
       outcome.p2.value = value.second;
       node.stats().update(outcome);

@@ -1,5 +1,6 @@
 #include <teams/benchmark-teams.h>
 #include <util/argparse.h>
+#include <util/random.h>
 #include <util/search.h>
 
 struct ProgramArgs : public AgentArgs {
@@ -29,8 +30,9 @@ int benchmark(int argc, char **argv) {
   const auto result = PKMN::update(battle, 0, 0, options);
   const auto durations = PKMN::durations();
   MCTS::BattleData battle_data{battle, durations, result};
+  auto device = mt19937{seed};
 
-  const auto output = RuntimeSearch::run(battle_data, nodes, agent);
+  const auto output = RuntimeSearch::run(device, battle_data, nodes, agent);
 
   std::cout << output.duration.count() << " ms." << std::endl;
 
