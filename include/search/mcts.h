@@ -517,7 +517,11 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (Options::root_matrix) {
       // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
       // TODO maybe use gmp since this is not the hot part of the code
-      constexpr int discretize_factor = 80;
+
+      output.p1_empirical = {};
+      output.p2_empirical = {};
+
+      constexpr int discretize_factor = 256;
       std::array<int, 9 * 9> solve_matrix;
       for (int i = 0; i < output.m; ++i) {
         for (int j = 0; j < output.n; ++j) {
