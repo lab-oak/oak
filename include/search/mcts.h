@@ -129,10 +129,6 @@ template <typename Options = SearchOptions<>> struct Search {
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
         node.stats().softmax_logits(get_params(params), p1_logits.data(),
                                     p2_logits.data());
-        // if constexpr (requires { node.stats().print_priors(); }) {
-        //   std::cout << "Root Priors" << std::endl;
-        //   node.stats().print_priors();
-        // }
       }
     }
 
@@ -171,7 +167,8 @@ template <typename Options = SearchOptions<>> struct Search {
     output.duration +=
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    return process_output(output);
+    process_output(output);
+    return output;
   }
 
   float run_root_iteration(auto &device, const auto &params, auto &node,
@@ -512,7 +509,7 @@ template <typename Options = SearchOptions<>> struct Search {
     }
   }
 
-  Output process_output(Output &output) {
+  void process_output(Output &output) {
 
     // prepare output, solve empirical root matrix if enabled
     output.empirical_value = output.total_value / output.iterations;
@@ -576,7 +573,6 @@ template <typename Options = SearchOptions<>> struct Search {
       }
     }
 
-    return output;
   }
 };
 
