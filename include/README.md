@@ -91,8 +91,6 @@ This pattern does not allow for implementation of 'matrix aware' algorithms like
 
 Lots to expliain TODO
 
-* tree.h
-
 A node is the joint bandit stats plus a std::map to child nodes. Child nodes are uniquely identified by the tuple of P1 actions, P2 actions, and `pkmn_gen1_chance_actions`. The chance actions are observations of how the turn played out: damage rolls, secondary procs, crits, etc.
 
 This is the reason for the `--option=key` flag in the `Libpkmn` build script. Without this flag, the chance actions would reveal hidden info like sleep rolls.

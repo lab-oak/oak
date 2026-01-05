@@ -17,7 +17,7 @@
 namespace RuntimeSearch {
 
 template <typename T>
-using UniqueNode = std::unique_ptr<Tree::Node<T, MCTS::Obs>>;
+using UniqueNode = std::unique_ptr<MCTS::Node<T, MCTS::Obs>>;
 
 struct Nodes {
   UniqueNode<Exp3::JointBandit> exp3;
@@ -43,29 +43,29 @@ struct Nodes {
   // This is a clumsy fix though. TODO
   void reset_stats() {
     if (exp3) {
-      exp3->stats() = {};
+      exp3->stats = {};
     }
     if (pexp3) {
-      pexp3->stats() = {};
+      pexp3->stats = {};
     }
     if (ucb) {
-      ucb->stats() = {};
+      ucb->stats = {};
     }
     if (ucb1) {
-      ucb1->stats() = {};
+      ucb1->stats = {};
     }
     if (pucb) {
-      pucb->stats() = {};
+      pucb->stats = {};
     }
   }
 
   bool update(auto i1, auto i2, const auto &obs) {
     auto update_node = [&](auto &node) -> bool {
-      if (!node || !node->is_init()) {
+      if (!node || !node->stats.is_init()) {
         return false;
       }
-      auto child = node->find(i1, i2, obs);
-      if (child == node->_map.end()) {
+      auto child = node->children.find({i1, i2, obs});
+      if (child == node->children.end()) {
         node = std::make_unique<std::decay_t<decltype(*node)>>();
         return false;
       } else {
@@ -81,19 +81,19 @@ struct Nodes {
 
   size_t count() const {
     if (exp3) {
-      return Tree::count(*exp3);
+      return MCTS::count(*exp3);
     }
     if (pexp3) {
-      return Tree::count(*pexp3);
+      return MCTS::count(*pexp3);
     }
     if (ucb) {
-      return Tree::count(*ucb);
+      return MCTS::count(*ucb);
     }
     if (ucb1) {
-      return Tree::count(*ucb1);
+      return MCTS::count(*ucb1);
     }
     if (pucb) {
-      return Tree::count(*pucb);
+      return MCTS::count(*pucb);
     }
     return 0;
   }

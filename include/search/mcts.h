@@ -3,7 +3,6 @@
 #include <libpkmn/layout.h>
 #include <libpkmn/strings.h>
 #include <search/durations.h>
-#include <search/tree.h>
 #include <util/random.h>
 
 #include <chrono>
@@ -13,6 +12,20 @@
 #include "../extern/lrsnash/src/lib.h"
 
 namespace MCTS {
+
+template <typename JointBandit, typename Obs> struct Node {
+  using Key = std::tuple<uint8_t, uint8_t, Obs>;
+  JointBandit stats;
+  std::map<Key, Node<JointBandit, Obs>> children;
+};
+
+size_t count(const auto &node) {
+  size_t c = 1;
+  for (const auto &pair : node.children) {
+    c += count(pair.second);
+  }
+  return c;
+}
 
 struct BattleData {
   pkmn_gen1_battle battle;
@@ -102,9 +115,9 @@ template <typename Options = SearchOptions<>> struct Search {
       model.get_root_score(input.battle);
     }
 
-    if (!node.is_init()) {
+    if (!node.stats.is_init()) {
 
-      node.init(output.m, output.n);
+      node.stats.init(output.m, output.n);
 
       const auto get_params = [](const auto &params) -> const auto & {
         if constexpr (requires { params.bandit_params; }) {
@@ -115,8 +128,8 @@ template <typename Options = SearchOptions<>> struct Search {
       };
 
       if constexpr (requires {
-                      node.stats().softmax_logits(get_params(params), nullptr,
-                                                  nullptr);
+                      node.stats.softmax_logits(get_params(params), nullptr,
+                                                nullptr);
                       model.inference(
                           input.battle,
                           *pkmn_gen1_battle_options_chance_durations(&options));
@@ -127,8 +140,8 @@ template <typename Options = SearchOptions<>> struct Search {
             input.battle, *pkmn_gen1_battle_options_chance_durations(&options),
             output.m, output.n, output.p1_choices.data(),
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
-        node.stats().softmax_logits(get_params(params), p1_logits.data(),
-                                    p2_logits.data());
+        node.stats.softmax_logits(get_params(params), p1_logits.data(),
+                                  p2_logits.data());
       }
     }
 
@@ -269,7 +282,7 @@ template <typename Options = SearchOptions<>> struct Search {
         copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
         const auto obs = std::bit_cast<const Obs>(
             *pkmn_gen1_battle_options_chance_actions(&options));
-        auto &child = node(p1_index, p2_index, obs);
+        auto &child = node.children[{p1_index, p2_index, obs}];
 
         const auto value =
             run_iteration(device, params.bandit_params, child, copy, model, 1)
@@ -313,14 +326,14 @@ template <typename Options = SearchOptions<>> struct Search {
       }
     };
 
-    if (node.stats().is_init()) {
-      using Bandit = std::remove_reference_t<decltype(node.stats())>;
+    if (node.stats.is_init()) {
+      using Bandit = std::remove_reference_t<decltype(node.stats)>;
       using JointOutcome = typename Bandit::JointOutcome;
 
       // do bandit
       JointOutcome outcome;
 
-      node.stats().select(device, bandit_params, outcome);
+      node.stats.select(device, bandit_params, outcome);
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
                                p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c1 = p1_choices[outcome.p1.index];
@@ -337,12 +350,12 @@ template <typename Options = SearchOptions<>> struct Search {
       const auto obs = std::bit_cast<const Obs>(
           *pkmn_gen1_battle_options_chance_actions(&options));
 
-      auto &child = node(outcome.p1.index, outcome.p2.index, obs);
+      auto &child = node.children[{outcome.p1.index, outcome.p2.index, obs}];
       const auto value =
           run_iteration(device, bandit_params, child, input, model, depth + 1);
       outcome.p1.value = value.first;
       outcome.p2.value = value.second;
-      node.stats().update(outcome);
+      node.stats.update(outcome);
 
       print("value: " + std::to_string(value.first));
 
@@ -371,10 +384,10 @@ template <typename Options = SearchOptions<>> struct Search {
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          node.stats().init(m, n);
+          node.stats.init(m, n);
           if constexpr (requires {
-                          node.stats().softmax_logits(bandit_params, nullptr,
-                                                      nullptr);
+                          node.stats.softmax_logits(bandit_params, nullptr,
+                                                    nullptr);
                         }) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
@@ -383,8 +396,8 @@ template <typename Options = SearchOptions<>> struct Search {
                 *pkmn_gen1_battle_options_chance_durations(&options), m, n,
                 p1_choices.data(), p2_choices.data(), p1_logits.data(),
                 p2_logits.data());
-            node.stats().softmax_logits(bandit_params, p1_logits.data(),
-                                        p2_logits.data());
+            node.stats.softmax_logits(bandit_params, p1_logits.data(),
+                                      p2_logits.data());
           } else {
             value = model.inference(
                 input.battle,
@@ -399,12 +412,12 @@ template <typename Options = SearchOptions<>> struct Search {
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          node.stats().init(m, n);
+          node.stats.init(m, n);
           value = model.evaluate(input.battle);
           return {value, 1 - value};
         } else {
           // model is monte-carlo
-          return init_stats_and_rollout(node.stats(), device, battle, result);
+          return init_stats_and_rollout(node.stats, device, battle, result);
         }
       }
     case PKMN_RESULT_WIN: {
@@ -576,7 +589,6 @@ template <typename Options = SearchOptions<>> struct Search {
         output.nash_value = output.empirical_value;
       }
     }
-
   }
 };
 
