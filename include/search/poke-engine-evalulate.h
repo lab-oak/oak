@@ -187,7 +187,6 @@ float evaluate_battle(const PKMN::Battle &battle) noexcept {
 }
 
 struct Model {
-  mt19937 device;
   float root_score;
 
   void get_root_score(const pkmn_gen1_battle &b) noexcept {

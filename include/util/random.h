@@ -15,7 +15,7 @@ private:
   std::uniform_int_distribution<uint64_t> uniform_64_;
 
 public:
-  mt19937() : seed(std::random_device{}()), engine(std::mt19937{seed}) {}
+  mt19937() = default;
   mt19937(std::mt19937::result_type seed)
       : seed(seed), engine(std::mt19937{seed}) {}
 

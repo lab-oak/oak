@@ -22,7 +22,6 @@ std::array<uint8_t, 5> &random_permutation_5() {
 
 struct Network {
 
-  mt19937 device;
   bool use_discrete;
 
   EmbeddingNet<> pokemon_net;
