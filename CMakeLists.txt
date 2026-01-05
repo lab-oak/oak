@@ -52,7 +52,7 @@ target_link_libraries(benchmark PRIVATE libpkmn_chance lrslibgmp eigen argparse)
 
 add_executable(search-test src/search-test.cc)
 target_include_directories(search-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(search-test PRIVATE libpkmn_chance lrslibgmp eigen)
+target_link_libraries(search-test PRIVATE libpkmn_chance lrslibgmp eigen argparse)
 
 add_executable(chall src/chall.cc)
 target_include_directories(chall PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
