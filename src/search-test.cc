@@ -38,7 +38,7 @@ struct Test {
   }
 
 private:
-  static MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
+  static MCTS::Input parse_input(const std::string &line, uint64_t seed) {
     auto [battle, durations] = Parse::parse_battle(line, seed);
     return {battle, durations, PKMN::result(battle)};
   }
