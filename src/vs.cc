@@ -159,7 +159,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto options = PKMN::options();
     const auto result = PKMN::update(battle, 0, 0, options);
-    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
+    MCTS::Input battle_data{battle, PKMN::durations(), result};
 
     if (p1_agent.uses_network()) {
       p1_agent.initialize_network(battle);

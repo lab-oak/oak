@@ -29,7 +29,7 @@ int benchmark(int argc, char **argv) {
   auto options = PKMN::options();
   const auto result = PKMN::update(battle, 0, 0, options);
   const auto durations = PKMN::durations();
-  MCTS::BattleData battle_data{battle, durations, result};
+  MCTS::Input battle_data{battle, durations, result};
   auto device = mt19937{seed};
 
   const auto output = RuntimeSearch::run(device, battle_data, nodes, agent);

@@ -27,7 +27,7 @@ size_t count(const auto &node) {
   return c;
 }
 
-struct BattleData {
+struct Input {
   pkmn_gen1_battle battle;
   pkmn_gen1_chance_durations durations;
   pkmn_result result;
@@ -95,7 +95,7 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p2_nash;
 
   Output run(auto &device, const auto dur, const auto &params, auto &node,
-             auto &model, const MCTS::BattleData &input, Output output = {}) {
+             auto &model, const MCTS::Input &input, Output output = {}) {
 
     // reset data members
     *this = {};

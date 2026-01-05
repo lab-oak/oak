@@ -21,7 +21,7 @@ void handle_suspend(int signal) {
   search_flag = false;
 }
 
-MCTS::BattleData parse_input(const std::string &line, uint64_t seed) {
+MCTS::Input parse_input(const std::string &line, uint64_t seed) {
   auto [battle, durations] = Parse::parse_battle(line, seed);
   MCTS::apply_durations(battle, durations);
   return {battle, durations, PKMN::result(battle)};
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
                              .min_prob = args.policy_min};
 
   mt19937 device{args.seed.value()};
-  MCTS::BattleData battle_data;
+  MCTS::Input battle_data;
 
   while (true) {
     std::string line;

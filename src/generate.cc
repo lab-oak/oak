@@ -249,7 +249,7 @@ void generate(const ProgramArgs *args_ptr) {
     auto options = PKMN::options();
     const auto result = PKMN::update(battle, 0, 0, options);
 
-    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
+    MCTS::Input battle_data{battle, PKMN::durations(), result};
 
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
