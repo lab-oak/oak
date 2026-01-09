@@ -95,8 +95,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
   const size_t training_frames_target_size = args.buffer_size << 20;
   const size_t thread_frame_buffer_size = (args.buffer_size + 1) << 20;
 
-  BattleFrameBuffer p1_battle_frame_buffer{thread_frame_buffer_size};
-  BattleFrameBuffer p2_battle_frame_buffer{thread_frame_buffer_size};
+  auto p1_battle_frame_buffer = BattleFrameBuffer{thread_frame_buffer_size};
+  auto p2_battle_frame_buffer = BattleFrameBuffer{thread_frame_buffer_size};
 
   // These are generated slowly so a vector is fine
   std::vector<Train::Build::Trajectory> build_buffer{};
@@ -164,7 +164,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
     auto battle = PKMN::battle(p1_team, p2_team, device.uniform_64());
     auto options = PKMN::options();
     const auto result = PKMN::update(battle, 0, 0, options);
-    MCTS::BattleData battle_data{battle, PKMN::durations(), result};
+    auto input = MCTS::BattleData{battle, PKMN::durations(), result};
 
     if (p1_agent.uses_network()) {
       p1_agent.initialize_network(battle);
@@ -173,15 +173,15 @@ void thread_fn(const ProgramArgs *args_ptr) {
       p2_agent.initialize_network(battle);
     }
 
-    Train::Battle::CompressedFrames p1_battle_frames{battle};
-    Train::Battle::CompressedFrames p2_battle_frames{battle};
+    auto p1_battle_frames = Train::Battle::CompressedFrames{battle};
+    auto p2_battle_frames = Train::Battle::CompressedFrames{battle};
 
     int p1_early_stop{}, p2_early_stop{};
     bool early_stop = false;
     size_t updates = 0;
     try {
       // playout game
-      while (!pkmn_result_type(battle_data.result)) {
+      while (!pkmn_result_type(input.result)) {
 
         RuntimeData::battle_lengths[id] = updates;
 
@@ -195,7 +195,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         }
 
         const auto [p1_choices, p2_choices] =
-            PKMN::choices(battle_data.battle, battle_data.result);
+            PKMN::choices(input.battle, input.result);
 
         MCTS::Output p1_output{}, p2_output{};
         int p1_index{}, p2_index{};
@@ -203,7 +203,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         p2_early_stop = 0;
         if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p1_output = RuntimeSearch::run(battle_data, nodes, p1_agent);
+          p1_output = RuntimeSearch::run(input, nodes, p1_agent);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
@@ -211,7 +211,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         }
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
-          p2_output = RuntimeSearch::run(battle_data, nodes, p2_agent);
+          p2_output = RuntimeSearch::run(input, nodes, p2_agent);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
@@ -241,39 +241,43 @@ void thread_fn(const ProgramArgs *args_ptr) {
         if (device.uniform() < args.print_prob) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
-          print(PKMN::battle_data_to_string(battle_data.battle,
-                                            battle_data.durations));
+          print(PKMN::battle_data_to_string(input.battle, input.durations));
           const auto [p1_labels, p2_labels] =
-              PKMN::choice_labels(battle_data.battle, battle_data.result);
-          MCTS::print_output(p1_output, battle_data.battle, p1_labels,
-                             p2_labels);
-          MCTS::print_output(p2_output, battle_data.battle, p1_labels,
-                             p2_labels);
+              PKMN::choice_labels(input.battle, input.result);
+          if (p1_choices.size() > 1) {
+            print("P1:");
+            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
+          }
+          if (p2_choices.size() > 1) {
+            print("P2:");
+            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
+          }
         }
-        battle_data.result =
-            PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
-        battle_data.durations = PKMN::durations(options);
+        input.result =
+            PKMN::update(input.battle, p1_choice, p2_choice, options);
+        input.durations = PKMN::durations(options);
         ++updates;
       }
 
       if (early_stop) {
         if (p1_early_stop > 0) {
-          battle_data.result = PKMN::result(PKMN::Result::Win);
+          input.result = PKMN::result(PKMN::Result::Win);
         } else {
-          battle_data.result = PKMN::result(PKMN::Result::Lose);
+          input.result = PKMN::result(PKMN::Result::Lose);
         }
       }
+
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
     }
 
-    p1_battle_frames.result = battle_data.result;
-    p2_battle_frames.result = battle_data.result;
+    p1_battle_frames.result = input.result;
+    p2_battle_frames.result = input.result;
 
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
-    switch (pkmn_result_type(battle_data.result)) {
+    switch (pkmn_result_type(input.result)) {
     case PKMN_RESULT_WIN: {
       RuntimeData::win.fetch_add(1);
       return 2;
@@ -428,7 +432,6 @@ void setup(auto &args) {
 
   // stats
   RuntimeData::battle_lengths.resize(args.threads);
-
 }
 
 int main(int argc, char **argv) {
