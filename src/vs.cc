@@ -79,12 +79,17 @@ std::atomic<size_t> win{};
 std::atomic<size_t> loss{};
 std::atomic<size_t> draw{};
 
+std::vector<size_t> battle_lengths{};
+std::atomic<size_t> thread_id{};
+
 TeamBuilding::Provider provider;
 } // namespace RuntimeData
 
 void thread_fn(const ProgramArgs *args_ptr) {
   const auto &args = *args_ptr;
   mt19937 device{args.seed.value()};
+
+  const auto id = RuntimeData::thread_id.fetch_add(1) % args.threads;
 
   // data gen
   const size_t training_frames_target_size = args.buffer_size << 20;
@@ -177,6 +182,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
     try {
       // playout game
       while (!pkmn_result_type(battle_data.result)) {
+
+        RuntimeData::battle_lengths[id] = updates;
 
         while (RuntimeData::suspended) {
           sleep(1);
@@ -356,6 +363,12 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
               << " games; Elo diff: " << elo_difference << std::endl;
     std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load()
               << ' ' << RuntimeData::loss.load() << std::endl;
+
+    std::cout << "Game Lengths: ";
+    for (const auto len : RuntimeData::battle_lengths) {
+      std::cout << len << ' ';
+    }
+    std::cout << std::endl;
   }
 }
 
@@ -412,6 +425,10 @@ void setup(auto &args) {
   RuntimeData::provider.network_path = args.build_network_path;
   RuntimeData::provider.team_modify_prob = args.team_modify_prob;
   RuntimeData::provider.read_network_parameters();
+
+  // stats
+  RuntimeData::battle_lengths.resize(args.threads);
+
 }
 
 int main(int argc, char **argv) {
