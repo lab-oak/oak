@@ -152,15 +152,35 @@ struct ActivePokemon {
       : stats{device}, species{device}, types{device}, boosts{device},
         volatiles{device} {}
 
-  uint64_t hash(const PKMN::ActivePokemon &active) const noexcept {
-    return stats.hash(active) ^ species.hash(active) ^ types.hash(active) ^
-           boosts.hash(active) ^ Volatiles.hash(active);
+  uint64_t hash(const PKMN::ActivePokemon &active,
+                const PKMN::Pokemon &pokemon) const noexcept {
+    return stats.hash(active, pokemon) ^ species.hash(active, pokemon) ^
+           types.hash(active, pokemon) ^ boosts.hash(active, pokemon) ^
+           Volatiles.hash(active, pokemon);
   }
 };
 
+struct HP {
+  static constexpr auto n_buckets = 8;
+  std::array<uint64_t, n_buckets> hashes;
+  static uint8_t get_key(uint16_t base_hp, uint16_t hp) noexcept {
+    return (8 * base_hp / hp) - (hp == base_hp);
+  }
+
+  static_assert(get_key(800, 800) == 7);
+  static_assert(get_key(800, 100) == 1);
+  static_assert(get_key(800, 99) == 1);
+
+  uint64_t hash(const PKMN::Pokemon &pokemon) const noexcept {
+    return hashes[get_key(pokemon.stats.hp, pokemon.hp)];
+  }
+}
+
 struct Side {
+
   std::array<Slot, 6> slots;
   std::array<ActivePokemon, 6> actives;
+  std::array<HP, 6> hps;
 
   Side(auto &device) {
     for (auto &slot : slots) {
@@ -173,10 +193,25 @@ struct Side {
 
   uint64_t hash(const PKMN::Side &side,
                 const PKMN::Duration &duration) const noexcept {
-    uint64_t h = actives.hash(side.active, side.stored(), duration);
-    for (auto slot = 2; slot <= 6; ++slot) {
-      h ^= 0;
+    uint64_t h = 0;
+    const auto &stored = side.stored();
+    if (stored.hp) {
+      h ^=
+          actives[side.order[0] - 1].hash(side.active, side.stored(), duration);
+      h ^= hp[side.order[0] - 1].hash(stored);
     }
+    for (auto slot = 2; slot <= 6; ++slot) {
+      const auto id = side.order[slot - 1];
+      if (id) {
+        const auto &pokemon = side.pokemon[id - 1];
+        const auto sleep = duration.sleep(slot - 1);
+        if (pokemon.hp) {
+          h ^= slots[id - 1].hash(pokemon, sleep);
+          h ^= hp[id - 1].hash(pokemon);
+        }
+      }
+    }
+    return h;
   }
 };
 
