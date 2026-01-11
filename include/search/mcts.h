@@ -28,14 +28,22 @@ template <typename JointBandit> struct Table {
   Hash::Battle hasher;
   std::unordered_map<Key, JointBandit> entries;
   Key root_key;
-
-  JointBandit &stats(Key key) { return entries[key]; }
-  const JointBandit &stats(Key key) const { return entries[key]; }
 };
 
-size_t count(const auto &node) {
+template <typename T> struct IsNode {
+  static consteval bool get_value() {
+    if constexpr (requires(T heap) { heap.stats; }) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  static constexpr bool value = get_value();
+};
+
+size_t count(const auto &heap) {
   size_t c = 1;
-  for (const auto &pair : node.children) {
+  for (const auto &pair : heap.children) {
     c += count(pair.second);
   }
   return c;
@@ -49,7 +57,7 @@ struct Input {
 
 struct MonteCarlo {};
 
-// wrapper to use for enabling matrix ucb at root node
+// wrapper to use for enabling matrix ucb at root heap
 template <typename BanditParams> struct MatrixUCBParams {
   static constexpr bool matrix_ucb{true};
 
@@ -106,13 +114,9 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p1_nash;
   std::array<float, 9 + 2> p2_nash;
 
-  Output run(auto &device, const auto dur, const auto &params, auto &node,
-             auto &model, const MCTS::Input &input, Output output = {})
-    requires requires { node.entries; }
-  {
-    return output;
-  }
-  Output run(auto &device, const auto dur, const auto &params, auto &node,
+  size_t total_depth;
+
+  Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const MCTS::Input &input, Output output = {}) {
 
     // reset data members
@@ -133,19 +137,21 @@ template <typename Options = SearchOptions<>> struct Search {
       model.get_root_score(input.battle);
     }
 
-    const auto get_stats = [&]() {
-      if constexpr (requires { node.stats; }) {
-        return node.stats;
+    auto &stats = [&]() -> auto & {
+      if constexpr (IsNode<decltype(heap)>::value) {
+        return heap.stats;
       } else {
-        return node.entries[node.hasher(input.battle, input.durations)];
+        return heap.entries[heap.hasher.hash(
+            input.battle,
+            input.durations)];
       }
-    };
+    }();
 
-    if (!node.stats.is_init()) {
+    if (!stats.is_init()) {
 
-      node.stats.init(output.m, output.n);
+      stats.init(output.m, output.n);
 
-      const auto get_params = [](const auto &params) -> const auto & {
+      const auto bandit_params = [](const auto &params) -> const auto & {
         if constexpr (requires { params.bandit_params; }) {
           return params.bandit_params;
         } else {
@@ -154,20 +160,20 @@ template <typename Options = SearchOptions<>> struct Search {
       };
 
       if constexpr (requires {
-                      node.stats.softmax_logits(get_params(params), nullptr,
-                                                nullptr);
+                      stats.softmax_logits(bandit_params(params), nullptr,
+                                           nullptr);
                       model.inference(
                           input.battle,
-                          *pkmn_gen1_battle_options_chance_durations(&options));
+                          input.durations);
                     }) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
         const float value = model.inference(
-            input.battle, *pkmn_gen1_battle_options_chance_durations(&options),
+            input.battle, input.durations,
             output.m, output.n, output.p1_choices.data(),
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
-        node.stats.softmax_logits(get_params(params), p1_logits.data(),
-                                  p2_logits.data());
+        stats.softmax_logits(bandit_params(params), p1_logits.data(),
+                             p2_logits.data());
       }
     }
 
@@ -175,30 +181,31 @@ template <typename Options = SearchOptions<>> struct Search {
     // Three types for 'dur' (the time investement of the search) are allowed:
     // chrono duration
     if constexpr (requires {
-                    std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        budget);
                   }) {
       const auto duration =
-          std::chrono::duration_cast<std::chrono::milliseconds>(dur);
+          std::chrono::duration_cast<std::chrono::milliseconds>(budget);
       std::chrono::milliseconds elapsed{};
       while (elapsed < duration) {
         output.total_value +=
-            run_root_iteration(device, params, node, input, model, output);
+            run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
       }
       // run while boolean flag is set
-    } else if constexpr (requires { *dur; }) {
-      while (*dur) {
-        ++output.iterations;
+    } else if constexpr (requires { *budget; }) {
+      while (*budget) {
         output.total_value +=
-            run_root_iteration(device, params, node, input, model, output);
+            run_root_iteration(device, params, heap, input, model, output);
+        ++output.iterations;
       }
       // number of iterations
     } else {
-      for (auto i = 0; i < dur; ++i) {
+      for (auto i = 0; i < budget; ++i) {
         output.total_value +=
-            run_root_iteration(device, params, node, input, model, output);
+            run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
       }
     }
@@ -210,7 +217,7 @@ template <typename Options = SearchOptions<>> struct Search {
     return output;
   }
 
-  float run_root_iteration(auto &device, const auto &params, auto &node,
+  float run_root_iteration(auto &device, const auto &params, auto &heap,
                            const auto &input, auto &model, Output &output) {
     auto copy = input;
     auto *rng = reinterpret_cast<uint64_t *>(
@@ -218,7 +225,12 @@ template <typename Options = SearchOptions<>> struct Search {
     rng[0] = device.uniform_64();
     chance_options.durations = copy.durations;
     apply_durations(copy.battle, copy.durations);
-    pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
+    if constexpr (IsNode<decltype(heap)>::value) {
+      battle_options_set(copy.battle, 0);
+    } else {
+      pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
+      nullptr);
+    }
 
     // check if we are passing MatrixUCB param wrapper
     if constexpr (requires { params.bandit_params; }) {
@@ -304,62 +316,74 @@ template <typename Options = SearchOptions<>> struct Search {
 
         auto c1 = p1_choices[p1_index];
         auto c2 = p1_choices[p2_index];
-        battle_options_set(copy.battle, 0);
+        // if constexpr (IsNode<decltype(heap)>::value) {
+        //   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
+        //                                nullptr);
+        //   battle_options_set(copy.battle, 0);
+        // } else {
+        //   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
+        //                                nullptr);
+        // }
         copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
-        const auto obs = std::bit_cast<const Obs>(
-            *pkmn_gen1_battle_options_chance_actions(&options));
-        auto &child = node.children[{p1_index, p2_index, obs}];
 
-        const auto value =
-            run_iteration(device, params.bandit_params, child, copy, model, 1)
-                .first;
+        const auto run_next_iteration = [&]() {
+          if constexpr (IsNode<decltype(heap)>::value) {
+            const auto obs = std::bit_cast<const Obs>(
+                *pkmn_gen1_battle_options_chance_actions(&options));
+            auto &child = heap.children[{p1_index, p2_index, obs}];
+            return run_iteration(device, params.bandit_params, child, copy,
+                                 model, 1);
+          } else {
+            return run_iteration(device, params.bandit_params, heap, copy,
+                                 model, 1);
+          }
+        };
+        const auto value = run_next_iteration().first;
 
         ++visit_matrix[p1_index][p2_index];
         value_matrix[p1_index][p2_index] += value;
-
         return value;
       } else {
-        return run_iteration(device, params.bandit_params, node, copy, model)
+        return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
       }
     } else {
-      return run_iteration(device, params, node, copy, model).first;
+      return run_iteration(device, params, heap, copy, model).first;
     }
+  }
+
+  inline constexpr bool turn_limit(const auto &battle) const noexcept {
+    return reinterpret_cast<const uint16_t *>(
+               battle.bytes + PKMN::Layout::Offsets::Battle::turn)[0] >= 1000;
   }
 
   // typical recursive mcts function
   // we return value for each player because it's slightly faster than calcing 1
-  // - value at each node
+  // - value at each heap
   std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
-                                        auto &node, auto &input, auto &model,
+                                        auto &heap, auto &input, auto &model,
                                         size_t depth = 0) {
 
     auto &battle = input.battle;
-    auto &durations = input.durations;
     auto &result = input.result;
+    auto &stats = [&]() -> auto & {
+      if constexpr (IsNode<decltype(heap)>::value) {
+        return heap.stats;
+      } else {
+        const auto h = heap.hasher.hash(
+            battle, *pkmn_gen1_battle_options_chance_durations(&options));
+        return heap.entries[h];
+      }
+    }();
 
-    // debug print, optimized out if not enabled
-    const auto print = [depth](const auto &data, bool new_line = true) -> void {
-      if constexpr (!Options::debug_print) {
-        return;
-      }
-      for (auto i = 0; i < depth; ++i) {
-        std::cout << "  ";
-      }
-      std::cout << data;
-      if (new_line) {
-        std::cout << '\n';
-      }
-    };
-
-    if (node.stats.is_init()) {
-      using Bandit = std::remove_reference_t<decltype(node.stats)>;
+    if (stats.is_init()) {
+      using Bandit = std::remove_reference_t<decltype(stats)>;
       using JointOutcome = typename Bandit::JointOutcome;
 
       // do bandit
       JointOutcome outcome;
 
-      node.stats.select(device, bandit_params, outcome);
+      stats.select(device, bandit_params, outcome);
       pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
                                p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c1 = p1_choices[outcome.p1.index];
@@ -367,23 +391,38 @@ template <typename Options = SearchOptions<>> struct Search {
                                p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c2 = p2_choices[outcome.p2.index];
 
-      print("P1: " + PKMN::side_choice_string(battle.bytes, c1) + " P2: " +
-            PKMN::side_choice_string(battle.bytes + PKMN::Layout::Sizes::Side,
-                                     c2));
-
-      battle_options_set(battle, depth);
+      if constexpr (IsNode<decltype(heap)>::value) {
+        battle_options_set(battle, depth);
+      } else {
+        pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
+      }
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
-      const auto obs = std::bit_cast<const Obs>(
-          *pkmn_gen1_battle_options_chance_actions(&options));
 
-      auto &child = node.children[{outcome.p1.index, outcome.p2.index, obs}];
-      const auto value =
-          run_iteration(device, bandit_params, child, input, model, depth + 1);
+      const auto value = [&]() {
+        if constexpr (IsNode<decltype(heap)>::value) {
+          const auto &obs = *reinterpret_cast<const Obs *>(
+              pkmn_gen1_battle_options_chance_actions(&options));
+          auto &child =
+              heap.children[{outcome.p1.index, outcome.p2.index, obs}];
+          return run_iteration(device, bandit_params, child, input, model,
+                               depth + 1);
+        } else {
+          return run_iteration(device, bandit_params, heap, input, model,
+                               depth + 1);
+        }
+      }();
       outcome.p1.value = value.first;
       outcome.p2.value = value.second;
-      node.stats.update(outcome);
 
-      print("value: " + std::to_string(value.first));
+      if constexpr (IsNode<decltype(heap)>::value) {
+        stats.update(outcome);
+      } else {
+        if (!turn_limit(battle)) {
+          stats.update(outcome);
+        } else {
+          return {0.5, 0.5};
+        }
+      }
 
       if constexpr (Options::root_matrix) {
         if (depth == 0) {
@@ -395,14 +434,15 @@ template <typename Options = SearchOptions<>> struct Search {
       return value;
     }
 
+    if (!turn_limit(battle) && (depth < 15)) {
+      total_depth += depth;
+    }
+
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:
       [[likely]] {
-        print("Initializing node");
         float value;
-        if constexpr (requires {
-                        model.inference(input.battle, input.durations);
-                      }) {
+        if constexpr (requires { model.inference(battle, input.durations); }) {
           // model is a net
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
@@ -410,27 +450,24 @@ template <typename Options = SearchOptions<>> struct Search {
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          node.stats.init(m, n);
+          stats.init(m, n);
           if constexpr (requires {
-                          node.stats.softmax_logits(bandit_params, nullptr,
-                                                    nullptr);
+                          stats.softmax_logits(bandit_params, nullptr, nullptr);
                         }) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
             value = model.inference(
-                input.battle,
-                *pkmn_gen1_battle_options_chance_durations(&options), m, n,
-                p1_choices.data(), p2_choices.data(), p1_logits.data(),
+                battle, *pkmn_gen1_battle_options_chance_durations(&options), m,
+                n, p1_choices.data(), p2_choices.data(), p1_logits.data(),
                 p2_logits.data());
-            node.stats.softmax_logits(bandit_params, p1_logits.data(),
-                                      p2_logits.data());
+            stats.softmax_logits(bandit_params, p1_logits.data(),
+                                 p2_logits.data());
           } else {
             value = model.inference(
-                input.battle,
-                *pkmn_gen1_battle_options_chance_durations(&options));
+                battle, *pkmn_gen1_battle_options_chance_durations(&options));
           }
           return {value, 1 - value};
-        } else if constexpr (requires { model.evaluate(input.battle); }) {
+        } else if constexpr (requires { model.evaluate(battle); }) {
           // poke-engine
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
@@ -438,12 +475,12 @@ template <typename Options = SearchOptions<>> struct Search {
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          node.stats.init(m, n);
-          value = model.evaluate(input.battle);
+          stats.init(m, n);
+          value = model.evaluate(battle);
           return {value, 1 - value};
         } else {
           // model is monte-carlo
-          return init_stats_and_rollout(node.stats, device, battle, result);
+          return init_stats_and_rollout(stats, device, battle, result);
         }
       }
     case PKMN_RESULT_WIN: {

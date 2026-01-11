@@ -43,9 +43,12 @@ struct Status {
   }
   uint64_t hash(const PKMN::Pokemon &pokemon,
                 const uint8_t sleep) const noexcept {
-    return hashes[Encode::Battle::Status::get_status_index(pokemon.status,
-                                                           sleep) +
-                  1];
+    const auto status_index =
+        (pokemon.status == PKMN::Data::Status::None)
+            ? 0
+            : Encode::Battle::Status::get_status_index(pokemon.status, sleep) +
+                  1;
+    return hashes[status_index];
   }
 };
 
@@ -117,7 +120,7 @@ struct Type {
   uint64_t hash(const PKMN::ActivePokemon &active,
                 const PKMN::Pokemon &stored) const noexcept {
     auto raw = static_cast<uint8_t>(active.types);
-    return hashes[raw ^ (raw >> 4)];
+    return hashes[(raw & 0x0F) + 15 * (raw >> 4)];
   }
 };
 
@@ -141,16 +144,42 @@ struct Boosts {
   }
 };
 
-struct Volatiles {
-  Volatiles() = default;
-  Volatiles(auto &device) {}
-  uint64_t hash(const PKMN::ActivePokemon &active,
-                const PKMN::Duration &duration) const noexcept {
-    return 0;
+struct Duration {
+  static constexpr int max_duration = 5;
+  std::array<uint64_t, max_duration> confusion;
+  std::array<uint64_t, max_duration> disable;
+  std::array<uint64_t, max_duration> attacking;
+  std::array<uint64_t, max_duration> binding;
+  Duration() = default;
+  Duration(auto &device) {
+    initialize(device, confusion);
+    initialize(device, disable);
+    initialize(device, attacking);
+    initialize(device, binding);
+  }
+  uint64_t hash(const PKMN::Duration &duration) const noexcept {
+    return confusion[duration.confusion()] ^ confusion[duration.disable()] ^
+           confusion[duration.attacking()] ^ confusion[duration.binding()];
   }
 };
 
-struct Duration {};
+struct Volatiles {
+  std::array<uint64_t, 2> recharging;
+  std::array<uint64_t, 2> reflect;
+  std::array<uint64_t, 2> light_screen;
+  Volatiles() = default;
+  Volatiles(auto &device) {
+    initialize(device, recharging);
+    initialize(device, reflect);
+    initialize(device, light_screen);
+  }
+  uint64_t hash(const PKMN::ActivePokemon &active,
+                const PKMN::Pokemon &stored) const noexcept {
+    const auto &vol = active.volatiles;
+    return recharging[vol.recharging()] ^ reflect[vol.reflect()] ^
+           light_screen[vol.light_screen()];
+  }
+};
 
 struct ActivePokemon {
   Stats stats;
@@ -162,13 +191,13 @@ struct ActivePokemon {
   ActivePokemon() = default;
   ActivePokemon(auto &device)
       : stats{device}, species{device}, types{device}, boosts{device},
-        volatiles{device} {}
+        volatiles{device}, duration{device} {}
 
   uint64_t hash(const PKMN::ActivePokemon &active, const PKMN::Pokemon &pokemon,
                 const PKMN::Duration &duration) const noexcept {
     return stats.hash(active, pokemon) ^ species.hash(active, pokemon) ^
            types.hash(active, pokemon) ^ boosts.hash(active, pokemon) ^
-           volatiles.hash(active, duration);
+           volatiles.hash(active, pokemon) ^ this->duration.hash(duration);
   }
 };
 
@@ -211,9 +240,9 @@ struct Side {
     uint64_t h = 0;
     const auto &stored = side.stored();
     if (stored.hp) {
-      h ^=
-          actives[side.order[0] - 1].hash(side.active, side.stored(), duration);
-      h ^= hps[side.order[0] - 1].hash(stored);
+      const auto id = side.order[0] - 1;
+      h ^= actives[id].hash(side.active, side.stored(), duration);
+      h ^= hps[id].hash(stored);
     }
     for (auto slot = 2; slot <= 6; ++slot) {
       const auto id = side.order[slot - 1];
@@ -243,7 +272,7 @@ struct Battle {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     return sides[0].hash(battle.sides[0], durations.get(0)) ^
-           sides[1].hash(battle.sides[1], durations.get(1));
+     sides[1].hash(battle.sides[1], durations.get(1));
   }
 };
 }; // namespace Hash

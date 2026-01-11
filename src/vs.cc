@@ -142,13 +142,15 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .bandit_name = args.p1_bandit_name,
                              .network_path = args.p1_network_path,
                              .discrete_network = args.p1_use_discrete,
-                             .matrix_ucb_name = args.p1_matrix_ucb_name};
+                             .matrix_ucb_name = args.p1_matrix_ucb_name,
+                             .use_table = args.p1_use_table};
     auto p2_agent =
         RuntimeSearch::Agent{.search_time = args.p2_search_time,
                              .bandit_name = args.p2_bandit_name,
                              .network_path = args.p2_network_path,
                              .discrete_network = args.p2_use_discrete,
-                             .matrix_ucb_name = args.p2_matrix_ucb_name};
+                             .matrix_ucb_name = args.p2_matrix_ucb_name,
+                             .use_table = args.p2_use_table};
     const auto p1_policy_options =
         RuntimePolicy::Options{.mode = args.p1_policy_mode,
                                .temp = args.p1_policy_temp,

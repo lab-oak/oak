@@ -19,11 +19,11 @@ function(create_library target mode dir)
 endfunction()
 
 create_library(libpkmn_client_release release client)
-create_library(libpkmn_client_debug debug client)
+create_library(libpkmn_client_debug release client)
 create_library(libpkmn_chance_release release chance)
-create_library(libpkmn_chance_debug debug chance)
+create_library(libpkmn_chance_debug release chance)
 create_library(libpkmn_fast_release release fast)
-create_library(libpkmn_fast_debug debug fast)
+create_library(libpkmn_fast_debug release fast)
 
 add_library(libpkmn_client INTERFACE)
 target_link_libraries(libpkmn_client INTERFACE

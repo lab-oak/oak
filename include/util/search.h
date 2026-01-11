@@ -165,7 +165,13 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
   const auto run_5 = [&](auto dur, auto &model, auto &params,
                          auto &node) -> MCTS::Output {
     MCTS::Search search{};
-    return search.run(device, dur, params, node, model, input, output);
+    const auto o = search.run(device, dur, params, node, model, input, output);
+    if constexpr (requires { node.entries; }) {
+      std::cout << node.entries.size() << std::endl;
+    }
+    std::cout << "depth: " << (float)search.total_depth / o.iterations
+              << std::endl;
+    return o;
   };
 
   // Whether to use MatrixUCB params or normal
@@ -195,6 +201,18 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
                          auto &both) {
     if (agent.use_table) {
       return run_4(dur, model, params, nodes.get(both.table));
+    } else {
+      return run_5(dur, model, bandit_params, node);
+    }
+  };
+
+  // Whether to use tree nodes or transposition table
+  const auto run_3 = [&](const auto dur, auto &model, const auto &params,
+                         auto &both) {
+    if (agent.use_table) {
+      auto &table = nodes.get(both.table);
+      table.hasher = {device};
+      return run_4(dur, model, params, table);
     } else {
       return run_4(dur, model, params, nodes.get(both.node));
     }
