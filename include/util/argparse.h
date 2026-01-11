@@ -42,6 +42,9 @@ struct TeamBuildingArgs : public argparse::Args {
     bool &A##use_discrete =                                                    \
         flag(B "use-discrete", "Enable Stockfish discrete main subnet");       \
                                                                                \
+    bool &A##use_table =                                                       \
+        flag(B "use-table", "Use a transposition table instead of a tree");    \
+                                                                               \
     char &A##policy_mode =                                                     \
         kwarg(B "policy-mode", "Policy mode").set_default('e');                \
                                                                                \

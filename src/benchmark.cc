@@ -16,7 +16,8 @@ int benchmark(int argc, char **argv) {
                                     .bandit_name = args.bandit_name,
                                     .network_path = args.network_path,
                                     .discrete_network = args.use_discrete,
-                                    .matrix_ucb_name = args.matrix_ucb_name};
+                                    .matrix_ucb_name = args.matrix_ucb_name,
+                                    .use_table = args.use_table};
 
   auto nodes = RuntimeSearch::Nodes{};
 
