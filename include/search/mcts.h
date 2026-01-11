@@ -76,6 +76,15 @@ inline constexpr bool is_contextual_bandit = []() {
     return false;
   }
 }();
+
+template <typename T>
+inline constexpr bool is_matrix_ucb = []() {
+  if constexpr (requires(T params) { params.bandit_params; }) {
+    return true;
+  } else {
+    return false;
+  }
+}();
 } // namespace TypeTraits
 
 using namespace TypeTraits;
@@ -261,91 +270,15 @@ template <typename Options = SearchOptions<>> struct Search {
     apply_durations(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     // check if we are passing MatrixUCB param wrapper
-    if constexpr (requires { params.bandit_params; }) {
-      if ((output.iterations >= params.delay)) {
-        uint8_t p1_index{}, p2_index{};
-
-        if (output.iterations % params.interval == 0) {
-
-          // get ucb matrices
-
-          std::array<int, 9 * 9> p1_ucb_matrix;
-          std::array<int, 9 * 9> p2_ucb_matrix;
-          constexpr int discretize_factor = 256;
-
-          const float log_T = std::log(output.iterations);
-
-          for (auto i = 0; i < output.m; ++i) {
-            for (auto j = 0; j < output.n; ++j) {
-
-              float p1_entry = 0;
-              float p2_entry = 0;
-
-              if (visit_matrix[i][j] > 0) {
-                p1_entry = value_matrix[i][j] / visit_matrix[i][j];
-                p2_entry = 1 - p1_entry;
-              }
-
-              const float exploration =
-                  params.c * std::sqrt(2 * (2 * log_T + ucb_weight) /
-                                       (visit_matrix[i][j] + 1));
-
-              p1_entry += exploration;
-              p2_entry -= exploration;
-
-              p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
-              p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
-            }
-          }
-
-          // solve and sample
-          std::array<float, 9 + 2> dummy;
-
-          {
-            LRSNash::FastInput solve_input{
-                static_cast<int>(output.m), static_cast<int>(output.n),
-                p1_ucb_matrix.data(), discretize_factor};
-            LRSNash::FloatOneSumOutput solve_output{p1_nash.data(),
-                                                    dummy.data(), 0};
-            LRSNash::solve_fast(&solve_input, &solve_output);
-          }
-
-          {
-            LRSNash::FastInput solve_input{
-                static_cast<int>(output.m), static_cast<int>(output.n),
-                p2_ucb_matrix.data(), discretize_factor};
-            LRSNash::FloatOneSumOutput solve_output{dummy.data(),
-                                                    p2_nash.data(), 0};
-            LRSNash::solve_fast(&solve_input, &solve_output);
-          }
-        }
-
-        {
-          float p = device.uniform();
-          for (auto i = 0; i < output.m; ++i) {
-            p -= p1_nash[i];
-            if (p <= 0) {
-              p1_index = i;
-              break;
-            }
-          }
-        }
-
-        {
-          float p = device.uniform();
-          for (auto i = 0; i < output.n; ++i) {
-            p -= p2_nash[i];
-            if (p <= 0) {
-              p2_index = i;
-              break;
-            }
-          }
-        }
-
-        const auto c1 = p1_choices[p1_index];
-        const auto c2 = p1_choices[p2_index];
-        battle_options_set(copy.battle, 0);
-        copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
+    if constexpr (!is_matrix_ucb<decltype(params)>) {
+      return run_iteration(device, params, heap, copy, model).first;
+    } else {
+      if ((output.iterations < params.delay)) {
+        return run_iteration(device, params.bandit_params, heap, copy, model)
+            .first;
+      } else {
+        const auto [p1_index, p2_index] =
+            solve_root_matrix_and_update(device, params, copy, output);
 
         const auto value = [&]() {
           if constexpr (is_node<decltype(heap)>) {
@@ -360,15 +293,11 @@ template <typename Options = SearchOptions<>> struct Search {
           }
         }();
 
+        // TODO error check
         ++visit_matrix[p1_index][p2_index];
         value_matrix[p1_index][p2_index] += value.first;
         return value.first;
-      } else {
-        return run_iteration(device, params.bandit_params, heap, copy, model)
-            .first;
       }
-    } else {
-      return run_iteration(device, params, heap, copy, model).first;
     }
   }
 
@@ -382,6 +311,7 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (!is_node<decltype(heap)>) {
       if (depth >= 20) {
         set_turn_limit(input.battle);
+        ++errors;
         return {.5, .5};
       }
     }
@@ -442,7 +372,6 @@ template <typename Options = SearchOptions<>> struct Search {
         if (!turn_limit(battle)) {
           stats.update(outcome);
         } else {
-          ++errors;
           return {0.5, 0.5};
         }
       }
@@ -562,6 +491,95 @@ template <typename Options = SearchOptions<>> struct Search {
       return {.5, .5};
     }
     };
+  }
+
+  inline auto solve_root_matrix_and_update(auto &device, auto &params,
+                                           auto &copy,
+                                           const auto &output) noexcept {
+    uint8_t p1_index{}, p2_index{};
+
+    if (output.iterations % params.interval == 0) {
+
+      // get ucb matrices
+
+      std::array<int, 9 * 9> p1_ucb_matrix;
+      std::array<int, 9 * 9> p2_ucb_matrix;
+      constexpr int discretize_factor = 256;
+
+      const float log_T = std::log(output.iterations);
+
+      for (auto i = 0; i < output.m; ++i) {
+        for (auto j = 0; j < output.n; ++j) {
+
+          float p1_entry = 0;
+          float p2_entry = 0;
+
+          if (visit_matrix[i][j] > 0) {
+            p1_entry = value_matrix[i][j] / visit_matrix[i][j];
+            p2_entry = 1 - p1_entry;
+          }
+
+          const float exploration =
+              params.c * std::sqrt(2 * (2 * log_T + ucb_weight) /
+                                   (visit_matrix[i][j] + 1));
+
+          p1_entry += exploration;
+          p2_entry -= exploration;
+
+          p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
+          p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
+        }
+      }
+
+      // solve and sample
+      std::array<float, 9 + 2> dummy;
+
+      {
+        LRSNash::FastInput solve_input{static_cast<int>(output.m),
+                                       static_cast<int>(output.n),
+                                       p1_ucb_matrix.data(), discretize_factor};
+        LRSNash::FloatOneSumOutput solve_output{p1_nash.data(), dummy.data(),
+                                                0};
+        LRSNash::solve_fast(&solve_input, &solve_output);
+      }
+
+      {
+        LRSNash::FastInput solve_input{static_cast<int>(output.m),
+                                       static_cast<int>(output.n),
+                                       p2_ucb_matrix.data(), discretize_factor};
+        LRSNash::FloatOneSumOutput solve_output{dummy.data(), p2_nash.data(),
+                                                0};
+        LRSNash::solve_fast(&solve_input, &solve_output);
+      }
+    }
+
+    {
+      float p = device.uniform();
+      for (auto i = 0; i < output.m; ++i) {
+        p -= p1_nash[i];
+        if (p <= 0) {
+          p1_index = i;
+          break;
+        }
+      }
+    }
+
+    {
+      float p = device.uniform();
+      for (auto i = 0; i < output.n; ++i) {
+        p -= p2_nash[i];
+        if (p <= 0) {
+          p2_index = i;
+          break;
+        }
+      }
+    }
+
+    const auto c1 = p1_choices[p1_index];
+    const auto c2 = p2_choices[p2_index];
+    battle_options_set(copy.battle, 0);
+    copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
+    return std::pair<uint8_t, uint8_t>{p1_index, p2_index};
   }
 
   // pkmn_gen1_battle_options_set with constexpr logic

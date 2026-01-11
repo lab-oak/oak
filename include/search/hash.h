@@ -38,7 +38,8 @@ static_assert(PP::get_key(std::array<PKMN::MoveSlot, 4>{
                   PKMN::MoveSlot{PKMN::Data::Move::None, 61},
                   PKMN::MoveSlot{PKMN::Data::Move::None, 61},
                   PKMN::MoveSlot{PKMN::Data::Move::None, 61},
-                  PKMN::MoveSlot{PKMN::Data::Move::None, 61}}) == (PP::n_keys - 1));
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61}}) ==
+              (PP::n_keys - 1));
 
 struct Status {
   static constexpr int n_status = Encode::Battle::Status::n_dim + 1;
@@ -210,7 +211,7 @@ struct ActivePokemon {
 };
 
 struct HP {
-  static constexpr int n_buckets = 16;
+  static constexpr int n_buckets = 8;
   std::array<uint64_t, n_buckets> hashes;
   HP() = default;
   HP(auto &device) { initialize(device, hashes); }
