@@ -278,7 +278,11 @@ template <typename Options = SearchOptions<>> struct Search {
             .first;
       } else {
         const auto [p1_index, p2_index] =
-            solve_root_matrix_and_update(device, params, copy, output);
+            solve_root_matrix_and_sample(device, params, copy, output);
+        const auto c1 = output.p1_choices[p1_index];
+        const auto c2 = output.p2_choices[p2_index];
+        battle_options_set(copy.battle, 0);
+        copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
 
         const auto value = [&]() {
           if constexpr (is_node<decltype(heap)>) {
@@ -493,39 +497,30 @@ template <typename Options = SearchOptions<>> struct Search {
     };
   }
 
-  inline auto solve_root_matrix_and_update(auto &device, auto &params,
+  inline auto solve_root_matrix_and_sample(auto &device, auto &params,
                                            auto &copy,
                                            const auto &output) noexcept {
     uint8_t p1_index{}, p2_index{};
 
     if (output.iterations % params.interval == 0) {
-
       // get ucb matrices
-
       std::array<int, 9 * 9> p1_ucb_matrix;
       std::array<int, 9 * 9> p2_ucb_matrix;
       constexpr int discretize_factor = 256;
-
       const float log_T = std::log(output.iterations);
-
       for (auto i = 0; i < output.m; ++i) {
         for (auto j = 0; j < output.n; ++j) {
-
           float p1_entry = 0;
           float p2_entry = 0;
-
           if (visit_matrix[i][j] > 0) {
             p1_entry = value_matrix[i][j] / visit_matrix[i][j];
             p2_entry = 1 - p1_entry;
           }
-
           const float exploration =
               params.c * std::sqrt(2 * (2 * log_T + ucb_weight) /
                                    (visit_matrix[i][j] + 1));
-
           p1_entry += exploration;
           p2_entry -= exploration;
-
           p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
           p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
         }
@@ -533,52 +528,37 @@ template <typename Options = SearchOptions<>> struct Search {
 
       // solve and sample
       std::array<float, 9 + 2> dummy;
+      LRSNash::FastInput p1_solve_input{
+          static_cast<int>(output.m), static_cast<int>(output.n),
+          p1_ucb_matrix.data(), discretize_factor};
+      LRSNash::FloatOneSumOutput p1_solve_output{p1_nash.data(), dummy.data(),
+                                                 0};
+      LRSNash::solve_fast(&p1_solve_input, &p1_solve_output);
+      LRSNash::FastInput p2_solve_input{
+          static_cast<int>(output.m), static_cast<int>(output.n),
+          p2_ucb_matrix.data(), discretize_factor};
+      LRSNash::FloatOneSumOutput p2_solve_output{dummy.data(), p2_nash.data(),
+                                                 0};
+      LRSNash::solve_fast(&p2_solve_input, &p2_solve_output);
+    }
 
-      {
-        LRSNash::FastInput solve_input{static_cast<int>(output.m),
-                                       static_cast<int>(output.n),
-                                       p1_ucb_matrix.data(), discretize_factor};
-        LRSNash::FloatOneSumOutput solve_output{p1_nash.data(), dummy.data(),
-                                                0};
-        LRSNash::solve_fast(&solve_input, &solve_output);
+    float p = device.uniform();
+    for (auto i = 0; i < output.m; ++i) {
+      p -= p1_nash[i];
+      if (p <= 0) {
+        p1_index = i;
+        break;
       }
-
-      {
-        LRSNash::FastInput solve_input{static_cast<int>(output.m),
-                                       static_cast<int>(output.n),
-                                       p2_ucb_matrix.data(), discretize_factor};
-        LRSNash::FloatOneSumOutput solve_output{dummy.data(), p2_nash.data(),
-                                                0};
-        LRSNash::solve_fast(&solve_input, &solve_output);
+    }
+    p = device.uniform();
+    for (auto i = 0; i < output.n; ++i) {
+      p -= p2_nash[i];
+      if (p <= 0) {
+        p2_index = i;
+        break;
       }
     }
 
-    {
-      float p = device.uniform();
-      for (auto i = 0; i < output.m; ++i) {
-        p -= p1_nash[i];
-        if (p <= 0) {
-          p1_index = i;
-          break;
-        }
-      }
-    }
-
-    {
-      float p = device.uniform();
-      for (auto i = 0; i < output.n; ++i) {
-        p -= p2_nash[i];
-        if (p <= 0) {
-          p2_index = i;
-          break;
-        }
-      }
-    }
-
-    const auto c1 = output.p1_choices[p1_index];
-    const auto c2 = output.p2_choices[p2_index];
-    battle_options_set(copy.battle, 0);
-    copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
     return std::pair<uint8_t, uint8_t>{p1_index, p2_index};
   }
 
