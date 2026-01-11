@@ -575,8 +575,8 @@ template <typename Options = SearchOptions<>> struct Search {
       }
     }
 
-    const auto c1 = p1_choices[p1_index];
-    const auto c2 = p2_choices[p2_index];
+    const auto c1 = output.p1_choices[p1_index];
+    const auto c2 = output.p2_choices[p2_index];
     battle_options_set(copy.battle, 0);
     copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
     return std::pair<uint8_t, uint8_t>{p1_index, p2_index};
