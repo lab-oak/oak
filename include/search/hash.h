@@ -272,7 +272,7 @@ struct Battle {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     return sides[0].hash(battle.sides[0], durations.get(0)) ^
-     sides[1].hash(battle.sides[1], durations.get(1));
+           sides[1].hash(battle.sides[1], durations.get(1));
   }
 };
 }; // namespace Hash

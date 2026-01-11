@@ -30,16 +30,55 @@ template <typename JointBandit> struct Table {
   Key root_key;
 };
 
-template <typename T> struct IsNode {
-  static consteval bool get_value() {
-    if constexpr (requires(T heap) { heap.stats; }) {
-      return true;
-    } else {
-      return false;
-    }
+namespace TypeTraits {
+template <typename T>
+inline constexpr bool is_node = []() {
+  if constexpr (requires(T heap) { heap.stats; }) {
+    return true;
+  } else {
+    return false;
   }
-  static constexpr bool value = get_value();
-};
+}();
+
+template <typename T>
+inline constexpr bool is_value_network = []() {
+  if constexpr (requires(T network) {
+                  network.inference(pkmn_gen1_battle{},
+                                    pkmn_gen1_chance_durations{});
+                }) {
+    return true;
+  } else {
+    return false;
+  }
+}();
+
+template <typename T>
+inline constexpr bool is_policy_network = []() {
+  if constexpr (requires(T network) {
+                  network.inference(pkmn_gen1_battle{},
+                                    pkmn_gen1_chance_durations{}, 0, 0, nullptr,
+                                    nullptr, nullptr, nullptr);
+                }) {
+    return true;
+  } else {
+    return false;
+  }
+}();
+
+template <typename T>
+inline constexpr bool is_contextual_bandit = []() {
+  if constexpr (requires(T stats) {
+                  stats.softmax_logits(declval(decltype(stats)::Params),
+                                       nullptr, nullptr);
+                }) {
+    return true;
+  } else {
+    return false;
+  }
+}();
+} // namespace TypeTraits
+
+using namespace TypeTraits;
 
 size_t count(const auto &heap) {
   size_t c = 1;
@@ -115,11 +154,12 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p2_nash;
 
   size_t total_depth;
+  size_t errors;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const MCTS::Input &input, Output output = {}) {
 
-    // reset data members
+    // reset data memberslimit
     *this = {};
 
     // get choices data here for matrix ucb
@@ -138,12 +178,10 @@ template <typename Options = SearchOptions<>> struct Search {
     }
 
     auto &stats = [&]() -> auto & {
-      if constexpr (IsNode<decltype(heap)>::value) {
+      if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        return heap.entries[heap.hasher.hash(
-            input.battle,
-            input.durations)];
+        return heap.entries[heap.hasher.hash(input.battle, input.durations)];
       }
     }();
 
@@ -159,19 +197,14 @@ template <typename Options = SearchOptions<>> struct Search {
         }
       };
 
-      if constexpr (requires {
-                      stats.softmax_logits(bandit_params(params), nullptr,
-                                           nullptr);
-                      model.inference(
-                          input.battle,
-                          input.durations);
-                    }) {
+      if constexpr (is_contextual_bandit<decltype(stats)> &&
+                    is_policy_network<decltype(model)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
-        const float value = model.inference(
-            input.battle, input.durations,
-            output.m, output.n, output.p1_choices.data(),
-            output.p2_choices.data(), p1_logits.data(), p2_logits.data());
+        const float value =
+            model.inference(input.battle, input.durations, output.m, output.n,
+                            output.p1_choices.data(), output.p2_choices.data(),
+                            p1_logits.data(), p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
       }
@@ -219,19 +252,14 @@ template <typename Options = SearchOptions<>> struct Search {
 
   float run_root_iteration(auto &device, const auto &params, auto &heap,
                            const auto &input, auto &model, Output &output) {
+
     auto copy = input;
     auto *rng = reinterpret_cast<uint64_t *>(
         copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
     rng[0] = device.uniform_64();
     chance_options.durations = copy.durations;
     apply_durations(copy.battle, copy.durations);
-    if constexpr (IsNode<decltype(heap)>::value) {
-      battle_options_set(copy.battle, 0);
-    } else {
-      pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
-      nullptr);
-    }
-
+    pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     // check if we are passing MatrixUCB param wrapper
     if constexpr (requires { params.bandit_params; }) {
       if ((output.iterations >= params.delay)) {
@@ -314,22 +342,14 @@ template <typename Options = SearchOptions<>> struct Search {
           }
         }
 
-        auto c1 = p1_choices[p1_index];
-        auto c2 = p1_choices[p2_index];
-        // if constexpr (IsNode<decltype(heap)>::value) {
-        //   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
-        //                                nullptr);
-        //   battle_options_set(copy.battle, 0);
-        // } else {
-        //   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
-        //                                nullptr);
-        // }
+        const auto c1 = p1_choices[p1_index];
+        const auto c2 = p1_choices[p2_index];
         copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
 
-        const auto run_next_iteration = [&]() {
-          if constexpr (IsNode<decltype(heap)>::value) {
-            const auto obs = std::bit_cast<const Obs>(
-                *pkmn_gen1_battle_options_chance_actions(&options));
+        const auto value = [&]() {
+          if constexpr (is_node<decltype(heap)>) {
+            const auto &obs = *reinterpret_cast<const Obs *>(
+                pkmn_gen1_battle_options_chance_actions(&options));
             auto &child = heap.children[{p1_index, p2_index, obs}];
             return run_iteration(device, params.bandit_params, child, copy,
                                  model, 1);
@@ -337,12 +357,11 @@ template <typename Options = SearchOptions<>> struct Search {
             return run_iteration(device, params.bandit_params, heap, copy,
                                  model, 1);
           }
-        };
-        const auto value = run_next_iteration().first;
+        }();
 
         ++visit_matrix[p1_index][p2_index];
-        value_matrix[p1_index][p2_index] += value;
-        return value;
+        value_matrix[p1_index][p2_index] += value.first;
+        return value.first;
       } else {
         return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
@@ -352,11 +371,6 @@ template <typename Options = SearchOptions<>> struct Search {
     }
   }
 
-  inline constexpr bool turn_limit(const auto &battle) const noexcept {
-    return reinterpret_cast<const uint16_t *>(
-               battle.bytes + PKMN::Layout::Offsets::Battle::turn)[0] >= 1000;
-  }
-
   // typical recursive mcts function
   // we return value for each player because it's slightly faster than calcing 1
   // - value at each heap
@@ -364,14 +378,20 @@ template <typename Options = SearchOptions<>> struct Search {
                                         auto &heap, auto &input, auto &model,
                                         size_t depth = 0) {
 
+    if constexpr (!is_node<decltype(heap)>) {
+      if (depth >= 20) {
+        set_turn_limit(input.battle);
+        return {.5, .5};
+      }
+    }
+
     auto &battle = input.battle;
     auto &result = input.result;
     auto &stats = [&]() -> auto & {
-      if constexpr (IsNode<decltype(heap)>::value) {
+      if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        const auto h = heap.hasher.hash(
-            battle, *pkmn_gen1_battle_options_chance_durations(&options));
+        const auto h = heap.hasher.hash(battle, durations());
         return heap.entries[h];
       }
     }();
@@ -391,7 +411,7 @@ template <typename Options = SearchOptions<>> struct Search {
                                p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c2 = p2_choices[outcome.p2.index];
 
-      if constexpr (IsNode<decltype(heap)>::value) {
+      if constexpr (is_node<decltype(heap)>) {
         battle_options_set(battle, depth);
       } else {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
@@ -399,7 +419,7 @@ template <typename Options = SearchOptions<>> struct Search {
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
 
       const auto value = [&]() {
-        if constexpr (IsNode<decltype(heap)>::value) {
+        if constexpr (is_node<decltype(heap)>) {
           const auto &obs = *reinterpret_cast<const Obs *>(
               pkmn_gen1_battle_options_chance_actions(&options));
           auto &child =
@@ -414,12 +434,13 @@ template <typename Options = SearchOptions<>> struct Search {
       outcome.p1.value = value.first;
       outcome.p2.value = value.second;
 
-      if constexpr (IsNode<decltype(heap)>::value) {
+      if constexpr (is_node<decltype(heap)>) {
         stats.update(outcome);
       } else {
         if (!turn_limit(battle)) {
           stats.update(outcome);
         } else {
+          ++errors;
           return {0.5, 0.5};
         }
       }
@@ -434,15 +455,13 @@ template <typename Options = SearchOptions<>> struct Search {
       return value;
     }
 
-    if (!turn_limit(battle) && (depth < 15)) {
-      total_depth += depth;
-    }
+    total_depth += depth;
 
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:
       [[likely]] {
         float value;
-        if constexpr (requires { model.inference(battle, input.durations); }) {
+        if constexpr (is_value_network<decltype(model)>) {
           // model is a net
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
@@ -451,20 +470,16 @@ template <typename Options = SearchOptions<>> struct Search {
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
           stats.init(m, n);
-          if constexpr (requires {
-                          stats.softmax_logits(bandit_params, nullptr, nullptr);
-                        }) {
+          if constexpr (is_contextual_bandit<decltype(stats)>) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
-            value = model.inference(
-                battle, *pkmn_gen1_battle_options_chance_durations(&options), m,
-                n, p1_choices.data(), p2_choices.data(), p1_logits.data(),
-                p2_logits.data());
+            value = model.inference(battle, durations(), m, n,
+                                    p1_choices.data(), p2_choices.data(),
+                                    p1_logits.data(), p2_logits.data());
             stats.softmax_logits(bandit_params, p1_logits.data(),
                                  p2_logits.data());
           } else {
-            value = model.inference(
-                battle, *pkmn_gen1_battle_options_chance_durations(&options));
+            value = model.inference(battle, durations());
           }
           return {value, 1 - value};
         } else if constexpr (requires { model.evaluate(battle); }) {
@@ -547,20 +562,6 @@ template <typename Options = SearchOptions<>> struct Search {
     };
   }
 
-  // use battle seed to quickly compute a clamped damage roll
-  template <size_t n_rolls>
-  static constexpr uint8_t roll_byte(const uint8_t seed) {
-    constexpr uint8_t lowest_roll{217};
-    constexpr uint8_t middle_roll{236};
-    if constexpr (n_rolls == 1) {
-      return middle_roll;
-    } else {
-      static_assert((n_rolls == 2) || (n_rolls == 3) || (n_rolls == 20));
-      constexpr uint8_t step = 38 / (n_rolls - 1);
-      return lowest_roll + step * (seed % n_rolls);
-    }
-  }
-
   // pkmn_gen1_battle_options_set with constexpr logic
   void battle_options_set(pkmn_gen1_battle &battle, size_t depth) {
     if constexpr (!Options::clamping) {
@@ -583,6 +584,34 @@ template <typename Options = SearchOptions<>> struct Search {
       }
       pkmn_gen1_battle_options_set(&options, nullptr, nullptr, &calc_options);
     }
+  }
+
+  // use battle seed to quickly compute a clamped damage roll
+  template <size_t n_rolls>
+  inline static constexpr uint8_t roll_byte(const uint8_t seed) {
+    constexpr uint8_t lowest_roll{217};
+    constexpr uint8_t middle_roll{236};
+    if constexpr (n_rolls == 1) {
+      return middle_roll;
+    } else {
+      static_assert((n_rolls == 2) || (n_rolls == 3) || (n_rolls == 20));
+      constexpr uint8_t step = 38 / (n_rolls - 1);
+      return lowest_roll + step * (seed % n_rolls);
+    }
+  }
+
+  void set_turn_limit(auto &battle) const {
+    reinterpret_cast<uint16_t *>(battle.bytes +
+                                 PKMN::Layout::Offsets::Battle::turn)[0] = 1000;
+  }
+
+  inline bool turn_limit(const auto &battle) const noexcept {
+    return reinterpret_cast<const uint16_t *>(
+               battle.bytes + PKMN::Layout::Offsets::Battle::turn)[0] >= 1000;
+  }
+
+  const auto &durations() const noexcept {
+    return *pkmn_gen1_battle_options_chance_durations(&options);
   }
 
   void process_output(Output &output) {

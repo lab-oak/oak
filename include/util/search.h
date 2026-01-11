@@ -166,11 +166,8 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
                          auto &node) -> MCTS::Output {
     MCTS::Search search{};
     const auto o = search.run(device, dur, params, node, model, input, output);
-    if constexpr (requires { node.entries; }) {
-      std::cout << node.entries.size() << std::endl;
-    }
-    std::cout << "depth: " << (float)search.total_depth / o.iterations
-              << std::endl;
+    // std::cout << "depth: " << (float)search.total_depth / o.iterations
+    //           << " errors: " << search.errors << std::endl;
     return o;
   };
 
