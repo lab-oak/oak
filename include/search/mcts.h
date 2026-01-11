@@ -3,6 +3,7 @@
 #include <libpkmn/layout.h>
 #include <libpkmn/strings.h>
 #include <search/durations.h>
+#include <search/hash.h>
 #include <util/random.h>
 
 #include <chrono>
@@ -13,10 +14,23 @@
 
 namespace MCTS {
 
-template <typename JointBandit, typename Obs> struct Node {
+// for std::map compatibility
+using Obs = std::array<uint8_t, 16>;
+
+template <typename JointBandit> struct Node {
   using Key = std::tuple<uint8_t, uint8_t, Obs>;
   JointBandit stats;
-  std::map<Key, Node<JointBandit, Obs>> children;
+  std::map<Key, Node<JointBandit>> children;
+};
+
+template <typename JointBandit> struct Table {
+  using Key = uint64_t;
+  Hash::Battle hasher;
+  std::unordered_map<Key, JointBandit> entries;
+  Key root_key;
+
+  JointBandit &stats(Key key) { return entries[key]; }
+  const JointBandit &stats(Key key) const { return entries[key]; }
 };
 
 size_t count(const auto &node) {
@@ -66,8 +80,6 @@ struct Output {
   std::array<std::array<double, 9>, 9> value_matrix;
 };
 
-using Obs = std::array<uint8_t, 16>;
-
 template <bool _root_matrix = true, size_t _root_rolls = 3,
           size_t _other_rolls = 1, bool _debug_print = false>
 struct SearchOptions {
@@ -95,6 +107,12 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<float, 9 + 2> p2_nash;
 
   Output run(auto &device, const auto dur, const auto &params, auto &node,
+             auto &model, const MCTS::Input &input, Output output = {})
+    requires requires { node.entries; }
+  {
+    return output;
+  }
+  Output run(auto &device, const auto dur, const auto &params, auto &node,
              auto &model, const MCTS::Input &input, Output output = {}) {
 
     // reset data members
@@ -114,6 +132,14 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (requires { model.get_root_score(input.battle); }) {
       model.get_root_score(input.battle);
     }
+
+    const auto get_stats = [&]() {
+      if constexpr (requires { node.stats; }) {
+        return node.stats;
+      } else {
+        return node.entries[node.hasher(input.battle, input.durations)];
+      }
+    };
 
     if (!node.stats.is_init()) {
 

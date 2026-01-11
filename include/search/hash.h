@@ -3,8 +3,6 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/key.h>
 
-
-
 namespace Hash {
 
 void initialize(auto &device, auto &arr) {
@@ -110,7 +108,8 @@ struct Species {
 };
 
 struct Type {
-  static constexpr int n_types = static_cast<uint8_t>(PKMN::Data::Type::Dragon) + 1;
+  static constexpr int n_types =
+      static_cast<uint8_t>(PKMN::Data::Type::Dragon) + 1;
   static constexpr int n_keys = n_types * n_types;
   std::array<uint64_t, n_keys> hashes;
   Type() = default;
@@ -151,9 +150,7 @@ struct Volatiles {
   }
 };
 
-struct Duration {
-
-};
+struct Duration {};
 
 struct ActivePokemon {
   Stats stats;
@@ -167,9 +164,8 @@ struct ActivePokemon {
       : stats{device}, species{device}, types{device}, boosts{device},
         volatiles{device} {}
 
-  uint64_t hash(const PKMN::ActivePokemon &active,
-                const PKMN::Pokemon &pokemon,
-              const PKMN::Duration& duration) const noexcept {
+  uint64_t hash(const PKMN::ActivePokemon &active, const PKMN::Pokemon &pokemon,
+                const PKMN::Duration &duration) const noexcept {
     return stats.hash(active, pokemon) ^ species.hash(active, pokemon) ^
            types.hash(active, pokemon) ^ boosts.hash(active, pokemon) ^
            volatiles.hash(active, duration);
@@ -180,9 +176,7 @@ struct HP {
   static constexpr int n_buckets = 8;
   std::array<uint64_t, n_buckets> hashes;
   HP() = default;
-  HP(auto&device) {
-    initialize(device, hashes);
-  }
+  HP(auto &device) { initialize(device, hashes); }
   static constexpr uint8_t get_key(uint16_t base_hp, uint16_t hp) noexcept {
     return (8 * hp / base_hp) - (hp == base_hp);
   }
@@ -196,8 +190,6 @@ static_assert(HP::get_key(800, 800) == 7);
 static_assert(HP::get_key(800, 799) == 7);
 static_assert(HP::get_key(800, 100) == 1);
 static_assert(HP::get_key(800, 99) == 0);
-
-
 
 struct Side {
 
@@ -240,13 +232,16 @@ struct Side {
 
 struct Battle {
   std::array<Side, 2> sides;
+  Battle() = default;
   Battle(auto &device) {
     for (auto &side : sides) {
       side = Side{device};
     }
   }
-  uint64_t hash(const PKMN::Battle &battle,
-                const PKMN::Durations &durations) const noexcept {
+  uint64_t hash(const pkmn_gen1_battle &b,
+                const pkmn_gen1_chance_durations &d) const noexcept {
+    const auto &battle = PKMN::view(b);
+    const auto &durations = PKMN::view(d);
     return sides[0].hash(battle.sides[0], durations.get(0)) ^
            sides[1].hash(battle.sides[1], durations.get(1));
   }

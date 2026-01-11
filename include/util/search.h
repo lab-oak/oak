@@ -16,18 +16,45 @@
 
 namespace RuntimeSearch {
 
-template <typename T>
-using UniqueNode = std::unique_ptr<MCTS::Node<T, MCTS::Obs>>;
+template <typename T> using UniqueNode = std::unique_ptr<MCTS::Node<T>>;
+template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
+
+template <typename T> struct UniqueStats {
+  UniqueNode<T> node;
+  UniqueTable<T> table;
+  void reset() noexcept {
+    node.reset();
+    table.reset();
+  }
+  void reset_stats() noexcept {
+    if (node) {
+      node->stats = {};
+    }
+    if (table) {
+      table->entries[table->root_key] = {};
+    }
+  }
+};
 
 struct Nodes {
-  UniqueNode<Exp3::JointBandit> exp3;
-  UniqueNode<PExp3::JointBandit> pexp3;
-  UniqueNode<UCB::JointBandit> ucb;
-  UniqueNode<UCB1::JointBandit> ucb1;
-  UniqueNode<PUCB::JointBandit> pucb;
+  UniqueStats<Exp3::JointBandit> exp3;
+  UniqueStats<PExp3::JointBandit> pexp3;
+  UniqueStats<UCB::JointBandit> ucb;
+  UniqueStats<UCB1::JointBandit> ucb1;
+  UniqueStats<PUCB::JointBandit> pucb;
   bool set;
 
   Nodes() { reset(); }
+
+  auto &get(auto &unique_item) {
+    if (set && !unique_item.get()) {
+      throw std::runtime_error{"Nodes alread set elsewhere"};
+    }
+    unique_item =
+        std::make_unique<std::remove_cvref_t<decltype(*unique_item)>>();
+    set = true;
+    return *unique_item;
+  }
 
   void reset() {
     exp3.reset();
@@ -42,60 +69,33 @@ struct Nodes {
   // the empirical policies may have 0.0 at some actions.
   // This is a clumsy fix though. TODO
   void reset_stats() {
-    if (exp3) {
-      exp3->stats = {};
-    }
-    if (pexp3) {
-      pexp3->stats = {};
-    }
-    if (ucb) {
-      ucb->stats = {};
-    }
-    if (ucb1) {
-      ucb1->stats = {};
-    }
-    if (pucb) {
-      pucb->stats = {};
-    }
+    // exp3.reset_stats();
+    // pexp3.reset_stats();
+    // ucb.reset_stats();
+    // ucb1.reset_stats();
+    // pucb.reset_stats();
   }
 
   bool update(auto i1, auto i2, const auto &obs) {
-    auto update_node = [&](auto &node) -> bool {
-      if (!node || !node->stats.is_init()) {
-        return false;
-      }
-      auto child = node->children.find({i1, i2, obs});
-      if (child == node->children.end()) {
-        node = std::make_unique<std::decay_t<decltype(*node)>>();
-        return false;
-      } else {
-        auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
-            std::move((*child).second));
-        node.swap(unique_child);
-        return true;
-      }
-    };
-    return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
-           update_node(ucb1) || update_node(pucb);
-  }
-
-  size_t count() const {
-    if (exp3) {
-      return MCTS::count(*exp3);
-    }
-    if (pexp3) {
-      return MCTS::count(*pexp3);
-    }
-    if (ucb) {
-      return MCTS::count(*ucb);
-    }
-    if (ucb1) {
-      return MCTS::count(*ucb1);
-    }
-    if (pucb) {
-      return MCTS::count(*pucb);
-    }
-    return 0;
+    reset();
+    return false;
+    // auto update_node = [&](auto &node) -> bool {
+    // if (!node || !node->stats.is_init()) {
+    //   return false;
+    // }
+    // auto child = node->children.find({i1, i2, obs});
+    // if (child == node->children.end()) {
+    //   node = std::make_unique<std::decay_t<decltype(*node)>>();
+    //   return false;
+    // } else {
+    //   auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
+    //       std::move((*child).second));
+    //   node.swap(unique_child);
+    //   return true;
+    // }
+    // };
+    // return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
+    //        update_node(ucb1) || update_node(pucb);
   }
 };
 
@@ -105,6 +105,7 @@ struct Agent {
   std::string network_path;
   bool discrete_network;
   std::string matrix_ucb_name;
+  bool use_table;
   // valid if already loaded/cache set
   std::optional<NN::Battle::Network> network;
   bool *flag;
@@ -157,29 +158,19 @@ struct Agent {
   }
 };
 
-auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
+auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
          MCTS::Output output = {}) {
 
-  MCTS::Input battle_data{};
-  using input_t = std::remove_cvref_t<decltype(input)>;
-  if constexpr (std::is_same_v<input_t, pkmn_gen1_battle>) {
-    battle_data.battle = input;
-    battle_data.result = PKMN::result(input);
-  } else if constexpr (std::is_same_v<input_t,
-                                      std::pair<pkmn_gen1_battle,
-                                                pkmn_gen1_chance_durations>>) {
-    battle_data.battle = input.first;
-    battle_data.durations = input.second;
-    battle_data.result = PKMN::result(input);
-  } else if constexpr (std::is_same_v<input_t, MCTS::Input>) {
-    battle_data = input;
-  } else {
-    assert(false);
-  }
-
-  const auto run_3 = [&](auto dur, auto &model, auto &params,
+  // Finally the MCTS::run call
+  const auto run_5 = [&](auto dur, auto &model, auto &params,
                          auto &node) -> MCTS::Output {
     MCTS::Search search{};
+    return search.run(device, dur, params, node, model, input, output);
+  };
+
+  // Whether to use MatrixUCB params or normal
+  const auto run_4 = [&](auto dur, auto &model, auto &bandit_params,
+                         auto &node) -> MCTS::Output {
     const auto &matrix_ucb_name = agent.matrix_ucb_name;
     if (!matrix_ucb_name.empty()) {
       const auto matrix_ucb_name_split =
@@ -188,39 +179,34 @@ auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
         throw std::runtime_error{"Could not parse MatrixUCB name: " +
                                  agent.matrix_ucb_name};
       }
-      MCTS::MatrixUCBParams<std::remove_cvref_t<decltype(params)>>
-          matrix_ucb_params{params};
+      MCTS::MatrixUCBParams<std::remove_cvref_t<decltype(bandit_params)>>
+          matrix_ucb_params{bandit_params};
       matrix_ucb_params.delay = std::stoull(matrix_ucb_name_split[0]);
       matrix_ucb_params.interval = std::stoull(matrix_ucb_name_split[1]);
       matrix_ucb_params.c = std::stof(matrix_ucb_name_split[2]);
-      return search.run(device, dur, matrix_ucb_params, node, model,
-                        battle_data, output);
+      return run_5(dur, model, matrix_ucb_params, node);
     } else {
-      return search.run(device, dur, params, node, model, battle_data, output);
+      return run_5(dur, model, bandit_params, node);
     }
   };
 
-  const auto run_2 = [&](auto dur, auto &model) {
-    const auto get = [&nodes](auto &node) -> auto & {
-      using Node = std::remove_reference_t<decltype(*node)>;
-      if (!node.get()) {
-        if (nodes.set) {
-          throw std::runtime_error("RuntimeSearch::run(): Wrong node type");
-        } else {
-          nodes.set = true;
-          node = std::make_unique<Node>();
-          assert(node.get());
-        }
-      }
-      return *node;
-    };
+  // Whether to use tree nodes or transposition table
+  const auto run_3 = [&](const auto dur, auto &model, const auto &params,
+                         auto &both) {
+    if (agent.use_table) {
+      return run_4(dur, model, params, nodes.get(both.table));
+    } else {
+      return run_4(dur, model, params, nodes.get(both.node));
+    }
+  };
 
+  // Parse bandit algorithm and parameters
+  const auto run_2 = [&](auto dur, auto &model) {
     const auto bandit_name_split = Parse::split(agent.bandit_name, '-');
 
     if (bandit_name_split.size() < 2) {
       throw std::runtime_error("Could not parse bandit string: " +
                                agent.bandit_name);
-      return output;
     }
 
     const auto &name = bandit_name_split[0];
@@ -228,13 +214,13 @@ auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
 
     if (name == "ucb") {
       UCB::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, get(nodes.ucb));
+      return run_3(dur, model, params, nodes.ucb);
     } else if (name == "ucb1") {
       UCB1::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, get(nodes.ucb1));
+      return run_3(dur, model, params, nodes.ucb1);
     } else if (name == "pucb") {
       PUCB::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, get(nodes.pucb));
+      return run_3(dur, model, params, nodes.pucb);
     }
 
     float alpha = .05;
@@ -247,24 +233,23 @@ auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
                                   .one_minus_gamma = (1 - f1),
                                   .alpha = alpha,
                                   .one_minus_alpha = (1 - alpha)};
-      return run_3(dur, model, params, get(nodes.exp3));
+      return run_3(dur, model, params, nodes.exp3);
     } else if (name == "pexp3") {
       PExp3::Bandit::Params params{.gamma = f1,
                                    .one_minus_gamma = (1 - f1),
                                    .alpha = alpha,
                                    .one_minus_alpha = (1 - alpha)};
-      return run_3(dur, model, params, get(nodes.pexp3));
+      return run_3(dur, model, params, nodes.pexp3);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + name);
-      return output;
     }
   };
 
-  // get model
+  // Whether to use a network, Monte Carlo, or Poke-Engine
   const auto search_1 = [&](const auto dur) {
     if (agent.uses_network()) {
       if (!agent.network.has_value()) {
-        agent.initialize_network(battle_data.battle);
+        agent.initialize_network(input.battle);
       }
       return run_2(dur, agent.network.value());
     } else if (agent.network_path == "fp") {
@@ -276,7 +261,7 @@ auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
     }
   };
 
-  // get duration
+  // Parse search budget
   const auto search_0 = [&]() {
     if (agent.flag != nullptr) {
       return search_1(agent.flag);
@@ -294,7 +279,6 @@ auto run(auto &device, const auto &input, Nodes &nodes, Agent &agent,
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
                                agent.search_time);
-      return output;
     }
   };
 
