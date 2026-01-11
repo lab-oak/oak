@@ -344,6 +344,7 @@ template <typename Options = SearchOptions<>> struct Search {
 
         const auto c1 = p1_choices[p1_index];
         const auto c2 = p1_choices[p2_index];
+        battle_options_set(copy.battle, 0);
         copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
 
         const auto value = [&]() {
@@ -414,6 +415,7 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         battle_options_set(battle, depth);
       } else {
+        // battle_options_set(battle, depth);
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       }
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);

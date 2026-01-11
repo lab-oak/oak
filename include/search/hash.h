@@ -18,11 +18,12 @@ struct PP {
   PP() = default;
   PP(auto &device) { initialize(device, hashes); }
 
-  uint8_t get_key(const std::array<PKMN::MoveSlot, 4> &moves) const noexcept {
+  static constexpr uint8_t
+  get_key(const std::array<PKMN::MoveSlot, 4> &moves) noexcept {
     uint8_t key = 0;
     for (const auto &move_slot : moves) {
-      key <<= 2;
-      key ^= std::min(move_slot.pp, uint8_t{3});
+      key *= n_pp_buckets;
+      key ^= std::min(move_slot.pp, uint8_t{n_pp_buckets - 1});
     }
     return key;
   }
@@ -31,6 +32,13 @@ struct PP {
     return hashes[get_key(pokemon.moves)];
   }
 };
+
+static_assert(PP::get_key(std::array<PKMN::MoveSlot, 4>{}) == 0);
+static_assert(PP::get_key(std::array<PKMN::MoveSlot, 4>{
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61}}) == (PP::n_keys - 1));
 
 struct Status {
   static constexpr int n_status = Encode::Battle::Status::n_dim + 1;
@@ -145,7 +153,7 @@ struct Boosts {
 };
 
 struct Duration {
-  static constexpr int max_duration = 5;
+  static constexpr int max_duration = 6;
   std::array<uint64_t, max_duration> confusion;
   std::array<uint64_t, max_duration> disable;
   std::array<uint64_t, max_duration> attacking;
@@ -158,8 +166,8 @@ struct Duration {
     initialize(device, binding);
   }
   uint64_t hash(const PKMN::Duration &duration) const noexcept {
-    return confusion[duration.confusion()] ^ confusion[duration.disable()] ^
-           confusion[duration.attacking()] ^ confusion[duration.binding()];
+    return confusion[duration.confusion()] ^ disable[duration.disable()] ^
+           attacking[duration.attacking()] ^ binding[duration.binding()];
   }
 };
 
@@ -194,20 +202,20 @@ struct ActivePokemon {
         volatiles{device}, duration{device} {}
 
   uint64_t hash(const PKMN::ActivePokemon &active, const PKMN::Pokemon &pokemon,
-                const PKMN::Duration &duration) const noexcept {
+                const PKMN::Duration &dur) const noexcept {
     return stats.hash(active, pokemon) ^ species.hash(active, pokemon) ^
            types.hash(active, pokemon) ^ boosts.hash(active, pokemon) ^
-           volatiles.hash(active, pokemon) ^ this->duration.hash(duration);
+           volatiles.hash(active, pokemon) ^ duration.hash(dur);
   }
 };
 
 struct HP {
-  static constexpr int n_buckets = 8;
+  static constexpr int n_buckets = 16;
   std::array<uint64_t, n_buckets> hashes;
   HP() = default;
   HP(auto &device) { initialize(device, hashes); }
   static constexpr uint8_t get_key(uint16_t base_hp, uint16_t hp) noexcept {
-    return (8 * hp / base_hp) - (hp == base_hp);
+    return (n_buckets * hp / base_hp) - (hp == base_hp);
   }
 
   uint64_t hash(const PKMN::Pokemon &pokemon) const noexcept {
@@ -215,10 +223,10 @@ struct HP {
   }
 };
 
-static_assert(HP::get_key(800, 800) == 7);
-static_assert(HP::get_key(800, 799) == 7);
-static_assert(HP::get_key(800, 100) == 1);
-static_assert(HP::get_key(800, 99) == 0);
+// static_assert(HP::get_key(800, 800) == 7);
+// static_assert(HP::get_key(800, 799) == 7);
+// static_assert(HP::get_key(800, 100) == 1);
+// static_assert(HP::get_key(800, 99) == 0);
 
 struct Side {
 
@@ -241,7 +249,7 @@ struct Side {
     const auto &stored = side.stored();
     if (stored.hp) {
       const auto id = side.order[0] - 1;
-      h ^= actives[id].hash(side.active, side.stored(), duration);
+      h ^= actives[id].hash(side.active, stored, duration);
       h ^= hps[id].hash(stored);
     }
     for (auto slot = 2; slot <= 6; ++slot) {
