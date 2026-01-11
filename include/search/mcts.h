@@ -132,12 +132,12 @@ template <typename Options = SearchOptions<>> struct Search {
                                                 nullptr);
                       model.inference(
                           input.battle,
-                          *pkmn_gen1_battle_options_chance_durations(&options));
+                          input.durations);
                     }) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
         const float value = model.inference(
-            input.battle, *pkmn_gen1_battle_options_chance_durations(&options),
+            input.battle, input.durations,
             output.m, output.n, output.p1_choices.data(),
             output.p2_choices.data(), p1_logits.data(), p2_logits.data());
         node.stats.softmax_logits(get_params(params), p1_logits.data(),
