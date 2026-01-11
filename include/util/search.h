@@ -200,16 +200,6 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
   const auto run_3 = [&](const auto dur, auto &model, const auto &params,
                          auto &both) {
     if (agent.use_table) {
-      return run_4(dur, model, params, nodes.get(both.table));
-    } else {
-      return run_5(dur, model, bandit_params, node);
-    }
-  };
-
-  // Whether to use tree nodes or transposition table
-  const auto run_3 = [&](const auto dur, auto &model, const auto &params,
-                         auto &both) {
-    if (agent.use_table) {
       auto &table = nodes.get(both.table);
       table.hasher = {device};
       return run_4(dur, model, params, table);
