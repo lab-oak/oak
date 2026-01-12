@@ -32,59 +32,37 @@ template <typename JointBandit> struct Table {
 
 namespace TypeTraits {
 template <typename T>
-inline constexpr bool is_node = []() {
-  if constexpr (requires(T heap) { heap.stats; }) {
-    return true;
-  } else {
-    return false;
-  }
-}();
+inline constexpr bool is_node =
+    requires(std::remove_cvref_t<T> &heap) { heap.stats; };
 
 template <typename T>
-inline constexpr bool is_value_network = []() {
-  if constexpr (requires(T network) {
-                  network.inference(pkmn_gen1_battle{},
-                                    pkmn_gen1_chance_durations{});
-                }) {
-    return true;
-  } else {
-    return false;
-  }
-}();
+inline constexpr bool is_network = requires(std::remove_cvref_t<T> &network) {
+  network.inference(std::declval<const pkmn_gen1_battle &>(),
+                    std::declval<const pkmn_gen1_chance_durations &>());
+};
 
 template <typename T>
-inline constexpr bool is_policy_network = []() {
-  if constexpr (requires(T network) {
-                  network.inference(pkmn_gen1_battle{},
-                                    pkmn_gen1_chance_durations{}, 0, 0, nullptr,
-                                    nullptr, nullptr, nullptr);
-                }) {
-    return true;
-  } else {
-    return false;
-  }
-}();
+inline constexpr bool is_policy_network =
+    requires(std::remove_cvref_t<T> &network) {
+      network.inference(std::declval<const pkmn_gen1_battle &>(),
+                        std::declval<const pkmn_gen1_chance_durations &>(),
+                        std::declval<uint8_t>(), std::declval<uint8_t>(),
+                        std::declval<const pkmn_choice *>(),
+                        std::declval<const pkmn_choice *>(),
+                        std::declval<float *>(), std::declval<float *>());
+    };
 
 template <typename T>
-inline constexpr bool is_contextual_bandit = []() {
-  if constexpr (requires(T stats) {
-                  stats.softmax_logits(declval(decltype(stats)::Params),
-                                       nullptr, nullptr);
-                }) {
-    return true;
-  } else {
-    return false;
-  }
-}();
+inline constexpr bool is_contextual_bandit =
+    requires(std::remove_cvref_t<T> &stats) {
+      stats.softmax_logits(
+          std::declval<typename std::remove_cvref_t<T>::Params>(),
+          std::declval<const float *>(), std::declval<const float *>());
+    };
 
 template <typename T>
-inline constexpr bool is_matrix_ucb = []() {
-  if constexpr (requires(T params) { params.bandit_params; }) {
-    return true;
-  } else {
-    return false;
-  }
-}();
+inline constexpr bool is_matrix_ucb =
+    requires(std::remove_cvref_t<T> &params) { params.bandit_params; };
 } // namespace TypeTraits
 
 using namespace TypeTraits;
@@ -396,7 +374,7 @@ template <typename Options = SearchOptions<>> struct Search {
     case PKMN_RESULT_NONE:
       [[likely]] {
         float value;
-        if constexpr (is_value_network<decltype(model)>) {
+        if constexpr (is_network<decltype(model)>) {
           // model is a net
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
