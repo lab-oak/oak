@@ -80,6 +80,7 @@ std::atomic<size_t> loss{};
 std::atomic<size_t> draw{};
 
 std::vector<size_t> battle_lengths{};
+std::vector<std::pair<float, float>> battle_evals{};
 std::atomic<size_t> thread_id{};
 
 TeamBuilding::Provider provider;
@@ -179,6 +180,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
     auto p2_battle_frames = Train::Battle::CompressedFrames{battle};
 
     int p1_early_stop{}, p2_early_stop{};
+
     bool early_stop = false;
     size_t updates = 0;
     try {
@@ -219,6 +221,9 @@ void thread_fn(const ProgramArgs *args_ptr) {
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash, p2_policy_options);
         }
+
+        RuntimeData::battle_evals[id] = {p1_output.empirical_value,
+                                         p2_output.empirical_value};
 
         if (updates == 0) {
           p1_build_traj.value = p1_output.empirical_value;
@@ -371,8 +376,10 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
               << ' ' << RuntimeData::loss.load() << std::endl;
 
     std::cout << "Game Lengths: ";
-    for (const auto len : RuntimeData::battle_lengths) {
-      std::cout << len << ' ';
+    for (auto i = 0; i < args.threads; ++i) {
+      const auto &evals = RuntimeData::battle_evals[i];
+      std::cout << "(" << RuntimeData::battle_lengths[i] << " " << evals.first
+                << "/" << evals.second << ") ";
     }
     std::cout << std::endl;
   }
@@ -434,6 +441,7 @@ void setup(auto &args) {
 
   // stats
   RuntimeData::battle_lengths.resize(args.threads);
+  RuntimeData::battle_evals.resize(args.threads);
 }
 
 int main(int argc, char **argv) {

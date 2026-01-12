@@ -416,7 +416,6 @@ template <typename Options = SearchOptions<>> struct Search {
           } else {
             value = model.inference(battle, durations());
           }
-          return {value, 1 - value};
         } else if constexpr (requires { model.evaluate(battle); }) {
           // poke-engine
           const auto m = pkmn_gen1_battle_choices(
@@ -427,11 +426,11 @@ template <typename Options = SearchOptions<>> struct Search {
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
           stats.init(m, n);
           value = model.evaluate(battle);
-          return {value, 1 - value};
         } else {
           // model is monte-carlo
-          return init_stats_and_rollout(stats, device, battle, result);
+          value = init_stats_and_rollout(stats, device, battle, result).first;
         }
+        return {value, 1 - value};
       }
     case PKMN_RESULT_WIN: {
       return {1, 0};
