@@ -36,6 +36,7 @@ int benchmark(int argc, char **argv) {
   const auto output = RuntimeSearch::run(device, battle_data, nodes, agent);
 
   std::cout << output.duration.count() << " ms." << std::endl;
+  std::cout << output.iterations << " iterations." << std::endl;
 
   return 0;
 }

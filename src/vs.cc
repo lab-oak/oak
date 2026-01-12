@@ -80,7 +80,7 @@ std::atomic<size_t> loss{};
 std::atomic<size_t> draw{};
 
 std::vector<size_t> battle_lengths{};
-std::vector<std::pair<float, float>> battle_evals{};
+std::vector<std::pair<MCTS::Output, MCTS::Output>> battle_outputs{};
 std::atomic<size_t> thread_id{};
 
 TeamBuilding::Provider provider;
@@ -222,8 +222,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                         p2_output.p2_nash, p2_policy_options);
         }
 
-        RuntimeData::battle_evals[id] = {p1_output.empirical_value,
-                                         p2_output.empirical_value};
+        RuntimeData::battle_outputs[id] = {p1_output, p2_output};
 
         if (updates == 0) {
           p1_build_traj.value = p1_output.empirical_value;
@@ -375,13 +374,16 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
     std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load()
               << ' ' << RuntimeData::loss.load() << std::endl;
 
-    std::cout << "Game Lengths: ";
+    std::cout << "info: " << std::endl;
     for (auto i = 0; i < args.threads; ++i) {
-      const auto &evals = RuntimeData::battle_evals[i];
-      std::cout << "(" << RuntimeData::battle_lengths[i] << " " << evals.first
-                << "/" << evals.second << ") ";
+      const auto &outputs = RuntimeData::battle_outputs[i];
+      std::cout << "\t" << i << ": " << RuntimeData::battle_lengths[i] << ", "
+                << "(" << outputs.first.empirical_value << "/"
+                << outputs.first.nash_value << "), " << "("
+                << outputs.second.empirical_value << "/"
+                << outputs.second.nash_value << ")";
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 }
 
@@ -441,7 +443,7 @@ void setup(auto &args) {
 
   // stats
   RuntimeData::battle_lengths.resize(args.threads);
-  RuntimeData::battle_evals.resize(args.threads);
+  RuntimeData::battle_outputs.resize(args.threads);
 }
 
 int main(int argc, char **argv) {
