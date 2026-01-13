@@ -88,9 +88,14 @@ TeamBuilding::Provider provider;
 
 void thread_fn(const ProgramArgs *args_ptr) {
   const auto &args = *args_ptr;
-  mt19937 device{args.seed.value()};
-
   const auto id = RuntimeData::thread_id.fetch_add(1) % args.threads;
+  mt19937 device = [&args, id]() {
+    mt19937 d{args.seed.value()};
+    for (auto i = 0; i < id; ++i) {
+      d.uniform_64();
+    }
+    return d.uniform_64();
+  }();
 
   // data gen
   const size_t training_frames_target_size = args.buffer_size << 20;
