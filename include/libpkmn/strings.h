@@ -295,7 +295,7 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
       ss << '\n';
     }
     if (s == 0) {
-      ss << "-\n";
+      ss << "--- --- --- " << b.turn << " --- --- ---" << "\n";
     }
   }
   return ss.str();
