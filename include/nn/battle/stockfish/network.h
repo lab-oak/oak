@@ -1,3 +1,19 @@
+#pragma once
+
+#include <memory>
+
+#ifdef NO_DISCRETE_NETWORK
+namespace NN::Battle::Stockfish {
+struct Network {
+  float propagate(const uint8_t *transformedFeatures) const { return 0; }
+  void copy_parameters(const Affine<> &, const Affine<> &, const Affine<> &,
+                       const Affine<false> &) {};
+};
+std::shared_ptr<Network> make_network(int in, int h1, int h2) {
+  throw std::runtime_error{"Discrete networks not supported in release."};
+}
+} // namespace NN::Battle::Stockfish
+#else
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
@@ -18,12 +34,9 @@
 
 // Input features and network structure used in NNUE evaluation function
 
-#pragma once
-
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
-#include <memory>
 
 #include <nn/affine.h>
 #include <nn/battle/stockfish/affine.h>
@@ -148,3 +161,5 @@ std::shared_ptr<Network> make_network(int in, int h1, int h2) {
 }
 
 } // namespace NN::Battle::Stockfish
+
+#endif

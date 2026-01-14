@@ -41,8 +41,8 @@ target_link_libraries(libpkmn_fast INTERFACE
   $<$<CONFIG:Release>:libpkmn_fast_release>
 )
 
-target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC)
-target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC)
+target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC NO_DISCRETE_NETWORK)
+target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC NO_DISCRETE_NETWORK)
 
 # Targets
 
