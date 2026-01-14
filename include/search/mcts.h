@@ -205,8 +205,7 @@ template <typename Options = SearchOptions<>> struct Search {
     }
 
     const auto start = std::chrono::high_resolution_clock::now();
-    // Three types for 'dur' (the time investement of the search) are allowed:
-    // chrono duration
+    // time duration
     if constexpr (requires {
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         budget);
@@ -314,13 +313,19 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        const auto h = heap.hasher.update_hash(battle, durations());
-        auto hasher_copy = heap.hasher;
-        hasher_copy.reset({}, {});
-        const auto h2 = hasher_copy.hash(battle, durations());
-        std::cout << depth << std::endl;
-        assert(h == h2);
-        return heap.entries[h];
+        // std::cout << PKMN::battle_data_to_string(battle, durations())
+        //           << std::endl;
+        // const auto h = heap.hasher.update_hash(battle, durations());
+        // auto hasher_copy = static_cast<const Hash::Battle &>(heap.hasher);
+        // hasher_copy.reset({}, {});
+        // const auto h2 = hasher_copy.hash(battle, durations());
+        // std::cout << depth << std::endl;
+        // // assert(h == h2);
+        // assert(heap.hasher.sides[0].state.last_hash ==
+        //        hasher_copy.sides[0].state.last_hash);
+        // assert(heap.hasher.sides[1].state.last_hash ==
+        //        hasher_copy.sides[1].state.last_hash);
+        return heap.entries[heap.hasher.last()];
       }
     }();
 
@@ -346,6 +351,10 @@ template <typename Options = SearchOptions<>> struct Search {
         pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
       }
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
+
+      if constexpr (!is_node<decltype(heap)>) {
+        heap.hasher.update(battle, durations(), c1, c2);
+      }
 
       const auto value = [&]() {
         if constexpr (is_node<decltype(heap)>) {
