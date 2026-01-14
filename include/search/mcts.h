@@ -133,7 +133,7 @@ template <typename Options = SearchOptions<>> struct Search {
   pkmn_gen1_calc_options calc_options;
   std::array<pkmn_choice, 9> p1_choices;
   std::array<pkmn_choice, 9> p2_choices;
-  std::pair<Hash::SideState, Hash::SideState> root_hash_state;
+  std::pair<Hash::Side::State, Hash::Side::State> root_hash_state;
 
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;

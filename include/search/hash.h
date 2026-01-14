@@ -54,14 +54,6 @@ struct Pokemon {
     }
   };
 
-  static_assert(PP::get_key(std::array<PKMN::MoveSlot, 4>{}) == 0);
-  static_assert(PP::get_key(std::array<PKMN::MoveSlot, 4>{
-                    PKMN::MoveSlot{PKMN::Data::Move::None, 61},
-                    PKMN::MoveSlot{PKMN::Data::Move::None, 61},
-                    PKMN::MoveSlot{PKMN::Data::Move::None, 61},
-                    PKMN::MoveSlot{PKMN::Data::Move::None, 61}}) ==
-                (PP::n_keys - 1));
-
   struct Status {
     static constexpr int n_status = Encode::Battle::Status::n_dim + 1;
     std::array<uint64_t, n_status> hashes;
@@ -126,10 +118,6 @@ struct ActivePokemon {
              spc[ratio_key(stored.stats.spc, active.stats.spc)];
     }
   };
-
-  static_assert(Stats::ratio_key(400, 100) == 0);
-  static_assert(Stats::ratio_key(100, 100) == 6);
-  static_assert(Stats::ratio_key(100, 400) == 12);
 
   struct Species {
     std::array<uint64_t, static_cast<uint8_t>(PKMN::Species::Mew)> hashes;
@@ -245,8 +233,8 @@ struct Side {
 
   Side() = default;
   Side(auto &device) : state{} {
-    for (auto &Pokemon : pokemon) {
-      Pokemon = Pokemon{device};
+    for (auto &p : pokemon) {
+      p = Pokemon{device};
     }
     for (auto &active : actives) {
       active = ActivePokemon{device};
@@ -254,18 +242,18 @@ struct Side {
   }
 
   void update(const PKMN::Side &updated_side,
-              const PKMN::Duration &update_duration,
+              const PKMN::Duration &updated_duration,
               pkmn_choice choice) noexcept {
     const auto choice_type = choice & 3;
     const auto choice_data = choice >> 2;
     switch (choice_type) {
     case 1: {
       assert(choice_data >= 0 && choice_data <= 4);
-      return move_update(updated_side, update_duration);
+      return move_update(updated_side, updated_duration);
     }
     case 2: {
       assert(choice_data >= 2 && choice_data <= 6);
-      return switch_update(updated_side, update_duration, choice_data);
+      return switch_update(updated_side, updated_duration, choice_data);
     }
     case 0: {
     }
@@ -276,22 +264,23 @@ struct Side {
   }
 
   void move_update(const PKMN::Side &updated_side,
-                   const PKMN::Duration &update_duration) noexcept {
-    state.last_hash ^= last_active;
-    state.last_hash ^= last_pokemon;
-    const auto id = side.order[0];
-    state.last_active = actives[id - 1].hash(side.active, stored, duration);
+                   const PKMN::Duration &updated_duration) noexcept {
+    state.last_hash ^= state.last_active;
+    state.last_hash ^= state.last_pokemon;
+    const auto id = updated_side.order[0];
+    state.last_active = actives[id - 1].hash(
+        updated_side.active, updated_side.stored(), updated_duration);
     state.last_pokemon = 0;
-    state.last_hash ^= last_active;
-    state.last_hash ^= last_pokemon;
+    state.last_hash ^= state.last_active;
+    state.last_hash ^= state.last_pokemon;
   }
 
   void switch_update(const PKMN::Side &updated_side,
-                     const PKMN::Duration &update_duration,
-                     const auto incoming_Pokemon) noexcept {
-    last_hash ^= last_active;
-    const auto &incoming = updated_side.pokemon[incoming_Pokemon - 1];
-    last_pokemon = slots[incoming_Pokemon - 1].hash(incoming, );
+                     const PKMN::Duration &updated_duration,
+                     const auto incoming_slot) noexcept {
+    state.last_hash ^= state.last_active;
+    const auto &incoming = updated_side.pokemon[incoming_slot - 1];
+    state.last_pokemon = pokemon[incoming_slot - 1].hash(incoming, 0); // TODO
     // last_active =
   }
 
@@ -302,8 +291,7 @@ struct Side {
       const auto id = side.order[0];
       state.last_active = actives[id - 1].hash(side.active, stored, duration);
       const uint8_t sleep = duration.sleep(0);
-      state.last_pokemon =
-          pokemon[id - 1].hash(stored, sleep) ^ hps[id - 1].hash(stored);
+      state.last_pokemon = pokemon[id - 1].hash(stored, sleep);
     } else {
       state.last_active = 0;
       state.last_pokemon = 0;
@@ -316,14 +304,13 @@ struct Side {
     hash_active(side, duration);
     state.last_hash ^= state.last_active;
     state.last_hash ^= state.last_pokemon;
-    for (auto Pokemon = 2; Pokemon <= 6; ++Pokemon) {
-      const auto id = side.order[Pokemon - 1];
+    for (auto slot = 2; slot <= 6; ++slot) {
+      const auto id = side.order[slot - 1];
       if (id) {
-        const auto &pokemon = side.pokemon[id - 1];
-        const uint8_t sleep = duration.sleep(Pokemon - 1);
-        if (pokemon.hp) {
-          const uint64_t pokemon_hash =
-              pokemon[id - 1].hash(pokemon, sleep) ^ hps[id - 1].hash(pokemon);
+        const auto &p = side.pokemon[id - 1];
+        const uint8_t sleep = duration.sleep(slot - 1);
+        if (p.hp) {
+          const uint64_t pokemon_hash = pokemon[id - 1].hash(p, sleep); // TODO
           state.last_hash ^= pokemon_hash;
         }
       }
@@ -354,7 +341,7 @@ struct Battle {
     sides[0].update(battle.sides[0], durations.get(0), c1);
     sides[1].update(battle.sides[1], durations.get(1), c2);
   }
-  void reset(const State &state1, const State &state2) noexcept {
+  void reset(const Side::State &state1, const Side::State &state2) noexcept {
     sides[0].state = state1;
     sides[1].state = state2;
   }
@@ -362,5 +349,17 @@ struct Battle {
     return sides[0].state.last_hash ^ sides[1].state.last_hash;
   }
 };
+
+static_assert(Pokemon::PP::get_key(std::array<PKMN::MoveSlot, 4>{}) == 0);
+static_assert(Pokemon::PP::get_key(std::array<PKMN::MoveSlot, 4>{
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61},
+                  PKMN::MoveSlot{PKMN::Data::Move::None, 61}}) ==
+              (Pokemon::PP::n_keys - 1));
+
+static_assert(ActivePokemon::Stats::ratio_key(400, 100) == 0);
+static_assert(ActivePokemon::Stats::ratio_key(100, 100) == 6);
+static_assert(ActivePokemon::Stats::ratio_key(100, 400) == 12);
 
 }; // namespace Hash
