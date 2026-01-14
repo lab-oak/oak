@@ -222,9 +222,9 @@ struct ActivePokemon {
 struct Side {
 
   struct State {
-    uint64_t last_hash;
-    uint64_t last_active;
-    uint64_t last_pokemon;
+    uint64_t last;
+    uint64_t active;
+    std::array<uint64_t, 6> pokemon;
   };
 
   State state;
@@ -241,6 +241,40 @@ struct Side {
     }
   }
 
+  void hash_active(const PKMN::Side &side,
+                   const PKMN::Duration &duration) noexcept {
+    const auto &stored = side.stored();
+    const auto id = side.order[0];
+    if (stored.hp) {
+      state.active = actives[id - 1].hash(side.active, stored, duration);
+      const uint8_t sleep = duration.sleep(0);
+      state.pokemon[id - 1] = pokemon[id - 1].hash(stored, sleep);
+    } else {
+      state.active = 0;
+      state.pokemon[id - 1] = 0;
+    }
+  }
+
+  void init(const PKMN::Side &side, const PKMN::Duration &duration) noexcept {
+    state = {};
+    hash_active(side, duration);
+    state.last ^= state.active;
+    state.last ^= state.pokemon[side.order[0] - 1];
+
+    for (auto slot = 2; slot <= 6; ++slot) {
+      const auto id = side.order[slot - 1];
+      if (id) {
+        const auto &p = side.pokemon[id - 1];
+        const uint8_t sleep = duration.sleep(slot - 1);
+        if (p.hp) {
+          const uint64_t pokemon_hash = pokemon[id - 1].hash(p, sleep); // TODO
+          state.pokemon[slot - 1] = pokemon_hash;
+          state.last ^= pokemon_hash;
+        }
+      }
+    }
+  }
+
   void update(const PKMN::Side &updated_side,
               const PKMN::Duration &updated_duration,
               pkmn_choice choice) noexcept {
@@ -249,71 +283,53 @@ struct Side {
     switch (choice_type) {
     case 1: {
       assert(choice_data >= 0 && choice_data <= 4);
-      return move_update(updated_side, updated_duration);
+      move_update(updated_side, updated_duration);
+      return;
     }
     case 2: {
       assert(choice_data >= 2 && choice_data <= 6);
-      return switch_update(updated_side, updated_duration, choice_data);
+      switch_update(updated_side, updated_duration, choice_data);
+      return;
     }
     case 0: {
+      return;
     }
     default: {
       assert(false);
+      return;
     }
+    }
+  }
+
+  void print() const noexcept {
+    std::cout << "a: " << state.active << '\n';
+    for (auto id = 1; id <= 6; ++id) {
+      std::cout << id << ": " << state.pokemon[id - 1] << '\n';
     }
   }
 
   void move_update(const PKMN::Side &updated_side,
                    const PKMN::Duration &updated_duration) noexcept {
-    state.last_hash ^= state.last_active;
-    state.last_hash ^= state.last_pokemon;
     const auto id = updated_side.order[0];
-    state.last_active = actives[id - 1].hash(
-        updated_side.active, updated_side.stored(), updated_duration);
-    state.last_pokemon = 0;
-    state.last_hash ^= state.last_active;
-    state.last_hash ^= state.last_pokemon;
+    // undo
+    state.last ^= state.active;
+    state.last ^= state.pokemon[id - 1];
+    // update
+    hash_active(updated_side, updated_duration);
+    // apply updated
+    state.last ^= state.active;
+    state.last ^= state.pokemon[id - 1];
   }
 
   void switch_update(const PKMN::Side &updated_side,
                      const PKMN::Duration &updated_duration,
                      const auto incoming_slot) noexcept {
-    state.last_hash ^= state.last_active;
-    const auto &incoming = updated_side.pokemon[incoming_slot - 1];
-    state.last_pokemon = pokemon[incoming_slot - 1].hash(incoming, 0); // TODO
-    // last_active =
-  }
-
-  void hash_active(const PKMN::Side &side,
-                   const PKMN::Duration &duration) noexcept {
-    const auto &stored = side.stored();
-    if (stored.hp) {
-      const auto id = side.order[0];
-      state.last_active = actives[id - 1].hash(side.active, stored, duration);
-      const uint8_t sleep = duration.sleep(0);
-      state.last_pokemon = pokemon[id - 1].hash(stored, sleep);
-    } else {
-      state.last_active = 0;
-      state.last_pokemon = 0;
-    }
-  }
-
-  void init(const PKMN::Side &side, const PKMN::Duration &duration) noexcept {
-    state = {};
-    hash_active(side, duration);
-    state.last_hash ^= state.last_active;
-    state.last_hash ^= state.last_pokemon;
-    for (auto slot = 2; slot <= 6; ++slot) {
-      const auto id = side.order[slot - 1];
-      if (id) {
-        const auto &p = side.pokemon[id - 1];
-        const uint8_t sleep = duration.sleep(slot - 1);
-        if (p.hp) {
-          const uint64_t pokemon_hash = pokemon[id - 1].hash(p, sleep); // TODO
-          state.last_hash ^= pokemon_hash;
-        }
-      }
-    }
+    state.last ^= state.active;
+    const auto incoming_id = updated_side.order[0];
+    state.last ^= state.pokemon[incoming_id - 1];
+    hash_active(updated_side, updated_duration);
+    state.last ^= state.active;
+    state.last ^= state.pokemon[incoming_id - 1];
   }
 };
 
@@ -330,6 +346,11 @@ struct Battle {
       side = Side{device};
     }
   }
+  void print() const {
+    for (auto &side : sides) {
+      side.print();
+    }
+  }
   void init(const pkmn_gen1_battle &b,
             const pkmn_gen1_chance_durations &d) noexcept {
     const auto &battle = PKMN::view(b);
@@ -338,7 +359,7 @@ struct Battle {
     sides[1].init(battle.sides[1], durations.get(1));
   }
   uint64_t last() const noexcept {
-    return sides[0].state.last_hash ^ sides[1].state.last_hash;
+    return sides[0].state.last ^ sides[1].state.last;
   }
   State state() const noexcept { return {sides[0].state, sides[1].state}; }
   void set(const State &state) noexcept {

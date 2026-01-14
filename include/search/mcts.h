@@ -322,17 +322,21 @@ template <typename Options = SearchOptions<>> struct Search {
       } else {
         // std::cout << PKMN::battle_data_to_string(battle, durations())
         //           << std::endl;
-        // const auto h = heap.hasher.update_hash(battle, durations());
-        // auto hasher_copy = static_cast<const Hash::Battle &>(heap.hasher);
-        // hasher_copy.reset({}, {});
-        // hasher_copy.init(battle, durations());
-        // const auto h2 = hasher_copy.last();
+        // const auto h = heap.hasher.last();
+        // auto heap_hasher = static_cast<const Hash::Battle &>(heap.hasher);
+        // heap_hasher.init(battle, durations());
+        // const auto h2 = heap_hasher.last();
         // std::cout << depth << std::endl;
         // // assert(h == h2);
-        // assert(heap.hasher.sides[0].state.last_hash ==
-        //        hasher_copy.sides[0].state.last_hash);
-        // assert(heap.hasher.sides[1].state.last_hash ==
-        //        hasher_copy.sides[1].state.last_hash);
+        // std::cout << "old\n";
+        // heap.hasher.print();
+        // std::cout << "new\n";
+        // heap_hasher.print();
+        // assert(heap.hasher.sides[0].state.last ==
+        //        heap_hasher.sides[0].state.last);
+        // assert(heap.hasher.sides[1].state.last ==
+        //        heap_hasher.sides[1].state.last);
+        // // heap.hasher.init(battle, durations());
         return heap.entries[heap.hasher.last()];
       }
     }();
