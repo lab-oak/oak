@@ -81,7 +81,10 @@ struct Pokemon {
   Pokemon(auto &device) : hp{device}, pp{device}, status{device} {}
   uint64_t hash(const PKMN::Pokemon &pokemon,
                 const uint8_t sleep) const noexcept {
-    return pp.hash(pokemon) ^ status.hash(pokemon, sleep);
+    if (pokemon.hp == 0) {
+      return 0;
+    }
+    return hp.hash(pokemon) ^ pp.hash(pokemon) ^ status.hash(pokemon, sleep);
   }
 };
 
@@ -267,9 +270,11 @@ struct Side {
         const auto &p = side.pokemon[id - 1];
         const uint8_t sleep = duration.sleep(slot - 1);
         if (p.hp) {
-          const uint64_t pokemon_hash = pokemon[id - 1].hash(p, sleep); // TODO
-          state.pokemon[slot - 1] = pokemon_hash;
+          const uint64_t pokemon_hash = pokemon[id - 1].hash(p, sleep);
+          state.pokemon[id - 1] = pokemon_hash;
           state.last ^= pokemon_hash;
+        } else {
+          state.pokemon[id - 1] = 0;
         }
       }
     }
@@ -288,10 +293,11 @@ struct Side {
     }
     case 2: {
       assert(choice_data >= 2 && choice_data <= 6);
-      switch_update(updated_side, updated_duration, choice_data);
+      move_update(updated_side, updated_duration);
       return;
     }
     case 0: {
+      move_update(updated_side, updated_duration);
       return;
     }
     default: {
