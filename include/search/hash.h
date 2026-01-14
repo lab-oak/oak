@@ -298,7 +298,7 @@ struct Side {
     }
   }
 
-  uint64_t hash(const PKMN::Side &side,
+  void init(const PKMN::Side &side,
                 const PKMN::Duration &duration) noexcept {
     state = {};
     hash_active(side, duration);
@@ -315,7 +315,6 @@ struct Side {
         }
       }
     }
-    return state.last_hash;
   }
 };
 
@@ -327,12 +326,12 @@ struct Battle {
       side = Side{device};
     }
   }
-  uint64_t hash(const pkmn_gen1_battle &b,
+  void init(const pkmn_gen1_battle &b,
                 const pkmn_gen1_chance_durations &d) noexcept {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
-    return sides[0].hash(battle.sides[0], durations.get(0)) ^
-           sides[1].hash(battle.sides[1], durations.get(1));
+    sides[0].init(battle.sides[0], durations.get(0));
+    sides[1].init(battle.sides[1], durations.get(1));
   }
   void update(const pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d,
               const pkmn_choice c1, const pkmn_choice c2) noexcept {

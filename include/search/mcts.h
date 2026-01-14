@@ -170,12 +170,12 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        const auto root_hash = heap.hasher.hash(input.battle, input.durations);
+        heap.hasher.init(input.battle, input.durations);
         root_hash_state = {
             heap.hasher.sides[0].state,
             heap.hasher.sides[1].state,
         };
-        return heap.entries[root_hash];
+        return heap.entries[heap.hasher.last()];
       }
     }();
 
@@ -318,7 +318,8 @@ template <typename Options = SearchOptions<>> struct Search {
         // const auto h = heap.hasher.update_hash(battle, durations());
         // auto hasher_copy = static_cast<const Hash::Battle &>(heap.hasher);
         // hasher_copy.reset({}, {});
-        // const auto h2 = hasher_copy.hash(battle, durations());
+        // hasher_copy.init(battle, durations());
+        // const auto h2 = hasher_copy.last();
         // std::cout << depth << std::endl;
         // // assert(h == h2);
         // assert(heap.hasher.sides[0].state.last_hash ==
