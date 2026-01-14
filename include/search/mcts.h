@@ -133,6 +133,8 @@ template <typename Options = SearchOptions<>> struct Search {
   pkmn_gen1_calc_options calc_options;
   std::array<pkmn_choice, 9> p1_choices;
   std::array<pkmn_choice, 9> p2_choices;
+  std::pair<Hash::SideState, Hash::SideState> root_hash_state;
+
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;
   // matrix ucb
@@ -168,7 +170,12 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        return heap.entries[heap.hasher.hash(input.battle, input.durations)];
+        const auto root_hash = heap.hasher.hash(input.battle, input.durations);
+        root_hash_state = {
+            heap.hasher.sides[0].state,
+            heap.hasher.sides[1].state,
+        };
+        return heap.entries[root_hash];
       }
     }();
 
@@ -247,6 +254,9 @@ template <typename Options = SearchOptions<>> struct Search {
     chance_options.durations = copy.durations;
     apply_durations(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
+    if constexpr (!is_node<decltype(heap)>) {
+      heap.hasher.reset(root_hash_state.first, root_hash_state.second);
+    }
     // check if we are passing MatrixUCB param wrapper
     if constexpr (!is_matrix_ucb<decltype(params)>) {
       return run_iteration(device, params, heap, copy, model).first;
@@ -304,7 +314,12 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        const auto h = heap.hasher.hash(battle, durations());
+        const auto h = heap.hasher.update_hash(battle, durations());
+        auto hasher_copy = heap.hasher;
+        hasher_copy.reset({}, {});
+        const auto h2 = hasher_copy.hash(battle, durations());
+        std::cout << depth << std::endl;
+        assert(h == h2);
         return heap.entries[h];
       }
     }();
