@@ -298,8 +298,7 @@ struct Side {
     }
   }
 
-  void init(const PKMN::Side &side,
-                const PKMN::Duration &duration) noexcept {
+  void init(const PKMN::Side &side, const PKMN::Duration &duration) noexcept {
     state = {};
     hash_active(side, duration);
     state.last_hash ^= state.last_active;
@@ -318,6 +317,11 @@ struct Side {
   }
 };
 
+struct State {
+  Side::State s1;
+  Side::State s2;
+};
+
 struct Battle {
   std::array<Side, 2> sides;
   Battle() = default;
@@ -327,25 +331,27 @@ struct Battle {
     }
   }
   void init(const pkmn_gen1_battle &b,
-                const pkmn_gen1_chance_durations &d) noexcept {
+            const pkmn_gen1_chance_durations &d) noexcept {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     sides[0].init(battle.sides[0], durations.get(0));
     sides[1].init(battle.sides[1], durations.get(1));
   }
+  uint64_t last() const noexcept {
+    return sides[0].state.last_hash ^ sides[1].state.last_hash;
+  }
+  State state() const noexcept { return {sides[0].state, sides[1].state}; }
+  void set(const State &state) noexcept {
+    sides[0].state = state.s1;
+    sides[1].state = state.s2;
+  }
+
   void update(const pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d,
               const pkmn_choice c1, const pkmn_choice c2) noexcept {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     sides[0].update(battle.sides[0], durations.get(0), c1);
     sides[1].update(battle.sides[1], durations.get(1), c2);
-  }
-  void reset(const Side::State &state1, const Side::State &state2) noexcept {
-    sides[0].state = state1;
-    sides[1].state = state2;
-  }
-  uint64_t last() const noexcept {
-    return sides[0].state.last_hash ^ sides[1].state.last_hash;
   }
 };
 

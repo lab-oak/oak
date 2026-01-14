@@ -12,34 +12,26 @@
 
 #include "../extern/lrsnash/src/lib.h"
 
-namespace MCTS {
-
-// for std::map compatibility
-using Obs = std::array<uint8_t, 16>;
-
-template <typename JointBandit> struct Node {
-  using Key = std::tuple<uint8_t, uint8_t, Obs>;
-  JointBandit stats;
-  std::map<Key, Node<JointBandit>> children;
-};
-
-template <typename JointBandit> struct Table {
-  using Key = uint64_t;
-  Hash::Battle hasher;
-  std::unordered_map<Key, JointBandit> entries;
-  Key root_key;
-};
-
 namespace TypeTraits {
 template <typename T>
 inline constexpr bool is_node =
     requires(std::remove_cvref_t<T> &heap) { heap.stats; };
 
 template <typename T>
+inline constexpr bool is_table =
+    requires(std::remove_cvref_t<T> &heap) { heap.entries; };
+
+template <typename T>
 inline constexpr bool is_network = requires(std::remove_cvref_t<T> &network) {
   network.inference(std::declval<const pkmn_gen1_battle &>(),
                     std::declval<const pkmn_gen1_chance_durations &>());
 };
+
+template <typename T>
+inline constexpr bool is_poke_engine =
+    requires(std::remove_cvref_t<T> &poke_engine) {
+      poke_engine.evaluate(std::declval<const pkmn_gen1_battle &>());
+    };
 
 template <typename T>
 inline constexpr bool is_policy_network =
@@ -65,7 +57,54 @@ inline constexpr bool is_matrix_ucb =
     requires(std::remove_cvref_t<T> &params) { params.bandit_params; };
 } // namespace TypeTraits
 
+namespace MCTS {
 using namespace TypeTraits;
+
+struct Input {
+  pkmn_gen1_battle battle;
+  pkmn_gen1_chance_durations durations;
+  pkmn_result result;
+};
+
+// strategies, value estimate, etc. All info the search produces
+struct Output {
+  uint8_t m;
+  uint8_t n;
+  std::array<pkmn_choice, 9> p1_choices;
+  std::array<pkmn_choice, 9> p2_choices;
+
+  std::array<std::array<size_t, 9>, 9> visit_matrix;
+  std::array<std::array<double, 9>, 9> value_matrix;
+
+  size_t iterations;
+  std::chrono::milliseconds duration;
+
+  double total_value;
+  double empirical_value;
+  double nash_value;
+  std::array<double, 9> p1_prior;
+  std::array<double, 9> p2_prior;
+  std::array<double, 9> p1_empirical;
+  std::array<double, 9> p2_empirical;
+  std::array<double, 9> p1_nash;
+  std::array<double, 9> p2_nash;
+};
+
+// for std::map compatibility
+using Obs = std::array<uint8_t, 16>;
+
+template <typename JointBandit> struct Node {
+  using Key = std::tuple<uint8_t, uint8_t, Obs>;
+  JointBandit stats;
+  std::map<Key, Node<JointBandit>> children;
+};
+
+template <typename JointBandit> struct Table {
+  using Key = uint64_t;
+  Hash::Battle hasher;
+  std::unordered_map<Key, JointBandit> entries;
+  Key root_key;
+};
 
 size_t count(const auto &heap) {
   size_t c = 1;
@@ -75,43 +114,14 @@ size_t count(const auto &heap) {
   return c;
 }
 
-struct Input {
-  pkmn_gen1_battle battle;
-  pkmn_gen1_chance_durations durations;
-  pkmn_result result;
-};
-
 struct MonteCarlo {};
 
 // wrapper to use for enabling matrix ucb at root heap
 template <typename BanditParams> struct MatrixUCBParams {
-  static constexpr bool matrix_ucb{true};
-
   BanditParams bandit_params;
   uint32_t delay;
   uint32_t interval;
   float c;
-};
-
-// strategies, value estimate, etc. All info the search produces
-struct Output {
-  uint8_t m;
-  uint8_t n;
-  size_t iterations;
-  std::chrono::milliseconds duration;
-  double total_value;
-  double empirical_value;
-  double nash_value;
-  std::array<pkmn_choice, 9> p1_choices;
-  std::array<pkmn_choice, 9> p2_choices;
-  std::array<double, 9> p1_prior;
-  std::array<double, 9> p2_prior;
-  std::array<double, 9> p1_empirical;
-  std::array<double, 9> p2_empirical;
-  std::array<double, 9> p1_nash;
-  std::array<double, 9> p2_nash;
-  std::array<std::array<size_t, 9>, 9> visit_matrix;
-  std::array<std::array<double, 9>, 9> value_matrix;
 };
 
 template <bool _root_matrix = true, size_t _root_rolls = 3,
@@ -133,7 +143,7 @@ template <typename Options = SearchOptions<>> struct Search {
   pkmn_gen1_calc_options calc_options;
   std::array<pkmn_choice, 9> p1_choices;
   std::array<pkmn_choice, 9> p2_choices;
-  std::pair<Hash::Side::State, Hash::Side::State> root_hash_state;
+  Hash::State root_hash_state;
 
   std::array<std::array<uint32_t, 9>, 9> visit_matrix;
   std::array<std::array<float, 9>, 9> value_matrix;
@@ -161,8 +171,8 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (requires { params.bandit_params; }) {
       ucb_weight = std::log(2 * output.m * output.n);
     }
-    // poke-eval
-    if constexpr (requires { model.get_root_score(input.battle); }) {
+
+    if constexpr (is_poke_engine<decltype(model)>) {
       model.get_root_score(input.battle);
     }
 
@@ -171,10 +181,7 @@ template <typename Options = SearchOptions<>> struct Search {
         return heap.stats;
       } else {
         heap.hasher.init(input.battle, input.durations);
-        root_hash_state = {
-            heap.hasher.sides[0].state,
-            heap.hasher.sides[1].state,
-        };
+        root_hash_state = heap.hasher.state();
         return heap.entries[heap.hasher.last()];
       }
     }();
@@ -253,8 +260,8 @@ template <typename Options = SearchOptions<>> struct Search {
     chance_options.durations = copy.durations;
     apply_durations(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
-    if constexpr (!is_node<decltype(heap)>) {
-      heap.hasher.reset(root_hash_state.first, root_hash_state.second);
+    if constexpr (is_table<decltype(heap)>) {
+      heap.hasher.set(root_hash_state);
     }
     // check if we are passing MatrixUCB param wrapper
     if constexpr (!is_matrix_ucb<decltype(params)>) {
@@ -299,7 +306,7 @@ template <typename Options = SearchOptions<>> struct Search {
                                         auto &heap, auto &input, auto &model,
                                         size_t depth = 0) {
 
-    if constexpr (!is_node<decltype(heap)>) {
+    if constexpr (is_table<decltype(heap)>) {
       if (depth >= 20) {
         set_turn_limit(input.battle);
         ++errors;
@@ -353,7 +360,7 @@ template <typename Options = SearchOptions<>> struct Search {
       }
       result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
 
-      if constexpr (!is_node<decltype(heap)>) {
+      if constexpr (is_table<decltype(heap)>) {
         heap.hasher.update(battle, durations(), c1, c2);
       }
 
@@ -419,7 +426,7 @@ template <typename Options = SearchOptions<>> struct Search {
           } else {
             value = model.inference(battle, durations());
           }
-        } else if constexpr (requires { model.evaluate(battle); }) {
+        } else if constexpr (is_poke_engine<decltype(model)>) {
           // poke-engine
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
