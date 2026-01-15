@@ -29,6 +29,20 @@ constexpr float *write(const PKMN::Stats &stats, float *t) {
   return t + n_dim;
 }
 
+constexpr void write(const PKMN::Stats &stats, float *& t, uint16_t *& index, uint16_t &offset) {
+  *t++ = stats.hp / max_hp_value;
+  *index++ = offset + 0;
+  *t++ = stats.atk / max_stat_value;
+  *index++ = offset + 1;
+  *t++ = stats.def / max_stat_value;
+  *index++ = offset + 2;
+  *t++ = stats.spe / max_stat_value;
+  *index++ = offset + 3;
+  *t++ = stats.spc / max_stat_value;
+  *index++ = offset + 4;
+  offset += n_dim;
+}
+
 constexpr auto read(const float *t) {
   PKMN::Stats stats{};
   stats.hp = t[0] * max_hp_value;
@@ -55,6 +69,16 @@ constexpr float *write(const std::array<PKMN::MoveSlot, 4> &move_slots,
     }
   }
   return t + n_dim;
+}
+
+constexpr void write(const std::array<PKMN::MoveSlot, 4> &move_slots, float *& t, uint16_t *& index, uint16_t &offset) {
+  for (const auto [id, pp] : move_slots) {
+    if (id != Move::Struggle && id != Move::None && static_cast<bool>(pp)) {
+      *index++ = offset + static_cast<uint8_t>(id) - 1;
+      *t++ = 1.0;
+    }
+  }
+  offset += n_dim;
 }
 
 constexpr auto read(const float *t) {
