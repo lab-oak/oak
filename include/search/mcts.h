@@ -253,9 +253,9 @@ template <typename Options = SearchOptions<>> struct Search {
     // std::cout << "error rate: " << (float)errors / output.iterations
     //           << " depth: " << (float)total_depth / output.iterations <<
     //           std::endl;
-    std::cout << "sr: " << switch_ratio_total / output.iterations
-              << " sdr: " << double_switch_ratio_total / output.iterations
-              << std::endl;
+    // std::cout << "sr: " << switch_ratio_total / output.iterations
+    //           << " sdr: " << double_switch_ratio_total / output.iterations
+    //           << std::endl;
     process_output(output);
     return output;
   }
@@ -279,12 +279,14 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (!is_matrix_ucb<decltype(params)>) {
       return run_iteration(device, params, heap, copy, model).first;
     } else {
+      bool initial_solve = true;
       if ((output.iterations < params.delay)) {
         return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
       } else {
         const auto [p1_index, p2_index] =
-            solve_root_matrix_and_sample(device, params, copy, output);
+            solve_root_matrix_and_sample(device, params, copy, output, initial_solve);
+        initial_solve = false;
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
         battle_options_set(copy.battle, 0);
@@ -557,10 +559,10 @@ template <typename Options = SearchOptions<>> struct Search {
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
                                            auto &copy,
-                                           const auto &output) noexcept {
+                                           const auto &output, bool solve = false) noexcept {
     uint8_t p1_index{}, p2_index{};
 
-    if (output.iterations % params.interval == 0) {
+    if ((output.iterations % params.interval == 0) || solve) {
       // get ucb matrices
       std::array<int, 9 * 9> p1_ucb_matrix;
       std::array<int, 9 * 9> p2_ucb_matrix;
