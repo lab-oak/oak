@@ -268,7 +268,7 @@ template <typename Options = SearchOptions<>> struct Search {
         copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
     rng[0] = device.uniform_64();
     chance_options.durations = copy.durations;
-    apply_durations(copy.battle, copy.durations);
+    randomize_hidden_variables(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     if constexpr (is_table<decltype(heap)>) {
       heap.hasher.set(root_hash_state);
@@ -284,8 +284,8 @@ template <typename Options = SearchOptions<>> struct Search {
         return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
       } else {
-        const auto [p1_index, p2_index] =
-            solve_root_matrix_and_sample(device, params, copy, output, initial_solve);
+        const auto [p1_index, p2_index] = solve_root_matrix_and_sample(
+            device, params, copy, output, initial_solve);
         initial_solve = false;
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
@@ -558,8 +558,8 @@ template <typename Options = SearchOptions<>> struct Search {
   }
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
-                                           auto &copy,
-                                           const auto &output, bool solve = false) noexcept {
+                                           auto &copy, const auto &output,
+                                           bool solve = false) noexcept {
     uint8_t p1_index{}, p2_index{};
 
     if ((output.iterations % params.interval == 0) || solve) {

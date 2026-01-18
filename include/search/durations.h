@@ -2,9 +2,28 @@
 
 #include <libpkmn/data.h>
 
+/*
+
+For MCTS we need to acurately sample the turn possiblities for at the start of
+each iteration
+
+Just changing the RNG bytes will not work as expected, because showdown/libpkmn
+use hidden variables for sleep, confusion
+
+Accurate randomizing means randomly sampling those variables, the distributions
+of which are dependent on public observations of how long the status condition
+has been.
+
+This means a state (in the markov sense) is not represented by the the bytes of
+the battle But instead by the battle, excluding the hidden value bytes, and
+including the durations bytes
+
+*/
+
 namespace MCTS {
 
-void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
+void randomize_hidden_variables(pkmn_gen1_battle &b,
+                                const pkmn_gen1_chance_durations &d) {
 
   static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
       std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -75,6 +94,35 @@ void apply_durations(pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d) {
       }
     }
   }
+}
+
+consteval auto get_hidden_values_mask() {
+  Battle battle{};
+  battle.rng = static_cast<uint64_t>(-1);
+  for (auto &side : battle.sides) {
+    auto &v = side.active.volatiles;
+    v.set_confusion(7); // TODO max value for all 1s in those bits
+    // remaining durations
+    for (auto &pokemon : side.pokemon) {
+      // we leave the top bit = rest intact
+      pokemon.status = 0b111;
+    }
+  }
+  constexpr auto n = Layout::Sizes::battle / 8;
+  auto b = std::bitcast<std::array<uint64_t, n>>(battle);
+  for (auto &x : b) {
+    x = !x;
+  }
+  return b;
+}
+
+constexpr auto hidden_values_mask = get_hidden_values_mask();
+
+void clear_rng(pkmn_gen1_battle &battle) {
+  auto *b = reinterpret_cast<decltype(hidden_values_mask) *>(&battle);
+  std::transform(b, b + hidden_values_mask.size(), hidden_values_mask.begin(),
+                 hidden_values_mask.end(), b,
+                 [](auto &x, const auto &y) { return x & y });
 }
 
 } // namespace MCTS
