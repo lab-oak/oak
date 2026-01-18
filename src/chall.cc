@@ -23,7 +23,7 @@ void handle_suspend(int signal) {
 
 MCTS::Input parse_input(const std::string &line, uint64_t seed) {
   auto [battle, durations] = Parse::parse_battle(line, seed);
-  MCTS::apply_durations(battle, durations);
+  MCTS::randomize_hidden_variables(battle, durations);
   return {battle, durations, PKMN::result(battle)};
 }
 
