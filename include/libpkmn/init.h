@@ -33,9 +33,8 @@ struct Pokemon {
 };
 
 constexpr uint16_t compute_stat(uint8_t base, bool hp = false,
-                                uint8_t level = 100) {
-  const uint16_t evs = 255;
-  const uint32_t core = (2 * (base + 15)) + 63;
+                                uint8_t level = 100, uint16_t evs = 255) {
+  const uint32_t core = (2 * (base + 15)) + (evs / 4);
   const uint32_t factor = hp ? level + 10 : 5;
   return core * level / 100 + factor;
 }
