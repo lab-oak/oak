@@ -5,6 +5,169 @@
 
 #include <iostream>
 
+enum Opcode : uint8_t {
+  null = 0x00,
+  laststill = 0x01,
+  lastmiss = 0x02,
+  move = 0x03,
+  switch_ = 0x04,
+  cant = 0x05,
+  faint = 0x06,
+  turn = 0x07,
+  win = 0x08,
+  tie = 0x09,
+  damage = 0x0A,
+  heal = 0x0B,
+  status = 0x0C,
+  curestatus = 0x0D,
+  boost = 0x0E,
+  clearallboost = 0x0F,
+  fail = 0x10,
+  miss = 0x11,
+  hitcount = 0x12,
+  prepare = 0x13,
+  mustrecharge = 0x14,
+  activate = 0x15,
+  fieldactivate = 0x16,
+  start = 0x17,
+  end = 0x18,
+  ohko = 0x19,
+  crit = 0x1A,
+  supereffective = 0x1B,
+  resisted = 0x1C,
+  immune = 0x1D,
+  transform = 0x1E,
+  drag = 0x1F,
+  item = 0x20,
+  enditem = 0x21,
+  cureteam = 0x22,
+  sethp = 0x23,
+  setboost = 0x24,
+  copyboost = 0x25,
+  sidestart = 0x26,
+  sideend = 0x27,
+  singlemove = 0x28,
+  singleturn = 0x29,
+  weather = 0x2A,
+};
+
+struct Ident {
+  int player; // 1 or 2
+  int slot;   // 1..6
+};
+
+static Ident decode_ident(uint8_t b) {
+  Ident id;
+  id.player = (b & 0x80) ? 2 : 1;
+  id.slot = (b & 0x07) + 1;
+  return id;
+}
+
+static std::string ident_to_string(const Ident &id) {
+  // Gen 1 singles → always "a"
+  return "p" + std::to_string(id.player) + "a";
+}
+
+struct Parser {
+  const unsigned char *buf;
+  size_t pos = 0;
+
+  std::vector<std::string> log;
+  std::optional<size_t> last_move_index;
+
+  Parser(const unsigned char *b) : buf(b) {}
+
+  uint8_t peek_u8() const { return buf[pos]; }
+
+  auto read_u8() { return buf[pos++]; }
+
+  uint16_t read_u16() {
+    uint16_t lo = buf[pos++];
+    uint16_t hi = buf[pos++];
+    return lo | (hi << 8);
+  }
+
+  void push(const std::string &s) { log.push_back(s); }
+
+  void annotate_last_move(const std::string &suffix) {
+    if (last_move_index) {
+      log[*last_move_index] += suffix;
+      last_move_index.reset();
+    }
+  }
+
+  void parse() {
+    while (true) {
+      const auto opcode = static_cast<Opcode>(read_u8());
+
+      switch (opcode) {
+
+      case Opcode::null: {
+        return;
+      }
+      case Opcode::move: {
+
+        // Ident id = decode_ident(read_u8());
+        // uint8_t move = read_u8();
+
+        // push("|move|" + ident_to_string(id) + "|" + PKMN::move_string(move));
+        // last_move_index = log.size() - 1;
+        auto source = read_u8();
+        auto move = read_u8();
+        auto target = read_u8();
+        auto reason = read_u8();
+        auto from = 0;
+        if (reason == 0x02) {
+          from = read_u8();
+        }
+        break;
+      }
+      case Opcode::switch_: {
+        // Ident id = decode_ident(read_u8());
+        // uint8_t species = read_u8();
+        // uint8_t hp = read_u8();
+
+        auto ident = read_u8();
+        auto species = read_u8();
+        auto level = read_u8();
+        auto hp = read_u16();
+        auto max_hp = read_u16();
+        auto status = read_u8();
+
+        push("|switch|" + ident_to_string(decode_ident(ident)) + "|" +
+             PKMN::species_string(species) + "|" + std::to_string(hp));
+        break;
+      }
+
+      case Opcode::cant: {
+        // Ident id = decode_ident(read_u8());
+        // uint8_t reason = read_u8();
+        auto ident = read_u8();
+        auto reason = read_u8();
+        int move;
+        if (reason == 0x05) {
+          move = read_u8();
+        }
+        push("|cant|" + ident_to_string(decode_ident(ident)) + "|" +
+             std::to_string(reason));
+        break;
+      }
+
+      case Opcode::faint: {
+        Ident id = decode_ident(read_u8());
+        // push("|-damage|" + ident_to_string(id) + "|" + std::to_string(hp));
+        break;
+      }
+
+      default: {
+      }
+        // Unknown opcode → stop parsing
+        // return;
+      }
+    }
+  }
+};
+
 int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
   constexpr size_t log_size{128};
   using Teams::ou_sample_teams;
@@ -55,17 +218,27 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
         PKMN_GEN1_MAX_CHOICES);
     c2 = choices[device.random_int(n)];
 
+    std::cout << PKMN::battle_data_to_string(battle, PKMN::durations(options))
+              << std::endl;
     result = debug_log.update(battle, c1, c2, options);
+    const auto *buffer = debug_log.frames.back().data();
+    Parser p(buffer);
+    p.parse();
+    for (auto &s : p.log) {
+      std::cout << s << "\n";
+    }
+    std::cout << "___" << std::endl;
+
     ++turns;
   }
 
   for (const char c : debug_log.header) {
-    std::cout << c;
+    // std::cout << c;
   }
   for (const auto &frame : debug_log.frames) {
-    for (const char c : frame) {
-      std::cout << c;
-    }
+    // for (const char c : frame) {
+    //   std::cout << c;
+    // }
   }
 
   return 0;
