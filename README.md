@@ -2,23 +2,23 @@
 
 Oak is a software toolkit for perfect info search and neural network training for the first generation of Pokemon (RBY). It includes:
 
-* A program for generating neural network training data for both battling and team building
+* Program for generating neural network training data for both battling and team building
 
 * Python scripts for training battling and team-building networks using the data from above 
 
-* A tool for comparing the strength of the trained networks and comparing them to Monte-Carlo and Poke-Engine baselines
+* Tool for comparing the strength of the trained networks and comparing them to Monte-Carlo and Poke-Engine baselines
 
-* An analysis engine that accepts arbitrary game states in a simple text format
+* Analysis engine that accepts arbitrary game states in a simple text format
 
-* A Reinforcement Learning master script that configures and runs the data generation and learning scripts concurrently
+* Reinforcement Learning master script that configures and runs the data generation and learning scripts concurrently
 
 This is all is intended to work out of the box to allow people with no programming knowledge to compile training data and train neural networks in Python
 
 These programs were all built from a shared header library that is easy to extend and modify. This library includes:
 
-* A complete C++ interface for `libpkmn` that mirrors the original Zig code
+* Complete C++ interface for `libpkmn` that mirrors the original Zig code
 
-* A high-performance MCTS implementation with a litany of variations
+* High-performance MCTS implementation with a litany of variations
 
 * Eigen backed neural networks for value/policy inference and team generation
 
