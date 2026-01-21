@@ -217,7 +217,7 @@ struct Parser {
         auto status = read_u8();
         auto reason = read_u8();
         uint8_t from;
-        if (reason == 0x01) {
+        if (reason == 0x02) {
           from = read_u8();
         }
         push("|status|" + std::to_string(ident));
