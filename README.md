@@ -4,29 +4,31 @@ Oak is a software toolkit for perfect info search and neural network training fo
 
 * A program for generating neural network training data for both battling and team building
 
-* An analysis engine that accepts any position in a a simple text format
+* Python scripts for training battling and team-building networks using the data from above 
 
-* A tool for comparing the strength of different neural network and search parameters
+* A tool for comparing the strength of the trained networks and comparing them to Monte-Carlo and Poke-Engine baselines
 
-* A python library for quickly reading training data into numpy arrays
+* An analysis engine that accepts arbitrary game states in a simple text format
+
+* A Reinforcement Learning master script that configures and runs the data generation and learning scripts concurrently
 
 This is all is intended to work out of the box to allow people with no programming knowledge to compile training data and train neural networks in Python
 
 These programs were all built from a shared header library that is easy to extend and modify. This library includes:
 
-* a complete C++ interface for `libpkmn` that mirrors the original Zig code
+* A complete C++ interface for `libpkmn` that mirrors the original Zig code
 
-* correct, high-performance mcts implementations
+* A high-performance MCTS implementation with a litany of variations
 
-* simple neural networks for value/policy inference and team generation
+* Eigen backed neural networks for value/policy inference and team generation
 
-* compressed training data formats for battling and team generation.
+* Compressed training data formats for battling and team generation.
 
 # Building
 
-**Note**: Libpkmn currently fails to build with the latest Zig. Use the official v0.11 release
+**Note**: Libpkmn currently only builds with the Zig `master` release. See the Libpkmn README for more information
 
-**Note**: Eigen has failed to build with some versions of g++-15.
+**Note**: Eigen has failed to build with some versions of g++-15. Try using version 14.
 
 The project uses the GNU Multiple Precision library to solve for Nash equilibrium. It can be installed with
 
@@ -46,5 +48,5 @@ mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release && make && cd
 If the installation fails, it is likely that the wrong version of Zig was used. The following command sets `zig` to the a non-installed compiler for the duration of the terminal session. Be sure to change the path to the folder containing the zig compiler binary.
 
 ```
-export PATH="/home/user/Downloads/zig11/:$PATH"
+export PATH="/home/user/Downloads/zig-master/:$PATH"
 ```
