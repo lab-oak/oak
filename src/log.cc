@@ -105,6 +105,14 @@ struct Parser {
       case Opcode::null: {
         return;
       }
+      case Opcode::lastmiss: {
+        push("|lastmiss");
+        break;
+      }
+      case Opcode::laststill: {
+        push("|laststill");
+        break;
+      }
       case Opcode::move: {
 
         // Ident id = decode_ident(read_u8());
@@ -389,9 +397,9 @@ struct Parser {
         break;
       }
       default: {
+        std::cout << "ERROR: " << std::to_string(opcode) << std::endl;
+        assert(false);
       }
-        // Unknown opcode → stop parsing
-        // return;
       }
     }
   }
