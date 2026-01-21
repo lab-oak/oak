@@ -163,20 +163,24 @@ struct Parser {
 
       case Opcode::faint: {
         auto ident = read_u8();
+        push("|faint|" + std::to_string(ident));
         break;
       }
 
       case Opcode::turn: {
         auto turn = read_u16();
+        push("|turn|" + std::to_string(turn));
         break;
       }
 
       case Opcode::win: {
         auto player = read_u8();
+        push("|win|" + std::to_string(player));
         break;
       }
 
       case Opcode::tie: {
+        push("|tie|");
         break;
       }
 
@@ -190,6 +194,7 @@ struct Parser {
         if (reason == 0x05) {
           of = read_u8();
         }
+        push("|damage|" + std::to_string(ident));
         break;
       }
 
@@ -203,6 +208,7 @@ struct Parser {
         if (reason == 0x02) {
           of = read_u8();
         }
+        push("|heal|" + std::to_string(ident));
         break;
       }
 
@@ -214,6 +220,7 @@ struct Parser {
         if (reason == 0x01) {
           from = read_u8();
         }
+        push("|status|" + std::to_string(ident));
         break;
       }
 
@@ -221,6 +228,7 @@ struct Parser {
         auto ident = read_u8();
         auto status = read_u8();
         auto reason = read_u8();
+        push("|curestatus|" + std::to_string(ident));
         break;
       }
 
@@ -228,48 +236,57 @@ struct Parser {
         auto ident = read_u8();
         auto reason = read_u8();
         auto num = read_u8();
+        push("|boost|" + std::to_string(ident));
         break;
       }
 
       case Opcode::clearallboost: {
+        push("|clearallboost|");
         break;
       }
 
       case Opcode::fail: {
         auto ident = read_u8();
         auto reason = read_u8();
+        push("|fail|" + std::to_string(ident));
         break;
       }
 
       case Opcode::miss: {
         auto ident = read_u8();
+        push("|miss|" + std::to_string(ident));
         break;
       }
 
       case Opcode::hitcount: {
         auto ident = read_u8();
         auto num = read_u8();
+        push("|hitcount|" + std::to_string(ident));
         break;
       }
 
       case Opcode::prepare: {
         auto ident = read_u8();
         auto move = read_u8();
+        push("|prepare|" + std::to_string(ident));
         break;
       }
 
       case Opcode::mustrecharge: {
         auto ident = read_u8();
+        push("|mustrecharge|" + std::to_string(ident));
         break;
       }
 
       case Opcode::activate: {
         auto ident = read_u8();
         auto reason = read_u8();
+        push("|activate|" + std::to_string(ident));
         break;
       }
 
       case Opcode::fieldactivate: {
+        push("|fieldactivate|");
         break;
       }
 
@@ -286,41 +303,49 @@ struct Parser {
         } else if (reason == 0x0B) {
           move_type = read_u8();
         }
+        push("|start|" + std::to_string(ident));
         break;
       }
 
       case Opcode::end: {
         auto ident = read_u8();
         auto reason = read_u8();
+        push("|end|" + std::to_string(ident));
         break;
       }
 
       case Opcode::ohko: {
+        push("|ohko|");
         break;
       }
 
       case Opcode::crit: {
         auto ident = read_u8();
+        push("|crit|" + std::to_string(ident));
         break;
       }
 
       case Opcode::supereffective: {
         auto ident = read_u8();
+        push("|supereffective|" + std::to_string(ident));
         break;
       }
 
       case Opcode::resisted: {
         auto ident = read_u8();
+        push("|resisted|" + std::to_string(ident));
         break;
       }
       case Opcode::immune: {
         auto ident = read_u8();
         auto reason = read_u8(); // 0x00 none, 0x01 ohko
+        push("|immune|" + std::to_string(ident));
         break;
       }
       case Opcode::transform: {
         auto source = read_u8();
         auto target = read_u8();
+        push("|transform|" + std::to_string(source));
         break;
       }
       case Opcode::drag: {
@@ -331,22 +356,26 @@ struct Parser {
         auto hp = read_u16();
         auto max_hp = read_u16();
         auto status = read_u8();
+        push("|drag|" + std::to_string(ident));
         break;
       }
       case Opcode::item: {
         auto target = read_u8();
         auto item = read_u8();
         auto source = read_u8();
+        push("|item|" + std::to_string(target));
         break;
       }
       case Opcode::enditem: {
         auto target = read_u8();
         auto item = read_u8();
         auto source = read_u8();
+        push("|enditem|" + std::to_string(target));
         break;
       }
       case Opcode::cureteam: {
         auto ident = read_u8();
+        push("|cureteam|" + std::to_string(ident));
         break;
       }
       case Opcode::sethp: {
@@ -355,21 +384,25 @@ struct Parser {
         auto max_hp = read_u16();
         auto status = read_u8();
         auto reason = read_u8();
+        push("|sethp|" + std::to_string(ident));
         break;
       }
       case Opcode::setboost: {
         auto ident = read_u8();
         auto num = read_u8();
+        push("|setboost|" + std::to_string(ident));
         break;
       }
       case Opcode::copyboost: {
         auto source = read_u8();
         auto target = read_u8();
+        push("|copyboost|" + std::to_string(source));
         break;
       }
       case Opcode::sidestart: {
         auto player = read_u8();
         auto reason = read_u8();
+        push("|sidestart|" + std::to_string(player));
         break;
       }
       case Opcode::sideend: {
@@ -379,21 +412,25 @@ struct Parser {
         if (reason == 0x03) {
           of = read_u8();
         }
+        push("|sideend|" + std::to_string(player));
         break;
       }
       case Opcode::singlemove: {
         auto ident = read_u8();
         auto move = read_u8();
+        push("|singlemove|" + std::to_string(ident));
         break;
       }
       case Opcode::singleturn: {
         auto ident = read_u8();
         auto move = read_u8();
+        push("|singleturn|" + std::to_string(ident));
         break;
       }
       case Opcode::weather: {
         auto weather = read_u8();
         auto reason = read_u8();
+        push("|weather|" + std::to_string(weather));
         break;
       }
       default: {
