@@ -70,9 +70,9 @@ add_library(pyoak SHARED src/pyoak.cc)
 target_include_directories(pyoak PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(pyoak PRIVATE libpkmn_chance eigen)
 
-add_executable(debug-log src/debug-log.cc)
-target_include_directories(debug-log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(debug-log PRIVATE libpkmn_client)
+add_executable(log src/log.cc)
+target_include_directories(log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(log PRIVATE libpkmn_client)
 
 # add_executable(randbat src/randbat.cc)
 # target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
