@@ -144,7 +144,7 @@ struct Parser {
         // uint8_t reason = read_u8();
         auto ident = read_u8();
         auto reason = read_u8();
-        int move;
+        uint8_t move;
         if (reason == 0x05) {
           move = read_u8();
         }
@@ -154,11 +154,240 @@ struct Parser {
       }
 
       case Opcode::faint: {
-        Ident id = decode_ident(read_u8());
-        // push("|-damage|" + ident_to_string(id) + "|" + std::to_string(hp));
+        auto ident = read_u8();
         break;
       }
 
+      case Opcode::turn: {
+        auto turn = read_u16();
+        break;
+      }
+
+      case Opcode::win: {
+        auto player = read_u8();
+        break;
+      }
+
+      case Opcode::tie: {
+        break;
+      }
+
+      case Opcode::damage: {
+        auto ident = read_u8();
+        auto hp = read_u16();
+        auto max_hp = read_u16();
+        auto status = read_u8();
+        auto reason = read_u8();
+        uint8_t of;
+        if (reason == 0x05) {
+          of = read_u8();
+        }
+        break;
+      }
+
+      case Opcode::heal: {
+        auto ident = read_u8();
+        auto hp = read_u16();
+        auto max_hp = read_u16();
+        auto status = read_u8();
+        auto reason = read_u8();
+        uint8_t of;
+        if (reason == 0x02) {
+          of = read_u8();
+        }
+        break;
+      }
+
+      case Opcode::status: {
+        auto ident = read_u8();
+        auto status = read_u8();
+        auto reason = read_u8();
+        uint8_t from;
+        if (reason == 0x01) {
+          from = read_u8();
+        }
+        break;
+      }
+
+      case Opcode::curestatus: {
+        auto ident = read_u8();
+        auto status = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+
+      case Opcode::boost: {
+        auto ident = read_u8();
+        auto reason = read_u8();
+        auto num = read_u8();
+        break;
+      }
+
+      case Opcode::clearallboost: {
+        break;
+      }
+
+      case Opcode::fail: {
+        auto ident = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+
+      case Opcode::miss: {
+        auto ident = read_u8();
+        break;
+      }
+
+      case Opcode::hitcount: {
+        auto ident = read_u8();
+        auto num = read_u8();
+        break;
+      }
+
+      case Opcode::prepare: {
+        auto ident = read_u8();
+        auto move = read_u8();
+        break;
+      }
+
+      case Opcode::mustrecharge: {
+        auto ident = read_u8();
+        break;
+      }
+
+      case Opcode::activate: {
+        auto ident = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+
+      case Opcode::fieldactivate: {
+        break;
+      }
+
+      case Opcode::start: {
+        auto ident = read_u8();
+        auto reason = read_u8();
+        uint8_t move_type;
+        uint8_t of;
+
+        if (reason == 0x09) {
+          move_type = read_u8();
+        } else if (reason == 0x0A) {
+          move_type = read_u8();
+        } else if (reason == 0x0B) {
+          move_type = read_u8();
+        }
+        break;
+      }
+
+      case Opcode::end: {
+        auto ident = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+
+      case Opcode::ohko: {
+        break;
+      }
+
+      case Opcode::crit: {
+        auto ident = read_u8();
+        break;
+      }
+
+      case Opcode::supereffective: {
+        auto ident = read_u8();
+        break;
+      }
+
+      case Opcode::resisted: {
+        auto ident = read_u8();
+        break;
+      }
+      case Opcode::immune: {
+        auto ident = read_u8();
+        auto reason = read_u8(); // 0x00 none, 0x01 ohko
+        break;
+      }
+      case Opcode::transform: {
+        auto source = read_u8();
+        auto target = read_u8();
+        break;
+      }
+      case Opcode::drag: {
+        auto ident = read_u8();
+        auto species = read_u8();
+        auto gender = read_u8();
+        auto level = read_u8();
+        auto hp = read_u16();
+        auto max_hp = read_u16();
+        auto status = read_u8();
+        break;
+      }
+      case Opcode::item: {
+        auto target = read_u8();
+        auto item = read_u8();
+        auto source = read_u8();
+        break;
+      }
+      case Opcode::enditem: {
+        auto target = read_u8();
+        auto item = read_u8();
+        auto source = read_u8();
+        break;
+      }
+      case Opcode::cureteam: {
+        auto ident = read_u8();
+        break;
+      }
+      case Opcode::sethp: {
+        auto ident = read_u8();
+        auto hp = read_u16();
+        auto max_hp = read_u16();
+        auto status = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+      case Opcode::setboost: {
+        auto ident = read_u8();
+        auto num = read_u8();
+        break;
+      }
+      case Opcode::copyboost: {
+        auto source = read_u8();
+        auto target = read_u8();
+        break;
+      }
+      case Opcode::sidestart: {
+        auto player = read_u8();
+        auto reason = read_u8();
+        break;
+      }
+      case Opcode::sideend: {
+        auto player = read_u8();
+        auto reason = read_u8();
+        uint8_t of;
+        if (reason == 0x03) {
+          of = read_u8();
+        }
+        break;
+      }
+      case Opcode::singlemove: {
+        auto ident = read_u8();
+        auto move = read_u8();
+        break;
+      }
+      case Opcode::singleturn: {
+        auto ident = read_u8();
+        auto move = read_u8();
+        break;
+      }
+      case Opcode::weather: {
+        auto weather = read_u8();
+        auto reason = read_u8();
+        break;
+      }
       default: {
       }
         // Unknown opcode → stop parsing
