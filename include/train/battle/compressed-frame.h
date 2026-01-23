@@ -11,7 +11,7 @@ template <typename in_type, typename out_type>
 constexpr out_type compress_probs(in_type x) {
   if constexpr (std::is_integral_v<out_type>) {
     if constexpr (std::is_signed_v<out_type>) {
-      static_assert(false,
+      static_assert(!std::is_same_v<out_type, out_type>,
                     "Signed integral types not supported to store probs.");
       return {};
     } else {

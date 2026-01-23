@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <csignal>
+#include <format>
 #include <thread>
 
 #include <fcntl.h>
