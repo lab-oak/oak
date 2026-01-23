@@ -121,9 +121,11 @@ std::string move_string(const auto move) noexcept {
 }
 
 std::string types_string(const auto types) noexcept {
-  return std::string{Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) % 16]} +
+  return std::string{
+             Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) % 16].data()} +
          '/' +
-         std::string{Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) / 16]};
+         std::string{
+             Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) / 16].data()};
 }
 
 } // namespace PKMN

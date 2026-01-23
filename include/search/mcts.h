@@ -153,11 +153,6 @@ template <typename Options = SearchOptions<>> struct Search {
 
   size_t total_depth;
   size_t errors;
-  double switch_ratio_total;
-  double double_switch_ratio_total;
-
-  double srt;
-  double dsrt;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const MCTS::Input &input, Output output = {}) {
@@ -273,8 +268,6 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (is_table<decltype(heap)>) {
       heap.hasher.set(root_hash_state);
     }
-    srt = 0;
-    dsrt = 0;
     // check if we are passing MatrixUCB param wrapper
     if constexpr (!is_matrix_ucb<decltype(params)>) {
       return run_iteration(device, params, heap, copy, model).first;
@@ -382,21 +375,6 @@ template <typename Options = SearchOptions<>> struct Search {
                                p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
       const auto c2 = p2_choices[outcome.p2.index];
 
-      const auto is_switch = [](const auto choice) {
-        return (choice & 3) == 2;
-      };
-
-      if (is_switch(c1)) {
-        srt += .5;
-        if (is_switch(c2)) {
-          srt += .5;
-          dsrt += 1;
-        }
-      }
-      if (is_switch(c2)) {
-        srt += .5;
-      }
-
       if constexpr (is_node<decltype(heap)>) {
         battle_options_set(battle, depth);
       } else {
@@ -447,8 +425,6 @@ template <typename Options = SearchOptions<>> struct Search {
     }
 
     total_depth += depth;
-    switch_ratio_total += srt / (depth + 1);
-    double_switch_ratio_total += dsrt / (depth + 1);
 
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:

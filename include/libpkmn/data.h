@@ -312,21 +312,19 @@ static_assert(sizeof(Boosts) == 4);
 static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
 static_assert(sizeof(Durations) == Layout::Sizes::Durations);
 
-inline constexpr PKMN::Battle &view(pkmn_gen1_battle &battle) noexcept {
+inline PKMN::Battle &view(pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<PKMN::Battle *>(&battle);
 }
 
-inline constexpr const PKMN::Battle &
-view(const pkmn_gen1_battle &battle) noexcept {
+inline const PKMN::Battle &view(const pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<const PKMN::Battle *>(&battle);
 }
 
-inline constexpr PKMN::Durations &
-view(pkmn_gen1_chance_durations &durations) noexcept {
+inline PKMN::Durations &view(pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<PKMN::Durations *>(&durations);
 }
 
-inline constexpr const PKMN::Durations &
+inline const PKMN::Durations &
 view(const pkmn_gen1_chance_durations &durations) noexcept {
   return *reinterpret_cast<const PKMN::Durations *>(&durations);
 }
