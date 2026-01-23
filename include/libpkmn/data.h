@@ -8,6 +8,7 @@
 #include <libpkmn/layout.h>
 
 #include <array>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
