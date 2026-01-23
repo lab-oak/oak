@@ -34,6 +34,12 @@ template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
     fc0.propagate(input_data, buf.data());
     fc1.propagate(buf.data(), output_data);
   }
+
+  void propagate(const float *input, const auto *index, float *output_data,
+                 auto n) {
+    fc0.propagate(input, index, buf.data(), n);
+    fc1.propagate(buf.data(), output_data);
+  }
 };
 
 } // namespace NN

@@ -208,7 +208,6 @@ constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *t) {
 
 constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *&t,
                      uint16_t *&index, uint16_t offset = 0) {
-  uint16_t offset = 0;
   Stats::write(pokemon.stats, t, index, offset);
   MoveSlots::write(pokemon.moves, t, index, offset);
   Status::write(pokemon.status, sleep, t, index, offset);
@@ -334,22 +333,22 @@ constexpr void write(const PKMN::Volatiles &vol, float *&t, uint16_t *&index,
 
   constexpr float chansey_sub = 706 / 4 + 1;
 
-  const float vals[n_dim] = {vol.bide(),
-                             vol.thrashing(),
-                             vol.charging(),
-                             vol.binding(),
-                             vol.invulnerable(),
-                             vol.confusion(),
-                             vol.mist(),
-                             vol.focus_energy(),
-                             vol.substitute(),
-                             vol.recharging(),
-                             vol.rage(),
-                             vol.leech_seed(),
-                             vol.toxic(),
-                             vol.light_screen(),
-                             vol.reflect(),
-                             vol.transform(),
+  const float vals[n_dim] = {static_cast<float>(vol.bide()),
+                             static_cast<float>(vol.thrashing()),
+                             static_cast<float>(vol.charging()),
+                             static_cast<float>(vol.binding()),
+                             static_cast<float>(vol.invulnerable()),
+                             static_cast<float>(vol.confusion()),
+                             static_cast<float>(vol.mist()),
+                             static_cast<float>(vol.focus_energy()),
+                             static_cast<float>(vol.substitute()),
+                             static_cast<float>(vol.recharging()),
+                             static_cast<float>(vol.rage()),
+                             static_cast<float>(vol.leech_seed()),
+                             static_cast<float>(vol.toxic()),
+                             static_cast<float>(vol.light_screen()),
+                             static_cast<float>(vol.reflect()),
+                             static_cast<float>(vol.transform()),
                              vol.state() /
                                  (float)std::numeric_limits<uint16_t>::max(),
                              vol.substitute_hp() / chansey_sub,

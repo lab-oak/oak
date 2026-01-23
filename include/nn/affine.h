@@ -73,8 +73,8 @@ public:
     }
   }
 
-  void propagate(const auto *index_data, const float *input_data,
-                 float *output_data, size_t n) const {
+  void propagate(const float *input_data, const auto *index_data,
+                 float *output_data, uint32_t n) const {
     Eigen::Map<Vector> output(output_data, out_dim);
     output = biases;
 

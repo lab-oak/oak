@@ -113,20 +113,26 @@ template <typename T, int dim = 0> struct PokemonCache {
 
       const auto get_entry = [this, &pokemon_net](const auto &pokemon,
                                                   const auto sleep) {
-        std::array<float, Encode::Battle::Pokemon::n_dim> encoding{};
-        Encode::Battle::Pokemon::write(pokemon, sleep, encoding.data());
+        std::array<uint16_t, Encode::Battle::Pokemon::n_dim> encoding_indices{};
+        std::array<float, Encode::Battle::Pokemon::n_dim> encoding_input{};
+        float *input = encoding_input.data();
+        uint16_t *indices = encoding_indices.data();
+        Encode::Battle::Pokemon::write(pokemon, sleep, input, indices);
+        uint32_t n = std::distance(encoding_input.data(), input);
         auto *embedding_data =
             this->data(Encode::Battle::pokemon_key(pokemon, sleep));
 
         if constexpr (is_integral) {
-          pokemon_net.propagate(encoding.data(), embedding.data());
+          pokemon_net.propagate(encoding_input.data(), encoding_indices.data(),
+                                embedding.data(), n);
           std::transform(embedding.begin(), embedding.end(), embedding_data,
                          [](const auto f) {
                            return static_cast<T>(std::numeric_limits<T>::max() *
                                                  f);
                          });
         } else {
-          pokemon_net.propagate(encoding.data(), embedding_data);
+          pokemon_net.propagate(encoding_input.data(), encoding_indices.data(),
+                                embedding_data, n);
         }
       };
 
@@ -159,7 +165,8 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
 
   uint32_t embedding_size;
   std::map<Key, Embedding> embeddings;
-  std::array<float, Encode::Battle::Active::n_dim> encoding;
+  std::array<float, Encode::Battle::Active::n_dim> encoding_input;
+  std::array<uint16_t, Encode::Battle::Active::n_dim> encoding_indices;
   std::vector<float> embedding;
 
   ActivePokemonCache(int d = 0) : embedding_size{dim} {
@@ -232,8 +239,10 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
       assert(embedding_data != nullptr);
       return embedding_data;
     } else {
-      std::fill(encoding.begin(), encoding.end(), 0);
-      Encode::Battle::Active::write(pokemon, active, duration, encoding.data());
+      auto *input = encoding_input.data();
+      auto *indices = encoding_indices.data();
+      Encode::Battle::Active::write(pokemon, active, duration, input, indices);
+      const auto n = std::distance(encoding_input.data(), input);
 
       if constexpr (is_dynamic) {
         embeddings[key] = new T[embedding_size];
@@ -241,15 +250,20 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
       auto *embedding_data = data(key);
 
       if constexpr (is_integral) {
-        active_net.propagate(encoding.data(), embedding.data());
+        active_net.propagate(encoding_input.data(), encoding_indices.data(),
+                             embedding.data(), n);
         std::transform(embedding.begin(), embedding.end(), embedding_data,
                        [](const auto f) {
                          return static_cast<T>(std::numeric_limits<T>::max() *
                                                f);
                        });
       } else {
-        active_net.propagate(encoding.data(), embedding_data);
+        active_net.propagate(encoding_input.data(), encoding_indices.data(),
+                             embedding_data, n);
       }
+
+      std::fill(encoding_input.begin(), encoding_input.begin() + n, 0);
+      std::fill(encoding_indices.begin(), encoding_indices.begin() + n, 0);
 
       return embedding_data;
     }
