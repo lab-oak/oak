@@ -236,8 +236,8 @@ using Seed = int64_t;
 namespace PRNG2 {
 
 constexpr void next(Seed &seed) noexcept {
-  static constexpr int64_t a{0x5D588B656C078965};
-  static constexpr int64_t c{0x0000000000269EC3};
+  constexpr int64_t a{0x5D588B656C078965};
+  constexpr int64_t c{0x0000000000269EC3};
   seed = a * seed + c;
 }
 

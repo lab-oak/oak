@@ -34,7 +34,8 @@ struct Pokemon {
 
   struct PP {
     static constexpr int n_pp_buckets = 4;
-    static constexpr int n_keys = std::pow(n_pp_buckets, 4);
+    static constexpr int n_keys =
+        n_pp_buckets * n_pp_buckets * n_pp_buckets * n_pp_buckets;
     std::array<uint64_t, n_keys> hashes;
     PP() = default;
     PP(auto &device) { initialize(device, hashes); }

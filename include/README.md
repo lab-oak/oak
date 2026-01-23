@@ -39,7 +39,7 @@ Duplication of the information in `libpkmn`'s layout.json. No magic constants!
 
 Helpers for initializing `Battle` and `Durations` structs. A battle is typically initialized from the start of the game using just the team information. In this case intializing is just computing the stats from base stats, setting pp, seeting the seed, and zero'ing certain fields.
 
-This file also handles the extended of functionality of initializing an in progress battle. This means setting bits in the volatiles and durations structs. As always, the battle state is not omniscient so e.g. `duration.confusion` is set rather than `volatiles.confusionLeft`. That is done as needed with the `apply_durations` function.
+This file also handles the extended of functionality of initializing an in progress battle. This means setting bits in the volatiles and durations structs. As always, the battle state is not omniscient so e.g. `duration.confusion` is set rather than `volatiles.confusionLeft`. That is done as needed with the `randomize_hidden_variables` function.
 
 *  rng.h
 

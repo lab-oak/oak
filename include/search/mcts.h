@@ -103,7 +103,6 @@ template <typename JointBandit> struct Table {
   using Key = uint64_t;
   Hash::Battle hasher;
   std::unordered_map<Key, JointBandit> entries;
-  Key root_key;
 };
 
 size_t count(const auto &heap) {
@@ -246,6 +245,12 @@ template <typename Options = SearchOptions<>> struct Search {
     output.duration +=
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
+    // std::cout << "error rate: " << (float)errors / output.iterations
+    //           << " depth: " << (float)total_depth / output.iterations <<
+    //           std::endl;
+    // std::cout << "sr: " << switch_ratio_total / output.iterations
+    //           << " sdr: " << double_switch_ratio_total / output.iterations
+    //           << std::endl;
     process_output(output);
     return output;
   }
@@ -258,7 +263,7 @@ template <typename Options = SearchOptions<>> struct Search {
         copy.battle.bytes + PKMN::Layout::Offsets::Battle::rng);
     rng[0] = device.uniform_64();
     chance_options.durations = copy.durations;
-    apply_durations(copy.battle, copy.durations);
+    randomize_hidden_variables(copy.battle, copy.durations);
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     if constexpr (is_table<decltype(heap)>) {
       heap.hasher.set(root_hash_state);
@@ -267,12 +272,14 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (!is_matrix_ucb<decltype(params)>) {
       return run_iteration(device, params, heap, copy, model).first;
     } else {
+      bool initial_solve = true;
       if ((output.iterations < params.delay)) {
         return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
       } else {
-        const auto [p1_index, p2_index] =
-            solve_root_matrix_and_sample(device, params, copy, output);
+        const auto [p1_index, p2_index] = solve_root_matrix_and_sample(
+            device, params, copy, output, initial_solve);
+        initial_solve = false;
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
         battle_options_set(copy.battle, 0);
@@ -305,12 +312,14 @@ template <typename Options = SearchOptions<>> struct Search {
   std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
                                         auto &heap, auto &input, auto &model,
                                         size_t depth = 0) {
+    static constexpr size_t max_depth = 100;
 
+    bool error = false;
     if constexpr (is_table<decltype(heap)>) {
-      if (depth >= 20) {
+      if (depth >= max_depth) {
         set_turn_limit(input.battle);
         ++errors;
-        return {.5, .5};
+        error = true;
       }
     }
 
@@ -320,28 +329,38 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        // std::cout << PKMN::battle_data_to_string(battle, durations())
-        //           << std::endl;
         // const auto h = heap.hasher.last();
         // auto heap_hasher = static_cast<const Hash::Battle &>(heap.hasher);
         // heap_hasher.init(battle, durations());
         // const auto h2 = heap_hasher.last();
-        // std::cout << depth << std::endl;
-        // // assert(h == h2);
-        // std::cout << "old\n";
-        // heap.hasher.print();
-        // std::cout << "new\n";
-        // heap_hasher.print();
-        // assert(heap.hasher.sides[0].state.last ==
-        //        heap_hasher.sides[0].state.last);
-        // assert(heap.hasher.sides[1].state.last ==
-        //        heap_hasher.sides[1].state.last);
-        // // heap.hasher.init(battle, durations());
+        // bool a =
+        //     heap.hasher.sides[0].state.last ==
+        //     heap_hasher.sides[0].state.last;
+        // bool b =
+        //     heap.hasher.sides[1].state.last ==
+        //     heap_hasher.sides[1].state.last;
+        // if (!a || !b) {
+        //   std::cout << depth << std::endl;
+        //   std::cout << "old\n";
+        //   heap.hasher.print();
+        //   std::cout << "new\n";
+        //   heap_hasher.print();
+
+        //   std::cout << PKMN::battle_data_to_string(old_battle, durations())
+        //             << std::endl;
+        //   const auto [l1, l2] =
+        //       PKMN::choice_labels(old_battle, PKMN::result(old_battle));
+        //   std::cout << l1[old_c1] << ' ' << l2[old_c2] << std::endl;
+        //   std::cout << PKMN::battle_data_to_string(battle, durations())
+        //             << std::endl;
+        //   assert(false);
+        // }
+        // heap.hasher.init(battle, durations());
         return heap.entries[heap.hasher.last()];
       }
     }();
 
-    if (stats.is_init()) {
+    if (stats.is_init() && !error) {
       using Bandit = std::remove_reference_t<decltype(stats)>;
       using JointOutcome = typename Bandit::JointOutcome;
 
@@ -390,7 +409,8 @@ template <typename Options = SearchOptions<>> struct Search {
         if (!turn_limit(battle)) {
           stats.update(outcome);
         } else {
-          return {0.5, 0.5};
+          stats.update(outcome);
+          // return {0.5, 0.5};
         }
       }
 
@@ -411,14 +431,15 @@ template <typename Options = SearchOptions<>> struct Search {
       [[likely]] {
         float value;
         if constexpr (is_network<decltype(model)>) {
-          // model is a net
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
               p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          stats.init(m, n);
+          if (!stats.is_init()) {
+            stats.init(m, n);
+          }
           if constexpr (is_contextual_bandit<decltype(stats)>) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
@@ -431,18 +452,19 @@ template <typename Options = SearchOptions<>> struct Search {
             value = model.inference(battle, durations());
           }
         } else if constexpr (is_poke_engine<decltype(model)>) {
-          // poke-engine
           const auto m = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
               p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
           const auto n = pkmn_gen1_battle_choices(
               &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
               p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          stats.init(m, n);
+          if (!stats.is_init()) {
+            stats.init(m, n);
+          }
           value = model.evaluate(battle);
         } else {
           // model is monte-carlo
-          value = init_stats_and_rollout(stats, device, battle, result).first;
+          value = init_stats_and_rollout(stats, device, battle, result);
         }
         return {value, 1 - value};
       }
@@ -462,9 +484,8 @@ template <typename Options = SearchOptions<>> struct Search {
     };
   }
 
-  std::pair<float, float> init_stats_and_rollout(auto &stats, auto &device,
-                                                 pkmn_gen1_battle &battle,
-                                                 pkmn_result result) {
+  float init_stats_and_rollout(auto &stats, auto &device,
+                               pkmn_gen1_battle &battle, pkmn_result result) {
 
     auto seed = device.uniform_64();
     auto m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
@@ -478,7 +499,9 @@ template <typename Options = SearchOptions<>> struct Search {
     auto c2 = p2_choices[seed % n];
     pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
     result = pkmn_gen1_battle_update(&battle, c1, c2, &options);
-    stats.init(m, n);
+    if (!stats.is_init()) {
+      stats.init(m, n);
+    }
     while (!pkmn_result_type(result)) {
       seed = device.uniform_64();
       m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
@@ -495,27 +518,27 @@ template <typename Options = SearchOptions<>> struct Search {
     }
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_WIN: {
-      return {1, 0};
+      return 1;
     }
     case PKMN_RESULT_LOSE: {
-      return {0, 1};
+      return 0;
     }
     case PKMN_RESULT_TIE: {
-      return {.5, .5};
+      return 0.5;
     }
     default: {
       assert(false);
-      return {.5, .5};
+      return 0.5;
     }
     };
   }
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
-                                           auto &copy,
-                                           const auto &output) noexcept {
+                                           auto &copy, const auto &output,
+                                           bool solve = false) noexcept {
     uint8_t p1_index{}, p2_index{};
 
-    if (output.iterations % params.interval == 0) {
+    if ((output.iterations % params.interval == 0) || solve) {
       // get ucb matrices
       std::array<int, 9 * 9> p1_ucb_matrix;
       std::array<int, 9 * 9> p2_ucb_matrix;

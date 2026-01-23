@@ -50,6 +50,15 @@ struct ProgramArgs : public VsAgentArgs {
       kwarg("max-build-traj",
             "Size of build buffer (No. of traj's) before write")
           .set_default(1 << 10);
+
+  std::optional<std::string> &p1_search_time_after =
+      kwarg("p1-search-time-after", "");
+  std::optional<std::string> &p2_search_time_after =
+      kwarg("p2-search-time-after", "");
+  std::optional<std::string> &p1_matrix_ucb_name_after =
+      kwarg("p1-matrix-ucb-name-after", "");
+  std::optional<std::string> &p2_matrix_ucb_name_after =
+      kwarg("p2-matrix-ucb-name-after", "");
 };
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
@@ -150,6 +159,13 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .discrete_network = args.p1_use_discrete,
                              .matrix_ucb_name = args.p1_matrix_ucb_name,
                              .use_table = args.p1_use_table};
+    auto p1_agent_after = RuntimeSearch::Agent{
+        .search_time = args.p1_search_time_after.value(),
+        .bandit_name = args.p1_bandit_name,
+        .network_path = args.p1_network_path,
+        .discrete_network = args.p1_use_discrete,
+        .matrix_ucb_name = args.p1_matrix_ucb_name_after.value(),
+        .use_table = args.p1_use_table};
     auto p2_agent =
         RuntimeSearch::Agent{.search_time = args.p2_search_time,
                              .bandit_name = args.p2_bandit_name,
@@ -157,6 +173,13 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .discrete_network = args.p2_use_discrete,
                              .matrix_ucb_name = args.p2_matrix_ucb_name,
                              .use_table = args.p2_use_table};
+    auto p2_agent_after = RuntimeSearch::Agent{
+        .search_time = args.p2_search_time_after.value(),
+        .bandit_name = args.p2_bandit_name,
+        .network_path = args.p2_network_path,
+        .discrete_network = args.p2_use_discrete,
+        .matrix_ucb_name = args.p2_matrix_ucb_name_after.value(),
+        .use_table = args.p2_use_table};
     const auto p1_policy_options =
         RuntimePolicy::Options{.mode = args.p1_policy_mode,
                                .temp = args.p1_policy_temp,
@@ -176,9 +199,11 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
     if (p1_agent.uses_network()) {
       p1_agent.initialize_network(battle);
+      p1_agent_after.network.emplace(p1_agent.network.value());
     }
     if (p2_agent.uses_network()) {
       p2_agent.initialize_network(battle);
+      p2_agent_after.network.emplace(p2_agent.network.value());
     }
 
     auto p1_battle_frames = Train::Battle::CompressedFrames{battle};
@@ -213,6 +238,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
         if (p1_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p1_output = RuntimeSearch::run(device, input, nodes, p1_agent);
+          p1_output = RuntimeSearch::run(device, input, nodes, p1_agent_after,
+                                         p1_output);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
@@ -221,6 +248,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
+          p2_output = RuntimeSearch::run(device, input, nodes, p2_agent_after,
+                                         p2_output);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
@@ -408,11 +437,21 @@ void setup(auto &args) {
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
   }
+  if (!args.p1_search_time_after.has_value()) {
+    args.p1_search_time_after.emplace("0ms");
+  }
+  if (!args.p2_search_time_after.has_value()) {
+    args.p2_search_time_after.emplace("0ms");
+  }
+  if (!args.p1_matrix_ucb_name_after.has_value()) {
+    args.p1_matrix_ucb_name_after.emplace("");
+  }
+  if (!args.p2_matrix_ucb_name_after.has_value()) {
+    args.p2_matrix_ucb_name_after.emplace("");
+  }
   // args
   if (args.save && !args.working_dir.has_value()) {
-    args.working_dir.emplace(
-        std::format("vs-{:%F-%T}", std::chrono::floor<std::chrono::seconds>(
-                                       std::chrono::system_clock::now())));
+    args.working_dir.emplace("vs-" + get_current_datetime());
   }
   // create working dir
   if (args.working_dir.has_value()) {

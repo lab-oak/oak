@@ -17,12 +17,12 @@
 #include <thread>
 #include <vector>
 
-constexpr auto dim_labels_to_c(const auto &data) {
-  constexpr auto size = data.size();
-  std::array<const char *, size> ptrs{};
-  auto i = 0;
-  for (auto &x : data) {
-    ptrs[i++] = x.data();
+template <std::size_t N, std::size_t M>
+constexpr std::array<const char *, N>
+dim_labels_to_c(const std::array<std::array<char, M>, N> &data) {
+  std::array<const char *, N> ptrs{};
+  for (std::size_t i = 0; i < N; ++i) {
+    ptrs[i] = data[i].data();
   }
   return ptrs;
 }
