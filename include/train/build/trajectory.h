@@ -2,7 +2,7 @@
 
 #include <libpkmn/pkmn.h>
 
-#include <utility>
+#include <optional>
 #include <vector>
 
 /*
