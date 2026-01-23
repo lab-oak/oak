@@ -9,7 +9,6 @@
 
 #include <atomic>
 #include <csignal>
-#include <format>
 #include <thread>
 
 #include <fcntl.h>
@@ -104,9 +103,7 @@ struct MatchupMatrix {
 namespace RuntimeData {
 bool terminated = false;
 bool suspended = false;
-std::string start_datetime = std::format(
-    "{:%F-%T}",
-    std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()));
+std::string start_datetime = get_current_datetime();
 // filenames
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};

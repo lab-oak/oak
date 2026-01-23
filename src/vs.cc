@@ -11,7 +11,6 @@
 #include <csignal>
 #include <exception>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -452,9 +451,7 @@ void setup(auto &args) {
   }
   // args
   if (args.save && !args.working_dir.has_value()) {
-    args.working_dir.emplace(
-        std::format("vs-{:%F-%T}", std::chrono::floor<std::chrono::seconds>(
-                                       std::chrono::system_clock::now())));
+    args.working_dir.emplace("vs-" + get_current_datetime());
   }
   // create working dir
   if (args.working_dir.has_value()) {

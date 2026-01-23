@@ -1,7 +1,25 @@
 #pragma once
 
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
+
+std::string get_current_datetime() {
+  // Get current time rounded to seconds
+  auto now = std::chrono::system_clock::now();
+  auto now_sec = std::chrono::floor<std::chrono::seconds>(now);
+  std::time_t t = std::chrono::system_clock::to_time_t(now_sec);
+
+  // Convert to local time
+  std::tm *tm = std::localtime(&t);
+
+  // Format as YYYY-MM-DD-HH:MM:SS
+  std::ostringstream oss;
+  oss << std::put_time(tm, "%F-%T");
+  return oss.str();
+}
 
 namespace Parse {
 
