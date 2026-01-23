@@ -150,7 +150,7 @@ constexpr auto battle(const auto &p1, const auto &p2,
 constexpr pkmn_gen1_chance_durations durations() { return {}; }
 
 #ifdef LOG
-constexpr pkmn_gen1_battle_options options(pkmn_gen1_log_options &log_options) {
+pkmn_gen1_battle_options options(pkmn_gen1_log_options &log_options) {
   if (!log_options.buf) {
     throw std::runtime_error{
         "Trying to initialize options when the log has null buffer."};

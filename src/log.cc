@@ -4,6 +4,7 @@
 #include <util/debug-log.h>
 
 #include <iostream>
+#include <optional>
 
 enum Opcode : uint8_t {
   null = 0x00,
