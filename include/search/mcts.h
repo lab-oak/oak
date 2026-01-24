@@ -155,7 +155,7 @@ template <typename Options = SearchOptions<>> struct Search {
   size_t errors;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
-             auto &model, const MCTS::Input &input, Output output = {}) {
+             auto &model, const Input &input, Output output = {}) {
 
     // reset data memberslimit
     *this = {};
@@ -720,7 +720,7 @@ template <typename Options = SearchOptions<>> struct Search {
   }
 };
 
-void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
+void print_output(const Output &output, const pkmn_gen1_battle &battle,
                   const auto &p1_labels, const auto &p2_labels) {
   constexpr auto label_width = 8;
 
