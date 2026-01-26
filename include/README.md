@@ -163,6 +163,28 @@ float run_iteration(auto& node, auto &state) {
 
 During this forward the phase the state will be mutated with no way to return to the state it was originally at the root node. For this reason we must copy the state at the start of each iteration and perform the iteration on the copy instead.
 
+
+### MatrixUCB
+
+```cpp
+template <typename BanditParams> struct MatrixUCBParams {
+  BanditParams bandit_params;
+  uint32_t delay;
+  uint32_t interval;
+  float c;
+};
+```
+
+MatrixUCB is an alternative to the joint bandit approach that utilizes the matrix structure to achieve theoretically superior results. It reduces to normal UCB in the case that one player has only 1 action.
+
+> Matrix games with bandit feedback. O'Donoghue, B., Lattimore, T. and Osband, I. (2020) Conference on Uncertainty in Artificial Intelligence.
+
+Despite the theoretical advantages, it is not feasible to use MatrixUCB at each node in the tree because of the high cost of computing Nash equilibrium.
+
+Instead, we implement a compromise where (when enabled), MatrixUCB is only performed at the root (handled by `run_root_iteration`) and subsequent nodes are searched with the normal `run_iteration`.
+
+The `MatrixUCBParams` wraps normal joint bandit params and stores additional params for the root. Even with MatrixUCB enabled, the root will use normal joint bandit search until `output.iterations >= delay`, and while it is active Nash equilbrium will only be solved when `output.iterations % interval == 0` and the cached solution used otherwise.
+
 ### State
 
 ```cpp
@@ -186,13 +208,15 @@ struct Output {
   std::array<pkmn_choice, 9> p1_choices;
   std::array<pkmn_choice, 9> p2_choices;
 
+  std::array<double, 9> p1_prior;
+  std::array<double, 9> p2_prior;
+
   std::array<std::array<size_t, 9>, 9> visit_matrix;
   std::array<std::array<double, 9>, 9> value_matrix;
   double total_value;
+
   double empirical_value;
   double nash_value;
-  std::array<double, 9> p1_prior;
-  std::array<double, 9> p2_prior;
   std::array<double, 9> p1_empirical;
   std::array<double, 9> p2_empirical;
   std::array<double, 9> p1_nash;
@@ -203,17 +227,34 @@ struct Output {
 };
 ```
 
-All variations of the MCTS produce the exact same kind of output. It is meant to summarize the value of the state and the best move for either player. It also stores some information that is used during the search, so it is both a parameter and return type.
+All variations of the MCTS produce the exact same kind of output. `Output` gives the empirical value of the state and the empirical policies (which converge to Nash with adversarial bandits like Exp3) and the best move for either player. It also stores some information that is used during the search, so it is both a parameter and return type.
 
 * `m`, `n`, `p1_choices`, `p2_choices`
 
+`m` and `n` are the number of actions of player 1 and 2, resp. Not that all of the data in `Output` is padded to the max number of actions (9).
 
+* `p1_prior`, `p2_priot`
+
+If the search parameters require (i.e. network with "P" bandits) a policy inference at the root, that is stored here. Otherwise the data is zero. MCTS does not require value estimation at the root so that is omitted.
 
 * `visit_matrix`, `value_matrix`
+
+The `value_matrix` stores *cumulative* values, so that empirical scores are calculated like
+
+`visit_matrix[i][j] > 0 ? value_matrix[i][j] / visit_matrix[i][j] : 0.5`
+
 
 
 * `iterations`, `duration`
 
+The upcoming `run()` function signature allows searches to be stopped and resumed easily.
+
+```cpp
+const auto output_1 = search.run(...);
+const auto output_2 = search.run(..., output_1);
+```
+
+Here `output_2` will include the iterations and cumulative data of `output_1`.
 
 ### run()
 
@@ -221,8 +262,10 @@ The main mcts function template has the signature
 
 ```cpp
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
-             auto &model, const MCTS::Input &input, Output output = {})
+             auto &model, const Input &input, Output output = {})
 ```
+
+
 
 #### Budget
 
@@ -236,7 +279,7 @@ The search will run until this many iterations have been performed
 
 The search will run for at least this length of time
 
-* pointer to `bool` like
+* pointer to `bool`-like
 
 This acts like an run/halt flag. The search will run until the value of the flag is observed once as `false`. 
 
@@ -244,13 +287,19 @@ This acts like an run/halt flag. The search will run until the value of the flag
 
 There are 3 kinds of value (and policy) estimators
 
-* MonteCarlo
+* `MonteCarlo`
 
-The struct holds no data and simply specifies that monte carlo rollouts should be used at leaf nodes
+The struct holds no data and simply specifies that monte carlo rollouts should be used at leaf nodes. It is an unbiased value estimator but generally it produces very weak search. It can be competent in positions where the optimal strategy is to attack and the game will end soon. However it is hopeless in a full OU 6v6,
 
-* NN::Battle::Network
+* `PokeEngine`
 
-The Oak battle network. It always provides a value but may also return policy inference in the form of logits. Whether it does so is determined by the bandit algorithm used
+This is a more or less exact copy of PokeEngine's, the perfect info MCTS component of `FoulPlay`, gen 1 eval. Loosely speaking the eval more or less sums the HP. In the kwargs, this eval is referred to as "fp".
+
+PokeEngine does not try to estimate the winrate. Instead it computes score, a raw sum of pokemon alive, status modiefiers, etc, then it subtracts the score at the root node to compute an advantage. Then it uses the sigmoid of the advantage as its final value.
+
+* `NN::Battle::Network`
+
+The Oak battle network. It always provides a value but may also return policy inference in the form of logits. Whether it does so is determined by the bandit algorithm used.
 
 #### Params
 
