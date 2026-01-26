@@ -29,6 +29,7 @@ struct ProgramArgs : public VsAgentArgs {
   bool &save = flag("save", "Sets --dir to a timestamp");
   std::string &teams_path =
       kwarg("teams", "Path to teams file").set_default("");
+  bool &mirror_match = flag("mirror-match", "Use the same teams for p1, p2");
   std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
   double &early_stop =
       kwarg("early-stop", "Forfeit when inverse sigmoid of score exceeds "
@@ -342,8 +343,12 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
     auto [p1_build_traj, p1_team_index] =
         RuntimeData::provider.get_trajectory(device);
-    auto [p2_build_traj, p2_team_index] =
-        RuntimeData::provider.get_trajectory(device);
+    auto p2_build_traj = p1_build_traj;
+    auto p2_team_index = p1_team_index;
+    if (!args.mirror_match) {
+      std::tie(p2_build_traj, p2_team_index) =
+          RuntimeData::provider.get_trajectory(device);
+    }
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
     const auto s2 = play(p2_build_traj, p1_build_traj);
