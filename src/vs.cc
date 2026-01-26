@@ -351,11 +351,15 @@ void thread_fn(const ProgramArgs *args_ptr) {
     }
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
-    const auto s2 = play(p2_build_traj, p1_build_traj);
-
+    auto s2 = 0;
+    auto n = 0;
+    if (!args.mirror_match) {
+      s2 = play(p2_build_traj, p1_build_traj);
+      n = 1;
+    }
     if (!RuntimeData::terminated) {
       RuntimeData::score.fetch_add(s1 + s2);
-      RuntimeData::n.fetch_add(2);
+      RuntimeData::n.fetch_add(1 + n);
     }
     if (args.working_dir.has_value()) {
       std::filesystem::path working_dir{args.working_dir.value()};
