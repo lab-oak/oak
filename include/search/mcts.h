@@ -513,6 +513,9 @@ template <typename Options = SearchOptions<>> struct Search {
         for (auto j = 0; j < output.n; ++j) {
           float p1_entry = 0;
           float p2_entry = 1;
+          if (output.visit_matrix[i][j] < params.minimum) {
+            return std::pair<uint8_t, uint8_t>{i, j};
+          }
           if (output.visit_matrix[i][j] > 0) {
             p1_entry = output.value_matrix[i][j] / output.visit_matrix[i][j];
             p2_entry = p1_entry;
