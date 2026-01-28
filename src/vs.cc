@@ -241,7 +241,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
           if (print_search_outputs) {
             return PKMN::choice_labels(input.battle, input.result);
           }
-          return std::pair<std::vector<std::string>, std::vector<std::string>>{};
+          return std::pair<std::vector<std::string>,
+                           std::vector<std::string>>{};
         }();
 
         MCTS::Output p1_output{}, p2_output{};
