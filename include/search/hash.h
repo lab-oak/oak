@@ -34,7 +34,8 @@ struct Pokemon {
 
   struct PP {
     static constexpr int n_pp_buckets = 4;
-    static constexpr int n_keys = std::pow(n_pp_buckets, 4);
+    static constexpr int n_keys =
+        n_pp_buckets * n_pp_buckets * n_pp_buckets * n_pp_buckets;
     std::array<uint64_t, n_keys> hashes;
     PP() = default;
     PP(auto &device) { initialize(device, hashes); }
@@ -280,6 +281,7 @@ struct Side {
     }
   }
 
+  // TODO remove this?
   void update(const PKMN::Side &updated_side,
               const PKMN::Duration &updated_duration,
               pkmn_choice choice) noexcept {
@@ -288,16 +290,17 @@ struct Side {
     switch (choice_type) {
     case 1: {
       assert(choice_data >= 0 && choice_data <= 4);
-      move_update(updated_side, updated_duration);
+      _update(updated_side, updated_duration);
       return;
     }
     case 2: {
       assert(choice_data >= 2 && choice_data <= 6);
-      move_update(updated_side, updated_duration);
+      _update(updated_side, updated_duration);
       return;
     }
     case 0: {
-      move_update(updated_side, updated_duration);
+      // TODO is this necessary? I forgot.
+      _update(updated_side, updated_duration);
       return;
     }
     default: {
@@ -314,8 +317,8 @@ struct Side {
     }
   }
 
-  void move_update(const PKMN::Side &updated_side,
-                   const PKMN::Duration &updated_duration) noexcept {
+  void _update(const PKMN::Side &updated_side,
+               const PKMN::Duration &updated_duration) noexcept {
     const auto id = updated_side.order[0];
     // undo
     state.last ^= state.active;
@@ -325,17 +328,6 @@ struct Side {
     // apply updated
     state.last ^= state.active;
     state.last ^= state.pokemon[id - 1];
-  }
-
-  void switch_update(const PKMN::Side &updated_side,
-                     const PKMN::Duration &updated_duration,
-                     const auto incoming_slot) noexcept {
-    state.last ^= state.active;
-    const auto incoming_id = updated_side.order[0];
-    state.last ^= state.pokemon[incoming_id - 1];
-    hash_active(updated_side, updated_duration);
-    state.last ^= state.active;
-    state.last ^= state.pokemon[incoming_id - 1];
   }
 };
 

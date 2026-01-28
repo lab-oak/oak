@@ -97,7 +97,7 @@ void randomize_hidden_variables(pkmn_gen1_battle &b,
 }
 
 consteval auto get_hidden_values_mask() {
-  Battle battle{};
+  PKMN::Battle battle{};
   battle.rng = static_cast<uint64_t>(-1);
   for (auto &side : battle.sides) {
     auto &v = side.active.volatiles;
@@ -105,11 +105,11 @@ consteval auto get_hidden_values_mask() {
     // remaining durations
     for (auto &pokemon : side.pokemon) {
       // we leave the top bit = rest intact
-      pokemon.status = 0b111;
+      pokemon.status = static_cast<PKMN::Data::Status>(0b111);
     }
   }
-  constexpr auto n = Layout::Sizes::battle / 8;
-  auto b = std::bitcast<std::array<uint64_t, n>>(battle);
+  constexpr auto n = PKMN::Layout::Sizes::Battle / 8;
+  auto b = std::bit_cast<std::array<uint64_t, n>>(battle);
   for (auto &x : b) {
     x = !x;
   }
@@ -119,10 +119,11 @@ consteval auto get_hidden_values_mask() {
 constexpr auto hidden_values_mask = get_hidden_values_mask();
 
 void clear_rng(pkmn_gen1_battle &battle) {
-  auto *b = reinterpret_cast<decltype(hidden_values_mask) *>(&battle);
-  std::transform(b, b + hidden_values_mask.size(), hidden_values_mask.begin(),
-                 hidden_values_mask.end(), b,
-                 [](auto &x, const auto &y) { return x & y });
+  auto &b =
+      *reinterpret_cast<std::remove_cvref_t<decltype(hidden_values_mask)> *>(
+          &battle);
+  std::transform(b.begin(), b.end(), hidden_values_mask.begin(), b.begin(),
+                 [](auto &x, const auto &y) { return x & y; });
 }
 
 } // namespace MCTS

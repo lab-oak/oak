@@ -136,7 +136,7 @@ namespace Types {
 constexpr auto n_dim = 15;
 constexpr float *write(const uint8_t types, float *t) {
   const uint8_t type_1 = types % 16;
-  const uint8_t type_2 = types % 16;
+  const uint8_t type_2 = types / 16;
   assert(type_1 < n_dim && type_2 < n_dim);
   t[type_1] = 1;
   t[type_2] = 1;
