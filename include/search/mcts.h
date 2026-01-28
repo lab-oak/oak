@@ -120,6 +120,7 @@ template <typename BanditParams> struct MatrixUCBParams {
   BanditParams bandit_params;
   uint32_t delay;
   uint32_t interval;
+  uint32_t minimum;
   float c;
 };
 
@@ -157,7 +158,7 @@ template <typename Options = SearchOptions<>> struct Search {
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const Input &input, Output output = {}) {
 
-    // reset data memberslimit
+    // reset data members
     *this = {};
 
     // get choices data here for matrix ucb
@@ -277,9 +278,12 @@ template <typename Options = SearchOptions<>> struct Search {
         return run_iteration(device, params.bandit_params, heap, copy, model)
             .first;
       } else {
+        // const auto start = std::chrono::high_resolution_clock::now();
         const auto [p1_index, p2_index] = solve_root_matrix_and_sample(
             device, params, copy, output, initial_solve);
-        initial_solve = false;
+        // const auto end = std::chrono::high_resolution_clock::now();
+        // std::cout << "solve: " << 
+        //   std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "\n";
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
         battle_options_set(copy.battle, 0);
@@ -535,11 +539,13 @@ template <typename Options = SearchOptions<>> struct Search {
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
                                            auto &copy, const auto &output,
-                                           bool solve = false) noexcept {
+                                           bool& initial_solve) noexcept {
     uint8_t p1_index{}, p2_index{};
 
-    if ((output.iterations % params.interval == 0) || solve) {
+    if ((output.iterations % params.interval == 0) || initial_solve) {
       // get ucb matrices
+      // const auto start = std::chrono::high_resolution_clock::now();
+
       std::array<int, 9 * 9> p1_ucb_matrix;
       std::array<int, 9 * 9> p2_ucb_matrix;
       constexpr int discretize_factor = 256;
@@ -572,10 +578,17 @@ template <typename Options = SearchOptions<>> struct Search {
       LRSNash::solve_fast(&p1_solve_input, &p1_solve_output);
       LRSNash::FastInput p2_solve_input{
           static_cast<int>(output.m), static_cast<int>(output.n),
-          p2_ucb_matrix.data(), discretize_factor};
+          p2_ucb_matrix.data  (), discretize_factor};
       LRSNash::FloatOneSumOutput p2_solve_output{dummy.data(), p2_nash.data(),
                                                  0};
       LRSNash::solve_fast(&p2_solve_input, &p2_solve_output);
+
+      initial_solve = false;
+
+      // const auto end = std::chrono::high_resolution_clock::now();
+      // std::cout << "solve: " << 
+      //   std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "\n";
+
     }
 
     float p = device.uniform();
