@@ -52,6 +52,10 @@ struct ProgramArgs : public VsAgentArgs {
             "Size of build buffer (No. of traj's) before write")
           .set_default(1 << 10);
 
+  std::optional<std::string> &p1_bandit_name_after =
+      kwarg("p1-bandit-name-after", "");
+  std::optional<std::string> &p2_bandit_name_after =
+      kwarg("p2-bandit-name-after", "");
   std::optional<std::string> &p1_search_time_after =
       kwarg("p1-search-time-after", "");
   std::optional<std::string> &p2_search_time_after =
@@ -161,8 +165,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .matrix_ucb_name = args.p1_matrix_ucb_name,
                              .use_table = args.p1_use_table};
     auto p1_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p1_search_time_after.value(),
-        .bandit_name = args.p1_bandit_name,
+        .search_time = args.p1_search_time_after.value_or("0"),
+        .bandit_name = args.p1_bandit_name_after.value_or(args.p1_bandit_name),
         .network_path = args.p1_network_path,
         .discrete_network = args.p1_use_discrete,
         .matrix_ucb_name = args.p1_matrix_ucb_name_after.value(),
@@ -175,8 +179,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .matrix_ucb_name = args.p2_matrix_ucb_name,
                              .use_table = args.p2_use_table};
     auto p2_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p2_search_time_after.value(),
-        .bandit_name = args.p2_bandit_name,
+        .search_time = args.p2_search_time_after.value_or("0"),
+        .bandit_name = args.p2_bandit_name_after.value_or(args.p2_bandit_name),
         .network_path = args.p2_network_path,
         .discrete_network = args.p2_use_discrete,
         .matrix_ucb_name = args.p2_matrix_ucb_name_after.value(),
@@ -232,6 +236,14 @@ void thread_fn(const ProgramArgs *args_ptr) {
         const auto [p1_choices, p2_choices] =
             PKMN::choices(input.battle, input.result);
 
+        const auto print_search_outputs = (device.uniform() < args.print_prob);
+        const auto [p1_labels, p2_labels] = [&input, print_search_outputs]() {
+          if (print_search_outputs) {
+            return PKMN::choice_labels(input.battle, input.result);
+          }
+          return std::pair<std::vector<std::string>, std::vector<std::string>>{};
+        }();
+
         MCTS::Output p1_output{}, p2_output{};
         int p1_index{}, p2_index{};
         p1_early_stop = 0;
@@ -245,7 +257,12 @@ void thread_fn(const ProgramArgs *args_ptr) {
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
                                         p1_output.p1_nash, p1_policy_options);
+          if (print_search_outputs) {
+            print("P1:");
+            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
+          }
         }
+
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
@@ -255,6 +272,10 @@ void thread_fn(const ProgramArgs *args_ptr) {
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash, p2_policy_options);
+          if (print_search_outputs) {
+            print("P2:");
+            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
+          }
         }
 
         RuntimeData::battle_outputs[id] = {p1_output, p2_output};
@@ -279,20 +300,10 @@ void thread_fn(const ProgramArgs *args_ptr) {
         p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
         p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
 
-        if (device.uniform() < args.print_prob) {
+        if (print_search_outputs) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
           print(PKMN::battle_data_to_string(input.battle, input.durations));
-          const auto [p1_labels, p2_labels] =
-              PKMN::choice_labels(input.battle, input.result);
-          if (p1_choices.size() > 1) {
-            print("P1:");
-            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
-          }
-          if (p2_choices.size() > 1) {
-            print("P2:");
-            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
-          }
         }
         input.result =
             PKMN::update(input.battle, p1_choice, p2_choice, options);
