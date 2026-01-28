@@ -178,7 +178,7 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
     if (!matrix_ucb_name.empty()) {
       const auto matrix_ucb_name_split =
           Parse::split(agent.matrix_ucb_name, '-');
-      if (matrix_ucb_name_split.size() != 3) {
+      if (matrix_ucb_name_split.size() != 4) {
         throw std::runtime_error{"Could not parse MatrixUCB name: " +
                                  agent.matrix_ucb_name};
       }
@@ -186,7 +186,8 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
           matrix_ucb_params{bandit_params};
       matrix_ucb_params.delay = std::stoull(matrix_ucb_name_split[0]);
       matrix_ucb_params.interval = std::stoull(matrix_ucb_name_split[1]);
-      matrix_ucb_params.c = std::stof(matrix_ucb_name_split[2]);
+      matrix_ucb_params.minimum = std::stoull(matrix_ucb_name_split[2]);
+      matrix_ucb_params.c = std::stof(matrix_ucb_name_split[3]);
       return run_5(dur, model, matrix_ucb_params, node);
     } else {
       return run_5(dur, model, bandit_params, node);
