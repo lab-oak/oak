@@ -15,3 +15,17 @@ cp -r work/libpkmn ./
 cp -r /work/extern/engine/zig-out ./extern/engine/
 mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release
 
+cmake -DCMAKE_TOOLCHAIN_FILE=../dev/mingw-toolchain.cmake -DGMP_LIBRARY=/usr/local/mingw/lib/libgmp.a -DGMP_INCLUDE_DIR=/usr/local/mingw/include -DCMAKE_BUILD_TYPE=Release ..
+
+export CC=x86_64-w64-mingw32-gcc
+export CXX=x86_64-w64-mingw32-g++
+sudo apt install m4
+sudo apt install texedit
+./configure \
+    --host=x86_64-w64-mingw32 \
+    --prefix=/usr/local/mingw \
+    --disable-shared \
+    --enable-static \
+    --disable-docs
+make
+make install
