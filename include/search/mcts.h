@@ -267,8 +267,8 @@ template <typename Options = SearchOptions<>> struct Search {
             .first;
       } else {
         // const auto start = std::chrono::high_resolution_clock::now();
-        const auto [p1_index, p2_index] = solve_root_matrix_and_sample(
-            device, params, copy, output, initial_solve);
+        const auto [p1_index, p2_index] =
+            solve_root_matrix_and_sample(device, params, copy, output);
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
         battle_options_set(copy.battle, 0);
@@ -494,8 +494,8 @@ template <typename Options = SearchOptions<>> struct Search {
   }
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
-                                           auto &copy, const auto &output,
-                                           bool &initial_solve) noexcept {
+                                           auto &copy,
+                                           const auto &output) noexcept {
     uint8_t p1_index{}, p2_index{};
     const bool periodic_solve = ((output.iterations % params.interval) == 0);
     if (periodic_solve || !initial_solve) {
