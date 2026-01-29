@@ -1,0 +1,17 @@
+sudo docker rmi ubuntu:22.04
+cd oak
+sudo docker pull ubuntu:22.04
+sudo docker run -it -v "$PWD:/work" ubuntu:22.04
+apt update
+apt install -y g++-12
+apt install -y cmake build-essential git libgmp3-dev
+
+export CC=gcc-12
+export CXX=g++-12
+
+git clone --recurse-submodules --shallow-submodules https://github.com/lab-oak/oak
+cd oak && git submodule update --recursive
+cp -r work/libpkmn ./
+cp -r /work/extern/engine/zig-out ./extern/engine/
+mkdir release && cd release && cmake .. -DCMAKE_BUILD_TYPE=Release
+
