@@ -4,8 +4,10 @@
 #include <util/random.h>
 #include <util/search.h>
 
+#include <chrono>
 #include <csignal>
 #include <iostream>
+#include <thread>
 
 struct ProgramArgs : public AgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
@@ -29,7 +31,7 @@ MCTS::Input parse_input(const std::string &line, uint64_t seed) {
 
 int main(int argc, char **argv) {
 
-  std::signal(SIGTSTP, handle_suspend);
+  std::signal(SIGINT, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
@@ -92,7 +94,7 @@ int main(int argc, char **argv) {
     }
     std::cout << std::endl;
 
-    std::cout << "Starting search. Suspend (Ctrl + Z) to stop." << std::endl;
+    std::cout << "Starting search. (Ctrl + C) to stop." << std::endl;
 
     RuntimeSearch::Nodes nodes{};
     MCTS::Output output{};
@@ -143,7 +145,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Actions: " << p1_labels[p1_index] << ' '
               << p2_labels[p2_index] << std::endl;
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     battle_data.result = PKMN::update(battle_data.battle, c1, c2, options);
     battle_data.durations =

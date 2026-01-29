@@ -137,8 +137,8 @@ template <typename F = Format::OU> struct CompressedTrajectory {
 template <typename F = Format::OU> struct SetHelper {
   Species species;
   std::array<Move, F::max_move_pool_size> move_pool;
-  uint n_moves;
-  uint move_pool_size;
+  uint32_t n_moves;
+  uint32_t move_pool_size;
 
   SetHelper() = default;
   SetHelper(const auto species)

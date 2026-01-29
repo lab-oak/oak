@@ -33,9 +33,9 @@ using PKMN::Data::Move;
 using PKMN::Data::Species;
 
 struct BasicAction {
-  uint lead;
-  uint slot;
-  uint move_slot;
+  uint32_t lead;
+  uint32_t slot;
+  uint32_t move_slot;
   Species species;
   Move move;
 
@@ -73,7 +73,7 @@ struct Trajectory {
 
   struct Update {
     std::vector<Action> legal_moves;
-    uint index;
+    uint32_t index;
     float probability;
   };
 

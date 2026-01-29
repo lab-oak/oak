@@ -26,7 +26,7 @@ struct Pokemon {
   // actual hp value, ignored if negative
   int hp = -1;
   // percent
-  uint percent = 100;
+  uint32_t percent = 100;
   Status status = {};
   uint8_t sleeps = 0;
   uint8_t level = 100;

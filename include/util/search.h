@@ -10,9 +10,11 @@
 #include <search/poke-engine-evalulate.h>
 #include <util/strings.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <thread>
 
 namespace RuntimeSearch {
 
@@ -130,7 +132,7 @@ struct Agent {
           throw std::runtime_error{
               "Agent could not read network parameters at: " + network_path};
         }
-        sleep(1);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
       }
     }
     if (discrete_network) {
