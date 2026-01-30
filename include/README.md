@@ -360,10 +360,27 @@ Both battling and team-building networks share some code.
 
 ## affine.h
 
+`Affine<>` defines a basic linear layer. It has dynamic size which allows Oak networks to have adjustable hyperparameters. The template bools determine if and what non-linearity is applied to the output. The class only has a default constructor. The weights and bias data is resized when `Affine::read_paramaters(std::ifstream& )` is called, not when the object is constructed.
+
+The stream first reads a two `u32`s for the in and out dimensions. Then it attempts to read the biases then the weights as a stream of `floats`. Both the read and write functions return a bool indicated if the operation was successful.
+
 ## embedding-net.h
+
+An embedding net is a two layer MLP with ReLu activation by default on both layer.
+
+`template <bool relu_0 = true, bool relu_1 = true> struct EmbeddingNet;`
+
+Also stores a buffer that holds the output of the first layer. This buffer is resized when parameters are read.
+
+The default parameters are used for the Pokemon and ActivePokemon embedding nets.
+
+The team-building network is just an actor/critic network pair, each of which is an `EmbeddingNet<true, false>` and the final output is used for policy logits or pre-sigmoid value output.
 
 ## default-hyperparameters
 
+The final `NN::Battle::Network` only has two hyper-parameters which are fixed, the input dims to the Pokemon and ActivePokemon embedding nets.
+
+Therefore these values just the defaults used in the release pre-trained networks. These value are used by the 
 
 
 # nn/battle/
