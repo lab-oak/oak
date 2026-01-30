@@ -3,10 +3,10 @@ mkdir libpkmn;
 mkdir libpkmn/debug;
 mkdir libpkmn/release;
 cd extern/engine;
-zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/client;
-zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/chance;
-zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/debug/fast;
-zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/client;
-zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/chance;
-zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/release/fast;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/client;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/chance;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/debug/fast;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/client;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/chance;
+zig build -Dtarget=x86_64-windows-gnu -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/release/fast;
 cd ../..
