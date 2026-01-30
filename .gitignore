@@ -1,6 +1,9 @@
 /release/
 /debug/
+/release-windows/
+/debug-windows/
 libpkmn-showdown.a
+pkmn-showdown.lib
 *.data
 *.net
 **/args
