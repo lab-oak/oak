@@ -12,7 +12,7 @@ add_subdirectory(extern/argparse EXCLUDE_FROM_ALL)
 function(create_library target mode dir)
   add_library(${target} STATIC IMPORTED)
   set_target_properties(${target} PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libpkmn/${mode}/${dir}/libpkmn-showdown.a
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libpkmn/${mode}/${dir}/pkmn-showdown.lib
   )
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/engine/zig-out/include)
   target_compile_options(${target} INTERFACE -mavx2)
