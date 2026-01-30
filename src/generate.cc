@@ -8,6 +8,7 @@
 #include <util/team-building.h>
 
 #include <atomic>
+#include <chrono>
 #include <csignal>
 #include <thread>
 
@@ -173,20 +174,19 @@ void generate(const ProgramArgs *args_ptr) {
         ".battle.data";
     const auto full_path =
         std::filesystem::path{args.working_dir.value()} / filename;
-    int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-      const auto write_result = write(fd, buffer, frame_buffer_write_index);
-      close(fd);
-    } else {
-      std::cerr << "Failed to write buffer to " << full_path << std::endl;
+    std::ofstream out(full_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      std::cerr << "Failed to write buffer to " << full_path << '\n';
+      return;
     }
-
+    out.write(reinterpret_cast<const char *>(buffer),
+              static_cast<std::streamsize>(frame_buffer_write_index));
     std::memset(buffer, 0, thread_frame_buffer_size);
     frame_buffer_write_index = 0;
   };
 
   const auto save_build_buffer_to_disk = [&build_buffer, &args]() {
-    if (build_buffer.size() == 0) {
+    if (build_buffer.empty()) {
       return;
     }
     const auto filename =
@@ -194,29 +194,19 @@ void generate(const ProgramArgs *args_ptr) {
         ".build.data";
     const auto full_path =
         std::filesystem::path{args.working_dir.value()} / filename;
-
-    const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-      const size_t bytes_to_write =
-          build_buffer.size() *
-          (Encode::Build::CompressedTrajectory<>::size_no_team);
-      ssize_t written = 0;
-      for (const auto &trajectory : build_buffer) {
-        const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
-        written += write(fd, &traj, decltype(traj)::size_no_team);
-      }
-      debug_print("build buffer - bytes to write: " +
-                  std::to_string(bytes_to_write));
-      debug_print("build buffer - bytes written: " + std::to_string(written));
-      close(fd);
-      if (written != static_cast<ssize_t>(bytes_to_write)) {
-        std::cerr << "Short write when flushing build buffer to " << full_path
-                  << " (" << written << '/' << bytes_to_write << " bytes)\n";
-      }
-    } else {
+    std::ofstream out(full_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
       std::cerr << "Failed to open " << full_path << " for writing\n";
+      return;
     }
-
+    const size_t bytes_to_write =
+        build_buffer.size() *
+        Encode::Build::CompressedTrajectory<>::size_no_team;
+    for (const auto &trajectory : build_buffer) {
+      const Encode::Build::CompressedTrajectory<> traj{trajectory};
+      out.write(reinterpret_cast<const char *>(&traj),
+                Encode::Build::CompressedTrajectory<>::size_no_team);
+    }
     build_buffer.clear();
   };
 
@@ -281,7 +271,7 @@ void generate(const ProgramArgs *args_ptr) {
         }
 
         while (RuntimeData::suspended) {
-          sleep(1);
+          std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         if (RuntimeData::terminated) {
@@ -451,7 +441,7 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
       if (RuntimeData::terminated) {
         return;
       }
-      sleep(1);
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     const auto frames_more = RuntimeData::frame_counter.load();
     const auto traj_more = RuntimeData::traj_counter.load();
@@ -566,7 +556,7 @@ void handle_terminate(int signal) {
 
 int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
-  std::signal(SIGTSTP, handle_suspend);
+  // std::signal(SIGTSTP, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 

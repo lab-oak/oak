@@ -1,12 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
-
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
 
 struct BattleFrameBuffer {
 
@@ -17,26 +15,28 @@ struct BattleFrameBuffer {
     buffer.resize(size);
   }
 
-  void clear() {
-    std::fill(buffer.begin(), buffer.end(), 0);
-    write_index = 0;
-  }
-
-  void save_to_disk(std::filesystem::path dir, auto &atomic) {
+  void save_to_disk(const std::filesystem::path &dir,
+                    std::atomic<uint64_t> &counter) {
     if (write_index == 0) {
       return;
     }
-    const auto filename = std::to_string(atomic.fetch_add(1)) + ".battle.data";
-    const auto full_path = dir / filename;
-    int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-      const auto write_result = write(fd, buffer.data(), write_index);
-      close(fd);
-    } else {
-      std::cerr << "Failed to write buffer to " << full_path << std::endl;
+    const auto filename =
+        std::to_string(counter.fetch_add(1, std::memory_order_relaxed)) +
+        ".battle.data";
+    const std::filesystem::path full_path = dir / filename;
+    std::ofstream out(full_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      std::cerr << "Failed to write buffer to " << full_path << '\n';
+      return;
     }
-
+    out.write(reinterpret_cast<const char *>(buffer.data()),
+              static_cast<std::streamsize>(write_index));
     clear();
+  }
+
+  void clear() {
+    std::fill(buffer.begin(), buffer.end(), 0);
+    write_index = 0;
   }
 
   void write_frames(const auto &training_frames) {
