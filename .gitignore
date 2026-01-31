@@ -15,6 +15,5 @@ pkmn-showdown.lib
 **/ratings
 **/results
 **/ucb
-# delete soon
-*.battle
-battle-network
+# dev
+teams
