@@ -44,7 +44,8 @@ template <typename F = Format::OU> struct Actions {
           ls.begin(), ls_end, std::back_inserter(actions),
           [&team, &empty_slot](const auto species) {
             return Action{BasicAction{
-                0, static_cast<uint>(std::distance(team.begin(), empty_slot)),
+                0,
+                static_cast<uint32_t>(std::distance(team.begin(), empty_slot)),
                 0, species, Move::None}};
           });
     }
@@ -64,8 +65,9 @@ template <typename F = Format::OU> struct Actions {
               start, end, std::back_inserter(actions),
               [&team, &set, &empty](const auto move) {
                 return Action{BasicAction{
-                    0, static_cast<uint>(std::distance(&team[0], &set)),
-                    static_cast<uint>(std::distance(set.moves.begin(), empty)),
+                    0, static_cast<uint32_t>(std::distance(&team[0], &set)),
+                    static_cast<uint32_t>(
+                        std::distance(set.moves.begin(), empty)),
                     set.species, move}};
               });
         }

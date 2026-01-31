@@ -7,6 +7,7 @@
 #include <util/team-building.h>
 
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <csignal>
 #include <exception>
@@ -29,6 +30,7 @@ struct ProgramArgs : public VsAgentArgs {
   bool &save = flag("save", "Sets --dir to a timestamp");
   std::string &teams_path =
       kwarg("teams", "Path to teams file").set_default("");
+  bool &mirror_match = flag("mirror-match", "Use the same teams for p1, p2");
   std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
   double &early_stop =
       kwarg("early-stop", "Forfeit when inverse sigmoid of score exceeds "
@@ -51,6 +53,10 @@ struct ProgramArgs : public VsAgentArgs {
             "Size of build buffer (No. of traj's) before write")
           .set_default(1 << 10);
 
+  std::optional<std::string> &p1_bandit_name_after =
+      kwarg("p1-bandit-name-after", "");
+  std::optional<std::string> &p2_bandit_name_after =
+      kwarg("p2-bandit-name-after", "");
   std::optional<std::string> &p1_search_time_after =
       kwarg("p1-search-time-after", "");
   std::optional<std::string> &p2_search_time_after =
@@ -117,37 +123,33 @@ void thread_fn(const ProgramArgs *args_ptr) {
   std::vector<Train::Build::Trajectory> build_buffer{};
 
   const auto save_build_buffer_to_disk = [&build_buffer, &args]() {
-    if (args.working_dir.has_value() == false) {
-      return;
-    }
-    if (build_buffer.size() == 0) {
+    if (build_buffer.empty()) {
       return;
     }
     const auto filename =
         std::to_string(RuntimeData::build_buffer_counter.fetch_add(1)) +
         ".build.data";
-    const auto full_path =
+    const std::filesystem::path full_path =
         std::filesystem::path{args.working_dir.value()} / filename;
-
-    const int fd = open(full_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-      const size_t bytes_to_write =
-          build_buffer.size() *
-          (Encode::Build::CompressedTrajectory<>::size_no_team);
-      ssize_t written = 0;
-      for (const auto &trajectory : build_buffer) {
-        const auto traj = Encode::Build::CompressedTrajectory<>{trajectory};
-        written += write(fd, &traj, decltype(traj)::size_no_team);
-      }
-      close(fd);
-      if (written != static_cast<ssize_t>(bytes_to_write)) {
-        std::cerr << "Short write when flushing build buffer to " << full_path
-                  << " (" << written << '/' << bytes_to_write << " bytes)\n";
-      }
-    } else {
+    std::ofstream out(full_path, std::ios::binary | std::ios::trunc);
+    if (!out) {
       std::cerr << "Failed to open " << full_path << " for writing\n";
+      return;
     }
-
+    const size_t bytes_to_write =
+        build_buffer.size() *
+        Encode::Build::CompressedTrajectory<>::size_no_team;
+    size_t written = 0;
+    for (const auto &trajectory : build_buffer) {
+      const Encode::Build::CompressedTrajectory<> traj{trajectory};
+      out.write(reinterpret_cast<const char *>(&traj),
+                Encode::Build::CompressedTrajectory<>::size_no_team);
+      written += Encode::Build::CompressedTrajectory<>::size_no_team;
+    }
+    if (written != bytes_to_write) {
+      std::cerr << "Short write when flushing build buffer to " << full_path
+                << " (" << written << '/' << bytes_to_write << " bytes)\n";
+    }
     build_buffer.clear();
   };
 
@@ -160,8 +162,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .matrix_ucb_name = args.p1_matrix_ucb_name,
                              .use_table = args.p1_use_table};
     auto p1_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p1_search_time_after.value(),
-        .bandit_name = args.p1_bandit_name,
+        .search_time = args.p1_search_time_after.value_or("0"),
+        .bandit_name = args.p1_bandit_name_after.value_or(args.p1_bandit_name),
         .network_path = args.p1_network_path,
         .discrete_network = args.p1_use_discrete,
         .matrix_ucb_name = args.p1_matrix_ucb_name_after.value(),
@@ -174,8 +176,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                              .matrix_ucb_name = args.p2_matrix_ucb_name,
                              .use_table = args.p2_use_table};
     auto p2_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p2_search_time_after.value(),
-        .bandit_name = args.p2_bandit_name,
+        .search_time = args.p2_search_time_after.value_or("0"),
+        .bandit_name = args.p2_bandit_name_after.value_or(args.p2_bandit_name),
         .network_path = args.p2_network_path,
         .discrete_network = args.p2_use_discrete,
         .matrix_ucb_name = args.p2_matrix_ucb_name_after.value(),
@@ -220,7 +222,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         RuntimeData::battle_lengths[id] = updates;
 
         while (RuntimeData::suspended) {
-          sleep(1);
+          std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         if (RuntimeData::terminated) {
@@ -230,6 +232,15 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
         const auto [p1_choices, p2_choices] =
             PKMN::choices(input.battle, input.result);
+
+        const auto print_search_outputs = (device.uniform() < args.print_prob);
+        const auto [p1_labels, p2_labels] = [&input, print_search_outputs]() {
+          if (print_search_outputs) {
+            return PKMN::choice_labels(input.battle, input.result);
+          }
+          return std::pair<std::vector<std::string>,
+                           std::vector<std::string>>{};
+        }();
 
         MCTS::Output p1_output{}, p2_output{};
         int p1_index{}, p2_index{};
@@ -244,7 +255,12 @@ void thread_fn(const ProgramArgs *args_ptr) {
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
           p1_index = process_and_sample(device, p1_output.p1_empirical,
                                         p1_output.p1_nash, p1_policy_options);
+          if (print_search_outputs) {
+            print("P1:");
+            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
+          }
         }
+
         if (p2_choices.size() > 1) {
           RuntimeSearch::Nodes nodes{};
           p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
@@ -254,6 +270,10 @@ void thread_fn(const ProgramArgs *args_ptr) {
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
           p2_index = process_and_sample(device, p2_output.p2_empirical,
                                         p2_output.p2_nash, p2_policy_options);
+          if (print_search_outputs) {
+            print("P2:");
+            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
+          }
         }
 
         RuntimeData::battle_outputs[id] = {p1_output, p2_output};
@@ -278,20 +298,10 @@ void thread_fn(const ProgramArgs *args_ptr) {
         p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
         p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
 
-        if (device.uniform() < args.print_prob) {
+        if (print_search_outputs) {
           print("GAME: " + std::to_string(RuntimeData::n.load()), false);
           print(" UPDATE: " + std::to_string(updates));
           print(PKMN::battle_data_to_string(input.battle, input.durations));
-          const auto [p1_labels, p2_labels] =
-              PKMN::choice_labels(input.battle, input.result);
-          if (p1_choices.size() > 1) {
-            print("P1:");
-            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
-          }
-          if (p2_choices.size() > 1) {
-            print("P2:");
-            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
-          }
         }
         input.result =
             PKMN::update(input.battle, p1_choice, p2_choice, options);
@@ -342,15 +352,23 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
     auto [p1_build_traj, p1_team_index] =
         RuntimeData::provider.get_trajectory(device);
-    auto [p2_build_traj, p2_team_index] =
-        RuntimeData::provider.get_trajectory(device);
+    auto p2_build_traj = p1_build_traj;
+    auto p2_team_index = p1_team_index;
+    if (!args.mirror_match) {
+      std::tie(p2_build_traj, p2_team_index) =
+          RuntimeData::provider.get_trajectory(device);
+    }
 
     const auto s1 = play(p1_build_traj, p2_build_traj);
-    const auto s2 = play(p2_build_traj, p1_build_traj);
-
+    auto s2 = 0;
+    auto n = 0;
+    if (!args.mirror_match) {
+      s2 = play(p2_build_traj, p1_build_traj);
+      n = 1;
+    }
     if (!RuntimeData::terminated) {
       RuntimeData::score.fetch_add(s1 + s2);
-      RuntimeData::n.fetch_add(2);
+      RuntimeData::n.fetch_add(1 + n);
     }
     if (args.working_dir.has_value()) {
       std::filesystem::path working_dir{args.working_dir.value()};
@@ -395,7 +413,7 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
           (RuntimeData::match_counter.load() >= args.max_games)) {
         return;
       }
-      sleep(1);
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     const double average_score =
@@ -493,7 +511,7 @@ void setup(auto &args) {
 int main(int argc, char **argv) {
 
   std::signal(SIGINT, handle_terminate);
-  std::signal(SIGTSTP, handle_suspend);
+  // std::signal(SIGTSTP, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 

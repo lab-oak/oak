@@ -13,7 +13,7 @@ uint64_t combine_hash(uint64_t h1, uint64_t h2) {
          0xFFFFFFFFFFFFFFFF;
 }
 
-template <bool clamp = true> class Affine {
+template <bool relu = true, bool clamp = false> class Affine {
 public:
   using Vector = Eigen::VectorXf;
   using Matrix =
@@ -66,9 +66,13 @@ public:
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
-    if constexpr (clamp) {
+    if constexpr (relu) {
       for (std::size_t i = 0; i < out_dim; ++i) {
-        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        if constexpr (clamp) {
+          output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        } else {
+          output(i) = std::max(output(i), {});
+        }
       }
     }
   }
@@ -83,9 +87,13 @@ public:
       float val = input_data[k];
       output.noalias() += weights.col(idx) * val;
     }
-    if constexpr (clamp) {
+    if constexpr (relu) {
       for (std::size_t i = 0; i < out_dim; ++i) {
-        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        if constexpr (clamp) {
+          output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        } else {
+          output(i) = std::max(output(i), {});
+        }
       }
     }
   }
@@ -98,9 +106,13 @@ public:
       auto idx = index_data[k];
       output.noalias() += weights.col(idx);
     }
-    if constexpr (clamp) {
+    if constexpr (relu) {
       for (std::size_t i = 0; i < out_dim; ++i) {
-        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        if constexpr (clamp) {
+          output(i) = std::clamp(output(i), 0.0f, 1.0f);
+        } else {
+          output(i) = std::max(output(i), {});
+        }
       }
     }
   }

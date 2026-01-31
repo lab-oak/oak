@@ -363,7 +363,7 @@ extern "C" size_t sample_from_battle_data_files(
 
       while (!errors.load()) {
 
-        const auto get_indices = [&]() -> std::pair<uint, uint> {
+        const auto get_indices = [&]() -> std::pair<uint32_t, uint32_t> {
           auto bi = dist_int(mt);
           auto pi = 0;
           while (bi >= 0) {

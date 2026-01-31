@@ -1,11 +1,16 @@
 import ctypes
 import os
+import sys
 
 import numpy as np
 
 from typing import List
 
-lib = ctypes.CDLL("./release/libpyoak.so")
+if sys.platform == "win32":
+    libname = "libpyoak.dll"
+else:
+    libname = "libpyoak.so"
+lib = ctypes.CDLL(os.path.join("release", libname))
 
 # battle net hyperparams
 pokemon_in_dim = ctypes.c_int.in_dll(lib, "pokemon_in_dim").value

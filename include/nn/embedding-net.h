@@ -7,9 +7,9 @@
 
 namespace NN {
 
-template <bool clamp_0 = true, bool clamp_1 = true> struct EmbeddingNet {
-  Affine<clamp_0> fc0;
-  Affine<clamp_1> fc1;
+template <bool relu_0 = true, bool relu_1 = true> struct EmbeddingNet {
+  Affine<relu_0> fc0;
+  Affine<relu_1> fc1;
   std::vector<float> buf;
 
   void initialize(auto &device) {

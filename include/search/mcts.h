@@ -79,7 +79,6 @@ struct Output {
   size_t iterations;
   std::chrono::milliseconds duration;
 
-  double total_value;
   double empirical_value;
   double nash_value;
   std::array<double, 9> p1_prior;
@@ -120,13 +119,13 @@ template <typename BanditParams> struct MatrixUCBParams {
   BanditParams bandit_params;
   uint32_t delay;
   uint32_t interval;
+  uint32_t minimum;
   float c;
 };
 
-template <bool _root_matrix = true, size_t _root_rolls = 3,
-          size_t _other_rolls = 1, bool _debug_print = false>
+template <size_t _root_rolls = 3, size_t _other_rolls = 1,
+          bool _debug_print = false>
 struct SearchOptions {
-  static constexpr bool root_matrix = _root_matrix;
   static constexpr size_t root_rolls = _root_rolls;
   static constexpr size_t other_rolls = _other_rolls;
   static constexpr bool debug_print = _debug_print;
@@ -144,9 +143,8 @@ template <typename Options = SearchOptions<>> struct Search {
   std::array<pkmn_choice, 9> p2_choices;
   Hash::State root_hash_state;
 
-  std::array<std::array<uint32_t, 9>, 9> visit_matrix;
-  std::array<std::array<float, 9>, 9> value_matrix;
   // matrix ucb
+  bool initial_solve;
   float ucb_weight;
   std::array<float, 9 + 2> p1_nash;
   std::array<float, 9 + 2> p2_nash;
@@ -155,9 +153,9 @@ template <typename Options = SearchOptions<>> struct Search {
   size_t errors;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
-             auto &model, const MCTS::Input &input, Output output = {}) {
+             auto &model, const Input &input, Output output = {}) {
 
-    // reset data memberslimit
+    // reset data members
     *this = {};
 
     // get choices data here for matrix ucb
@@ -220,8 +218,7 @@ template <typename Options = SearchOptions<>> struct Search {
           std::chrono::duration_cast<std::chrono::milliseconds>(budget);
       std::chrono::milliseconds elapsed{};
       while (elapsed < duration) {
-        output.total_value +=
-            run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
@@ -229,15 +226,13 @@ template <typename Options = SearchOptions<>> struct Search {
       // run while boolean flag is set
     } else if constexpr (requires { *budget; }) {
       while (*budget) {
-        output.total_value +=
-            run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
       }
       // number of iterations
     } else {
       for (auto i = 0; i < budget; ++i) {
-        output.total_value +=
-            run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
       }
     }
@@ -245,12 +240,6 @@ template <typename Options = SearchOptions<>> struct Search {
     output.duration +=
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    // std::cout << "error rate: " << (float)errors / output.iterations
-    //           << " depth: " << (float)total_depth / output.iterations <<
-    //           std::endl;
-    // std::cout << "sr: " << switch_ratio_total / output.iterations
-    //           << " sdr: " << double_switch_ratio_total / output.iterations
-    //           << std::endl;
     process_output(output);
     return output;
   }
@@ -268,18 +257,18 @@ template <typename Options = SearchOptions<>> struct Search {
     if constexpr (is_table<decltype(heap)>) {
       heap.hasher.set(root_hash_state);
     }
-    // check if we are passing MatrixUCB param wrapper
+
     if constexpr (!is_matrix_ucb<decltype(params)>) {
-      return run_iteration(device, params, heap, copy, model).first;
+      return run_iteration(device, params, heap, copy, model, output).first;
     } else {
-      bool initial_solve = true;
       if ((output.iterations < params.delay)) {
-        return run_iteration(device, params.bandit_params, heap, copy, model)
+        return run_iteration(device, params.bandit_params, heap, copy, model,
+                             output)
             .first;
       } else {
-        const auto [p1_index, p2_index] = solve_root_matrix_and_sample(
-            device, params, copy, output, initial_solve);
-        initial_solve = false;
+        // const auto start = std::chrono::high_resolution_clock::now();
+        const auto [p1_index, p2_index] =
+            solve_root_matrix_and_sample(device, params, copy, output);
         const auto c1 = output.p1_choices[p1_index];
         const auto c2 = output.p2_choices[p2_index];
         battle_options_set(copy.battle, 0);
@@ -291,16 +280,16 @@ template <typename Options = SearchOptions<>> struct Search {
                 pkmn_gen1_battle_options_chance_actions(&options));
             auto &child = heap.children[{p1_index, p2_index, obs}];
             return run_iteration(device, params.bandit_params, child, copy,
-                                 model, 1);
+                                 model, output, 1);
           } else {
             return run_iteration(device, params.bandit_params, heap, copy,
-                                 model, 1);
+                                 model, output, 1);
           }
         }();
 
         // TODO error check
-        ++visit_matrix[p1_index][p2_index];
-        value_matrix[p1_index][p2_index] += value.first;
+        ++output.visit_matrix[p1_index][p2_index];
+        output.value_matrix[p1_index][p2_index] += value.first;
         return value.first;
       }
     }
@@ -311,7 +300,7 @@ template <typename Options = SearchOptions<>> struct Search {
   // - value at each heap
   std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
                                         auto &heap, auto &input, auto &model,
-                                        size_t depth = 0) {
+                                        Output &output, size_t depth = 0) {
     static constexpr size_t max_depth = 100;
 
     bool error = false;
@@ -329,33 +318,6 @@ template <typename Options = SearchOptions<>> struct Search {
       if constexpr (is_node<decltype(heap)>) {
         return heap.stats;
       } else {
-        // const auto h = heap.hasher.last();
-        // auto heap_hasher = static_cast<const Hash::Battle &>(heap.hasher);
-        // heap_hasher.init(battle, durations());
-        // const auto h2 = heap_hasher.last();
-        // bool a =
-        //     heap.hasher.sides[0].state.last ==
-        //     heap_hasher.sides[0].state.last;
-        // bool b =
-        //     heap.hasher.sides[1].state.last ==
-        //     heap_hasher.sides[1].state.last;
-        // if (!a || !b) {
-        //   std::cout << depth << std::endl;
-        //   std::cout << "old\n";
-        //   heap.hasher.print();
-        //   std::cout << "new\n";
-        //   heap_hasher.print();
-
-        //   std::cout << PKMN::battle_data_to_string(old_battle, durations())
-        //             << std::endl;
-        //   const auto [l1, l2] =
-        //       PKMN::choice_labels(old_battle, PKMN::result(old_battle));
-        //   std::cout << l1[old_c1] << ' ' << l2[old_c2] << std::endl;
-        //   std::cout << PKMN::battle_data_to_string(battle, durations())
-        //             << std::endl;
-        //   assert(false);
-        // }
-        // heap.hasher.init(battle, durations());
         return heap.entries[heap.hasher.last()];
       }
     }();
@@ -394,10 +356,10 @@ template <typename Options = SearchOptions<>> struct Search {
           auto &child =
               heap.children[{outcome.p1.index, outcome.p2.index, obs}];
           return run_iteration(device, bandit_params, child, input, model,
-                               depth + 1);
+                               output, depth + 1);
         } else {
           return run_iteration(device, bandit_params, heap, input, model,
-                               depth + 1);
+                               output, depth + 1);
         }
       }();
       outcome.p1.value = value.first;
@@ -414,11 +376,9 @@ template <typename Options = SearchOptions<>> struct Search {
         }
       }
 
-      if constexpr (Options::root_matrix) {
-        if (depth == 0) {
-          ++visit_matrix[outcome.p1.index][outcome.p2.index];
-          value_matrix[outcome.p1.index][outcome.p2.index] += value.first;
-        }
+      if (depth == 0) {
+        ++output.visit_matrix[outcome.p1.index][outcome.p2.index];
+        output.value_matrix[outcome.p1.index][outcome.p2.index] += value.first;
       }
 
       return value;
@@ -534,11 +494,11 @@ template <typename Options = SearchOptions<>> struct Search {
   }
 
   inline auto solve_root_matrix_and_sample(auto &device, auto &params,
-                                           auto &copy, const auto &output,
-                                           bool solve = false) noexcept {
+                                           auto &copy,
+                                           const auto &output) noexcept {
     uint8_t p1_index{}, p2_index{};
-
-    if ((output.iterations % params.interval == 0) || solve) {
+    const bool periodic_solve = ((output.iterations % params.interval) == 0);
+    if (periodic_solve || !initial_solve) {
       // get ucb matrices
       std::array<int, 9 * 9> p1_ucb_matrix;
       std::array<int, 9 * 9> p2_ucb_matrix;
@@ -548,13 +508,16 @@ template <typename Options = SearchOptions<>> struct Search {
         for (auto j = 0; j < output.n; ++j) {
           float p1_entry = 0;
           float p2_entry = 1;
-          if (visit_matrix[i][j] > 0) {
-            p1_entry = value_matrix[i][j] / visit_matrix[i][j];
+          if (output.visit_matrix[i][j] < params.minimum) {
+            return std::pair<uint8_t, uint8_t>{i, j};
+          }
+          if (output.visit_matrix[i][j] > 0) {
+            p1_entry = output.value_matrix[i][j] / output.visit_matrix[i][j];
             p2_entry = p1_entry;
           }
           const float exploration =
               params.c * std::sqrt(2 * (2 * log_T + ucb_weight) /
-                                   (visit_matrix[i][j] + 1));
+                                   (output.visit_matrix[i][j] + 1));
           p1_entry += exploration;
           p2_entry -= exploration;
           p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
@@ -576,6 +539,8 @@ template <typename Options = SearchOptions<>> struct Search {
       LRSNash::FloatOneSumOutput p2_solve_output{dummy.data(), p2_nash.data(),
                                                  0};
       LRSNash::solve_fast(&p2_solve_input, &p2_solve_output);
+
+      initial_solve = true;
     }
 
     float p = device.uniform();
@@ -653,74 +618,73 @@ template <typename Options = SearchOptions<>> struct Search {
   void process_output(Output &output) {
 
     // prepare output, solve empirical root matrix if enabled
-    output.empirical_value = output.total_value / output.iterations;
+    // output.empirical_value = output.total_value / output.iterations;
+    double total_value = 0;
 
-    if constexpr (Options::root_matrix) {
-      // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
-      // TODO maybe use gmp since this is not the hot part of the code
+    // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
+    // TODO maybe use gmp since this is not the hot part of the code
 
-      output.p1_empirical = {};
-      output.p2_empirical = {};
+    output.p1_empirical = {};
+    output.p2_empirical = {};
 
-      constexpr int discretize_factor = 256;
-      std::array<int, 9 * 9> solve_matrix;
-      for (int i = 0; i < output.m; ++i) {
-        for (int j = 0; j < output.n; ++j) {
-          output.visit_matrix[i][j] += visit_matrix[i][j];
-          output.value_matrix[i][j] += value_matrix[i][j];
-          auto n = output.visit_matrix[i][j];
-          output.p1_empirical[i] += n;
-          output.p2_empirical[j] += n;
-          n += !n;
-          solve_matrix[output.n * i + j] =
-              output.value_matrix[i][j] / n * discretize_factor;
-        }
-      }
-
-      LRSNash::FastInput solve_input{static_cast<int>(output.m),
-                                     static_cast<int>(output.n),
-                                     solve_matrix.data(), discretize_factor};
-      // LRSNash convention: 2 extra entries needed for output denom, nash value
-      std::array<float, 9 + 2> nash1{}, nash2{};
-      LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
-      bool success = true;
-      try {
-        LRSNash::solve_fast(&solve_input, &solve_output);
-      } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        success = false;
-        // print offending matrix in lossless form
-        std::cout << "value matrix" << std::endl;
-        for (auto i = 0; i < output.m; ++i) {
-          for (auto j = 0; j < output.n; ++j) {
-            std::cerr << "(" << output.value_matrix[i][j] << ", "
-                      << output.visit_matrix[i][j] << ") ";
-          }
-          std::cerr << std::endl;
-        }
-      }
-
-      for (int i = 0; i < output.m; ++i) {
-        output.p1_empirical[i] /= (float)output.iterations;
-        output.p1_nash[i] = nash1[i];
-      }
+    constexpr int discretize_factor = 256;
+    std::array<int, 9 * 9> solve_matrix;
+    for (int i = 0; i < output.m; ++i) {
       for (int j = 0; j < output.n; ++j) {
-        output.p2_empirical[j] /= (float)output.iterations;
-        output.p2_nash[j] = nash2[j];
+        total_value += output.value_matrix[i][j];
+        auto n = output.visit_matrix[i][j];
+        output.p1_empirical[i] += n;
+        output.p2_empirical[j] += n;
+        n += !n;
+        solve_matrix[output.n * i + j] =
+            output.value_matrix[i][j] / n * discretize_factor;
       }
-      output.nash_value = solve_output.value;
+    }
 
-      // set nash data to emprical rather than leave as garbage/zeros/etc
-      if (!success) {
-        output.p1_nash = output.p1_empirical;
-        output.p2_nash = output.p2_empirical;
-        output.nash_value = output.empirical_value;
+    output.empirical_value = total_value / output.iterations;
+    LRSNash::FastInput solve_input{static_cast<int>(output.m),
+                                   static_cast<int>(output.n),
+                                   solve_matrix.data(), discretize_factor};
+    // LRSNash convention: 2 extra entries needed for output denom, nash value
+    std::array<float, 9 + 2> nash1{}, nash2{};
+    LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
+    bool success = true;
+    try {
+      LRSNash::solve_fast(&solve_input, &solve_output);
+    } catch (std::exception &e) {
+      std::cerr << e.what() << std::endl;
+      success = false;
+      // print offending matrix in lossless form
+      std::cout << "value matrix" << std::endl;
+      for (auto i = 0; i < output.m; ++i) {
+        for (auto j = 0; j < output.n; ++j) {
+          std::cerr << "(" << output.value_matrix[i][j] << ", "
+                    << output.visit_matrix[i][j] << ") ";
+        }
+        std::cerr << std::endl;
       }
+    }
+
+    for (int i = 0; i < output.m; ++i) {
+      output.p1_empirical[i] /= (float)output.iterations;
+      output.p1_nash[i] = nash1[i];
+    }
+    for (int j = 0; j < output.n; ++j) {
+      output.p2_empirical[j] /= (float)output.iterations;
+      output.p2_nash[j] = nash2[j];
+    }
+    output.nash_value = solve_output.value;
+
+    // set nash data to emprical rather than leave as garbage/zeros/etc
+    if (!success) {
+      output.p1_nash = output.p1_empirical;
+      output.p2_nash = output.p2_empirical;
+      output.nash_value = output.empirical_value;
     }
   }
 };
 
-void print_output(const MCTS::Output &output, const pkmn_gen1_battle &battle,
+void print_output(const Output &output, const pkmn_gen1_battle &battle,
                   const auto &p1_labels, const auto &p2_labels) {
   constexpr auto label_width = 8;
 

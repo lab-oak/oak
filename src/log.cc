@@ -1,5 +1,6 @@
 #include <util/random.h>
 
+#include <libpkmn/layout.h>
 #include <teams/ou-sample-teams.h>
 #include <util/debug-log.h>
 
@@ -88,7 +89,10 @@ struct Parser {
     return lo | (hi << 8);
   }
 
-  void push(const std::string &s) { log.push_back(s); }
+  void push(const std::string &s) {
+    log.push_back(s);
+    std::cout << s << std::endl;
+  }
 
   void annotate_last_move(const std::string &suffix) {
     if (last_move_index) {
@@ -449,7 +453,7 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
 
   mt19937 device{std::random_device{}()};
 
-  for (auto i = 0; i < 100000; ++i) {
+  for (auto i = 0; i < 1; ++i) {
     auto p1 = device.random_int(ou_sample_teams.size());
     auto p2 = device.random_int(ou_sample_teams.size());
 
@@ -474,7 +478,10 @@ int rollout_sample_teams_and_stream_debug_log(int argc, char **argv) {
           &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), choices.data(),
           PKMN_GEN1_MAX_CHOICES);
       c2 = choices[device.random_int(n)];
-
+      std::cout << PKMN::side_choice_string(battle.bytes, c1) << ' '
+                << PKMN::side_choice_string(
+                       battle.bytes + PKMN::Layout::Sizes::Side, c2)
+                << std::endl;
       // std::cout << PKMN::battle_data_to_string(battle,
       // PKMN::durations(options))
       //           << std::endl;

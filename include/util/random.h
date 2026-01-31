@@ -37,9 +37,9 @@ public:
   uint64_t uniform_64() noexcept { return uniform_64_(engine); }
 
   template <typename Container>
-  uint sample_pdf(const Container &input) noexcept {
+  uint32_t sample_pdf(const Container &input) noexcept {
     double p = uniform();
-    for (uint i = 0; i < input.size(); ++i) {
+    for (uint32_t i = 0; i < input.size(); ++i) {
       p -= static_cast<double>(input[i]);
       if (p <= 0) {
         return i;
@@ -50,9 +50,9 @@ public:
 
   template <template <typename...> typename Vector, typename T>
     requires(T::get_d())
-  uint sample_pdf(const Vector<T> &input) noexcept {
+  uint32_t sample_pdf(const Vector<T> &input) noexcept {
     double p = uniform();
-    for (uint i = 0; i < input.size(); ++i) {
+    for (uint32_t i = 0; i < input.size(); ++i) {
       p -= input[i].get_d();
       if (p <= 0) {
         return i;
