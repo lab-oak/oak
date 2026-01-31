@@ -13,10 +13,12 @@ uint64_t combine_hash(uint64_t h1, uint64_t h2) {
          0xFFFFFFFFFFFFFFFF;
 }
 
-template <bool relu = true, bool clamp = false> class Affine {
+template <bool relu = true, bool clamp = false, int Order = Eigen::RowMajor>
+class Affine {
 public:
   using Vector = Eigen::VectorXf;
-  using Matrix =
+  using Matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Order>;
+  using MatrixRowMajor =
       Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   uint32_t in_dim;
@@ -37,9 +39,19 @@ public:
                      out_dim * sizeof(float))) {
       return false;
     }
-    if (!stream.read(reinterpret_cast<char *>(weights.data()),
-                     out_dim * in_dim * sizeof(float))) {
-      return false;
+    if constexpr (Order == Eigen::RowMajor) {
+      if (!stream.read(reinterpret_cast<char *>(weights.data()),
+                       out_dim * in_dim * sizeof(float))) {
+        return false;
+      }
+    } else {
+      MatrixRowMajor row_major_matrix;
+      row_major_matrix.resize(out_dim, in_dim);
+      if (!stream.read(reinterpret_cast<char *>(row_major_matrix.data()),
+                       out_dim * in_dim * sizeof(float))) {
+        return false;
+      }
+      weights = row_major_matrix;
     }
 
     for (auto i = 0; i < out_dim; ++i) {
@@ -57,8 +69,17 @@ public:
     stream.write(reinterpret_cast<const char *>(&out_dim), sizeof(uint32_t));
     stream.write(reinterpret_cast<const char *>(biases.data()),
                  out_dim * sizeof(float));
-    stream.write(reinterpret_cast<const char *>(weights.data()),
-                 out_dim * in_dim * sizeof(float));
+    if constexpr (Order == Eigen::RowMajor) {
+      stream.write(reinterpret_cast<const char *>(weights.data()),
+                   out_dim * in_dim * sizeof(float));
+
+    } else {
+      MatrixRowMajor row_major_matrix;
+      row_major_matrix.resize(out_dim, in_dim);
+      row_major_matrix = weights;
+      stream.write(reinterpret_cast<const char *>(weights.data()),
+                   out_dim * in_dim * sizeof(float));
+    }
     return !stream.fail();
   }
 

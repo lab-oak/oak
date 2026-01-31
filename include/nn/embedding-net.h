@@ -8,7 +8,7 @@
 namespace NN {
 
 template <bool relu_0 = true, bool relu_1 = true> struct EmbeddingNet {
-  Affine<relu_0> fc0;
+  Affine<relu_0, false, Eigen::ColMajor> fc0;
   Affine<relu_1> fc1;
   std::vector<float> buf;
 
