@@ -180,7 +180,7 @@ constexpr float *write(const uint8_t types, float *t) {
 constexpr void write(const uint8_t types, float *&t, uint16_t *&index,
                      uint16_t &offset) {
   const uint8_t type_1 = types % 16;
-  const uint8_t type_2 = types % 16;
+  const uint8_t type_2 = types / 16;
   assert(type_1 < n_dim && type_2 < n_dim);
 
   *t++ = 1.0f;
