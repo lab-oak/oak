@@ -168,81 +168,6 @@ lib.print_battle_data.argtypes = [
 ]
 
 
-class BattleFrame:
-    def __init__(self, size: int):
-        self.size = size
-
-        self.m = np.zeros((size, 1), dtype=np.uint8)
-        self.n = np.zeros((size, 1), dtype=np.uint8)
-
-        self.battle = np.zeros((size, 384), dtype=np.uint8)
-        self.durations = np.zeros((size, 8), dtype=np.uint8)
-        self.result = np.zeros((size, 1), dtype=np.uint8)
-
-        self.p1_choices = np.zeros((size, 9), dtype=np.uint8)
-        self.p2_choices = np.zeros((size, 9), dtype=np.uint8)
-
-        self.iterations = np.zeros((size, 1), dtype=np.uint32)
-        self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
-        self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
-
-        self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value = np.zeros((size, 1), dtype=np.float32)
-        self.score = np.zeros((size, 1), dtype=np.float32)
-
-    def raw_pointers(self, i: int):
-        return (
-            self.m[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.n[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.battle[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.durations[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.result[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.p1_choices[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.p2_choices[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-            self.iterations[i].ctypes.data_as(ctypes.POINTER(ctypes.c_uint32)),
-            self.p1_empirical[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.p1_nash[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.p2_empirical[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.p2_nash[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.empirical_value[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.nash_value[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            self.score[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-        )
-
-
-# Returns a list tuples containing: a bytes object, the number of frames in the bytes
-def read_battle_data(path: str, max_battles=1_000_000) -> list[tuple[bytes, int]]:
-    path_bytes = path.encode("utf-8")
-
-    offsets = (ctypes.c_uint16 * max_battles)()
-    frame_counts = (ctypes.c_uint16 * max_battles)()
-    buffer_size = os.path.getsize(path)
-    buffer = (ctypes.c_char * int(buffer_size))()
-
-    args = (
-        ctypes.c_char_p(path_bytes),
-        ctypes.cast(buffer, ctypes.POINTER(ctypes.c_char)),
-        ctypes.cast(offsets, ctypes.POINTER(ctypes.c_uint16)),
-        ctypes.cast(frame_counts, ctypes.POINTER(ctypes.c_uint16)),
-    )
-
-    n = lib.index_compressed_battle_frames(*args)
-
-    if n < 0:
-        raise RuntimeError("Failed to read battle data")
-
-    offset = 0
-    result = []
-    for i in range(n):
-        sz = offsets[i]
-        result.append((bytes(buffer[offset : offset + sz]), int(frame_counts[i])))
-        offset += sz
-
-    return result
-
-
 def test_consistency(
     max_games: int, network_path: str, data_path: str, max_battles=1_000_000
 ) -> list[tuple[bytes, int]]:
@@ -266,14 +191,6 @@ def test_consistency(
     n = lib.test_consistency(*args)
 
     return n
-
-
-# convert bytes object into BattleFrames
-def get_frames(data: bytes, frame_count: int) -> BattleFrame:
-    frames = BattleFrame(frame_count)
-    args = (ctypes.c_char_p(data),) + frames.raw_pointers(0)
-    lib.uncompress_training_frames(*args)
-    return frames
 
 
 def print_battle_data(frames, i):
@@ -308,81 +225,6 @@ class BuildTrajectories:
         )
 
 
-class EncodedBattleFrames:
-    def __init__(self, size):
-        self.size = size
-
-        self.m = np.zeros((size, 1), dtype=np.uint8)
-        self.n = np.zeros((size, 1), dtype=np.uint8)
-
-        self.p1_choice_indices = np.zeros((size, 9), dtype=np.int64)
-        self.p2_choice_indices = np.zeros((size, 9), dtype=np.int64)
-
-        self.pokemon = np.zeros((size, 2, 5, pokemon_in_dim), dtype=np.float32)
-        self.active = np.zeros((size, 2, 1, active_in_dim), dtype=np.float32)
-        self.hp = np.zeros((size, 2, 6, 1), dtype=np.float32)
-
-        self.iterations = np.zeros((size, 1), dtype=np.uint32)
-        self.p1_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p1_nash = np.zeros((size, 9), dtype=np.float32)
-        self.p2_empirical = np.zeros((size, 9), dtype=np.float32)
-        self.p2_nash = np.zeros((size, 9), dtype=np.float32)
-
-        self.empirical_value = np.zeros((size, 1), dtype=np.float32)
-        self.nash_value = np.zeros((size, 1), dtype=np.float32)
-        self.score = np.zeros((size, 1), dtype=np.float32)
-
-    def clear(self):
-        self.m.fill(0)
-        self.n.fill(0)
-        self.p1_choice_indices.fill(0)
-        self.p2_choice_indices.fill(0)
-
-        self.pokemon.fill(0)
-        self.active.fill(0)
-        self.hp.fill(0)
-
-        self.iterations.fill(0)
-        self.p1_empirical.fill(0)
-        self.p1_nash.fill(0)
-        self.p2_empirical.fill(0)
-        self.p2_nash.fill(0)
-
-        self.empirical_value.fill(0)
-        self.nash_value.fill(0)
-        self.score.fill(0)
-
-    def raw_pointers(self, i: int):
-        def ptr(x, dtype):
-            return x[i].ctypes.data_as(ctypes.POINTER(dtype))
-
-        return (
-            ptr(self.m, ctypes.c_uint8),
-            ptr(self.n, ctypes.c_uint8),
-            ptr(self.p1_choice_indices, ctypes.c_int64),
-            ptr(self.p2_choice_indices, ctypes.c_int64),
-            ptr(self.pokemon, ctypes.c_float),
-            ptr(self.active, ctypes.c_float),
-            ptr(self.hp, ctypes.c_float),
-            ptr(self.iterations, ctypes.c_uint32),
-            ptr(self.p1_empirical, ctypes.c_float),
-            ptr(self.p1_nash, ctypes.c_float),
-            ptr(self.p2_empirical, ctypes.c_float),
-            ptr(self.p2_nash, ctypes.c_float),
-            ptr(self.empirical_value, ctypes.c_float),
-            ptr(self.nash_value, ctypes.c_float),
-            ptr(self.score, ctypes.c_float),
-        )
-
-
-# convert bytes object into BattleFrames
-def get_encoded_frames(data: bytes, frame_count: int) -> EncodedBattleFrames:
-    encoded_frames = EncodedBattleFrames(frame_count)
-    args = (ctypes.c_char_p(data),) + encoded_frames.raw_pointers(0)
-    lib.uncompress_and_encode_training_frames(*args)
-    return encoded_frames
-
-
 # convert bytes object into BattleFrames
 def read_build_trajectories(
     paths: List[str], buffer_size: int, threads: int
@@ -397,37 +239,6 @@ def read_build_trajectories(
     ) + trajectories.raw_pointers(0)
     count = lib.read_build_trajectories(*args)
     return trajectories, count
-
-
-Offset = int
-Frames = int
-
-
-class SampleIndexer:
-
-    def __init__(self):
-        self.data: Dict[str, List[[Offset, Frames]]] = {}
-
-    def get(self, path: str) -> list[[int, int]]:
-
-        if path in self.data:
-            return self.data[path]
-        else:
-            output = []
-            battle_data = read_battle_data(path)
-            total_offset = 0
-
-            for b, frames in battle_data:
-                output.append((total_offset, frames))
-                total_offset += len(b)
-
-            self.data[path] = output
-            return self.data[path]
-
-    def prune(self, paths: List[str]):
-        for path in self.data:
-            if path not in paths:
-                del self.data[path]
 
 
 def sample_from_battle_data_files(

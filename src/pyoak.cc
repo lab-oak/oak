@@ -21,7 +21,7 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h> 
+#include <pybind11/stl.h>
 
 template <std::size_t N, std::size_t M>
 std::vector<std::string>
@@ -35,6 +35,354 @@ dim_labels_to_vec(const std::array<std::array<char, M>, N> &data) {
 }
 
 using Tensorizer = Encode::Build::Tensorizer<>;
+
+namespace py = pybind11;
+
+struct BattleFrame {
+  size_t size;
+
+  py::array_t<uint8_t> m;
+  py::array_t<uint8_t> n;
+  py::array_t<uint8_t> battle;
+  py::array_t<uint8_t> durations;
+  py::array_t<uint8_t> result;
+
+  py::array_t<uint8_t> p1_choices;
+  py::array_t<uint8_t> p2_choices;
+
+  py::array_t<uint32_t> iterations;
+  py::array_t<float> p1_empirical;
+  py::array_t<float> p1_nash;
+  py::array_t<float> p2_empirical;
+  py::array_t<float> p2_nash;
+
+  py::array_t<float> empirical_value;
+  py::array_t<float> nash_value;
+  py::array_t<float> score;
+
+  BattleFrame(size_t size_) : size(size_) {
+    std::vector<ssize_t> shape1{static_cast<ssize_t>(size), 1};
+    std::vector<ssize_t> shape8{static_cast<ssize_t>(size), 8};
+    std::vector<ssize_t> shape9{static_cast<ssize_t>(size), 9};
+    std::vector<ssize_t> shape384{static_cast<ssize_t>(size), 384};
+
+    m = py::array_t<uint8_t>(shape1);
+    n = py::array_t<uint8_t>(shape1);
+    battle = py::array_t<uint8_t>(shape384);
+    durations = py::array_t<uint8_t>(shape8);
+    result = py::array_t<uint8_t>(shape1);
+    p1_choices = py::array_t<uint8_t>(shape9);
+    p2_choices = py::array_t<uint8_t>(shape9);
+    iterations = py::array_t<uint32_t>(shape1);
+    p1_empirical = py::array_t<float>(shape9);
+    p1_nash = py::array_t<float>(shape9);
+    p2_empirical = py::array_t<float>(shape9);
+    p2_nash = py::array_t<float>(shape9);
+    empirical_value = py::array_t<float>(shape1);
+    nash_value = py::array_t<float>(shape1);
+    score = py::array_t<float>(shape1);
+  }
+
+  void uncompress_from_bytes(const py::bytes &data) {
+    std::string_view data_view(data);
+    const char *raw_data = data_view.data();
+
+    Train::Battle::CompressedFrames compressed_frames{};
+    compressed_frames.read(raw_data);
+
+    using In = Train::Battle::FrameInput;
+    In input{.m = m.mutable_data(),
+             .n = n.mutable_data(),
+             .battle = battle.mutable_data(),
+             .durations = durations.mutable_data(),
+             .result = result.mutable_data(),
+             .p1_choices = p1_choices.mutable_data(),
+             .p2_choices = p2_choices.mutable_data(),
+             .iterations = iterations.mutable_data(),
+             .p1_empirical = p1_empirical.mutable_data(),
+             .p1_nash = p1_nash.mutable_data(),
+             .p2_empirical = p2_empirical.mutable_data(),
+             .p2_nash = p2_nash.mutable_data(),
+             .empirical_value = empirical_value.mutable_data(),
+             .nash_value = nash_value.mutable_data(),
+             .score = score.mutable_data()};
+
+    const auto frames_vec = compressed_frames.uncompress();
+    for (const auto &frame : frames_vec) {
+      input.write(frame);
+    }
+  }
+
+  // optional: factory function
+  static BattleFrame from_bytes(const py::bytes &data, size_t size) {
+    BattleFrame f(size);
+    f.uncompress_from_bytes(data);
+    return f;
+  }
+};
+
+struct EncodedBattleFrame {
+  size_t size;
+  py::array_t<uint8_t> m;
+  py::array_t<uint8_t> n;
+  py::array_t<int64_t> p1_choice_indices;
+  py::array_t<int64_t> p2_choice_indices;
+  py::array_t<float> pokemon; // shape: (size, 2, 5, pokemon_in_dim)
+  py::array_t<float> active;  // shape: (size, 2, 1, active_in_dim)
+  py::array_t<float> hp;      // shape: (size, 2, 6, 1)
+  py::array_t<uint32_t> iterations;
+  py::array_t<float> p1_empirical;
+  py::array_t<float> p1_nash;
+  py::array_t<float> p2_empirical;
+  py::array_t<float> p2_nash;
+  py::array_t<float> empirical_value;
+  py::array_t<float> nash_value;
+  py::array_t<float> score;
+
+  static constexpr ssize_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
+  static constexpr ssize_t active_in_dim = Encode::Battle::Active::n_dim;
+
+  EncodedBattleFrame(size_t sz) : size(sz) {
+    auto make_shape = [sz](std::vector<ssize_t> dims) {
+      dims[0] = static_cast<ssize_t>(sz); // overwrite first dim with batch size
+      return dims;
+    };
+    m = py::array_t<uint8_t>(make_shape({0, 1}));
+    n = py::array_t<uint8_t>(make_shape({0, 1}));
+    p1_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
+    p2_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
+    pokemon = py::array_t<float>(make_shape({0, 2, 5, pokemon_in_dim}));
+    active = py::array_t<float>(make_shape({0, 2, 1, active_in_dim}));
+    hp = py::array_t<float>(make_shape({0, 2, 6, 1}));
+    iterations = py::array_t<uint32_t>(make_shape({0, 1}));
+    p1_empirical = py::array_t<float>(make_shape({0, 9}));
+    p1_nash = py::array_t<float>(make_shape({0, 9}));
+    p2_empirical = py::array_t<float>(make_shape({0, 9}));
+    p2_nash = py::array_t<float>(make_shape({0, 9}));
+    empirical_value = py::array_t<float>(make_shape({0, 1}));
+    nash_value = py::array_t<float>(make_shape({0, 1}));
+    score = py::array_t<float>(make_shape({0, 1}));
+  }
+
+  void clear() {
+    std::fill_n(m.mutable_data(), m.size(), uint8_t(0));
+    std::fill_n(n.mutable_data(), n.size(), uint8_t(0));
+
+    std::fill_n(p1_choice_indices.mutable_data(), p1_choice_indices.size(),
+                int64_t(0));
+    std::fill_n(p2_choice_indices.mutable_data(), p2_choice_indices.size(),
+                int64_t(0));
+
+    std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
+    std::fill_n(active.mutable_data(), active.size(), 0.0f);
+    std::fill_n(hp.mutable_data(), hp.size(), 0.0f);
+
+    std::fill_n(iterations.mutable_data(), iterations.size(), uint32_t(0));
+    std::fill_n(p1_empirical.mutable_data(), p1_empirical.size(), 0.0f);
+    std::fill_n(p1_nash.mutable_data(), p1_nash.size(), 0.0f);
+    std::fill_n(p2_empirical.mutable_data(), p2_empirical.size(), 0.0f);
+    std::fill_n(p2_nash.mutable_data(), p2_nash.size(), 0.0f);
+
+    std::fill_n(empirical_value.mutable_data(), empirical_value.size(), 0.0f);
+    std::fill_n(nash_value.mutable_data(), nash_value.size(), 0.0f);
+    std::fill_n(score.mutable_data(), score.size(), 0.0f);
+  }
+
+  // member function to uncompress and encode
+  void uncompress_from_bytes(const py::bytes &data) {
+    std::string_view sv(data);
+    const char *raw_data = sv.data();
+
+    Train::Battle::CompressedFrames compressed_frames{};
+    compressed_frames.read(raw_data);
+
+    Encode::Battle::FrameInput input{
+        .m = m.mutable_data(),
+        .n = n.mutable_data(),
+        .p1_choice_indices = p1_choice_indices.mutable_data(),
+        .p2_choice_indices = p2_choice_indices.mutable_data(),
+        .pokemon = pokemon.mutable_data(),
+        .active = active.mutable_data(),
+        .hp = hp.mutable_data(),
+        .iterations = iterations.mutable_data(),
+        .p1_empirical = p1_empirical.mutable_data(),
+        .p1_nash = p1_nash.mutable_data(),
+        .p2_empirical = p2_empirical.mutable_data(),
+        .p2_nash = p2_nash.mutable_data(),
+        .empirical_value = empirical_value.mutable_data(),
+        .nash_value = nash_value.mutable_data(),
+        .score = score.mutable_data()};
+
+    const auto frames_vec = compressed_frames.uncompress();
+    for (const auto &frame : frames_vec) {
+      Encode::Battle::Frame encoded{frame};
+      input.write(encoded, frame.target);
+    }
+  }
+
+  // optional static factory
+  static EncodedBattleFrame from_bytes(const py::bytes &data, size_t sz) {
+    EncodedBattleFrame f(sz);
+    f.uncompress_from_bytes(data);
+    return f;
+  }
+};
+
+py::list read_battle_data(const std::string &path,
+                          size_t max_battles = 1'000'000) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("Failed to open file: " + path);
+  }
+
+  py::list result;
+  size_t total_battles = 0;
+
+  while (file.peek() != EOF && total_battles < max_battles) {
+    uint32_t offset;
+    uint16_t frame_count;
+
+    file.read(reinterpret_cast<char *>(&offset), sizeof(offset));
+    if (file.gcount() != sizeof(offset))
+      throw std::runtime_error("bad offset read");
+
+    file.read(reinterpret_cast<char *>(&frame_count), sizeof(frame_count));
+    if (file.gcount() != sizeof(frame_count))
+      throw std::runtime_error("bad frame count read");
+
+    // move back 6 bytes to match original seek
+    file.seekg(-6, std::ios::cur);
+
+    std::vector<char> buffer(offset);
+    file.read(buffer.data(), offset);
+    if (file.gcount() != offset)
+      throw std::runtime_error("truncated battle frame");
+
+    result.append(py::make_tuple(py::bytes(buffer.data(), buffer.size()),
+                                 static_cast<int>(frame_count)));
+
+    ++total_battles;
+  }
+
+  return result;
+}
+
+struct SampleIndexer {
+  // store Python objects directly
+  std::unordered_map<std::string, py::list> data;
+
+  SampleIndexer() = default;
+
+  py::list get(const std::string &path) {
+    auto it = data.find(path);
+    if (it != data.end()) {
+      return it->second; // cached Python list, no conversion needed
+    }
+
+    py::list output;
+    int total_offset = 0;
+
+    py::object py_battle_data =
+        read_battle_data(path); // Python list of (bytes,int)
+
+    for (auto bf : py_battle_data) {
+      py::tuple t = bf.cast<py::tuple>();
+      py::bytes battle_bytes = t[0].cast<py::bytes>();
+      int frame_count = t[1].cast<int>();
+
+      output.append(py::make_tuple(total_offset, frame_count));
+      total_offset += static_cast<int>(PyBytes_Size(battle_bytes.ptr()));
+    }
+
+    data[path] = output; // now works because data is py::list
+    return output;
+  }
+
+  void prune(const std::vector<std::string> &paths) {
+    for (auto it = data.begin(); it != data.end();) {
+      if (std::find(paths.begin(), paths.end(), it->first) == paths.end()) {
+        it = data.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
+  // Pybind version of sample_from_battle_data_files
+  size_t sample(EncodedBattleFrame &encoded_frames, size_t threads,
+                size_t max_game_length = 10000, size_t minimum_iterations = 1) {
+    size_t max_count = encoded_frames.size;
+
+    // prepare C++ structures from cached Python data
+    std::vector<const char *> paths;
+    std::vector<int> n_battles;
+    std::vector<std::vector<int>> offsets;
+    std::vector<std::vector<int>> n_frames;
+
+    for (auto &p : data) {
+      std::string path_str = p.first;
+      paths.push_back(path_str.c_str());
+
+      py::list lst = p.second;
+      n_battles.push_back(py::len(lst));
+
+      offsets.emplace_back();
+      n_frames.emplace_back();
+
+      for (auto item : lst) {
+        py::tuple t = item.cast<py::tuple>();
+        offsets.back().push_back(t[0].cast<int>());
+        n_frames.back().push_back(t[1].cast<int>());
+      }
+    }
+
+    // convert vectors to pointers for the C++ sampler
+    std::vector<const int *> offsets_pp, n_frames_pp;
+    for (size_t i = 0; i < offsets.size(); i++) {
+      offsets_pp.push_back(offsets[i].data());
+      n_frames_pp.push_back(n_frames[i].data());
+    }
+
+    std::atomic<size_t> count{};
+    std::atomic<size_t> errors{};
+
+    auto start_reading = [&]() {
+      std::mt19937 mt{std::random_device{}()};
+      std::uniform_int_distribution<size_t> dist_int{0,
+                                                     encoded_frames.size - 1};
+
+      while (!errors.load()) {
+        // Pick a random battle
+        size_t total_battles = 0;
+        for (auto n : n_battles)
+          total_battles += n;
+        if (total_battles == 0)
+          return;
+
+        size_t bi = dist_int(mt);
+        size_t path_index = 0;
+        while (bi >= n_battles[path_index]) {
+          bi -= n_battles[path_index];
+          path_index++;
+        }
+        size_t battle_index = bi;
+
+        // TODO: open file, read battle, select valid frame
+        // This part can directly call your existing C++ sampler code
+        // using encoded_frames mutable_data() as destination
+      }
+    };
+
+    // launch threads
+    std::vector<std::thread> pool;
+    for (size_t i = 0; i < threads; i++)
+      pool.emplace_back(start_reading);
+    for (auto &t : pool)
+      t.join();
+
+    return errors.load() ? 0 : std::min(count.load(), max_count);
+  }
+};
 
 namespace py = pybind11;
 
@@ -97,10 +445,7 @@ PYBIND11_MODULE(pyoak, m) {
       py::arg("input"), py::arg("output"));
 
   py::class_<MCTS::Output>(m, "Output")
-      // allow Python to create one
       .def(py::init<>())
-
-      // scalars
       .def_readonly("m", &MCTS::Output::m)
       .def_readonly("n", &MCTS::Output::n)
       .def_readonly("iterations", &MCTS::Output::iterations)
@@ -110,8 +455,6 @@ PYBIND11_MODULE(pyoak, m) {
       .def_property_readonly(
           "duration_ms",
           [](const MCTS::Output &o) { return o.duration.count(); })
-
-      // 9x9 visit matrix (padded)
       .def_property_readonly("visit_matrix",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<size_t>({9, 9});
@@ -123,8 +466,6 @@ PYBIND11_MODULE(pyoak, m) {
                                                  : 0;
                                return arr;
                              })
-
-      // 9x9 value matrix (padded)
       .def_property_readonly("value_matrix",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<double>({9, 9});
@@ -250,122 +591,41 @@ PYBIND11_MODULE(pyoak, m) {
     }
     return result;
   });
-}
 
-extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
-                                              uint16_t *offsets,
-                                              uint16_t *frame_counts) {
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    std::cerr << "Failed to open file: " << path << std::endl;
-    return -1;
-  }
+  py::class_<BattleFrame>(m, "BattleFrame")
+      .def(py::init<size_t>())
+      .def("uncompress_from_bytes", &BattleFrame::uncompress_from_bytes)
+      .def_static("from_bytes", &BattleFrame::from_bytes)
+      .def_readonly("size", &BattleFrame::size);
 
-  int n_battles = 0;
-  size_t total_offset = 0;
-  while (true) {
+  py::class_<EncodedBattleFrame>(m, "EncodedBattleFrame")
+      .def(py::init<size_t>())
+      .def("clear", &EncodedBattleFrame::clear)
+      .def_readonly("size", &EncodedBattleFrame::size)
+      .def_readonly("m", &EncodedBattleFrame::m)
+      .def_readonly("n", &EncodedBattleFrame::n)
+      .def_readonly("p1_choice_indices", &EncodedBattleFrame::p1_choice_indices)
+      .def_readonly("p2_choice_indices", &EncodedBattleFrame::p2_choice_indices)
+      .def_readonly("pokemon", &EncodedBattleFrame::pokemon)
+      .def_readonly("active", &EncodedBattleFrame::active)
+      .def_readonly("hp", &EncodedBattleFrame::hp)
+      .def_readonly("iterations", &EncodedBattleFrame::iterations)
+      .def_readonly("p1_empirical", &EncodedBattleFrame::p1_empirical)
+      .def_readonly("p1_nash", &EncodedBattleFrame::p1_nash)
+      .def_readonly("p2_empirical", &EncodedBattleFrame::p2_empirical)
+      .def_readonly("p2_nash", &EncodedBattleFrame::p2_nash)
+      .def_readonly("empirical_value", &EncodedBattleFrame::empirical_value)
+      .def_readonly("nash_value", &EncodedBattleFrame::nash_value)
+      .def_readonly("score", &EncodedBattleFrame::score);
 
-    if (file.peek() == EOF) {
-      break;
-    }
+  // pybind11 module
+  py::class_<SampleIndexer>(m, "SampleIndexer")
+      .def(py::init<>())
+      .def("get", &SampleIndexer::get)
+      .def("prune", &SampleIndexer::prune);
 
-    uint32_t offset;
-    uint16_t frame_count;
-    file.read(reinterpret_cast<char *>(&offset), 4);
-    if (file.gcount() < 4) {
-      std::cerr << "bad offset read" << std::endl;
-      return -1;
-    }
-    file.read(reinterpret_cast<char *>(&frame_count), 2);
-    if (file.gcount() < 2) {
-      std::cerr << "bad frame count read" << std::endl;
-      return -1;
-    }
-    file.seekg(-6, std::ios::cur);
-
-    std::vector<char> buffer;
-    buffer.reserve(offset);
-    file.read(buffer.data(), offset);
-
-    if (file.gcount() < offset) {
-      std::cerr << "truncated battle frame" << std::endl;
-      return -1;
-    }
-
-    std::memcpy(out_data + total_offset, buffer.data(), offset);
-    offsets[n_battles] = offset;
-    frame_counts[n_battles] = frame_count;
-    total_offset += offset;
-    ++n_battles;
-  }
-
-  return n_battles;
-}
-
-extern "C" void uncompress_training_frames(
-    const char *data, uint8_t *m, uint8_t *n, uint8_t *battle,
-    uint8_t *durations, uint8_t *result, uint8_t *p1_choices,
-    uint8_t *p2_choices, uint32_t *iterations, float *p1_empirical,
-    float *p1_nash, float *p2_empirical, float *p2_nash, float *empirical_value,
-    float *nash_value, float *score) {
-
-  Train::Battle::CompressedFrames compressed_frames{};
-  compressed_frames.read(data);
-
-  using In = Train::Battle::FrameInput;
-  In input{.m = m,
-           .n = n,
-           .battle = battle,
-           .durations = durations,
-           .result = result,
-           .p1_choices = p1_choices,
-           .p2_choices = p2_choices,
-           .iterations = iterations,
-           .p1_empirical = p1_empirical,
-           .p1_nash = p1_nash,
-           .p2_empirical = p2_empirical,
-           .p2_nash = p2_nash,
-           .empirical_value = empirical_value,
-           .nash_value = nash_value,
-           .score = score};
-
-  const auto frames = compressed_frames.uncompress();
-  for (const auto frame : frames) {
-    input.write(frame);
-  }
-}
-
-extern "C" void uncompress_and_encode_training_frames(
-    const char *data, uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
-    int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
-    uint32_t *iterations, float *p1_empirical, float *p1_nash,
-    float *p2_empirical, float *p2_nash, float *empirical_value,
-    float *nash_value, float *score) {
-
-  Train::Battle::CompressedFrames compressed_frames{};
-  compressed_frames.read(data);
-
-  Encode::Battle::FrameInput input{.m = m,
-                                   .n = n,
-                                   .p1_choice_indices = p1_choice_indices,
-                                   .p2_choice_indices = p2_choice_indices,
-                                   .pokemon = pokemon,
-                                   .active = active,
-                                   .hp = hp,
-                                   .iterations = iterations,
-                                   .p1_empirical = p1_empirical,
-                                   .p1_nash = p1_nash,
-                                   .p2_empirical = p2_empirical,
-                                   .p2_nash = p2_nash,
-                                   .empirical_value = empirical_value,
-                                   .nash_value = nash_value,
-                                   .score = score};
-
-  const auto frames = compressed_frames.uncompress();
-  for (const auto frame : frames) {
-    Encode::Battle::Frame encoded{frame};
-    input.write(encoded, frame.target);
-  }
+  m.def("read_battle_data", &read_battle_data, py::arg("path"),
+        py::arg("max_battles") = 1'000'000);
 }
 
 extern "C" int test_consistency(size_t max_games, const char *network_path,
@@ -471,170 +731,6 @@ extern "C" int test_consistency(size_t max_games, const char *network_path,
   }
 
   return n_battles;
-}
-
-extern "C" size_t sample_from_battle_data_files(
-    size_t max_count, size_t threads, size_t max_battle_length,
-    size_t min_interations, // params
-    size_t n_paths, const char *const *paths, const int *n_battles,
-    const int *const *offsets,
-    const int *const *n_frames, // input
-    uint8_t *m, uint8_t *n, int64_t *p1_choice_indices,
-    int64_t *p2_choice_indices, float *pokemon, float *active, float *hp,
-    uint32_t *iterations, float *p1_empirical, float *p1_nash,
-    float *p2_empirical, float *p2_nash, float *empirical_value,
-    float *nash_value, float *score
-
-) {
-  using Input = Encode::Battle::FrameInput;
-  Input input{m,
-              n,
-              p1_choice_indices,
-              p2_choice_indices,
-              pokemon,
-              active,
-              hp,
-              iterations,
-              p1_empirical,
-              p1_nash,
-              p2_empirical,
-              p2_nash,
-              empirical_value,
-              nash_value,
-              score};
-
-  const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
-  if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; })) {
-    std::cerr << "null pointer in input" << std::endl;
-    return 0;
-  }
-
-  size_t total_battles = 0;
-  for (auto i = 0; i < n_paths; ++i) {
-    total_battles += n_battles[i];
-  }
-
-  std::atomic<size_t> count{};
-  std::atomic<size_t> errors{};
-
-  const auto start_reading = [&]() -> void {
-    std::mt19937 mt{std::random_device{}()};
-    std::uniform_int_distribution<size_t> dist_int{0, total_battles - 1};
-    std::vector<char> buffer{};
-
-    const auto report_error = [&](const auto &msg) -> void {
-      std::cerr << msg << std::endl;
-      errors.fetch_add(1);
-      return;
-    };
-
-    try {
-
-      while (!errors.load()) {
-
-        const auto get_indices = [&]() -> std::pair<uint32_t, uint32_t> {
-          auto bi = dist_int(mt);
-          auto pi = 0;
-          while (bi >= 0) {
-            const auto n_battles_in_path = n_battles[pi];
-            if (n_battles_in_path > bi) {
-              break;
-            } else {
-              bi -= n_battles_in_path;
-              ++pi;
-            }
-          }
-          return {bi, pi};
-        };
-
-        const auto [battle_index, path_index] = get_indices();
-
-        if (path_index >= n_paths) {
-          return report_error("bad path index");
-        }
-
-        const char *path = paths[path_index];
-        std::ifstream file(path, std::ios::binary);
-        if (!file) {
-          return report_error("unable to open file");
-        }
-
-        const auto battle_offset = offsets[path_index][battle_index];
-
-        file.seekg(battle_offset, std::ios::beg);
-
-        using Offset = Train::Battle::CompressedFrames::Offset;
-        using FrameCount = Train::Battle::CompressedFrames::FrameCount;
-
-        Offset offset;
-        FrameCount n_frames;
-
-        file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
-        if (file.gcount() < sizeof(Offset)) {
-          return report_error("bad offset read");
-        }
-        file.read(reinterpret_cast<char *>(&n_frames), sizeof(FrameCount));
-        if (file.gcount() < sizeof(FrameCount)) {
-          return report_error("bad frame count read");
-        }
-
-        if (n_frames > max_battle_length) {
-          continue;
-        }
-
-        file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
-        if ((offset > 200000) || (offset < sizeof(pkmn_gen1_battle))) {
-          return report_error("Bad offset length: " + std::to_string(offset) +
-                              "; frames: " + std::to_string(n_frames));
-        }
-        buffer.resize(offset);
-        buffer.clear();
-        file.read(buffer.data(), offset);
-        Train::Battle::CompressedFrames compressed_frames{};
-        compressed_frames.read(buffer.data());
-
-        std::vector<int> valid_frame_indices{};
-        for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
-          const auto &update = compressed_frames.updates[i];
-          if (update.iterations >= min_interations) {
-            valid_frame_indices.push_back(i);
-          }
-        }
-
-        if (valid_frame_indices.size() == 0) {
-          continue;
-        }
-
-        const auto selected_frame_index =
-            valid_frame_indices[std::uniform_int_distribution<size_t>{
-                0, valid_frame_indices.size() - 1}(mt)];
-
-        const auto frames = compressed_frames.uncompress();
-        const auto &frame = frames[selected_frame_index];
-
-        const auto write_index = count.fetch_add(1);
-        if (write_index >= max_count) {
-          return;
-        } else {
-          input.index(write_index)
-              .write(Encode::Battle::Frame{frame}, frame.target);
-        }
-      }
-
-    } catch (const std::exception &e) {
-      report_error(e.what());
-    }
-  };
-
-  std::vector<std::thread> thread_pool{};
-  for (auto i = 0; i < threads; ++i) {
-    thread_pool.emplace_back(std::thread{start_reading});
-  }
-  for (auto i = 0; i < threads; ++i) {
-    thread_pool[i].join();
-  }
-
-  return errors.load() ? 0 : std::min(count.load(), max_count);
 }
 
 extern "C" size_t

@@ -763,7 +763,6 @@ void print_output(const Output &output, const pkmn_gen1_battle &battle,
   }
 }
 
-
 std::string output_string(const MCTS::Output &output,
                           const MCTS::Input &input) {
 
@@ -848,6 +847,5 @@ std::string output_string(const MCTS::Output &output,
   }
   return ss.str();
 }
-
 
 } // namespace MCTS
