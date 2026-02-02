@@ -7,6 +7,8 @@
 #include <train/battle/compressed-frame.h>
 #include <train/battle/frame.h>
 #include <train/build/trajectory.h>
+#include <util/parse.h>
+#include <util/search.h>
 
 #include <atomic>
 #include <bit>
@@ -16,6 +18,258 @@
 #include <random>
 #include <thread>
 #include <vector>
+
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+
+std::string output_string(const MCTS::Output &output, const MCTS::Input &input) {
+  
+  std::stringstream ss{};
+
+  constexpr auto label_width = 8;
+  const auto &battle = input.battle;
+  const auto [p1_labels, p2_labels] = PKMN::choice_labels(battle, input.result);
+
+  auto print_arr = [&ss](const auto &arr, size_t k) {
+    for (size_t i = 0; i < k; ++i) {
+      ss << std::left << std::fixed << std::setw(label_width)
+                << std::setprecision(3) << arr[i] << "  ";
+    }
+    ss << '\n';
+  };
+
+  const auto fix_label = [label_width](auto label) {
+    std::stringstream ss{};
+    ss << std::left << std::setw(label_width)
+       << label.substr(0, label_width - 1);
+    return ss.str();
+  };
+
+  ss << "Iterations: " << output.iterations
+            << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
+  ss << "Value: " << std::fixed << std::setprecision(3)
+            << output.empirical_value << "\n";
+
+  ss << "\nP1" << std::endl;
+  print_arr(p1_labels, output.m);
+  print_arr(output.p1_empirical, output.m);
+  print_arr(output.p1_nash, output.m);
+  ss << "P2" << std::endl;
+  print_arr(p2_labels, output.n);
+  print_arr(output.p2_empirical, output.n);
+  print_arr(output.p2_nash, output.n);
+
+  ss << "\nMatrix:\n";
+  std::array<char, label_width + 1> col_offset{};
+  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
+  ss << fix_label(std::string{col_offset.data()}) << ' ';
+
+  for (size_t j = 0; j < output.n; ++j)
+    ss << fix_label(p2_labels[j]) << " ";
+  ss << "\n";
+
+  for (size_t i = 0; i < output.m; ++i) {
+    ss << fix_label(p1_labels[i]) << " ";
+    for (size_t j = 0; j < output.n; ++j) {
+      if (output.visit_matrix[i][j] == 0) {
+        ss << " ----    ";
+      } else {
+        double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
+        ss << std::left << std::fixed << std::setw(label_width)
+                  << std::setprecision(3) << avg << " ";
+      }
+    }
+    ss << '\n';
+  }
+
+  ss << "\nVisits:\n";
+  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
+  ss << fix_label(std::string{col_offset.data()}) << ' ';
+
+  for (size_t j = 0; j < output.n; ++j)
+    ss << fix_label(p2_labels[j]) << " ";
+  ss << "\n";
+
+  for (size_t i = 0; i < output.m; ++i) {
+    ss << fix_label(p1_labels[i]) << " ";
+    for (size_t j = 0; j < output.n; ++j) {
+      if (output.visit_matrix[i][j] == 0) {
+        ss << " ----    ";
+      } else {
+        auto avg = output.visit_matrix[i][j];
+        ss << std::left << std::fixed << std::setw(label_width)
+                  << std::setprecision(3) << avg << " ";
+      }
+    }
+    ss << '\n';
+  }
+  return ss.str();
+}
+
+namespace py = pybind11;
+
+PYBIND11_MODULE(pyoak, m) {
+  m.doc() = "Python bindings for oak";
+
+  py::class_<RuntimeSearch::Nodes>(m, "Nodes")
+      .def(py::init<>())
+      .def("reset", &RuntimeSearch::Nodes::reset);
+
+  py::class_<RuntimeSearch::Agent>(m, "Agent")
+      .def(py::init<>())
+      .def_readwrite("search_time", &RuntimeSearch::Agent::search_time)
+      .def_readwrite("bandit_name", &RuntimeSearch::Agent::bandit_name)
+      .def_readwrite("network_path", &RuntimeSearch::Agent::network_path)
+      .def_readwrite("matrix_ucb_name", &RuntimeSearch::Agent::matrix_ucb_name)
+      .def_readwrite("use_table", &RuntimeSearch::Agent::use_table);
+  py::class_<MCTS::Input>(m, "Input").def(py::init<>());
+
+  m.def(
+      "parse_battle",
+      [](const std::string &battle_string, uint64_t seed = 0x123456) {
+        auto [battle, durations] = Parse::parse_battle(battle_string, seed);
+        MCTS::Input input{};
+        input.battle = battle;
+        input.durations = durations;
+        input.result = PKMN::result(battle);
+        return input;
+      },
+      py::arg("battle_string"), py::arg("seed") = 0x123456);
+
+  m.def(
+      "update",
+      [](MCTS::Input &input, uint8_t c1, uint8_t c2) {
+        pkmn_gen1_chance_options chance_options{};
+        chance_options.durations = input.durations;
+
+        pkmn_gen1_battle_options options{};
+        pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
+                                     nullptr);
+
+        pkmn_gen1_battle_update(&input.battle, c1, c2, &options);
+
+        input.durations = PKMN::durations(options);
+      },
+      py::arg("input"), py::arg("c1"), py::arg("c2"));
+
+  m.def(
+      "battle_string",
+      [](const MCTS::Input &input) {
+        return PKMN::battle_data_to_string(input.battle, input.durations);
+      },
+      py::arg("input"));
+
+  m.def(
+      "format",
+      [](const MCTS::Input &input, const MCTS::Output& output) {
+        return output_string(output, input);
+      },
+      py::arg("input"), py::arg("output"));
+
+  py::class_<MCTS::Output>(m, "Output")
+      // allow Python to create one
+      .def(py::init<>())
+
+      // scalars
+      .def_readonly("m", &MCTS::Output::m)
+      .def_readonly("n", &MCTS::Output::n)
+      .def_readonly("iterations", &MCTS::Output::iterations)
+      .def_readonly("empirical_value", &MCTS::Output::empirical_value)
+      .def_readonly("nash_value", &MCTS::Output::nash_value)
+
+      .def_property_readonly(
+          "duration_ms",
+          [](const MCTS::Output &o) { return o.duration.count(); })
+
+      // 9x9 visit matrix (padded)
+      .def_property_readonly("visit_matrix",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<size_t>({9, 9});
+                               auto r = arr.mutable_unchecked<2>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 for (size_t j = 0; j < 9; ++j)
+                                   r(i, j) = (i < o.m && j < o.n)
+                                                 ? o.visit_matrix[i][j]
+                                                 : 0;
+                               return arr;
+                             })
+
+      // 9x9 value matrix (padded)
+      .def_property_readonly("value_matrix",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>({9, 9});
+                               auto r = arr.mutable_unchecked<2>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 for (size_t j = 0; j < 9; ++j)
+                                   r(i, j) = (i < o.m && j < o.n)
+                                                 ? o.value_matrix[i][j]
+                                                 : 0.0;
+                               return arr;
+                             })
+
+      // 1D vectors
+      .def_property_readonly("p1_prior",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>(9);
+                               auto r = arr.mutable_unchecked<1>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 r(i) = o.p1_prior[i];
+                               return arr;
+                             })
+
+      .def_property_readonly("p2_prior",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>(9);
+                               auto r = arr.mutable_unchecked<1>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 r(i) = o.p2_prior[i];
+                               return arr;
+                             })
+
+      .def_property_readonly("p1_empirical",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>(9);
+                               auto r = arr.mutable_unchecked<1>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 r(i) = o.p1_empirical[i];
+                               return arr;
+                             })
+
+      .def_property_readonly("p2_empirical",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>(9);
+                               auto r = arr.mutable_unchecked<1>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 r(i) = o.p2_empirical[i];
+                               return arr;
+                             })
+
+      .def_property_readonly("p1_nash",
+                             [](const MCTS::Output &o) {
+                               auto arr = py::array_t<double>(9);
+                               auto r = arr.mutable_unchecked<1>();
+                               for (size_t i = 0; i < 9; ++i)
+                                 r(i) = o.p1_nash[i];
+                               return arr;
+                             })
+
+      .def_property_readonly("p2_nash", [](const MCTS::Output &o) {
+        auto arr = py::array_t<double>(9);
+        auto r = arr.mutable_unchecked<1>();
+        for (size_t i = 0; i < 9; ++i)
+          r(i) = o.p2_nash[i];
+        return arr;
+      });
+  m.def(
+      "search",
+      [](const MCTS::Input &input, RuntimeSearch::Nodes &nodes,
+         RuntimeSearch::Agent &agent, MCTS::Output output = {}) {
+        mt19937 device{std::random_device{}()};
+        return RuntimeSearch::run(device, input, nodes, agent, output);
+      },
+      py::arg("input"), py::arg("nodes"), py::arg("agent"),
+      py::arg("output") = MCTS::Output{});
+}
 
 template <std::size_t N, std::size_t M>
 constexpr std::array<const char *, N>
