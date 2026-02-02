@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-struct ProgramArgs : public SelfPlayAgentArgs {
+struct ProgramArgs : public GenerateAgentArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
   std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
   size_t &threads =
@@ -44,6 +44,10 @@ struct ProgramArgs : public SelfPlayAgentArgs {
 
   double &fast_search_prob =
       kwarg("fast-search-prob",
+            "Probability a search with only fast-search-time is used")
+          .set_default(0);
+  double &after_search_prob =
+      kwarg("after-search-prob",
             "Probability a search with only fast-search-time is used")
           .set_default(0);
   int &max_battle_length =
@@ -285,12 +289,15 @@ void generate(const ProgramArgs *args_ptr) {
                                                 battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
+        const bool use_after =
+            !use_fast && (device.uniform() < args.after_search_prob);
         agent.search_time =
             ((battle_length == 0) && skip_battle)
                 ? args.t1_search_time.value()
                 : (use_fast ? args.fast_search_time.value() : args.search_time);
         policy_options.mode =
-            use_fast ? args.fast_policy_mode : args.policy_mode;
+            use_fast ? args.fast_policy_mode.value_or(args.policy_mode)
+                     : args.policy_mode;
         MCTS::Output output{};
 
         const bool policy_rollout_only =
@@ -342,6 +349,37 @@ void generate(const ProgramArgs *args_ptr) {
           }
         } else {
           output = RuntimeSearch::run(device, battle_data, nodes, agent);
+          if (use_after) {
+            agent.search_time =
+                args.after_search_time.value_or(agent.search_time);
+            agent.bandit_name =
+                args.after_bandit_name.value_or(agent.bandit_name);
+            agent.matrix_ucb_name =
+                args.after_matrix_ucb_name.value_or(agent.matrix_ucb_name);
+            agent.network_path =
+                args.after_network_path.value_or(agent.network_path);
+            // agent.use_discrete = args.after_use_discrete;
+            // use-table must be the same...
+            auto after_output =
+                RuntimeSearch::run(device, battle_data, nodes, agent, output);
+            const auto [min, u, max] =
+                RuntimeSearch::expl(after_output, output, policy_options);
+            const auto p1_expl = u - min;
+            const auto p2_expl = max - u;
+            // std::cout << "expl: " << p2_expl << ' ' << p1_expl << std::endl;
+            if ((std::max(p1_expl, p2_expl) > 0.20) ||
+                ((p1_expl + p2_expl) > 0.35)) {
+              const auto [p1_labels, p2_labels] =
+                  PKMN::choice_labels(battle_data.battle, battle_data.result);
+              std::cout << PKMN::battle_data_to_string(battle_data.battle,
+                                                       battle_data.durations)
+                        << std::endl;
+              MCTS::print_output(output, battle_data.battle, p1_labels,
+                                 p2_labels);
+              MCTS::print_output(after_output, battle_data.battle, p1_labels,
+                                 p2_labels);
+            }
+          }
           if (battle_length == 0) {
             p1_matchup = output.empirical_value;
             p2_matchup = 1 - output.empirical_value;
