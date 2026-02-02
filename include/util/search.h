@@ -8,6 +8,7 @@
 #include <search/bandit/ucb1.h>
 #include <search/mcts.h>
 #include <search/poke-engine-evalulate.h>
+#include <util/policy.h>
 #include <util/strings.h>
 
 #include <chrono>
@@ -159,6 +160,31 @@ struct Agent {
     return ss.str();
   }
 };
+
+std::tuple<double, double, double> expl(const MCTS::Output &a,
+                                        const MCTS::Output &o,
+                                        const RuntimePolicy::Options &p) {
+  auto p1_policy = RuntimePolicy::get_policy(o.p1_empirical, o.p1_nash, p);
+  auto p2_policy = RuntimePolicy::get_policy(o.p2_empirical, o.p2_nash, p);
+  std::array<double, 9> p1_rewards{};
+  std::array<double, 9> p2_rewards{};
+  for (auto i = 0; i < a.m; ++i) {
+    for (auto j = 0; j < a.n; ++j) {
+      auto value = a.visit_matrix[i][j] == 0
+                       ? .5
+                       : a.value_matrix[i][j] / a.visit_matrix[i][j];
+      p1_rewards[i] += p2_policy[j] * value;
+      p2_rewards[j] += p1_policy[i] * value;
+    }
+  }
+  auto min = *std::min_element(p2_rewards.begin(), p2_rewards.begin() + a.n);
+  auto max = *std::max_element(p1_rewards.begin(), p1_rewards.begin() + a.m);
+  double u = 0;
+  for (auto i = 0; i < a.m; ++i) {
+    u += p1_policy[i] * p1_rewards[i];
+  }
+  return {min, u, max};
+}
 
 auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
          MCTS::Output output = {}) {
