@@ -21,9 +21,9 @@ endfunction()
 create_library(libpkmn_client_release release client)
 create_library(libpkmn_client_debug release client)
 create_library(libpkmn_chance_release release chance)
-create_library(libpkmn_chance_debug release chance)
-create_library(libpkmn_fast_release release fast)
-create_library(libpkmn_fast_debug release fast)
+create_library(libpkmn_chance_debug debug chance)
+create_library(libpkmn_fast_release debug fast)
+create_library(libpkmn_fast_debug debug fast)
 
 add_library(libpkmn_client INTERFACE)
 target_link_libraries(libpkmn_client INTERFACE
@@ -43,6 +43,17 @@ target_link_libraries(libpkmn_fast INTERFACE
 
 target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC NO_DISCRETE_NETWORK)
 target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC NO_DISCRETE_NETWORK)
+
+## Pybind
+
+include(FetchContent)
+
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG v2.12.0
+)
+FetchContent_MakeAvailable(pybind11)
 
 # Targets
 
@@ -68,7 +79,8 @@ target_link_libraries(vs PRIVATE libpkmn_chance lrslibgmp eigen argparse)
 
 add_library(pyoak SHARED src/pyoak.cc)
 target_include_directories(pyoak PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(pyoak PRIVATE libpkmn_chance eigen)
+target_link_libraries(pyoak PRIVATE libpkmn_chance lrslibgmp eigen pybind11::module)
+set_target_properties(pyoak PROPERTIES PREFIX "" SUFFIX ".so")
 
 add_executable(log src/log.cc)
 target_include_directories(log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
