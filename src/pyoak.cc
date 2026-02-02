@@ -21,90 +21,20 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h> 
 
-std::string output_string(const MCTS::Output &output, const MCTS::Input &input) {
-  
-  std::stringstream ss{};
-
-  constexpr auto label_width = 8;
-  const auto &battle = input.battle;
-  const auto [p1_labels, p2_labels] = PKMN::choice_labels(battle, input.result);
-
-  auto print_arr = [&ss](const auto &arr, size_t k) {
-    for (size_t i = 0; i < k; ++i) {
-      ss << std::left << std::fixed << std::setw(label_width)
-                << std::setprecision(3) << arr[i] << "  ";
-    }
-    ss << '\n';
-  };
-
-  const auto fix_label = [label_width](auto label) {
-    std::stringstream ss{};
-    ss << std::left << std::setw(label_width)
-       << label.substr(0, label_width - 1);
-    return ss.str();
-  };
-
-  ss << "Iterations: " << output.iterations
-            << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
-  ss << "Value: " << std::fixed << std::setprecision(3)
-            << output.empirical_value << "\n";
-
-  ss << "\nP1" << std::endl;
-  print_arr(p1_labels, output.m);
-  print_arr(output.p1_empirical, output.m);
-  print_arr(output.p1_nash, output.m);
-  ss << "P2" << std::endl;
-  print_arr(p2_labels, output.n);
-  print_arr(output.p2_empirical, output.n);
-  print_arr(output.p2_nash, output.n);
-
-  ss << "\nMatrix:\n";
-  std::array<char, label_width + 1> col_offset{};
-  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  ss << fix_label(std::string{col_offset.data()}) << ' ';
-
-  for (size_t j = 0; j < output.n; ++j)
-    ss << fix_label(p2_labels[j]) << " ";
-  ss << "\n";
-
-  for (size_t i = 0; i < output.m; ++i) {
-    ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
-      if (output.visit_matrix[i][j] == 0) {
-        ss << " ----    ";
-      } else {
-        double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
-        ss << std::left << std::fixed << std::setw(label_width)
-                  << std::setprecision(3) << avg << " ";
-      }
-    }
-    ss << '\n';
+template <std::size_t N, std::size_t M>
+std::vector<std::string>
+dim_labels_to_vec(const std::array<std::array<char, M>, N> &data) {
+  std::vector<std::string> result;
+  result.reserve(N);
+  for (auto &arr : data) {
+    result.emplace_back(arr.data());
   }
-
-  ss << "\nVisits:\n";
-  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  ss << fix_label(std::string{col_offset.data()}) << ' ';
-
-  for (size_t j = 0; j < output.n; ++j)
-    ss << fix_label(p2_labels[j]) << " ";
-  ss << "\n";
-
-  for (size_t i = 0; i < output.m; ++i) {
-    ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
-      if (output.visit_matrix[i][j] == 0) {
-        ss << " ----    ";
-      } else {
-        auto avg = output.visit_matrix[i][j];
-        ss << std::left << std::fixed << std::setw(label_width)
-                  << std::setprecision(3) << avg << " ";
-      }
-    }
-    ss << '\n';
-  }
-  return ss.str();
+  return result;
 }
+
+using Tensorizer = Encode::Build::Tensorizer<>;
 
 namespace py = pybind11;
 
@@ -161,8 +91,8 @@ PYBIND11_MODULE(pyoak, m) {
 
   m.def(
       "format",
-      [](const MCTS::Input &input, const MCTS::Output& output) {
-        return output_string(output, input);
+      [](const MCTS::Input &input, const MCTS::Output &output) {
+        return MCTS::output_string(output, input);
       },
       py::arg("input"), py::arg("output"));
 
@@ -269,73 +199,58 @@ PYBIND11_MODULE(pyoak, m) {
       },
       py::arg("input"), py::arg("nodes"), py::arg("agent"),
       py::arg("output") = MCTS::Output{});
+
+  // Battle net hyperparams
+  m.attr("pokemon_in_dim") = Encode::Battle::Pokemon::n_dim;
+  m.attr("active_in_dim") = Encode::Battle::Active::n_dim;
+  m.attr("pokemon_hidden_dim") = NN::Battle::Default::pokemon_hidden_dim;
+  m.attr("pokemon_out_dim") = NN::Battle::Default::pokemon_out_dim;
+  m.attr("active_hidden_dim") = NN::Battle::Default::active_hidden_dim;
+  m.attr("active_out_dim") = NN::Battle::Default::active_out_dim;
+  m.attr("side_out_dim") = NN::Battle::Default::side_out_dim;
+  m.attr("hidden_dim") = NN::Battle::Default::hidden_dim;
+  m.attr("value_hidden_dim") = NN::Battle::Default::value_hidden_dim;
+  m.attr("policy_hidden_dim") = NN::Battle::Default::policy_hidden_dim;
+  m.attr("policy_out_dim") = NN::Battle::Default::policy_out_dim;
+
+  // Build net hyperparams
+  // m.attr("build_policy_hidden_dim") =
+  //     NN::Build::Default::build_policy_hidden_dim;
+  // m.attr("build_value_hidden_dim") =
+  // NN::Build::Default::build_value_hidden_dim; m.attr("build_max_actions") =
+  // NN::Build::Default::build_max_actions;
+
+  m.def("move_names",
+        []() { return dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY); });
+
+  m.def("species_names",
+        []() { return dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY); });
+
+  m.def("pokemon_dim_labels", []() {
+    return dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
+  });
+
+  m.def("active_dim_labels",
+        []() { return dim_labels_to_vec(Encode::Battle::Active::dim_labels); });
+
+  m.def("policy_dim_labels", []() {
+    auto v = dim_labels_to_vec(Encode::Battle::Policy::dim_labels);
+    v.push_back(""); // preserve your extra empty string
+    return v;
+  });
+
+  // Species-move list
+  m.def("species_move_list", []() {
+    std::vector<std::pair<int, int>> result;
+    result.reserve(Tensorizer::species_move_list_size);
+    for (int i = 0; i < Tensorizer::species_move_list_size; ++i) {
+      auto p = Tensorizer::species_move_list(i);
+      result.emplace_back(static_cast<int>(p.first),
+                          static_cast<int>(p.second));
+    }
+    return result;
+  });
 }
-
-template <std::size_t N, std::size_t M>
-constexpr std::array<const char *, N>
-dim_labels_to_c(const std::array<std::array<char, M>, N> &data) {
-  std::array<const char *, N> ptrs{};
-  for (std::size_t i = 0; i < N; ++i) {
-    ptrs[i] = data[i].data();
-  }
-  return ptrs;
-}
-
-const auto move_names_ptrs = dim_labels_to_c(PKMN::Data::MOVE_CHAR_ARRAY);
-const auto species_names_ptrs = dim_labels_to_c(PKMN::Data::SPECIES_CHAR_ARRAY);
-const char *const *move_names = move_names_ptrs.data();
-const char *const *species_names = species_names_ptrs.data();
-
-using Tensorizer = Encode::Build::Tensorizer<>;
-
-extern "C" const auto species_move_list_size =
-    static_cast<int>(Tensorizer::species_move_list_size);
-
-consteval auto get_species_move_list_py() {
-  std::array<int, species_move_list_size * 2> result{};
-  for (auto i = 0; i < species_move_list_size; ++i) {
-    const auto pair = Tensorizer::species_move_list(i);
-    result[2 * i] = static_cast<int>(pair.first);
-    result[2 * i + 1] = static_cast<int>(pair.second);
-  }
-  return result;
-}
-
-const auto species_move_list_py = get_species_move_list_py();
-
-const int *species_move_list_ptrs = species_move_list_py.data();
-
-const auto pokemon_dim_label_ptrs =
-    dim_labels_to_c(Encode::Battle::Pokemon::dim_labels);
-const auto active_dim_label_ptrs =
-    dim_labels_to_c(Encode::Battle::Active::dim_labels);
-const auto policy_dim_label_ptrs =
-    dim_labels_to_c(Encode::Battle::Policy::dim_labels);
-
-const char *const *pokemon_dim_labels = pokemon_dim_label_ptrs.data();
-const char *const *active_dim_labels = active_dim_label_ptrs.data();
-const char *const *policy_dim_labels = policy_dim_label_ptrs.data();
-
-extern "C" const int pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
-extern "C" const int active_in_dim = Encode::Battle::Active::n_dim;
-
-extern "C" const int pokemon_hidden_dim =
-    NN::Battle::Default::pokemon_hidden_dim;
-extern "C" const int pokemon_out_dim = NN::Battle::Default::pokemon_out_dim;
-extern "C" const int active_hidden_dim = NN::Battle::Default::active_hidden_dim;
-extern "C" const int active_out_dim = NN::Battle::Default::active_out_dim;
-extern "C" const int side_out_dim = NN::Battle::Default::side_out_dim;
-extern "C" const int hidden_dim = NN::Battle::Default::hidden_dim;
-extern "C" const int value_hidden_dim = NN::Battle::Default::value_hidden_dim;
-extern "C" const int policy_hidden_dim = NN::Battle::Default::policy_hidden_dim;
-extern "C" const int policy_out_dim = NN::Battle::Default::policy_out_dim;
-
-extern "C" const int build_policy_hidden_dim =
-    NN::Build::Default::policy_hidden_dim;
-extern "C" const int build_value_hidden_dim =
-    NN::Build::Default::value_hidden_dim;
-// input and output dim for policy net due to encoding
-extern "C" const int build_max_actions = Tensorizer::max_actions;
 
 extern "C" int index_compressed_battle_frames(const char *path, char *out_data,
                                               uint16_t *offsets,
