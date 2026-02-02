@@ -14,11 +14,14 @@ void initialize(auto &device, auto &arr) {
 struct Pokemon {
 
   struct HP {
+    using Key = uint8_t;
     static constexpr int n_buckets = 8;
     std::array<uint64_t, n_buckets> hashes;
     HP() = default;
     HP(auto &device) { initialize(device, hashes); }
-    static constexpr uint8_t get_key(uint16_t base_hp, uint16_t hp) noexcept {
+    // TODO finish so that battles return a collision-less key
+    // to be used with std::map
+    static constexpr Key get_key(uint16_t base_hp, uint16_t hp) noexcept {
       return (n_buckets * hp / base_hp) - (hp == base_hp);
     }
 
