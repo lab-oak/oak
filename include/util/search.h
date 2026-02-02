@@ -106,12 +106,12 @@ struct Agent {
   std::string search_time;
   std::string bandit_name;
   std::string network_path;
-  bool discrete_network;
   std::string matrix_ucb_name;
   bool use_table;
   // valid if already loaded/cache set
   std::optional<NN::Battle::Network> network;
   bool *flag;
+  bool discrete_network;
 
   bool uses_network() const {
     return !network_path.empty() && network_path != "mc" &&
