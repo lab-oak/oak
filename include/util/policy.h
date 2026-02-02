@@ -17,6 +17,57 @@ struct Options {
   }
 };
 
+std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
+                                 const auto &options) {
+  std::array<double, 9> policy{};
+  if (options.mode == 'x') {
+    policy[std::distance(
+        empirical.begin(),
+        std::max_element(empirical.begin(), empirical.end()))] = 1.0;
+  } else if (options.mode == 'n') {
+    std::copy(nash.begin(), nash.end(), policy.begin());
+  } else if (options.mode == 'e') {
+    std::copy(empirical.begin(), empirical.end(), policy.begin());
+  } else if (options.mode == 'm') {
+    const auto weighted_sum = [](const auto &a, const auto &b,
+                                 const auto alpha) {
+      auto result = a;
+      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
+                     [alpha](const auto &x, const auto &y) {
+                       return alpha * x + (1 - alpha) * y;
+                     });
+      return result;
+    };
+    policy = weighted_sum(nash, empirical, options.nash_weight);
+  }
+
+  if (options.temp != 1) {
+    double sum = 0;
+    for (auto &x : policy) {
+      x = std::pow(x, options.temp);
+      sum += x;
+    }
+    for (auto &x : policy) {
+      x /= sum;
+    }
+  }
+
+  if (options.min_prob > 0) {
+    double sum = 0;
+    for (auto &x : policy) {
+      if (x < options.min_prob) {
+        x = 0;
+      }
+      sum += x;
+    }
+    for (auto &x : policy) {
+      x /= sum;
+    }
+  }
+
+  return policy;
+}
+
 int process_and_sample(auto &device, const auto &empirical, const auto &nash,
                        const auto &policy_options) {
   const double t = policy_options.temp;
