@@ -273,6 +273,8 @@ struct SampleIndexer {
 
   SampleIndexer() = default;
 
+  size_t size() const { return data.size(); }
+
   py::list get(const std::string &path) {
     auto it = data.find(path);
     if (it != data.end()) {
@@ -336,6 +338,8 @@ struct SampleIndexer {
       }
     }
 
+    std::cout << data.size() << std::endl;
+
     // convert vectors to pointers for the C++ sampler
     std::vector<const int *> offsets_pp, n_frames_pp;
     for (size_t i = 0; i < offsets.size(); i++) {
@@ -386,7 +390,7 @@ struct SampleIndexer {
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(pyoak, m) {
+PYBIND11_MODULE(py_oak, m) {
   m.doc() = "Python bindings for oak";
 
   py::class_<RuntimeSearch::Nodes>(m, "Nodes")
@@ -622,224 +626,10 @@ PYBIND11_MODULE(pyoak, m) {
   py::class_<SampleIndexer>(m, "SampleIndexer")
       .def(py::init<>())
       .def("get", &SampleIndexer::get)
-      .def("prune", &SampleIndexer::prune);
+      .def("prune", &SampleIndexer::prune)
+      .def("sample", &SampleIndexer::sample)
+      .def("size", &SampleIndexer::size);
 
   m.def("read_battle_data", &read_battle_data, py::arg("path"),
         py::arg("max_battles") = 1'000'000);
-}
-
-extern "C" int test_consistency(size_t max_games, const char *network_path,
-                                const char *path, char *out_data,
-                                uint16_t *offsets, uint16_t *frame_counts) {
-
-  std::ifstream network_params{network_path, std::ios::binary};
-  NN::Battle::Network network{};
-  if (!network.read_parameters(network_params)) {
-    return -1;
-  }
-
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    std::cerr << "Failed to open file: " << path << std::endl;
-    return -1;
-  }
-
-  int n_battles = 0;
-  size_t total_offset = 0;
-  for (auto i = 0; i < max_games; ++i) {
-
-    if (file.peek() == EOF) {
-      break;
-    }
-
-    uint32_t offset;
-    uint16_t frame_count;
-    file.read(reinterpret_cast<char *>(&offset), 4);
-    if (file.gcount() < 4) {
-      std::cerr << "bad offset read" << std::endl;
-      return -1;
-    }
-    file.read(reinterpret_cast<char *>(&frame_count), 2);
-    if (file.gcount() < 2) {
-      std::cerr << "bad frame count read" << std::endl;
-      return -1;
-    }
-    file.seekg(-6, std::ios::cur);
-
-    std::vector<char> buffer;
-    buffer.reserve(offset);
-    file.read(buffer.data(), offset);
-
-    if (file.gcount() < offset) {
-      std::cerr << "truncated battle frame" << std::endl;
-      return -1;
-    }
-
-    Train::Battle::CompressedFrames compressed_frames{};
-    compressed_frames.read(buffer.data());
-
-    auto battle = compressed_frames.battle;
-    auto options = PKMN::options();
-    auto result = PKMN::result();
-
-    network.fill_pokemon_caches(battle);
-
-    std::vector<float> network_values{};
-    network_values.reserve(compressed_frames.updates.size());
-
-    std::array<pkmn_choice, 9> p1_choices;
-    std::array<pkmn_choice, 9> p2_choices;
-
-    for (const auto &update : compressed_frames.updates) {
-      const auto m = pkmn_gen1_battle_choices(
-          &battle, PKMN_PLAYER_P1, pkmn_result_p1(result), p1_choices.data(),
-          PKMN_GEN1_MAX_CHOICES);
-      const auto n = pkmn_gen1_battle_choices(
-          &battle, PKMN_PLAYER_P2, pkmn_result_p2(result), p2_choices.data(),
-          PKMN_GEN1_MAX_CHOICES);
-      std::array<float, 9> p1_logits{};
-      std::array<float, 9> p2_logits{};
-
-      const auto durations = PKMN::durations(options);
-      const auto value = network.inference(battle, durations, m, n,
-                                           p1_choices.data(), p2_choices.data(),
-                                           p1_logits.data(), p2_logits.data());
-      network_values.push_back(value);
-      // std::cout << "____" << std::endl;
-      std::cout << value << ' ';
-      // for (auto i = 0; i < m; ++i) {
-      //   std::cout << p1_logits[i] << ' ';
-      // }
-      // std::cout << std::endl;
-      // for (auto i = 0; i < n; ++i) {
-      //   std::cout << p2_logits[i] << ' ';
-      // }
-      // std::cout << std::endl;
-
-      result = PKMN::update(battle, update.c1, update.c2, options);
-    }
-
-    std::cout << compressed_frames.updates.size() << std::endl;
-
-    std::memcpy(out_data + total_offset, buffer.data(), offset);
-    offsets[n_battles] = offset;
-    frame_counts[n_battles] = frame_count;
-    total_offset += offset;
-    ++n_battles;
-
-    // break;
-  }
-
-  return n_battles;
-}
-
-extern "C" size_t
-read_build_trajectories(size_t max_count, size_t threads, size_t n_paths,
-                        const char *const *paths, int64_t *action,
-                        int64_t *mask, float *policy, float *value,
-                        float *score, int64_t *start, int64_t *end) {
-
-  constexpr auto traj_size =
-      Encode::Build::CompressedTrajectory<>::size_no_team;
-
-  using In = Encode::Build::TrajectoryInput<>;
-  In input{.action = action,
-           .mask = mask,
-           .policy = policy,
-           .value = value,
-           .score = score,
-           .start = start,
-           .end = end};
-
-  const auto ptrs = std::bit_cast<std::array<void *, 7>>(input);
-  if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; })) {
-    std::cerr << "null pointer in input" << std::endl;
-    return 0;
-  }
-
-  std::atomic<size_t> count{};
-  std::atomic<size_t> errors{};
-
-  const auto start_reading = [&]() {
-    std::mt19937 mt{std::random_device{}()};
-    std::uniform_int_distribution<size_t> file_dist{0, n_paths - 1};
-
-    const auto report_error = [&](const auto &msg) -> void {
-      std::cerr << msg << std::endl;
-      errors.fetch_add(1);
-      return;
-    };
-
-    try {
-      while (true) {
-
-        const auto path_index = file_dist(mt);
-        std::ifstream file(paths[path_index], std::ios::binary);
-        if (!file) {
-          return report_error("Failed to open file " +
-                              std::to_string(path_index));
-        }
-        file.seekg(0, std::ios::end);
-        auto size = file.tellg();
-        file.seekg(0);
-        if ((size % traj_size) != 0) {
-          return report_error("File " + std::to_string(path_index) + " size " +
-                              std::to_string(size) + " is not a multiple of " +
-                              std::to_string(traj_size));
-        }
-
-        const auto n_trajectories = size / traj_size;
-
-        const auto trajectory_index =
-            std::uniform_int_distribution<size_t>{0, n_trajectories - 1}(mt);
-        file.seekg(trajectory_index * traj_size);
-
-        Encode::Build::CompressedTrajectory<> traj;
-        file.read(reinterpret_cast<char *>(&traj), traj_size);
-        if (file.gcount() < traj_size) {
-          return report_error("Bad trajectory read");
-        }
-        const auto format = static_cast<uint8_t>(traj.header.format);
-        if (format != 0) {
-          return report_error("Only NoTeam trajectories are supported");
-        }
-
-        const auto write_index = count.fetch_add(1);
-        if (write_index >= max_count) {
-          return;
-        } else {
-          input.index(write_index).write(traj);
-        }
-      }
-    } catch (const std::exception &e) {
-      return report_error(e.what());
-    }
-  };
-
-  const auto start_ = std::chrono::high_resolution_clock::now();
-
-  std::vector<std::thread> thread_pool{};
-  for (auto i = 0; i < threads; ++i) {
-    thread_pool.emplace_back(std::thread{start_reading});
-  }
-  for (auto i = 0; i < threads; ++i) {
-    thread_pool[i].join();
-  }
-
-  const auto end_ = std::chrono::high_resolution_clock::now();
-  const auto ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end_ - start_);
-  // std::cout << ms.count() << std::endl;
-  return errors.load() ? 0 : std::min(count.load(), max_count);
-}
-
-extern "C" void print_battle_data(uint8_t *battle_bytes,
-                                  uint8_t *durations_bytes) {
-  pkmn_gen1_battle battle;
-  pkmn_gen1_chance_durations durations;
-  std::copy(battle_bytes, battle_bytes + PKMN::Layout::Sizes::Battle,
-            battle.bytes);
-  std::copy(durations_bytes, durations_bytes + PKMN::Layout::Sizes::Durations,
-            durations.bytes);
-  std::cout << PKMN::battle_data_to_string(battle, durations) << std::endl;
 }

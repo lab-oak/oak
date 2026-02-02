@@ -4,7 +4,10 @@ import random
 import time
 import datetime
 import itertools
+import sys
+import numpy as np
 
+sys.path.append(os.path.abspath("release"))  # or wherever pyoak.so / pyoak.pyd lives
 import py_oak
 
 parser = argparse.ArgumentParser(
@@ -185,7 +188,7 @@ def main():
         return loss_per_sample.mean()
 
     def loss(
-        input: torch_oak.EncodedBattleFrames,
+        input: torch_oak.EncodedBattleFrame,
         output: torch_oak.OutputBuffers,
         args,
         print_flag=False,
@@ -278,7 +281,7 @@ def main():
         args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    py_oak.save_args(args, args.dir)
+    # py_oak.save_args(args, args.dir)
 
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
@@ -300,8 +303,8 @@ def main():
 
     print(f"Initial network hash: {network.hash()}")
 
-    encoded_frames = py_oak.EncodedBattleFrames(args.batch_size)
-    encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames).to(device)
+    encoded_frames = py_oak.EncodedBattleFrame(args.batch_size)
+    encoded_frames_torch = torch_oak.EncodedBattleFrame(encoded_frames).to(device)
 
     output_buffer = torch_oak.OutputBuffers(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
@@ -328,16 +331,23 @@ def main():
         for file in data_files:
             sample_indexer.get(file)
 
+        print(f"Size {sample_indexer.size()}")
+
         encoded_frames.clear()
         output_buffer.clear()
 
-        samples_read = py_oak.sample_from_battle_data_files(
-            sample_indexer,
-            encoded_frames,
-            args.threads,
-            args.max_battle_length,
-            args.min_iterations,
+        # samples_read = py_oak.sample_from_battle_data_files(
+        #     sample_indexer,
+        #     encoded_frames,
+        #     args.threads,
+        #     args.max_battle_length,
+        #     args.min_iterations,
+        # )
+        print("Start read")
+        samples_read = sample_indexer.sample(
+            encoded_frames, args.threads, args.max_battle_length, args.min_iterations
         )
+        print("End read")
 
         if samples_read < args.batch_size:
             skipped_steps += 1
