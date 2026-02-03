@@ -390,7 +390,7 @@ struct SampleIndexer {
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(py_oak, m) {
+PYBIND11_MODULE(pyoak, m) {
   m.doc() = "Python bindings for oak";
 
   py::class_<RuntimeSearch::Nodes>(m, "Nodes")
