@@ -38,6 +38,90 @@ using Tensorizer = Encode::Build::Tensorizer<>;
 
 namespace py = pybind11;
 
+
+py::list read_battle_data(const std::string &path,
+                          size_t max_battles = 1'000'000) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("Failed to open file: " + path);
+  }
+
+  py::list result;
+  size_t total_battles = 0;
+
+  while (file.peek() != EOF && total_battles < max_battles) {
+    uint32_t offset;
+    uint16_t frame_count;
+
+    file.read(reinterpret_cast<char *>(&offset), sizeof(offset));
+    if (file.gcount() != sizeof(offset))
+      throw std::runtime_error("bad offset read");
+
+    file.read(reinterpret_cast<char *>(&frame_count), sizeof(frame_count));
+    if (file.gcount() != sizeof(frame_count))
+      throw std::runtime_error("bad frame count read");
+
+    // move back 6 bytes to match original seek
+    file.seekg(-6, std::ios::cur);
+
+    std::vector<char> buffer(offset);
+    file.read(buffer.data(), offset);
+    if (file.gcount() != offset)
+      throw std::runtime_error("truncated battle frame");
+
+    result.append(py::make_tuple(py::bytes(buffer.data(), buffer.size()),
+                                 static_cast<int>(frame_count)));
+
+    ++total_battles;
+  }
+
+  return result;
+}
+
+struct SampleIndexer {
+  // store Python objects directly
+  std::unordered_map<std::string, py::list> data;
+
+  SampleIndexer() = default;
+
+  size_t size() const { return data.size(); }
+
+  py::list get(const std::string &path) {
+    auto it = data.find(path);
+    if (it != data.end()) {
+      return it->second; // cached Python list, no conversion needed
+    }
+
+    py::list output;
+    int total_offset = 0;
+
+    py::object py_battle_data =
+        read_battle_data(path); // Python list of (bytes,int)
+
+    for (auto bf : py_battle_data) {
+      py::tuple t = bf.cast<py::tuple>();
+      py::bytes battle_bytes = t[0].cast<py::bytes>();
+      int frame_count = t[1].cast<int>();
+
+      output.append(py::make_tuple(total_offset, frame_count));
+      total_offset += static_cast<int>(PyBytes_Size(battle_bytes.ptr()));
+    }
+
+    data[path] = output; // now works because data is py::list
+    return output;
+  }
+
+  void prune(const std::vector<std::string> &paths) {
+    for (auto it = data.begin(); it != data.end();) {
+      if (std::find(paths.begin(), paths.end(), it->first) == paths.end()) {
+        it = data.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+};
+
 struct BattleFrame {
   size_t size;
 
@@ -226,106 +310,45 @@ struct EncodedBattleFrame {
     f.uncompress_from_bytes(data);
     return f;
   }
-};
 
-py::list read_battle_data(const std::string &path,
-                          size_t max_battles = 1'000'000) {
-  std::ifstream file(path, std::ios::binary);
-  if (!file) {
-    throw std::runtime_error("Failed to open file: " + path);
-  }
+  size_t sample(const SampleIndexer &indexer, size_t threads,
+                size_t max_battle_length, size_t min_iterations) {
+    using Input = Encode::Battle::FrameInput;
 
-  py::list result;
-  size_t total_battles = 0;
+    // ---- construct FrameInput from *member data* ----
+    Input input{
+        .m = m.mutable_data(),
+        .n = n.mutable_data(),
+        .p1_choice_indices = p1_choice_indices.mutable_data(),
+        .p2_choice_indices = p2_choice_indices.mutable_data(),
+        .pokemon = pokemon.mutable_data(),
+        .active = active.mutable_data(),
+        .hp = hp.mutable_data(),
+        .iterations = iterations.mutable_data(),
+        .p1_empirical = p1_empirical.mutable_data(),
+        .p1_nash = p1_nash.mutable_data(),
+        .p2_empirical = p2_empirical.mutable_data(),
+        .p2_nash = p2_nash.mutable_data(),
+        .empirical_value = empirical_value.mutable_data(),
+        .nash_value = nash_value.mutable_data(),
+        .score = score.mutable_data(),
+    };
 
-  while (file.peek() != EOF && total_battles < max_battles) {
-    uint32_t offset;
-    uint16_t frame_count;
-
-    file.read(reinterpret_cast<char *>(&offset), sizeof(offset));
-    if (file.gcount() != sizeof(offset))
-      throw std::runtime_error("bad offset read");
-
-    file.read(reinterpret_cast<char *>(&frame_count), sizeof(frame_count));
-    if (file.gcount() != sizeof(frame_count))
-      throw std::runtime_error("bad frame count read");
-
-    // move back 6 bytes to match original seek
-    file.seekg(-6, std::ios::cur);
-
-    std::vector<char> buffer(offset);
-    file.read(buffer.data(), offset);
-    if (file.gcount() != offset)
-      throw std::runtime_error("truncated battle frame");
-
-    result.append(py::make_tuple(py::bytes(buffer.data(), buffer.size()),
-                                 static_cast<int>(frame_count)));
-
-    ++total_battles;
-  }
-
-  return result;
-}
-
-struct SampleIndexer {
-  // store Python objects directly
-  std::unordered_map<std::string, py::list> data;
-
-  SampleIndexer() = default;
-
-  size_t size() const { return data.size(); }
-
-  py::list get(const std::string &path) {
-    auto it = data.find(path);
-    if (it != data.end()) {
-      return it->second; // cached Python list, no conversion needed
+    // sanity check, same as original
+    const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
+    if (std::any_of(ptrs.begin(), ptrs.end(), [](auto p) { return !p; })) {
+      std::cerr << "null pointer in input" << std::endl;
+      return 0;
     }
 
-    py::list output;
-    int total_offset = 0;
-
-    py::object py_battle_data =
-        read_battle_data(path); // Python list of (bytes,int)
-
-    for (auto bf : py_battle_data) {
-      py::tuple t = bf.cast<py::tuple>();
-      py::bytes battle_bytes = t[0].cast<py::bytes>();
-      int frame_count = t[1].cast<int>();
-
-      output.append(py::make_tuple(total_offset, frame_count));
-      total_offset += static_cast<int>(PyBytes_Size(battle_bytes.ptr()));
-    }
-
-    data[path] = output; // now works because data is py::list
-    return output;
-  }
-
-  void prune(const std::vector<std::string> &paths) {
-    for (auto it = data.begin(); it != data.end();) {
-      if (std::find(paths.begin(), paths.end(), it->first) == paths.end()) {
-        it = data.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
-
-  // Pybind version of sample_from_battle_data_files
-  size_t sample(EncodedBattleFrame &encoded_frames, size_t threads,
-                size_t max_game_length = 10000, size_t minimum_iterations = 1) {
-    size_t max_count = encoded_frames.size;
-
-    // prepare C++ structures from cached Python data
+    // ---- flatten indexer data into C++ arrays ----
     std::vector<const char *> paths;
     std::vector<int> n_battles;
     std::vector<std::vector<int>> offsets;
     std::vector<std::vector<int>> n_frames;
 
-    for (auto &p : data) {
-      std::string path_str = p.first;
-      paths.push_back(path_str.c_str());
-
-      py::list lst = p.second;
+    for (const auto &[path, lst] : indexer.data) {
+      paths.push_back(path.c_str());
       n_battles.push_back(py::len(lst));
 
       offsets.emplace_back();
@@ -338,53 +361,122 @@ struct SampleIndexer {
       }
     }
 
-    std::cout << data.size() << std::endl;
-
-    // convert vectors to pointers for the C++ sampler
-    std::vector<const int *> offsets_pp, n_frames_pp;
-    for (size_t i = 0; i < offsets.size(); i++) {
-      offsets_pp.push_back(offsets[i].data());
-      n_frames_pp.push_back(n_frames[i].data());
-    }
+    size_t total_battles = 0;
+    for (auto n : n_battles)
+      total_battles += n;
 
     std::atomic<size_t> count{};
     std::atomic<size_t> errors{};
 
-    auto start_reading = [&]() {
+    // ---- worker ----
+    const auto start_reading = [&]() {
       std::mt19937 mt{std::random_device{}()};
-      std::uniform_int_distribution<size_t> dist_int{0,
-                                                     encoded_frames.size - 1};
+      std::uniform_int_distribution<size_t> dist_int(0, total_battles - 1);
 
-      while (!errors.load()) {
-        // Pick a random battle
-        size_t total_battles = 0;
-        for (auto n : n_battles)
-          total_battles += n;
-        if (total_battles == 0)
-          return;
+      std::vector<char> buffer;
 
-        size_t bi = dist_int(mt);
-        size_t path_index = 0;
-        while (bi >= n_battles[path_index]) {
-          bi -= n_battles[path_index];
-          path_index++;
+      auto report_error = [&](const std::string &msg) {
+        std::cerr << msg << std::endl;
+        errors.fetch_add(1);
+      };
+
+      try {
+        while (!errors.load()) {
+
+          // ---- select battle ----
+          size_t bi = dist_int(mt);
+          size_t pi = 0;
+          while (bi >= static_cast<size_t>(n_battles[pi])) {
+            bi -= n_battles[pi];
+            ++pi;
+          }
+
+          if (pi >= paths.size()) {
+            report_error("bad path index");
+            return;
+          }
+
+          // ---- open file ----
+          std::ifstream file(paths[pi], std::ios::binary);
+          if (!file) {
+            report_error("unable to open file");
+            return;
+          }
+
+          int battle_offset = offsets[pi][bi];
+          file.seekg(battle_offset, std::ios::beg);
+
+          using Offset = Train::Battle::CompressedFrames::Offset;
+          using FrameCount = Train::Battle::CompressedFrames::FrameCount;
+
+          Offset offset;
+          FrameCount frame_count;
+
+          file.read(reinterpret_cast<char *>(&offset), sizeof(Offset));
+          if (file.gcount() < sizeof(Offset)) {
+            report_error("bad offset read");
+            return;
+          }
+
+          file.read(reinterpret_cast<char *>(&frame_count), sizeof(FrameCount));
+          if (file.gcount() < sizeof(FrameCount)) {
+            report_error("bad frame count read");
+            return;
+          }
+
+          if (frame_count > max_battle_length)
+            continue;
+
+          file.seekg(-(sizeof(Offset) + sizeof(FrameCount)), std::ios::cur);
+
+          if (offset > 200000 || offset < sizeof(pkmn_gen1_battle)) {
+            report_error("bad offset length");
+            return;
+          }
+
+          buffer.resize(offset);
+          file.read(buffer.data(), offset);
+
+          Train::Battle::CompressedFrames compressed;
+          compressed.read(buffer.data());
+
+          // ---- filter frames ----
+          std::vector<size_t> valid;
+          for (size_t i = 0; i < compressed.updates.size(); ++i) {
+            if (compressed.updates[i].iterations >= min_iterations)
+              valid.push_back(i);
+          }
+
+          if (valid.empty())
+            continue;
+
+          size_t selected = valid[std::uniform_int_distribution<size_t>(
+              0, valid.size() - 1)(mt)];
+
+          auto frames = compressed.uncompress();
+          const auto &frame = frames[selected];
+
+          // ---- write ----
+          size_t write_index = count.fetch_add(1);
+          if (write_index >= size)
+            return;
+
+          input.index(write_index)
+              .write(Encode::Battle::Frame{frame}, frame.target);
         }
-        size_t battle_index = bi;
-
-        // TODO: open file, read battle, select valid frame
-        // This part can directly call your existing C++ sampler code
-        // using encoded_frames mutable_data() as destination
+      } catch (const std::exception &e) {
+        report_error(e.what());
       }
     };
 
-    // launch threads
+    // ---- thread pool ----
     std::vector<std::thread> pool;
-    for (size_t i = 0; i < threads; i++)
+    for (size_t i = 0; i < threads; ++i)
       pool.emplace_back(start_reading);
     for (auto &t : pool)
       t.join();
 
-    return errors.load() ? 0 : std::min(count.load(), max_count);
+    return errors.load() ? 0 : std::min(count.load(), size);
   }
 };
 
@@ -620,14 +712,14 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("p2_nash", &EncodedBattleFrame::p2_nash)
       .def_readonly("empirical_value", &EncodedBattleFrame::empirical_value)
       .def_readonly("nash_value", &EncodedBattleFrame::nash_value)
-      .def_readonly("score", &EncodedBattleFrame::score);
+      .def_readonly("score", &EncodedBattleFrame::score)
+      .def("sample", &EncodedBattleFrame::sample);
 
   // pybind11 module
   py::class_<SampleIndexer>(m, "SampleIndexer")
       .def(py::init<>())
       .def("get", &SampleIndexer::get)
       .def("prune", &SampleIndexer::prune)
-      .def("sample", &SampleIndexer::sample)
       .def("size", &SampleIndexer::size);
 
   m.def("read_battle_data", &read_battle_data, py::arg("path"),
