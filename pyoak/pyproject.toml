@@ -13,3 +13,10 @@ dependencies = [
     "numpy>=2.3.0,<3.0",
     "torch>=2.8.0,<3.0"
 ]
+
+[project.scripts]
+tutorial = "pyoak.tutorial:main"
+battle   = "pyoak.battle:main"
+rl       = "pyoak.rl:main"
+build    = "pyoak.build:main"
+elo      = "pyoak.elo:main"
