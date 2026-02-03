@@ -8,4 +8,4 @@ clang-format -i \
     include/format/*.h include/format/cart/*.h include/format/ou/*.h  include/format/random-battles/*.h \
     include/teams/*.h \
     include/util/*.h;
-black py/*.py
+black pyoak/**.py
