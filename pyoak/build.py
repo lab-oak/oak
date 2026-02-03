@@ -108,7 +108,7 @@ def main():
     ), "--network-path must be provided when --in-place is used."
 
     import torch
-    import torch_oak
+    import pyoak.torchoak as torchoak
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
@@ -153,8 +153,8 @@ def main():
         return decision_outputs * clipped_force.detach()
 
     def process_targets(
-        network: torch_oak.BuildNetwork,
-        traj: torch_oak.BuildTrajectories,
+        network: torchoak.BuildNetwork,
+        traj: torchoak.BuildTrajectories,
     ):
         b, T, _ = traj.mask.shape
         # only do up to max traj length
@@ -259,13 +259,13 @@ def main():
     os.makedirs(args.dir, exist_ok=False)
     pyoak.save_args(args, args.dir)
 
-    network = torch_oak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
+    network = torchoak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
 
     if args.network_path:
         with open(args.network_path, "rb") as f:
             network.read_parameters(f)
 
-    average_network = torch_oak.BuildNetwork()
+    average_network = torchoak.BuildNetwork()
 
     with open(os.path.join(args.dir, "initial.build.net"), "wb") as f:
         network.write_parameters(f)
@@ -305,7 +305,7 @@ def main():
 
             T = trajectories.end.max()
             # here is where we trunacte the episode length for 1v1, etc
-            traj = torch_oak.BuildTrajectories(trajectories, n=T)
+            traj = torchoak.BuildTrajectories(trajectories, n=T)
 
             surr, returns, values, logp = process_targets(network, traj)
 

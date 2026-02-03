@@ -7,7 +7,6 @@ import itertools
 import sys
 import numpy as np
 
-sys.path.append(os.path.abspath("release"))  # or wherever pyoak.so / pyoak.pyd lives
 import pyoak
 
 parser = argparse.ArgumentParser(
@@ -155,7 +154,7 @@ def main():
     ), "--network-path must be provided when --in-place is used."
 
     import torch
-    import torch_oak
+    import pyoak.torchoak as torchoak
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
@@ -188,8 +187,8 @@ def main():
         return loss_per_sample.mean()
 
     def loss(
-        input: torch_oak.EncodedBattleFrame,
-        output: torch_oak.OutputBuffers,
+        input: torchoak.EncodedBattleFrame,
+        output: torchoak.OutputBuffers,
         args,
         print_flag=False,
     ):
@@ -283,7 +282,7 @@ def main():
     os.makedirs(args.dir, exist_ok=False)
     # pyoak.save_args(args, args.dir)
 
-    network = torch_oak.BattleNetwork(
+    network = torchoak.BattleNetwork(
         args.pokemon_hidden_dim,
         args.active_hidden_dim,
         args.pokemon_out_dim,
@@ -304,9 +303,9 @@ def main():
     print(f"Initial network hash: {network.hash()}")
 
     encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = torch_oak.EncodedBattleFrame(encoded_frames).to(device)
+    encoded_frames_torch = torchoak.EncodedBattleFrame(encoded_frames).to(device)
 
-    output_buffer = torch_oak.OutputBuffers(
+    output_buffer = torchoak.OutputBuffers(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
     ).to(device)
 

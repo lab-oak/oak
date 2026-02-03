@@ -177,7 +177,7 @@ def main():
 
     import pyoak
     import torch
-    import torch_oak
+    import pyoak.torchoak as torchoak
 
     # arg set
     if args.device is None:
@@ -199,7 +199,7 @@ def main():
     # load/save initial dirs
     if use_battle:
         with open(network_path, "wb") as f:
-            network = torch_oak.BattleNetwork(
+            network = torchoak.BattleNetwork(
                 args.pokemon_hidden_dim,
                 args.active_hidden_dim,
                 args.pokemon_out_dim,
@@ -216,7 +216,7 @@ def main():
 
     if use_build:
         with open(build_network_path, "wb") as f:
-            build_network = torch_oak.BuildNetwork(
+            build_network = torchoak.BuildNetwork(
                 args.build_policy_hidden_dim, args.build_value_hidden_dim
             )
             if args.build_network_path != "":

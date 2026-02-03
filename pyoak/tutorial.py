@@ -125,11 +125,11 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import torch_oak
+    import pyoak.torchoak as torchoak
     import torch
     import math
 
-    network = torch_oak.BuildNetwork()
+    network = torchoak.BuildNetwork()
 
     path = sys.argv[2]
     with open(path, "rb") as file:
@@ -160,7 +160,7 @@ def show_species_probs():
 
 def create_set():
 
-    from torch_oak import BuildNetwork
+    from pyoak.torchoak import BuildNetwork
 
     network = BuildNetwork()
 
@@ -228,12 +228,12 @@ def test_consistency():
 
     import torch
     import pyoak
-    import torch_oak
+    import pyoak.torchoak as torchoak
 
     network_path = sys.argv[2]
     data_path = sys.argv[3]
 
-    network = torch_oak.BattleNetwork()
+    network = torchoak.BattleNetwork()
 
     with open(network_path, "rb") as f:
         network.read_parameters(f)
@@ -245,9 +245,9 @@ def test_consistency():
     for buffer, n_frames in buffer_list[:max_games]:
 
         encoded_frames = pyoak.get_encoded_frames(buffer, n_frames)
-        encoded_frames_torch = torch_oak.EncodedBattleFrames(encoded_frames)
+        encoded_frames_torch = torchoak.EncodedBattleFrames(encoded_frames)
 
-        output = torch_oak.OutputBuffers(encoded_frames.size)
+        output = torchoak.OutputBuffers(encoded_frames.size)
 
         network.inference(encoded_frames_torch, output)
 

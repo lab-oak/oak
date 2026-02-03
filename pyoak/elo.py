@@ -9,7 +9,7 @@ import subprocess
 import math
 
 import pyoak
-import torch_oak
+import pyoak.torchoak as torchoak
 
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
 
@@ -109,7 +109,7 @@ class Global:
         net_files = pyoak.find_data_files(path, ext=".battle.net")
 
         for file in net_files:
-            network = torch_oak.BattleNetwork()
+            network = torchoak.BattleNetwork()
             with open(file, "rb") as f:
                 network.read_parameters(f)
             network_hash = network.hash()

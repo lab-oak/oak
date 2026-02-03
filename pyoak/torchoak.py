@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import sys
 import os
 
-sys.path.append(os.path.abspath("release"))  # or wherever pyoak.so / pyoak.pyd lives
 import pyoak
 
 import struct
