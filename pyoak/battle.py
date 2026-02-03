@@ -8,7 +8,7 @@ import sys
 import numpy as np
 
 sys.path.append(os.path.abspath("release"))  # or wherever pyoak.so / pyoak.pyd lives
-import py_oak
+import pyoak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak battle network.",
@@ -96,43 +96,43 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "pokemon-hidden-dim",
         type=int,
-        default=py_oak.pokemon_hidden_dim,
+        default=pyoak.pokemon_hidden_dim,
         help="Pokemon encoding net hidden dim",
     )
     parser.add_argument(
         prefix + "active-hidden-dim",
         type=int,
-        default=py_oak.active_hidden_dim,
+        default=pyoak.active_hidden_dim,
         help="ActivePokemon encoding net hidden dim",
     )
     parser.add_argument(
         prefix + "pokemon-out-dim",
         type=int,
-        default=py_oak.pokemon_out_dim,
+        default=pyoak.pokemon_out_dim,
         help="Pokemon encoding net output dim",
     )
     parser.add_argument(
         prefix + "active-out-dim",
         type=int,
-        default=py_oak.active_out_dim,
+        default=pyoak.active_out_dim,
         help="ActivePokemon encoding net output dim",
     )
     parser.add_argument(
         prefix + "hidden-dim",
         type=int,
-        default=py_oak.hidden_dim,
+        default=pyoak.hidden_dim,
         help="Main subnet hidden dim",
     )
     parser.add_argument(
         prefix + "value-hidden-dim",
         type=int,
-        default=py_oak.value_hidden_dim,
+        default=pyoak.value_hidden_dim,
         help="Value head hidden dim",
     )
     parser.add_argument(
         prefix + "policy-hidden-dim",
         type=int,
-        default=py_oak.policy_hidden_dim,
+        default=pyoak.policy_hidden_dim,
         help="Policy head hidden dim",
     )
     parser.add_argument(
@@ -281,7 +281,7 @@ def main():
         args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    # py_oak.save_args(args, args.dir)
+    # pyoak.save_args(args, args.dir)
 
     network = torch_oak.BattleNetwork(
         args.pokemon_hidden_dim,
@@ -303,7 +303,7 @@ def main():
 
     print(f"Initial network hash: {network.hash()}")
 
-    encoded_frames = py_oak.EncodedBattleFrame(args.batch_size)
+    encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
     encoded_frames_torch = torch_oak.EncodedBattleFrame(encoded_frames).to(device)
 
     output_buffer = torch_oak.OutputBuffers(
@@ -312,7 +312,7 @@ def main():
 
     optimizer = Optimizer(network, args.lr)
 
-    sample_indexer = py_oak.SampleIndexer()
+    sample_indexer = pyoak.SampleIndexer()
 
     step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
@@ -336,7 +336,7 @@ def main():
         encoded_frames.clear()
         output_buffer.clear()
 
-        # samples_read = py_oak.sample_from_battle_data_files(
+        # samples_read = pyoak.sample_from_battle_data_files(
         #     sample_indexer,
         #     encoded_frames,
         #     args.threads,

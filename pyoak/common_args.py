@@ -3,7 +3,7 @@ import time
 import os
 from typing import List
 
-import py_oak
+import pyoak
 
 
 def find_data_files(root_dir, ext):

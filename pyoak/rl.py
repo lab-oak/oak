@@ -175,7 +175,7 @@ def main():
         args.policy_mode != "m" or args.policy_nash_weight
     ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
-    import py_oak
+    import pyoak
     import torch
     import torch_oak
 
@@ -189,7 +189,7 @@ def main():
     now = datetime.datetime.now()
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
-    py_oak.save_args(args, working_dir)
+    pyoak.save_args(args, working_dir)
     network_path = os.path.join(working_dir, "current.battle.net")
     build_network_path = os.path.join(working_dir, "current.build.net")
     data_dir = os.path.join(working_dir, "generate")

@@ -5,7 +5,7 @@ import time
 import datetime
 import itertools
 
-import py_oak
+import pyoak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak build network.",
@@ -31,7 +31,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         prefix + "trajectories-per-step",
         type=int,
         required=True,
-        help="How many trajectories to read from a single py_oak.read_build_trajectories call",
+        help="How many trajectories to read from a single pyoak.read_build_trajectories call",
     )
     parser.add_argument(
         prefix + "keep-prob",
@@ -85,13 +85,13 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "policy-hidden-dim",
         type=int,
-        default=py_oak.build_policy_hidden_dim,
+        default=pyoak.build_policy_hidden_dim,
         help="Policy head hidden dim",
     )
     parser.add_argument(
         prefix + "value-hidden-dim",
         type=int,
-        default=py_oak.build_value_hidden_dim,
+        default=pyoak.build_value_hidden_dim,
         help="Value head hidden dim",
     )
 
@@ -122,7 +122,7 @@ def main():
     def get_state(actions):
         b, T, _ = actions.shape
         state = torch.zeros(
-            (b, T, py_oak.species_move_list_size + 1), dtype=torch.float32
+            (b, T, pyoak.species_move_list_size + 1), dtype=torch.float32
         )  # [b, T, N+1]
         state = state.scatter(2, actions + 1, 1.0)
         state = torch.cumsum(state, dim=1).clamp_max(1.0)
@@ -257,7 +257,7 @@ def main():
         args.dir = now.strftime("build-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    py_oak.save_args(args, args.dir)
+    pyoak.save_args(args, args.dir)
 
     network = torch_oak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
 
@@ -295,7 +295,7 @@ def main():
         b = 0
         # break batches up by file to limit memory use
         while b < args.batch_size:
-            trajectories, n_read = py_oak.read_build_trajectories(
+            trajectories, n_read = pyoak.read_build_trajectories(
                 data_files, args.trajectories_per_step, args.threads
             )
 

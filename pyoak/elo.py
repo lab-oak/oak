@@ -8,7 +8,7 @@ from typing import Dict, List
 import subprocess
 import math
 
-import py_oak
+import pyoak
 import torch_oak
 
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
@@ -106,7 +106,7 @@ class Global:
         self.directory: Dict[int, str] = {}
 
     def fill_from_path(self, path, n=args.max_agents):
-        net_files = py_oak.find_data_files(path, ext=".battle.net")
+        net_files = pyoak.find_data_files(path, ext=".battle.net")
 
         for file in net_files:
             network = torch_oak.BattleNetwork()
