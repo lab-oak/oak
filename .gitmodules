@@ -1,12 +1,12 @@
 [submodule "extern/lrsnash"]
-	path = extern/lrsnash
+	path = cpp/extern/lrsnash
 	url = https://github.com/lab-oak/lrsnash
 [submodule "extern/engine"]
-	path = extern/engine
+	path = cpp/extern/engine
 	url = https://github.com/lab-oak/engine
 [submodule "extern/argparse"]
-	path = extern/argparse
+	path = cpp/extern/argparse
 	url = https://github.com/lab-oak/argparse
 [submodule "extern/eigen"]
-	path = extern/eigen
+	path = cpp/extern/eigen
 	url = https://github.com/lab-oak/eigen
