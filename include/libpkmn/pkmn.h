@@ -174,6 +174,20 @@ const auto &durations(const pkmn_gen1_battle_options &options) {
 void set(pkmn_gen1_battle_options &options) {
   return pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
 }
+void set(pkmn_gen1_battle_options &options,
+         pkmn_gen1_log_options &log_options) {
+  return pkmn_gen1_battle_options_set(&options, &log_options, nullptr, nullptr);
+}
+void set(pkmn_gen1_battle_options &options,
+         pkmn_gen1_chance_options &chance_options) {
+  return pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
+                                      nullptr);
+}
+void set(pkmn_gen1_battle_options &options,
+         pkmn_gen1_calc_options &calc_options) {
+  return pkmn_gen1_battle_options_set(&options, nullptr, nullptr,
+                                      &calc_options);
+}
 
 [[nodiscard]] pkmn_result update(auto &b, const auto c1, const auto c2,
                                  pkmn_gen1_battle_options &options) {
