@@ -1,6 +1,6 @@
 # About
 
-Oak is a software toolkit for perfect info search and neural network training for the first generation of Pokemon (RBY). It includes:
+Oak is a Python package for perfect info search and neural network training for the first generation of Pokemon (RBY). It includes:
 
 * Program for generating neural network training data for both battling and team building
 

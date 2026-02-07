@@ -2,4 +2,6 @@ build/
 cpp/build/
 libpkmn-showdown.a
 pkmn-showdown.lib
+*.so
+*.pyc
 /src/oak.egg-info/

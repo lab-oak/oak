@@ -15,8 +15,8 @@ dependencies = [
 ]
 
 [project.scripts]
-tutorial = "pyoak.tutorial:main"
-battle   = "pyoak.battle:main"
-rl       = "pyoak.rl:main"
-build    = "pyoak.build:main"
-elo      = "pyoak.elo:main"
+tutorial = "oak.tutorial:main"
+battle   = "oak.battle:main"
+rl       = "oak.rl:main"
+build    = "oak.build:main"
+elo      = "oak.elo:main"
