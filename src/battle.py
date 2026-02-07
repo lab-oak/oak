@@ -369,7 +369,9 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        pyoak.common_args.save_and_decay(args, network, optimizer.opt, step, ".battle.net")
+        pyoak.common_args.save_and_decay(
+            args, network, optimizer.opt, step, ".battle.net"
+        )
 
 
 if __name__ == "__main__":

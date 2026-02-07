@@ -1,11 +1,11 @@
 clang-format -i \
-    src/*.cc \
-    include/libpkmn/*.h include/libpkmn/data/*.h \
-    include/search/*.h include/search/bandit/*.h include/search/util/*.h \
-    include/train/battle/*.h include/train/build/*.h \
-    include/nn/*.h include/nn/battle/*.h include/nn/build/*.h include/nn/battle/stockfish/*.h\
-    include/encode/battle/*.h include/encode/build/*.h \
-    include/format/*.h include/format/cart/*.h include/format/ou/*.h  include/format/random-battles/*.h \
-    include/teams/*.h \
-    include/util/*.h;
-black pyoak/**.py
+    cpp/src/*.cc \
+    cpp/include/libpkmn/*.h cpp/include/libpkmn/data/*.h \
+    cpp/include/search/*.h cpp/include/search/bandit/*.h cpp/include/search/util/*.h \
+    cpp/include/train/battle/*.h cpp/include/train/build/*.h \
+    cpp/include/nn/*.h cpp/include/nn/battle/*.h cpp/include/nn/build/*.h cpp/include/nn/battle/stockfish/*.h\
+    cpp/include/encode/battle/*.h cpp/include/encode/build/*.h \
+    cpp/include/format/*.h cpp/include/format/cart/*.h cpp/include/format/ou/*.h  cpp/include/format/random-battles/*.h \
+    cpp/include/teams/*.h \
+    cpp/include/util/*.h;
+black src/**.py

@@ -256,6 +256,7 @@ def test_consistency():
 
     pyoak.test_consistency(max_games, network_path, data_path)
 
+
 def main():
     key = sys.argv[1]
     if key == "read-build-trajectories":

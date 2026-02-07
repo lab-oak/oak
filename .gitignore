@@ -1,7 +1,7 @@
 cpp/build/
 libpkmn-showdown.a
 pkmn-showdown.lib
-/pyoak/build/
+/src/oak.egg-info/
 *.data
 *.net
 **/args
