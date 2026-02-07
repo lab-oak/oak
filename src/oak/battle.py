@@ -7,16 +7,16 @@ import itertools
 import sys
 import numpy as np
 
-import pyoak
+import oak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak battle network.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
-import pyoak.common_args
+import oak.common_args
 
-pyoak.common_args.add_common_args(parser)
+oak.common_args.add_common_args(parser)
 
 
 def add_local_args(parser, prefix: str = "", rl: bool = False):
@@ -95,43 +95,43 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "pokemon-hidden-dim",
         type=int,
-        default=pyoak.pokemon_hidden_dim,
+        default=oak.pokemon_hidden_dim,
         help="Pokemon encoding net hidden dim",
     )
     parser.add_argument(
         prefix + "active-hidden-dim",
         type=int,
-        default=pyoak.active_hidden_dim,
+        default=oak.active_hidden_dim,
         help="ActivePokemon encoding net hidden dim",
     )
     parser.add_argument(
         prefix + "pokemon-out-dim",
         type=int,
-        default=pyoak.pokemon_out_dim,
+        default=oak.pokemon_out_dim,
         help="Pokemon encoding net output dim",
     )
     parser.add_argument(
         prefix + "active-out-dim",
         type=int,
-        default=pyoak.active_out_dim,
+        default=oak.active_out_dim,
         help="ActivePokemon encoding net output dim",
     )
     parser.add_argument(
         prefix + "hidden-dim",
         type=int,
-        default=pyoak.hidden_dim,
+        default=oak.hidden_dim,
         help="Main subnet hidden dim",
     )
     parser.add_argument(
         prefix + "value-hidden-dim",
         type=int,
-        default=pyoak.value_hidden_dim,
+        default=oak.value_hidden_dim,
         help="Value head hidden dim",
     )
     parser.add_argument(
         prefix + "policy-hidden-dim",
         type=int,
-        default=pyoak.policy_hidden_dim,
+        default=oak.policy_hidden_dim,
         help="Policy head hidden dim",
     )
     parser.add_argument(
@@ -154,7 +154,7 @@ def main():
     ), "--network-path must be provided when --in-place is used."
 
     import torch
-    import pyoak.src.pyoak.torch as torch
+    import oak.torch
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
@@ -187,8 +187,8 @@ def main():
         return loss_per_sample.mean()
 
     def loss(
-        input: torch.EncodedBattleFrame,
-        output: torch.OutputBuffers,
+        input: oak.torch.EncodedBattleFrame,
+        output: oak.torch.OutputBuffers,
         args,
         print_flag=False,
     ):
@@ -280,9 +280,9 @@ def main():
         args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    # pyoak.util.save_args(args, args.dir)
+    # oak.util.save_args(args, args.dir)
 
-    network = torch.BattleNetwork(
+    network = oak.torch.BattleNetwork(
         args.pokemon_hidden_dim,
         args.active_hidden_dim,
         args.pokemon_out_dim,
@@ -302,16 +302,16 @@ def main():
 
     print(f"Initial network hash: {network.hash()}")
 
-    encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = torch.EncodedBattleFrame(encoded_frames).to(device)
+    encoded_frames = oak.EncodedBattleFrame(args.batch_size)
+    encoded_frames_torch = oak.torch.EncodedBattleFrame(encoded_frames).to(device)
 
-    output_buffer = torch.OutputBuffers(
+    output_buffer = oak.torch.OutputBuffers(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
     ).to(device)
 
     optimizer = Optimizer(network, args.lr)
 
-    sample_indexer = pyoak.SampleIndexer()
+    sample_indexer = oak.SampleIndexer()
 
     step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
 
@@ -321,7 +321,7 @@ def main():
 
         step = s - skipped_steps
 
-        data_files, enough = pyoak.common_args.get_files(args, ".battle.data")
+        data_files, enough = oak.common_args.get_files(args, ".battle.data")
         if not enough:
             skipped_steps += 1
             continue
@@ -334,19 +334,9 @@ def main():
 
         encoded_frames.clear()
         output_buffer.clear()
-
-        # samples_read = pyoak.sample_from_battle_data_files(
-        #     sample_indexer,
-        #     encoded_frames,
-        #     args.threads,
-        #     args.max_battle_length,
-        #     args.min_iterations,
-        # )
-        print("Start read")
-        samples_read = sample_indexer.sample(
-            encoded_frames, args.threads, args.max_battle_length, args.min_iterations
+        samples_read = encoded_frames.sample(
+            sample_indexer, args.threads, args.max_battle_length, args.min_iterations
         )
-        print("End read")
 
         if samples_read < args.batch_size:
             skipped_steps += 1
@@ -369,7 +359,7 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        pyoak.common_args.save_and_decay(
+        oak.common_args.save_and_decay(
             args, network, optimizer.opt, step, ".battle.net"
         )
 

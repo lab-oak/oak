@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import sys
 import os
 
-import pyoak
+import oak
 
 import struct
 import hashlib
@@ -14,7 +14,7 @@ import torch
 
 
 class EncodedBattleFrame:
-    def __init__(self, frames: pyoak.EncodedBattleFrame):
+    def __init__(self, frames: oak.EncodedBattleFrame):
         self.size = frames.size
         self.m = torch.from_numpy(frames.m)
         self.n = torch.from_numpy(frames.n)
@@ -33,7 +33,7 @@ class EncodedBattleFrame:
 
     def permute_pokemon(self):
         perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
-        perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, pyoak.pokemon_in_dim)
+        perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, oak.pokemon_in_dim)
         torch.gather(self.pokemon, dim=2, index=perms_expanded)
 
     def permute_sides(self, prob=0.5):
@@ -85,7 +85,7 @@ def combine_hash(h1: int, h2: int) -> int:
 
 
 # class BuildTrajectories:
-#     def __init__(self, traj: pyoak.BuildTrajectories, n=None, device="cpu"):
+#     def __init__(self, traj: oak.BuildTrajectories, n=None, device="cpu"):
 #         if n is None:
 #             n = 31
 #         self.size = traj.size
@@ -276,7 +276,7 @@ class MainNet(nn.Module):
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
 class OutputBuffers:
-    def __init__(self, size, pod=pyoak.pokemon_out_dim, aod=pyoak.active_out_dim):
+    def __init__(self, size, pod=oak.pokemon_out_dim, aod=oak.active_out_dim):
         self.size = size
         self.pokemon_out_dim = pod
         self.active_out_dim = aod
@@ -290,8 +290,8 @@ class OutputBuffers:
         self.sides = torch.zeros((size, 2, 1, self.side_out_dim), dtype=torch.float32)
         self.value = torch.zeros((size, 1), dtype=torch.float32)
         # last dim is neg inf to supply logit for invalid actions
-        self.p1_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
-        self.p2_policy_logit = torch.zeros(size, pyoak.policy_out_dim + 1)
+        self.p1_policy_logit = torch.zeros(size, oak.policy_out_dim + 1)
+        self.p2_policy_logit = torch.zeros(size, oak.policy_out_dim + 1)
         self.p1_policy = torch.zeros((size, 9))
         self.p2_policy = torch.zeros((size, 9))
 
@@ -321,19 +321,19 @@ class OutputBuffers:
 
 class BattleNetwork(torch.nn.Module):
     # only remaining hard-coded dims
-    pokemon_in_dim = pyoak.pokemon_in_dim
-    active_in_dim = pyoak.active_in_dim
-    policy_out_dim = pyoak.policy_out_dim
+    pokemon_in_dim = oak.pokemon_in_dim
+    active_in_dim = oak.active_in_dim
+    policy_out_dim = oak.policy_out_dim
 
     def __init__(
         self,
-        phd=pyoak.pokemon_hidden_dim,
-        ahd=pyoak.active_hidden_dim,
-        pod=pyoak.pokemon_out_dim,
-        aod=pyoak.active_out_dim,
-        hd=pyoak.hidden_dim,
-        vhd=pyoak.value_hidden_dim,
-        pohd=pyoak.policy_hidden_dim,
+        phd=oak.pokemon_hidden_dim,
+        ahd=oak.active_hidden_dim,
+        pod=oak.pokemon_out_dim,
+        aod=oak.active_out_dim,
+        hd=oak.hidden_dim,
+        vhd=oak.value_hidden_dim,
+        pohd=oak.policy_hidden_dim,
     ):
         super().__init__()
         self.pokemon_hidden_dim = phd
@@ -420,19 +420,19 @@ class BattleNetwork(torch.nn.Module):
 # class BuildNetwork(nn.Module):
 #     def __init__(
 #         self,
-#         policy_hidden_dim=pyoak.build_policy_hidden_dim,
-#         value_hidden_dim=pyoak.build_value_hidden_dim,
+#         policy_hidden_dim=oak.build_policy_hidden_dim,
+#         value_hidden_dim=oak.build_value_hidden_dim,
 #     ):
 #         super().__init__()
 #         self.policy_net = EmbeddingNet(
-#             pyoak.species_move_list_size,
+#             oak.species_move_list_size,
 #             policy_hidden_dim,
-#             pyoak.species_move_list_size,
+#             oak.species_move_list_size,
 #             True,
 #             False,
 #         )
 #         self.value_net = EmbeddingNet(
-#             pyoak.species_move_list_size, value_hidden_dim, 1, True, False
+#             oak.species_move_list_size, value_hidden_dim, 1, True, False
 #         )
 
 #     def read_parameters(self, f):

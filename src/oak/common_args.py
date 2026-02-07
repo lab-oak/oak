@@ -3,7 +3,7 @@ import time
 import os
 from typing import List
 
-import pyoak
+import oak
 
 
 def add_common_args(
@@ -112,7 +112,7 @@ def add_common_args(
 
 
 def get_files(args: argparse.ArgumentParser, ext: str) -> [List[str], bool]:
-    data_files = pyoak.util.find_data_files(args.data_dir, ext)
+    data_files = oak.util.find_data_files(args.data_dir, ext)
 
     if len(data_files) < args.min_files:
         print("Minimum files not reached. Sleeping")

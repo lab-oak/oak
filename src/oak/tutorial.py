@@ -1,6 +1,6 @@
 import sys
 
-import pyoak
+import oak
 import numpy as np
 
 
@@ -11,9 +11,9 @@ def battle_frame_stats():
     if len(sys.argv) >= 3:
         path = sys.argv[2]
 
-    files = pyoak.util.find_data_files(path, ext=".battle.data")
+    files = oak.util.find_data_files(path, ext=".battle.data")
     for file in files:
-        data = pyoak.read_battle_data(file)
+        data = oak.read_battle_data(file)
         for buf, n in data:
             total_battles += 1
             total_frames += n
@@ -28,7 +28,7 @@ def read_battle_trajectories():
         path = sys.argv[2]
 
     # using only the head gives most recent files
-    files = pyoak.util.find_data_files(path, ext=".battle.data")
+    files = oak.util.find_data_files(path, ext=".battle.data")
 
     assert len(files) > 0, f"No battle files found in {path}"
 
@@ -37,12 +37,12 @@ def read_battle_trajectories():
     file = sample(files, 1)[0]
     # file = files[0]
 
-    data = pyoak.read_battle_data(file)
+    data = oak.read_battle_data(file)
 
     shuffle(data)
 
     for buf, n in data:
-        frames = pyoak.get_encoded_frames(buf, n)
+        frames = oak.get_encoded_frames(buf, n)
 
         # i = randint(0, frames.size - 1)
         i = -1
@@ -56,44 +56,44 @@ def read_battle_trajectories():
         print("n2", frames.p2_nash[i])
         print(
             "c1",
-            [pyoak.policy_dim_labels[_.item()] for _ in frames.p1_choice_indices[i]],
+            [oak.policy_dim_labels[_.item()] for _ in frames.p1_choice_indices[i]],
         )
         print(
             "c2",
-            [pyoak.policy_dim_labels[_.item()] for _ in frames.p2_choice_indices[i]],
+            [oak.policy_dim_labels[_.item()] for _ in frames.p2_choice_indices[i]],
         )
-        raw_frames = pyoak.get_frames(buf, n)
+        raw_frames = oak.get_frames(buf, n)
 
         print("iterations", frames.iterations[i])
 
         # print(raw_frames.battle[i])
         # print(raw_frames.battle[i, 23])
         # print(raw_frames.durations[i])
-        pyoak.print_battle_data(raw_frames, i)
+        oak.print_battle_data(raw_frames, i)
 
 
 def read_build_trajectories():
 
     # using only the head gives most recent files
-    files = pyoak.util.find_data_files(".", ext=".build.data")
+    files = oak.util.find_data_files(".", ext=".build.data")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
 
-    build_trajectories, read = pyoak.read_build_trajectories(files, 1024, 1)
+    build_trajectories, read = oak.read_build_trajectories(files, 1024, 1)
     print(build_trajectories.size, read)
     assert build_trajectories.size == read, f"Bad read from {file}."
     for i in range(min(10, build_trajectories.size)):
         index = sample(list(range(build_trajectories.size)), 1)[0]
         print(f"Sample {index}:")
         species_move = [
-            pyoak.species_move_list[_]
+            oak.species_move_list[_]
             for _ in build_trajectories.actions[index].reshape(-1)
         ]
         names = []
         for sm in species_move:
             s, m = sm
-            names.append(pyoak.species_names[s] + " " + pyoak.move_names[m])
+            names.append(oak.species_names[s] + " " + oak.move_names[m])
         selection_probs = [
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
@@ -125,7 +125,7 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import pyoak.src.pyoak.torch as torch
+    import oak.src.oak.torch as torch
     import torch
     import math
 
@@ -138,14 +138,14 @@ def show_species_probs():
     weights = dict()
     logits_d = dict()
 
-    logits, _ = network.forward(torch.zeros((1, pyoak.species_move_list_size)))
+    logits, _ = network.forward(torch.zeros((1, oak.species_move_list_size)))
 
-    for index, pair in enumerate(pyoak.species_move_list):
+    for index, pair in enumerate(oak.species_move_list):
         s, m = pair
         if m != 0:
             continue
 
-        name = pyoak.species_names[s]
+        name = oak.species_names[s]
         weights[name] = math.exp(logits[0, index])
         logits_d[name] = logits[0, index]
 
@@ -160,7 +160,7 @@ def show_species_probs():
 
 def create_set():
 
-    from pyoak.src.pyoak.torch import BuildNetwork
+    from oak.src.oak.torch import BuildNetwork
 
     network = BuildNetwork()
 
@@ -177,11 +177,11 @@ def create_set():
     import torch
 
     for _ in range(n):
-        team = torch.zeros([pyoak.species_move_list_size])
+        team = torch.zeros([oak.species_move_list_size])
 
         # create mask for choosing the first species
-        mask = torch.zeros([pyoak.species_move_list_size])
-        for index, pair in enumerate(pyoak.species_move_list):
+        mask = torch.zeros([oak.species_move_list_size])
+        for index, pair in enumerate(oak.species_move_list):
             s, m = pair
             if m == 0:
                 mask[index] = 1
@@ -199,14 +199,14 @@ def create_set():
 
         logits, _ = network.forward(team)
         index, p, q = sample_masked_logits(logits, mask)
-        species, _ = pyoak.species_move_list[index]
-        print(f"{pyoak.species_names[species]} : {p}% ~ {q}%")
+        species, _ = oak.species_move_list[index]
+        print(f"{oak.species_names[species]} : {p}% ~ {q}%")
         team[index] = 1
 
         # reset mask and fill with legal moves
         mask.zero_()
         n_moves = 0
-        for index, pair in enumerate(pyoak.species_move_list):
+        for index, pair in enumerate(oak.species_move_list):
             s, m = pair
             if s == species and m != 0:
                 n_moves += 1
@@ -214,8 +214,8 @@ def create_set():
 
         for _ in range(min(4, n_moves)):
             index, p, q = sample_masked_logits(network.forward(team)[0], mask)
-            _, move = pyoak.species_move_list[index]
-            print(f"    {pyoak.move_names[move]} : {p}% ~ {q}%")
+            _, move = oak.species_move_list[index]
+            print(f"    {oak.move_names[move]} : {p}% ~ {q}%")
             team[index] = 1
             mask[index] = 0
 
@@ -227,8 +227,8 @@ def test_consistency():
         exit()
 
     import torch
-    import pyoak
-    import pyoak.src.pyoak.torch as torch
+    import oak
+    import oak.src.oak.torch as torch
 
     network_path = sys.argv[2]
     data_path = sys.argv[3]
@@ -238,13 +238,13 @@ def test_consistency():
     with open(network_path, "rb") as f:
         network.read_parameters(f)
 
-    buffer_list = pyoak.read_battle_data(data_path)
+    buffer_list = oak.read_battle_data(data_path)
 
     max_games = 2
 
     for buffer, n_frames in buffer_list[:max_games]:
 
-        encoded_frames = pyoak.get_encoded_frames(buffer, n_frames)
+        encoded_frames = oak.get_encoded_frames(buffer, n_frames)
         encoded_frames_torch = torch.EncodedBattleFrames(encoded_frames)
 
         output = torch.OutputBuffers(encoded_frames.size)
@@ -254,7 +254,7 @@ def test_consistency():
         print(output.value)
         # policies = torch.cat([output.p1_policy.unsqueeze(1), output.p2_policy.unsqueeze(1)], dim=1)
 
-    pyoak.test_consistency(max_games, network_path, data_path)
+    oak.test_consistency(max_games, network_path, data_path)
 
 
 def main():

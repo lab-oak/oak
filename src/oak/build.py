@@ -5,14 +5,14 @@ import time
 import datetime
 import itertools
 
-import pyoak
+import oak
 
 parser = argparse.ArgumentParser(
     description="Train an Oak build network.",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
-pyoak.common_args.add_common_args(parser)
+oak.common_args.add_common_args(parser)
 
 
 def add_local_args(parser, prefix: str = "", rl: bool = False):
@@ -29,7 +29,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         prefix + "trajectories-per-step",
         type=int,
         required=True,
-        help="How many trajectories to read from a single pyoak.read_build_trajectories call",
+        help="How many trajectories to read from a single oak.read_build_trajectories call",
     )
     parser.add_argument(
         prefix + "keep-prob",
@@ -83,13 +83,13 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "policy-hidden-dim",
         type=int,
-        default=pyoak.build_policy_hidden_dim,
+        default=oak.build_policy_hidden_dim,
         help="Policy head hidden dim",
     )
     parser.add_argument(
         prefix + "value-hidden-dim",
         type=int,
-        default=pyoak.build_value_hidden_dim,
+        default=oak.build_value_hidden_dim,
         help="Value head hidden dim",
     )
 
@@ -106,7 +106,7 @@ def main():
     ), "--network-path must be provided when --in-place is used."
 
     import torch
-    import pyoak.torchoak as torchoak
+    import oak.torch
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
@@ -120,7 +120,7 @@ def main():
     def get_state(actions):
         b, T, _ = actions.shape
         state = torch.zeros(
-            (b, T, pyoak.species_move_list_size + 1), dtype=torch.float32
+            (b, T, oak.species_move_list_size + 1), dtype=torch.float32
         )  # [b, T, N+1]
         state = state.scatter(2, actions + 1, 1.0)
         state = torch.cumsum(state, dim=1).clamp_max(1.0)
@@ -151,8 +151,8 @@ def main():
         return decision_outputs * clipped_force.detach()
 
     def process_targets(
-        network: torchoak.BuildNetwork,
-        traj: torchoak.BuildTrajectories,
+        network: oak.torch.BuildNetwork,
+        traj: oak.torch.BuildTrajectories,
     ):
         b, T, _ = traj.mask.shape
         # only do up to max traj length
@@ -255,15 +255,15 @@ def main():
         args.dir = now.strftime("build-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    pyoak.util.save_args(args, args.dir)
+    oak.util.save_args(args, args.dir)
 
-    network = torchoak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
+    network = oak.torch.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
 
     if args.network_path:
         with open(args.network_path, "rb") as f:
             network.read_parameters(f)
 
-    average_network = torchoak.BuildNetwork()
+    average_network = oak.torch.BuildNetwork()
 
     with open(os.path.join(args.dir, "initial.build.net"), "wb") as f:
         network.write_parameters(f)
@@ -284,7 +284,7 @@ def main():
 
         print(f"step: {step}")
 
-        data_files, enough = pyoak.common_args.get_files(args, ".build.data")
+        data_files, enough = oak.common_args.get_files(args, ".build.data")
         if not enough:
             skipped_steps += 1
             continue
@@ -293,7 +293,7 @@ def main():
         b = 0
         # break batches up by file to limit memory use
         while b < args.batch_size:
-            trajectories, n_read = pyoak.read_build_trajectories(
+            trajectories, n_read = oak.read_build_trajectories(
                 data_files, args.trajectories_per_step, args.threads
             )
 
@@ -303,7 +303,7 @@ def main():
 
             T = trajectories.end.max()
             # here is where we trunacte the episode length for 1v1, etc
-            traj = torchoak.BuildTrajectories(trajectories, n=T)
+            traj = oak.torch.BuildTrajectories(trajectories, n=T)
 
             surr, returns, values, logp = process_targets(network, traj)
 
@@ -332,7 +332,7 @@ def main():
 
         optimizer.step()
 
-        pyoak.common_args.save_and_decay(args, network, optimizer, step, ".build.net")
+        oak.common_args.save_and_decay(args, network, optimizer, step, ".build.net")
 
         rolling_average(average_network, network, args.avg_gamma)
 

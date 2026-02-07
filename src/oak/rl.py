@@ -131,10 +131,10 @@ import common_args
 import battle
 import build
 
-pyoak.common_args.add_common_args(battle_parser, "", True)
+oak.common_args.add_common_args(battle_parser, "", True)
 battle.add_local_args(battle_parser, "", True)
 
-pyoak.common_args.add_common_args(build_parser, "build", True)
+oak.common_args.add_common_args(build_parser, "build", True)
 build.add_local_args(build_parser, "build", True)
 
 parser.add_argument(
@@ -175,9 +175,9 @@ def main():
         args.policy_mode != "m" or args.policy_nash_weight
     ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
-    import pyoak
+    import oak
     import torch
-    import pyoak.torchoak as torchoak
+    import oak.torch
 
     # arg set
     if args.device is None:
@@ -189,7 +189,7 @@ def main():
     now = datetime.datetime.now()
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
-    pyoak.util.save_args(args, working_dir)
+    oak.util.save_args(args, working_dir)
     network_path = os.path.join(working_dir, "current.battle.net")
     build_network_path = os.path.join(working_dir, "current.build.net")
     data_dir = os.path.join(working_dir, "generate")
@@ -199,7 +199,7 @@ def main():
     # load/save initial dirs
     if use_battle:
         with open(network_path, "wb") as f:
-            network = torchoak.BattleNetwork(
+            network = oak.torch.BattleNetwork(
                 args.pokemon_hidden_dim,
                 args.active_hidden_dim,
                 args.pokemon_out_dim,
@@ -216,7 +216,7 @@ def main():
 
     if use_build:
         with open(build_network_path, "wb") as f:
-            build_network = torchoak.BuildNetwork(
+            build_network = oak.torch.BuildNetwork(
                 args.build_policy_hidden_dim, args.build_value_hidden_dim
             )
             if args.build_network_path != "":
