@@ -106,7 +106,7 @@ class Global:
         self.directory: Dict[int, str] = {}
 
     def fill_from_path(self, path, n=args.max_agents):
-        net_files = pyoak.find_data_files(path, ext=".battle.net")
+        net_files = pyoak.util.find_data_files(path, ext=".battle.net")
 
         for file in net_files:
             network = torchoak.BattleNetwork()

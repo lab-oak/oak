@@ -11,7 +11,7 @@ def battle_frame_stats():
     if len(sys.argv) >= 3:
         path = sys.argv[2]
 
-    files = pyoak.find_data_files(path, ext=".battle.data")
+    files = pyoak.util.find_data_files(path, ext=".battle.data")
     for file in files:
         data = pyoak.read_battle_data(file)
         for buf, n in data:
@@ -28,7 +28,7 @@ def read_battle_trajectories():
         path = sys.argv[2]
 
     # using only the head gives most recent files
-    files = pyoak.find_data_files(path, ext=".battle.data")
+    files = pyoak.util.find_data_files(path, ext=".battle.data")
 
     assert len(files) > 0, f"No battle files found in {path}"
 
@@ -75,7 +75,7 @@ def read_battle_trajectories():
 def read_build_trajectories():
 
     # using only the head gives most recent files
-    files = pyoak.find_data_files(".", ext=".build.data")
+    files = pyoak.util.find_data_files(".", ext=".build.data")
     assert len(files) > 0, "No build files found in cwd"
 
     from random import sample
@@ -125,11 +125,11 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import pyoak.torchoak as torchoak
+    import pyoak.src.pyoak.torch as torch
     import torch
     import math
 
-    network = torchoak.BuildNetwork()
+    network = torch.BuildNetwork()
 
     path = sys.argv[2]
     with open(path, "rb") as file:
@@ -160,7 +160,7 @@ def show_species_probs():
 
 def create_set():
 
-    from pyoak.torchoak import BuildNetwork
+    from pyoak.src.pyoak.torch import BuildNetwork
 
     network = BuildNetwork()
 
@@ -228,12 +228,12 @@ def test_consistency():
 
     import torch
     import pyoak
-    import pyoak.torchoak as torchoak
+    import pyoak.src.pyoak.torch as torch
 
     network_path = sys.argv[2]
     data_path = sys.argv[3]
 
-    network = torchoak.BattleNetwork()
+    network = torch.BattleNetwork()
 
     with open(network_path, "rb") as f:
         network.read_parameters(f)
@@ -245,9 +245,9 @@ def test_consistency():
     for buffer, n_frames in buffer_list[:max_games]:
 
         encoded_frames = pyoak.get_encoded_frames(buffer, n_frames)
-        encoded_frames_torch = torchoak.EncodedBattleFrames(encoded_frames)
+        encoded_frames_torch = torch.EncodedBattleFrames(encoded_frames)
 
-        output = torchoak.OutputBuffers(encoded_frames.size)
+        output = torch.OutputBuffers(encoded_frames.size)
 
         network.inference(encoded_frames_torch, output)
 
@@ -256,11 +256,8 @@ def test_consistency():
 
     pyoak.test_consistency(max_games, network_path, data_path)
 
-
-if __name__ == "__main__":
-
+def main():
     key = sys.argv[1]
-
     if key == "read-build-trajectories":
         # print the first 10 trajectories in cwd
         read_build_trajectories()
@@ -278,3 +275,7 @@ if __name__ == "__main__":
         test_consistency()
     else:
         print("Invalid keyword. See TUTORIAL.md")
+
+
+if __name__ == "__main__":
+    main()

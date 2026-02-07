@@ -6,26 +6,6 @@ from typing import List
 import pyoak
 
 
-def find_data_files(root_dir, ext):
-    files = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        for filename in filenames:
-            if filename.endswith(ext):
-                full_path = os.path.join(dirpath, filename)
-                files.append(full_path)
-    files.sort(key=os.path.getctime, reverse=True)
-    return files
-
-
-def save_args(namespace, path):
-    os.makedirs(path, exist_ok=True)
-    out_path = os.path.join(path, "args")
-
-    with open(out_path, "w") as f:
-        for key, value in vars(namespace).items():
-            f.write(f"--{key}={value}\n")
-
-
 def add_common_args(
     parser: argparse.ArgumentParser, prefix: str = "", rl: bool = False
 ):
@@ -132,7 +112,7 @@ def add_common_args(
 
 
 def get_files(args: argparse.ArgumentParser, ext: str) -> [List[str], bool]:
-    data_files = find_data_files(args.data_dir, ext)
+    data_files = pyoak.util.find_data_files(args.data_dir, ext)
 
     if len(data_files) < args.min_files:
         print("Minimum files not reached. Sleeping")

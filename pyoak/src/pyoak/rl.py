@@ -131,10 +131,10 @@ import common_args
 import battle
 import build
 
-common_args.add_common_args(battle_parser, "", True)
+pyoak.common_args.add_common_args(battle_parser, "", True)
 battle.add_local_args(battle_parser, "", True)
 
-common_args.add_common_args(build_parser, "build", True)
+pyoak.common_args.add_common_args(build_parser, "build", True)
 build.add_local_args(build_parser, "build", True)
 
 parser.add_argument(
@@ -189,7 +189,7 @@ def main():
     now = datetime.datetime.now()
     working_dir = now.strftime("rl-%Y-%m-%d-%H:%M:%S")
     os.makedirs(working_dir, exist_ok=False)
-    pyoak.save_args(args, working_dir)
+    pyoak.util.save_args(args, working_dir)
     network_path = os.path.join(working_dir, "current.battle.net")
     build_network_path = os.path.join(working_dir, "current.build.net")
     data_dir = os.path.join(working_dir, "generate")

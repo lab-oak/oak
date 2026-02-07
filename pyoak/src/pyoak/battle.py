@@ -14,9 +14,9 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
-import common_args
+import pyoak.common_args
 
-common_args.add_common_args(parser)
+pyoak.common_args.add_common_args(parser)
 
 
 def add_local_args(parser, prefix: str = "", rl: bool = False):
@@ -154,7 +154,7 @@ def main():
     ), "--network-path must be provided when --in-place is used."
 
     import torch
-    import pyoak.torchoak as torchoak
+    import pyoak.src.pyoak.torch as torch
 
     torch.set_num_threads(args.threads)
     torch.set_num_interop_threads(args.threads)
@@ -187,8 +187,8 @@ def main():
         return loss_per_sample.mean()
 
     def loss(
-        input: torchoak.EncodedBattleFrame,
-        output: torchoak.OutputBuffers,
+        input: torch.EncodedBattleFrame,
+        output: torch.OutputBuffers,
         args,
         print_flag=False,
     ):
@@ -280,9 +280,9 @@ def main():
         args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    # pyoak.save_args(args, args.dir)
+    # pyoak.util.save_args(args, args.dir)
 
-    network = torchoak.BattleNetwork(
+    network = torch.BattleNetwork(
         args.pokemon_hidden_dim,
         args.active_hidden_dim,
         args.pokemon_out_dim,
@@ -303,9 +303,9 @@ def main():
     print(f"Initial network hash: {network.hash()}")
 
     encoded_frames = pyoak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = torchoak.EncodedBattleFrame(encoded_frames).to(device)
+    encoded_frames_torch = torch.EncodedBattleFrame(encoded_frames).to(device)
 
-    output_buffer = torchoak.OutputBuffers(
+    output_buffer = torch.OutputBuffers(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
     ).to(device)
 
@@ -321,7 +321,7 @@ def main():
 
         step = s - skipped_steps
 
-        data_files, enough = common_args.get_files(args, ".battle.data")
+        data_files, enough = pyoak.common_args.get_files(args, ".battle.data")
         if not enough:
             skipped_steps += 1
             continue
@@ -369,7 +369,7 @@ def main():
         if not args.no_clamp_parameters:
             network.clamp_parameters()
 
-        common_args.save_and_decay(args, network, optimizer.opt, step, ".battle.net")
+        pyoak.common_args.save_and_decay(args, network, optimizer.opt, step, ".battle.net")
 
 
 if __name__ == "__main__":

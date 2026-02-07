@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(
 
 import common_args
 
-common_args.add_common_args(parser)
+pyoak.common_args.add_common_args(parser)
 
 
 def add_local_args(parser, prefix: str = "", rl: bool = False):
@@ -257,7 +257,7 @@ def main():
         args.dir = now.strftime("build-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    pyoak.save_args(args, args.dir)
+    pyoak.util.save_args(args, args.dir)
 
     network = torchoak.BuildNetwork(args.policy_hidden_dim, args.value_hidden_dim)
 
@@ -286,7 +286,7 @@ def main():
 
         print(f"step: {step}")
 
-        data_files, enough = common_args.get_files(args, ".build.data")
+        data_files, enough = pyoak.common_args.get_files(args, ".build.data")
         if not enough:
             skipped_steps += 1
             continue
@@ -334,7 +334,7 @@ def main():
 
         optimizer.step()
 
-        common_args.save_and_decay(args, network, optimizer, step, ".build.net")
+        pyoak.common_args.save_and_decay(args, network, optimizer, step, ".build.net")
 
         rolling_average(average_network, network, args.avg_gamma)
 
