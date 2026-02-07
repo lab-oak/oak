@@ -1,10 +1,7 @@
-/release/
-/debug/
-/pyoak/build/
-/release-windows/
-/debug-windows/
+cpp/build/
 libpkmn-showdown.a
 pkmn-showdown.lib
+/pyoak/build/
 *.data
 *.net
 **/args

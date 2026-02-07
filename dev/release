@@ -1,0 +1,7 @@
+mkdir -p cpp/build/release
+cd cpp/build/release || exit 1
+
+cmake ../.. -DCMAKE_BUILD_TYPE=Release
+make "$@"
+
+cd ..

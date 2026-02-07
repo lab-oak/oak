@@ -1,12 +1,17 @@
-rm -r libpkmn;
-mkdir libpkmn;
-mkdir libpkmn/debug;
-mkdir libpkmn/release;
-cd extern/engine;
+# Optional first argument: directory to prepend to PATH
+if [ -n "$1" ]; then
+    export PATH="$1:$PATH"
+    echo "Prepended $1 to PATH"
+fi
+rm -r cpp/libpkmn;
+mkdir cpp/libpkmn;
+mkdir cpp/libpkmn/debug;
+mkdir cpp/libpkmn/release;
+cd cpp/extern/engine;
 zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/client;
 zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/debug/chance;
 zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/debug/fast;
 zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/client;
 zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/release/chance;
 zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false --prefix-lib-dir ../../../libpkmn/release/fast;
-cd ../..
+cd ../../..

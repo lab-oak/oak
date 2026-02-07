@@ -12,8 +12,6 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
-import common_args
-
 pyoak.common_args.add_common_args(parser)
 
 
