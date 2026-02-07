@@ -1,5 +1,6 @@
 /release/
 /debug/
+/pyoak/build/
 /release-windows/
 /debug-windows/
 libpkmn-showdown.a
