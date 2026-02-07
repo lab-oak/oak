@@ -2,16 +2,3 @@ cpp/build/
 libpkmn-showdown.a
 pkmn-showdown.lib
 /src/oak.egg-info/
-*.data
-*.net
-**/args
-**/matchup-matrix
-*.log
-*.pyc
-# Elo
-**/directory
-**/ratings
-**/results
-**/ucb
-# dev
-teams

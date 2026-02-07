@@ -4,5 +4,5 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"pyoak": ["_native/*"]},  # include your prebuilt .so
+    package_data={"oak": ["_native/*"]},
 )
