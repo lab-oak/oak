@@ -317,7 +317,24 @@ void thread_fn(const ProgramArgs *args_ptr) {
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
-    return PKMN::score2(input.result);
+    switch (pkmn_result_type(input.result)) {
+    case PKMN_RESULT_WIN: {
+      RuntimeData::win.fetch_add(1);
+      return 2;
+    }
+    case PKMN_RESULT_LOSE: {
+      RuntimeData::loss.fetch_add(1);
+      return 0;
+    }
+    case PKMN_RESULT_TIE: {
+      RuntimeData::draw.fetch_add(1);
+      return 1;
+    }
+    default: {
+      assert(false);
+      return 0;
+    }
+    }
   };
 
   while ((args.max_games < 0) ||

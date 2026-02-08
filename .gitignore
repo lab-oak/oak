@@ -5,5 +5,5 @@ pkmn-showdown.lib
 *.so
 *.pyc
 /src/oaks_lab.egg-info/
-/src/_bin
-/src/_native
+/src/oak/_bin
+/src/oak/_native

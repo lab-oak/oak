@@ -2,6 +2,6 @@ mkdir -p cpp/build/Release
 cmake cpp \
   -B cpp/build/Release \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/_native \
-  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/_bin
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
 make -C cpp/build/Release "$@"
