@@ -9,7 +9,7 @@ class BinaryDistribution(Distribution):
 
 
 setup(
-    name="oak",
+    name="oaks-lab",
     version="1.1.0",
     packages=find_packages("src"),
     package_dir={"": "src"},
