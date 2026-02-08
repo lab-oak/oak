@@ -150,39 +150,50 @@ void thread_fn(const ProgramArgs *args_ptr) {
     }
     build_buffer.clear();
   };
-
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
     auto p1_agent = RuntimeSearch::Agent{
         .search_budget =
-            args.p1_search_budget.value_or(args.search_budget.value()),
-        .bandit = args.p1_bandit.value_or(args.bandit.value()),
-        .eval = args.p1_eval.value_or(args.eval.value()),
+            args.p1_search_budget.or_else([&] { return args.search_budget; })
+                .value(),
+        .bandit = args.p1_bandit.or_else([&] { return args.bandit; }).value(),
+        .eval = args.p1_eval.or_else([&] { return args.eval; }).value(),
         .discrete_network = args.p1_use_discrete,
-        .matrix_ucb = args.p1_matrix_ucb.value_or(args.matrix_ucb.value_or("")),
+        .matrix_ucb =
+            args.p1_matrix_ucb.or_else([&] { return args.matrix_ucb; })
+                .value_or(""),
         .use_table = args.p1_use_table};
     auto p1_agent_after = p1_agent;
     p1_agent_after.search_budget = args.p1_search_budget_after.value_or("0");
     p1_agent_after.matrix_ucb = args.p1_matrix_ucb_after.value_or("");
     const auto p1_policy_options = RuntimePolicy::Options{
-        .mode = args.p1_policy_mode.value_or(args.policy_mode.value()),
-        .temp = args.p1_policy_temp.value_or(args.policy_temp.value_or(1)),
-        .min = args.p1_policy_min.value_or(args.policy_min.value_or(0))};
+        .mode = args.p1_policy_mode.or_else([&] { return args.policy_mode; })
+                    .value(),
+        .temp = args.p1_policy_temp.or_else([&] { return args.policy_temp; })
+                    .value_or(1),
+        .min = args.p1_policy_min.or_else([&] { return args.policy_min; })
+                   .value_or(0)};
 
     auto p2_agent = RuntimeSearch::Agent{
         .search_budget =
-            args.p2_search_budget.value_or(args.search_budget.value()),
-        .bandit = args.p2_bandit.value_or(args.bandit.value()),
-        .eval = args.p2_eval.value_or(args.eval.value()),
+            args.p2_search_budget.or_else([&] { return args.search_budget; })
+                .value(),
+        .bandit = args.p2_bandit.or_else([&] { return args.bandit; }).value(),
+        .eval = args.p2_eval.or_else([&] { return args.eval; }).value(),
         .discrete_network = args.p2_use_discrete,
-        .matrix_ucb = args.p2_matrix_ucb.value_or(args.matrix_ucb.value_or("")),
+        .matrix_ucb =
+            args.p2_matrix_ucb.or_else([&] { return args.matrix_ucb; })
+                .value_or(""),
         .use_table = args.p2_use_table};
     auto p2_agent_after = p2_agent;
     p2_agent_after.search_budget = args.p2_search_budget_after.value_or("0");
     p2_agent_after.matrix_ucb = args.p2_matrix_ucb_after.value_or("");
     const auto p2_policy_options = RuntimePolicy::Options{
-        .mode = args.p2_policy_mode.value_or(args.policy_mode.value()),
-        .temp = args.p2_policy_temp.value_or(args.policy_temp.value_or(1)),
-        .min = args.p2_policy_min.value_or(args.policy_min.value_or(0))};
+        .mode = args.p2_policy_mode.or_else([&] { return args.policy_mode; })
+                    .value(),
+        .temp = args.p2_policy_temp.or_else([&] { return args.policy_temp; })
+                    .value_or(1),
+        .min = args.p2_policy_min.or_else([&] { return args.policy_min; })
+                   .value_or(0)};
 
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
