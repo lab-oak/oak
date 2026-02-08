@@ -445,6 +445,20 @@ void setup(auto &args) {
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
   }
+  const auto check_args = [](auto x, auto y, auto z, const auto &name) {
+    if (!x.has_value()) {
+      if (!y.has_value() || !z.has_value()) {
+        throw std::runtime_error{name};
+      }
+    }
+  };
+
+  check_args(args.search_budget, args.p1_search_budget, args.p2_search_budget,
+             "search-budget");
+  check_args(args.eval, args.p1_eval, args.p2_eval, "eval");
+  check_args(args.bandit, args.p1_bandit, args.p2_bandit, "bandit");
+  check_args(args.policy_mode, args.p1_policy_mode, args.p2_policy_mode,
+             "policy-mode");
   // args
   if (args.save && !args.working_dir.has_value()) {
     args.working_dir.emplace("vs-" + get_current_datetime());

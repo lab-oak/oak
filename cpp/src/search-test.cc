@@ -6,10 +6,7 @@
 #include <exception>
 #include <iostream>
 
-struct ProgramArgs : public AgentArgs {
-  std::string &search_budget =
-      kwarg("search-budget", "").set_default(std::to_string(1ULL << 20));
-};
+struct ProgramArgs : public BenchmarkArgs {};
 
 constexpr float small = .03;
 
@@ -26,11 +23,12 @@ struct Test {
     chance_options.durations = battle_data.durations;
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     RuntimeSearch::Nodes nodes{};
-    auto agent = RuntimeSearch::Agent{.search_budget = args.search_budget,
-                                      .bandit = args.bandit,
-                                      .eval = args.eval,
-                                      .discrete_network = args.use_discrete,
-                                      .matrix_ucb = args.matrix_ucb};
+    auto agent = RuntimeSearch::Agent{
+        .search_budget = args.search_budget.value_or(std::to_string(1 << 20)),
+        .bandit = args.bandit.value_or("exp3-1.0-0.1"),
+        .eval = args.eval.value_or("mc"),
+        .discrete_network = args.use_discrete,
+        .matrix_ucb = args.matrix_ucb.value_or("")};
     auto output = RuntimeSearch::run(device, battle_data, nodes, agent);
     bool success = std::abs(output.empirical_value - expected) <= error;
     if (!success) {
