@@ -5,3 +5,5 @@ pkmn-showdown.lib
 *.so
 *.pyc
 /src/oak.egg-info/
+/src/oak/_bin
+/src/oak/_native
