@@ -103,20 +103,19 @@ struct Nodes {
 };
 
 struct Agent {
-  std::string search_time;
-  std::string bandit_name;
-  std::string network_path;
+  std::string search_budget;
+  std::string bandit;
+  std::string eval;
   bool discrete_network;
-  std::string matrix_ucb_name;
+  std::string matrix_ucb;
   bool use_table;
   // valid if already loaded/cache set
   std::optional<NN::Battle::Network> network;
   bool *flag;
 
   bool uses_network() const {
-    return !network_path.empty() && network_path != "mc" &&
-           network_path != "montecarlo" && network_path != "monte-carlo" &&
-           network_path != "fp";
+    return !eval.empty() && eval != "mc" && eval != "montecarlo" &&
+           eval != "monte-carlo" && eval != "fp";
   }
 
   void initialize_network(const pkmn_gen1_battle &b) {
@@ -125,13 +124,13 @@ struct Agent {
     constexpr auto tries = 3;
     // sometimes reads fail because python is writing to that file. just retry
     for (auto i = 0; i < tries; ++i) {
-      std::ifstream file{network_path};
+      std::ifstream file{eval};
       if (network.value().read_parameters(file)) {
         break;
       } else {
         if (i == (tries - 1)) {
           throw std::runtime_error{
-              "Agent could not read network parameters at: " + network_path};
+              "Agent could not read network parameters at: " + eval};
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
@@ -144,16 +143,16 @@ struct Agent {
 
   std::string to_string() const {
     std::stringstream ss{};
-    ss << "search_time: ";
+    ss << "search_budget: ";
     if (flag) {
       ss << "(flag)";
     } else {
-      ss << search_time;
+      ss << search_budget;
     }
-    ss << " bandit_name: " << bandit_name;
-    ss << " network_path: ";
+    ss << " bandit: " << bandit;
+    ss << " eval: ";
     if (uses_network()) {
-      ss << network_path;
+      ss << eval;
     } else {
       ss << "(monte-carlo)";
     }
@@ -202,20 +201,19 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
   // Whether to use MatrixUCB params or normal
   const auto run_4 = [&](auto dur, auto &model, auto &bandit_params,
                          auto &node) -> MCTS::Output {
-    const auto &matrix_ucb_name = agent.matrix_ucb_name;
-    if (!matrix_ucb_name.empty()) {
-      const auto matrix_ucb_name_split =
-          Parse::split(agent.matrix_ucb_name, '-');
-      if (matrix_ucb_name_split.size() != 4) {
+    const auto &matrix_ucb = agent.matrix_ucb;
+    if (!matrix_ucb.empty()) {
+      const auto matrix_ucb_split = Parse::split(agent.matrix_ucb, '-');
+      if (matrix_ucb_split.size() != 4) {
         throw std::runtime_error{"Could not parse MatrixUCB name: " +
-                                 agent.matrix_ucb_name};
+                                 agent.matrix_ucb};
       }
       MCTS::MatrixUCBParams<std::remove_cvref_t<decltype(bandit_params)>>
           matrix_ucb_params{bandit_params};
-      matrix_ucb_params.delay = std::stoull(matrix_ucb_name_split[0]);
-      matrix_ucb_params.interval = std::stoull(matrix_ucb_name_split[1]);
-      matrix_ucb_params.minimum = std::stoull(matrix_ucb_name_split[2]);
-      matrix_ucb_params.c = std::stof(matrix_ucb_name_split[3]);
+      matrix_ucb_params.delay = std::stoull(matrix_ucb_split[0]);
+      matrix_ucb_params.interval = std::stoull(matrix_ucb_split[1]);
+      matrix_ucb_params.minimum = std::stoull(matrix_ucb_split[2]);
+      matrix_ucb_params.c = std::stof(matrix_ucb_split[3]);
       return run_5(dur, model, matrix_ucb_params, node);
     } else {
       return run_5(dur, model, bandit_params, node);
@@ -236,15 +234,15 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
 
   // Parse bandit algorithm and parameters
   const auto run_2 = [&](auto dur, auto &model) {
-    const auto bandit_name_split = Parse::split(agent.bandit_name, '-');
+    const auto bandit_split = Parse::split(agent.bandit, '-');
 
-    if (bandit_name_split.size() < 2) {
+    if (bandit_split.size() < 2) {
       throw std::runtime_error("Could not parse bandit string: " +
-                               agent.bandit_name);
+                               agent.bandit);
     }
 
-    const auto &name = bandit_name_split[0];
-    const float f1 = std::stof(bandit_name_split[1]);
+    const auto &name = bandit_split[0];
+    const float f1 = std::stof(bandit_split[1]);
 
     if (name == "ucb") {
       UCB::Bandit::Params params{.c = f1};
@@ -258,8 +256,8 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
     }
 
     float alpha = .05;
-    if (bandit_name_split.size() >= 3) {
-      alpha = std::stof(bandit_name_split[2]);
+    if (bandit_split.size() >= 3) {
+      alpha = std::stof(bandit_split[2]);
     }
 
     if (name == "exp3") {
@@ -286,7 +284,7 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
         agent.initialize_network(input.battle);
       }
       return run_2(dur, agent.network.value());
-    } else if (agent.network_path == "fp") {
+    } else if (agent.eval == "fp") {
       PokeEngine::Model model{};
       return run_2(dur, model);
     } else {
@@ -300,10 +298,10 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
     if (agent.flag != nullptr) {
       return search_1(agent.flag);
     }
-    const auto pos = agent.search_time.find_first_not_of("0123456789");
-    size_t number = std::stoll(agent.search_time.substr(0, pos));
+    const auto pos = agent.search_budget.find_first_not_of("0123456789");
+    size_t number = std::stoll(agent.search_budget.substr(0, pos));
     std::string unit =
-        (pos == std::string::npos) ? "" : agent.search_time.substr(pos);
+        (pos == std::string::npos) ? "" : agent.search_budget.substr(pos);
     if (unit.empty()) {
       return search_1(number);
     } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
@@ -312,7 +310,7 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       return search_1(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
-                               agent.search_time);
+                               agent.search_budget);
     }
   };
 

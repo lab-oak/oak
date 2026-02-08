@@ -4,7 +4,6 @@
 
 namespace Argparse {
 template <typename T> using Identity = T;
-}
 
 struct TeamBuildingArgs : public argparse::Args {
   double &team_modify_prob =
@@ -24,18 +23,17 @@ struct TeamBuildingArgs : public argparse::Args {
 
 #define MAKE_AGENT_ARGS(NAME, BASE, WRAPPER, A, B)                             \
   struct NAME : public BASE {                                                  \
-    WRAPPER<std::string> &A##search_time =                                     \
-        kwarg(B "search-time", "Default search time");                         \
+    WRAPPER<std::string> &A##search_budget =                                   \
+        kwarg(B "search-budget", "Search budget, e.g. 1024/100ms/8s");         \
                                                                                \
-    WRAPPER<std::string> &A##bandit_name =                                     \
-        kwarg(B "bandit-name", "Bandit algorithm");                            \
+    WRAPPER<std::string> &A##bandit =                                          \
+        kwarg(B "bandit", "Bandit algorithm and parameters");                  \
                                                                                \
-    WRAPPER<std::string> &A##matrix_ucb_name =                                 \
-        kwarg(B "matrix-ucb-name", "MatrixUCB start/interval/minimum/c")       \
+    WRAPPER<std::string> &A##matrix_ucb =                                      \
+        kwarg(B "matrix-ucb", "MatrixUCB start/interval/minimum/c")            \
             .set_default("");                                                  \
                                                                                \
-    WRAPPER<std::string> &A##network_path =                                    \
-        kwarg(B "network-path", "Network path").set_default("mc");             \
+    WRAPPER<std::string> &A##eval = kwarg(B "eval", "Eval mc/fp/<network-path>");           \
                                                                                \
     bool &A##use_discrete =                                                    \
         flag(B "use-discrete", "Enable Stockfish discrete main subnet");       \
@@ -46,33 +44,43 @@ struct TeamBuildingArgs : public argparse::Args {
 
 #define MAKE_AGENT_POLICY_ARGS(NAME, BASE, WRAPPER, A, B)                      \
   struct NAME : public BASE {                                                  \
-    WRAPPER<char> &A##policy_mode = kwarg(B "policy-mode", "Policy mode");     \
-    double &A##policy_temp =                                                   \
+    WRAPPER<std::string> &A##policy_mode =                                     \
+        kwarg(B "policy-mode", "Policy mode");                                 \
+    std::optional<double> &A##policy_temp =                                    \
         kwarg(B "policy-temp", "P-norm just before clipping/sampling")         \
-            .set_default(1);                                                   \
-    double &A##policy_nash_weight =                                            \
-        kwarg(B "policy-nash-weight",                                          \
-              "Weight of nash policy when using (m)ixed mode")                 \
-            .set_default(.5);                                                  \
-    double &A##policy_min =                                                    \
+            .set_default(1.0);                                                 \
+    std::optional<double> &A##policy_min =                                     \
         kwarg(B "policy-min", "Probs below this will be zerod")                \
             .set_default(0);                                                   \
   };
 
-MAKE_AGENT_POLICY_ARGS(AgentPolicyArgs, TeamBuildingArgs, Argparse::Identity, ,
-                       "")
+MAKE_AGENT_ARGS(AgentArgs, TeamBuildingArgs, Identity, , "")
+MAKE_AGENT_ARGS(AgentArgsOptional, TeamBuildingArgs, std::optional, , "")
+using BenchmarkArgs = AgentArgsOptional;
+
+MAKE_AGENT_POLICY_ARGS(AgentPolicyArgs, AgentArgs, Identity, , "")
+using ChallArgs = AgentPolicyArgs;
+
 MAKE_AGENT_POLICY_ARGS(FastAgentPolicyArgs, AgentPolicyArgs, std::optional,
                        fast_, "fast-")
-MAKE_AGENT_ARGS(AgentArgs, FastAgentPolicyArgs, Argparse::Identity, , "")
-MAKE_AGENT_ARGS(T1AgentArgs, AgentArgs, std::optional, t1_, "t1-")
-MAKE_AGENT_ARGS(FastAgentArgs, T1AgentArgs, std::optional, fast_, "fast-")
-MAKE_AGENT_ARGS(AfterAgentArgs, FastAgentArgs, std::optional, after_, "after-")
-using GenerateAgentArgs = AfterAgentArgs;
+MAKE_AGENT_ARGS(FastAgentArgs, FastAgentPolicyArgs, std::optional, fast_,
+                "fast-")
+MAKE_AGENT_ARGS(T1AgentArgs, FastAgentArgs, std::optional, t1_, "t1-")
+MAKE_AGENT_ARGS(AfterAgentArgs, T1AgentArgs, std::optional, after_, "after-")
+using GenerateArgs = AfterAgentArgs;
 
-MAKE_AGENT_POLICY_ARGS(P1PolicyArgs, TeamBuildingArgs, Argparse::Identity, p1_,
-                       "p1-")
-MAKE_AGENT_POLICY_ARGS(P2PolicyArgs, P1PolicyArgs, Argparse::Identity, p2_,
-                       "p2-")
-MAKE_AGENT_ARGS(P1AgentArgs, P2PolicyArgs, Argparse::Identity, p1_, "p1-")
-MAKE_AGENT_ARGS(P2AgentArgs, P1AgentArgs, Argparse::Identity, p2_, "p2-")
-using VsAgentArgs = P2AgentArgs;
+MAKE_AGENT_POLICY_ARGS(AgentOptionalPolicyArgs, AgentArgsOptional,
+                       std::optional, , "")
+MAKE_AGENT_POLICY_ARGS(P1PolicyArgs, AgentOptionalPolicyArgs, std::optional,
+                       p1_, "p1-")
+MAKE_AGENT_POLICY_ARGS(P2PolicyArgs, P1PolicyArgs, std::optional, p2_, "p2-")
+MAKE_AGENT_ARGS(P1AgentArgs, P2PolicyArgs, std::optional, p1_, "p1-")
+MAKE_AGENT_ARGS(P2AgentArgs, P1AgentArgs, std::optional, p2_, "p2-")
+using VsArgs = P2AgentArgs;
+
+} // namespace Argparse
+
+using Argparse::BenchmarkArgs;
+using Argparse::ChallArgs;
+using Argparse::GenerateArgs;
+using Argparse::VsArgs;

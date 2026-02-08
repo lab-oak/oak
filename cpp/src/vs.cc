@@ -18,7 +18,7 @@
 #include <thread>
 #include <vector>
 
-struct ProgramArgs : public VsAgentArgs {
+struct ProgramArgs : public VsArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
   size_t &threads =
       kwarg("threads",
@@ -53,18 +53,16 @@ struct ProgramArgs : public VsAgentArgs {
             "Size of build buffer (No. of traj's) before write")
           .set_default(1 << 10);
 
-  std::optional<std::string> &p1_bandit_name_after =
-      kwarg("p1-bandit-name-after", "");
-  std::optional<std::string> &p2_bandit_name_after =
-      kwarg("p2-bandit-name-after", "");
-  std::optional<std::string> &p1_search_time_after =
-      kwarg("p1-search-time-after", "");
-  std::optional<std::string> &p2_search_time_after =
-      kwarg("p2-search-time-after", "");
-  std::optional<std::string> &p1_matrix_ucb_name_after =
-      kwarg("p1-matrix-ucb-name-after", "");
-  std::optional<std::string> &p2_matrix_ucb_name_after =
-      kwarg("p2-matrix-ucb-name-after", "");
+  std::optional<std::string> &p1_bandit_after = kwarg("p1-bandit-after", "");
+  std::optional<std::string> &p2_bandit_after = kwarg("p2-bandit-after", "");
+  std::optional<std::string> &p1_search_budget_after =
+      kwarg("p1-search-budget-after", "");
+  std::optional<std::string> &p2_search_budget_after =
+      kwarg("p2-search-budget-after", "");
+  std::optional<std::string> &p1_matrix_ucb_after =
+      kwarg("p1-matrix-ucb-after", "");
+  std::optional<std::string> &p2_matrix_ucb_after =
+      kwarg("p2-matrix-ucb-after", "");
 };
 
 auto inverse_sigmoid(const auto x) { return std::log(x) - std::log(1 - x); }
@@ -154,42 +152,37 @@ void thread_fn(const ProgramArgs *args_ptr) {
   };
 
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
-    auto p1_agent =
-        RuntimeSearch::Agent{.search_time = args.p1_search_time,
-                             .bandit_name = args.p1_bandit_name,
-                             .network_path = args.p1_network_path,
-                             .discrete_network = args.p1_use_discrete,
-                             .matrix_ucb_name = args.p1_matrix_ucb_name,
-                             .use_table = args.p1_use_table};
-    auto p1_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p1_search_time_after.value_or("0"),
-        .bandit_name = args.p1_bandit_name_after.value_or(args.p1_bandit_name),
-        .network_path = args.p1_network_path,
+    auto p1_agent = RuntimeSearch::Agent{
+        .search_budget =
+            args.p1_search_budget.value_or(args.search_budget.value()),
+        .bandit = args.p1_bandit.value_or(args.bandit.value()),
+        .eval = args.p1_eval.value_or(args.eval.value()),
         .discrete_network = args.p1_use_discrete,
-        .matrix_ucb_name = args.p1_matrix_ucb_name_after.value(),
+        .matrix_ucb = args.p1_matrix_ucb.value_or(args.matrix_ucb.value_or("")),
         .use_table = args.p1_use_table};
-    auto p2_agent =
-        RuntimeSearch::Agent{.search_time = args.p2_search_time,
-                             .bandit_name = args.p2_bandit_name,
-                             .network_path = args.p2_network_path,
-                             .discrete_network = args.p2_use_discrete,
-                             .matrix_ucb_name = args.p2_matrix_ucb_name,
-                             .use_table = args.p2_use_table};
-    auto p2_agent_after = RuntimeSearch::Agent{
-        .search_time = args.p2_search_time_after.value_or("0"),
-        .bandit_name = args.p2_bandit_name_after.value_or(args.p2_bandit_name),
-        .network_path = args.p2_network_path,
+    auto p1_agent_after = p1_agent;
+    p1_agent_after.search_budget = args.p1_search_budget_after.value_or("0");
+    p1_agent_after.matrix_ucb = args.p1_matrix_ucb_after.value_or("");
+    const auto p1_policy_options = RuntimePolicy::Options{
+        .mode = args.p1_policy_mode.value_or(args.policy_mode.value()),
+        .temp = args.p1_policy_temp.value_or(args.policy_temp.value_or(1)),
+        .min = args.p1_policy_min.value_or(args.policy_min.value_or(0))};
+
+    auto p2_agent = RuntimeSearch::Agent{
+        .search_budget =
+            args.p2_search_budget.value_or(args.search_budget.value()),
+        .bandit = args.p2_bandit.value_or(args.bandit.value()),
+        .eval = args.p2_eval.value_or(args.eval.value()),
         .discrete_network = args.p2_use_discrete,
-        .matrix_ucb_name = args.p2_matrix_ucb_name_after.value(),
+        .matrix_ucb = args.p2_matrix_ucb.value_or(args.matrix_ucb.value_or("")),
         .use_table = args.p2_use_table};
-    const auto p1_policy_options =
-        RuntimePolicy::Options{.mode = args.p1_policy_mode,
-                               .temp = args.p1_policy_temp,
-                               .min_prob = args.p1_policy_min};
-    const auto p2_policy_options =
-        RuntimePolicy::Options{.mode = args.p2_policy_mode,
-                               .temp = args.p2_policy_temp,
-                               .min_prob = args.p2_policy_min};
+    auto p2_agent_after = p2_agent;
+    p2_agent_after.search_budget = args.p2_search_budget_after.value_or("0");
+    p2_agent_after.matrix_ucb = args.p2_matrix_ucb_after.value_or("");
+    const auto p2_policy_options = RuntimePolicy::Options{
+        .mode = args.p2_policy_mode.value_or(args.policy_mode.value()),
+        .temp = args.p2_policy_temp.value_or(args.policy_temp.value_or(1)),
+        .min = args.p2_policy_min.value_or(args.policy_min.value_or(0))};
 
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
@@ -285,9 +278,6 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
         // only if they have same sign and are both non zero
         if ((p1_early_stop * p2_early_stop) > 0) {
-          // std::cout << "Early stop: " << p1_output.empirical_value << ' '
-          //           << p2_output.empirical_value << std::endl;
-          // std::cout << p1_early_stop << ' ' << p2_early_stop << std::endl;
           early_stop = true;
           break;
         }
@@ -327,24 +317,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
     p1_battle_frame_buffer.write_frames(p1_battle_frames);
     p2_battle_frame_buffer.write_frames(p2_battle_frames);
 
-    switch (pkmn_result_type(input.result)) {
-    case PKMN_RESULT_WIN: {
-      RuntimeData::win.fetch_add(1);
-      return 2;
-    }
-    case PKMN_RESULT_LOSE: {
-      RuntimeData::loss.fetch_add(1);
-      return 0;
-    }
-    case PKMN_RESULT_TIE: {
-      RuntimeData::draw.fetch_add(1);
-      return 1;
-    }
-    default: {
-      assert(false);
-      return 0;
-    }
-    }
+    return PKMN::score2(input.result);
   };
 
   while ((args.max_games < 0) ||
@@ -455,18 +428,6 @@ void setup(auto &args) {
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
   }
-  if (!args.p1_search_time_after.has_value()) {
-    args.p1_search_time_after.emplace("0ms");
-  }
-  if (!args.p2_search_time_after.has_value()) {
-    args.p2_search_time_after.emplace("0ms");
-  }
-  if (!args.p1_matrix_ucb_name_after.has_value()) {
-    args.p1_matrix_ucb_name_after.emplace("");
-  }
-  if (!args.p2_matrix_ucb_name_after.has_value()) {
-    args.p2_matrix_ucb_name_after.emplace("");
-  }
   // args
   if (args.save && !args.working_dir.has_value()) {
     args.working_dir.emplace("vs-" + get_current_datetime());
@@ -499,7 +460,7 @@ void setup(auto &args) {
   RuntimeData::provider = TeamBuilding::Provider{args.teams_path};
   RuntimeData::provider.omitter = {args.max_pokemon, args.pokemon_delete_prob,
                                    args.move_delete_prob};
-  RuntimeData::provider.network_path = args.build_network_path;
+  RuntimeData::provider.eval = args.build_network_path;
   RuntimeData::provider.team_modify_prob = args.team_modify_prob;
   RuntimeData::provider.read_network_parameters();
 

@@ -9,11 +9,11 @@
 #include <iostream>
 #include <thread>
 
-struct ProgramArgs : public AgentArgs {
+struct ProgramArgs : public ChallArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
-  bool &use_search_time =
-      flag("--use-search-time",
-           "Use --search-time value instead of ctrl+z to end search");
+  bool &use_search_budget =
+      flag("--use-search-budget",
+           "Use --search-budget value instead of ctrl+z to end search");
 };
 
 bool search_flag = true;
@@ -36,21 +36,21 @@ int main(int argc, char **argv) {
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
   auto agent = RuntimeSearch::Agent{
-      .search_time = args.search_time,
-      .bandit_name = args.bandit_name,
-      .network_path = args.network_path,
+      .search_budget = args.search_budget,
+      .bandit = args.bandit,
+      .eval = args.eval,
       .discrete_network = args.use_discrete,
-      .matrix_ucb_name = args.matrix_ucb_name,
-      .flag = args.use_search_time ? nullptr : &search_flag};
+      .matrix_ucb = args.matrix_ucb,
+      .flag = args.use_search_budget ? nullptr : &search_flag};
 
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
   }
 
   const auto policy_options =
-      RuntimePolicy::Options{.mode = args.policy_mode,
-                             .temp = args.policy_temp,
-                             .min_prob = args.policy_min};
+      RuntimePolicy::Options{.mode = args.policy_mode.value_or("x"),
+                             .temp = args.policy_temp.value_or(1.0),
+                             .min = args.policy_min.value_or(0)};
 
   mt19937 device{args.seed.value()};
   MCTS::Input battle_data;

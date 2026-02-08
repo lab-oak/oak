@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description="Parameter testing for battle agent
 parser.add_argument("--working-dir", default=None, type=str)
 parser.add_argument("--net-path", default=".", type=str)
 parser.add_argument("--vs-path", default="./release/vs", type=str)
-parser.add_argument("--search-time", default=2**12, type=int)
+parser.add_argument("--search-budget", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
@@ -45,10 +45,10 @@ def log_uniform(min, max):
 
 
 class ID:
-    def __init__(self, net_hash, bandit_name, policy_mode, iterations):
+    def __init__(self, net_hash, bandit, policy_mode, iterations):
         self.net_hash = net_hash
-        assert len(bandit_name) < 15, f"Error: bandit-name too long: {bandit_name}"
-        self.bandit_name = bandit_name
+        assert len(bandit) < 15, f"Error: bandit too long: {bandit}"
+        self.bandit = bandit
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
         self.iterations = iterations
@@ -58,32 +58,32 @@ class ID:
             return NotImplemented
         return (
             self.net_hash == other.net_hash
-            and self.bandit_name == other.bandit_name
+            and self.bandit == other.bandit
             and self.policy_mode == other.policy_mode
             and self.iterations == other.iterations
         )
 
     def __hash__(self):
         return hash(
-            (self.net_hash, self.bandit_name, self.policy_mode, self.iterations)
+            (self.net_hash, self.bandit, self.policy_mode, self.iterations)
         )  # combine fields safely
 
     def write(self, f):
         f.write(struct.pack("<Q", self.net_hash))
-        bn = self.bandit_name.encode("utf8")
+        bn = self.bandit.encode("utf8")
         bn = bn.ljust(15, b"\0")
         f.write(bn)
         f.write(self.policy_mode.encode("utf8"))
         f.write(struct.pack("<I", self.iterations))
 
     def print(self):
-        print(self.net_hash, self.bandit_name, self.policy_mode, self.iterations)
+        print(self.net_hash, self.bandit, self.policy_mode, self.iterations)
 
 
 def less_than(id1: ID, id2: ID):
-    return (id1.net_hash, id1.bandit_name, id1.policy_mode, id1.iterations) < (
+    return (id1.net_hash, id1.bandit, id1.policy_mode, id1.iterations) < (
         id2.net_hash,
-        id2.bandit_name,
+        id2.bandit,
         id2.policy_mode,
         id2.iterations,
     )
@@ -146,12 +146,12 @@ class Global:
             param = random.uniform(args.ucb_param_min, args.ucb_param_max)
         else:
             assert false, "bad bandit name"
-        bandit_name = bandit + str(param)[:5]
+        bandit = bandit + str(param)[:5]
 
         selection_modes = ["n", "e", "x"]
         selection_mode = random.choice(selection_modes)
 
-        return ID(net_hash, bandit_name, selection_mode, args.search_time)
+        return ID(net_hash, bandit, selection_mode, args.search_budget)
 
     def remove_id(self, target_id: ID):
         return NotImplemented
@@ -359,12 +359,12 @@ def run_once() -> [ID, ID, [int, int, int]]:
         "--max-games=1",
         "--skip-save",
         f"--teams={args.teams}",
-        f"--p1-network-path={glob.directory[lesserID.net_hash]}",
-        f"--p2-network-path={glob.directory[greaterID.net_hash]}",
-        f"--p1-search-time={lesserID.iterations}",
-        f"--p2-search-time={greaterID.iterations}",
-        f"--p1-bandit-name={lesserID.bandit_name}",
-        f"--p2-bandit-name={greaterID.bandit_name}",
+        f"--p1-eval={glob.directory[lesserID.net_hash]}",
+        f"--p2-eval={glob.directory[greaterID.net_hash]}",
+        f"--p1-search-budget={lesserID.iterations}",
+        f"--p2-search-budget={greaterID.iterations}",
+        f"--p1-bandit={lesserID.bandit}",
+        f"--p2-bandit={greaterID.bandit}",
         f"--p1-policy-mode={lesserID.policy_mode}",
         f"--p2-policy-mode={greaterID.policy_mode}",
     ]
@@ -393,7 +393,7 @@ def main():
                 if key in glob.ucb:
                     print(
                         glob.directory[key.net_hash],
-                        key.bandit_name,
+                        key.bandit,
                         key.policy_mode,
                         key.iterations,
                         value,

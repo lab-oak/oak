@@ -453,10 +453,10 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<RuntimeSearch::Agent>(m, "Agent")
       .def(py::init<>())
-      .def_readwrite("search_time", &RuntimeSearch::Agent::search_time)
-      .def_readwrite("bandit_name", &RuntimeSearch::Agent::bandit_name)
-      .def_readwrite("network_path", &RuntimeSearch::Agent::network_path)
-      .def_readwrite("matrix_ucb_name", &RuntimeSearch::Agent::matrix_ucb_name)
+      .def_readwrite("search_budget", &RuntimeSearch::Agent::search_budget)
+      .def_readwrite("bandit", &RuntimeSearch::Agent::bandit)
+      .def_readwrite("eval", &RuntimeSearch::Agent::eval)
+      .def_readwrite("matrix_ucb", &RuntimeSearch::Agent::matrix_ucb)
       .def_readwrite("use_table", &RuntimeSearch::Agent::use_table);
   py::class_<MCTS::Input>(m, "Input").def(py::init<>());
 

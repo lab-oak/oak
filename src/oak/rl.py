@@ -39,19 +39,19 @@ generate_parser.add_argument(
     help="Initial build network ('' = random initial)",
 )
 generate_parser.add_argument(
-    "--search-time",
+    "--search-budget",
     type=int,
     help="Number of iterations for training frames",
     required=True,
 )
 generate_parser.add_argument(
-    "--fast-search-time",
+    "--fast-search-budget",
     type=int,
     help="Number of iterations for non-training frames",
     required=True,
 )
 generate_parser.add_argument(
-    "--t1-search-time",
+    "--t1-search-budget",
     type=int,
     default=None,
     help="Number of iterations for turn 1 search, used when skipping battles for build data generation",
@@ -59,11 +59,11 @@ generate_parser.add_argument(
 generate_parser.add_argument(
     "--fast-search-prob",
     type=float,
-    help="Probability that fast-search-time is used instead of search-time",
+    help="Probability that fast-search-budget is used instead of search-budget",
     required=True,
 )
 generate_parser.add_argument(
-    "--bandit-name",
+    "--bandit",
     type=str,
     help="Bandit algorithm and parameters (exp3/pexp3/p2exp3/ucb/pucb)-(exp3 'gamma'/ucb 'c')",
     required=True,
@@ -182,8 +182,8 @@ def main():
     # arg set
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
-    if args.t1_search_time is None:
-        args.t1_search_time = args.search_time
+    if args.t1_search_budget is None:
+        args.t1_search_budget = args.search_budget
 
     # paths set
     now = datetime.datetime.now()
@@ -227,11 +227,11 @@ def main():
 
     generate_cmd = [
         f"./{args.generate_path}",
-        f"--search-time={args.search_time}",
-        f"--fast-search-time={args.fast_search_time}",
-        f"--t1-search-time={args.t1_search_time}",
-        f"--bandit-name={args.bandit_name}",
-        f"--network-path={network_path if use_battle else "mc"}",
+        f"--search-budget={args.search_budget}",
+        f"--fast-search-budget={args.fast_search_budget}",
+        f"--t1-search-budget={args.t1_search_budget}",
+        f"--bandit={args.bandit}",
+        f"--eval={network_path if use_battle else "mc"}",
         f"--policy-mode={args.policy_mode}",
         f"--fast-policy-mode={args.fast_policy_mode}",
         f"--policy-temp={args.policy_temp}",
@@ -259,7 +259,7 @@ def main():
     def get_common_cmd(args, prefix):
         p = prefix or ""
         return [
-            f"--network-path={network_path if prefix == "" else build_network_path}",
+            f"--network_path={network_path if prefix == "" else build_network_path}",
             f"--data-dir={data_dir}",
             "--in-place",
             f"--device={getattr(args, f'{p}device')}",
@@ -286,7 +286,7 @@ def main():
         + get_common_cmd(args, "")
         + [
             f"--max-battle-length={args.max_battle_length}",
-            f"--min-iterations={args.fast_search_time + 1}",
+            f"--min-iterations={args.fast_search_budget + 1}",
             f"--value-nash-weight={args.value_nash_weight}",
             f"--value-empirical-weight={args.value_empirical_weight}",
             f"--value-score-weight={args.value_score_weight}",

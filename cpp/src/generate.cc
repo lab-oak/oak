@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-struct ProgramArgs : public GenerateAgentArgs {
+struct ProgramArgs : public GenerateArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
   std::optional<std::string> &working_dir = kwarg("dir", "Save directory");
   size_t &threads =
@@ -44,11 +44,11 @@ struct ProgramArgs : public GenerateAgentArgs {
 
   double &fast_search_prob =
       kwarg("fast-search-prob",
-            "Probability a search with only fast-search-time is used")
+            "Probability a search with only fast-search-budget is used")
           .set_default(0);
   double &after_search_prob =
       kwarg("after-search-prob",
-            "Probability a search with only fast-search-time is used")
+            "Probability a search with only fast-search-budget is used")
           .set_default(0);
   int &max_battle_length =
       kwarg("max-battle-length",
@@ -164,6 +164,7 @@ void generate(const ProgramArgs *args_ptr) {
   const size_t training_frames_target_size = args.buffer_size << 20;
   const size_t thread_frame_buffer_size = (args.buffer_size + 1) << 20;
   auto buffer = new char[thread_frame_buffer_size]{};
+  // auto battle_buffer = BattleFrameBuffer{thread_frame_buffer_size};
   size_t frame_buffer_write_index = 0;
   // These are generated slowly so a vector is fine
   std::vector<Train::Build::Trajectory> build_buffer{};
@@ -245,11 +246,11 @@ void generate(const ProgramArgs *args_ptr) {
 
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
-    auto agent = RuntimeSearch::Agent{.search_time = args.search_time,
-                                      .bandit_name = args.bandit_name,
-                                      .network_path = args.network_path,
+    auto agent = RuntimeSearch::Agent{.search_budget = args.search_budget,
+                                      .bandit = args.bandit,
+                                      .eval = args.eval,
                                       .discrete_network = args.use_discrete,
-                                      .matrix_ucb_name = args.matrix_ucb_name};
+                                      .matrix_ucb = args.matrix_ucb};
     if (agent.uses_network()) {
       agent.initialize_network(battle_data.battle);
     }
@@ -258,11 +259,10 @@ void generate(const ProgramArgs *args_ptr) {
 
     auto policy_options =
         RuntimePolicy::Options{.mode = args.policy_mode,
-                               .temp = args.policy_temp,
-                               .min_prob = args.policy_min,
-                               .nash_weight = args.policy_nash_weight};
+                               .temp = args.policy_temp.value(),
+                               .min = args.policy_min.value()};
     const auto rollout_policy_options = RuntimePolicy::Options{
-        .mode = 'e', .temp = 1.0, .min_prob = args.policy_min};
+        .mode = "e", .temp = 1.0, .min = args.policy_min.value()};
 
     battle_length = 0;
     try {
@@ -291,17 +291,17 @@ void generate(const ProgramArgs *args_ptr) {
         const bool use_fast = device.uniform() < args.fast_search_prob;
         const bool use_after =
             !use_fast && (device.uniform() < args.after_search_prob);
-        agent.search_time =
-            ((battle_length == 0) && skip_battle)
-                ? args.t1_search_time.value()
-                : (use_fast ? args.fast_search_time.value() : args.search_time);
+        agent.search_budget = ((battle_length == 0) && skip_battle)
+                                  ? args.t1_search_budget.value()
+                                  : (use_fast ? args.fast_search_budget.value()
+                                              : args.search_budget);
         policy_options.mode =
             use_fast ? args.fast_policy_mode.value_or(args.policy_mode)
                      : args.policy_mode;
         MCTS::Output output{};
 
         const bool policy_rollout_only =
-            agent.uses_network() && (agent.search_time == "1");
+            agent.uses_network() && (agent.search_budget == "1");
 
         if (policy_rollout_only) {
 
@@ -350,14 +350,11 @@ void generate(const ProgramArgs *args_ptr) {
         } else {
           output = RuntimeSearch::run(device, battle_data, nodes, agent);
           if (use_after) {
-            agent.search_time =
-                args.after_search_time.value_or(agent.search_time);
-            agent.bandit_name =
-                args.after_bandit_name.value_or(agent.bandit_name);
-            agent.matrix_ucb_name =
-                args.after_matrix_ucb_name.value_or(agent.matrix_ucb_name);
-            agent.network_path =
-                args.after_network_path.value_or(agent.network_path);
+            agent.search_budget =
+                args.after_search_budget.value_or(agent.search_budget);
+            agent.bandit = args.after_bandit.value_or(agent.bandit);
+            agent.matrix_ucb = args.after_matrix_ucb.value_or(agent.matrix_ucb);
+            agent.eval = args.after_eval.value_or(agent.eval);
             // agent.use_discrete = args.after_use_discrete;
             // use-table must be the same...
             auto after_output =
@@ -517,11 +514,11 @@ void setup(const auto &args) {
   if (!args.working_dir.has_value()) {
     args.working_dir.emplace(RuntimeData::start_datetime);
   }
-  if (!args.t1_search_time.has_value()) {
-    args.t1_search_time.emplace(args.search_time);
+  if (!args.t1_search_budget.has_value()) {
+    args.t1_search_budget.emplace(args.search_budget);
   }
-  if (!args.fast_search_time.has_value()) {
-    args.fast_search_time.emplace(args.search_time);
+  if (!args.fast_search_budget.has_value()) {
+    args.fast_search_budget.emplace(args.search_budget);
   }
 
   // create working dir

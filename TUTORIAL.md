@@ -260,12 +260,12 @@ we can see a large number of '.build' files. The ratio of build to battle files 
 --buffer-size=8
 --debug-print=true
 --print-interval=30
---search-time=4096
---bandit-name=exp3-0.03
---battle-network-path=mc
+--search-budget=4096
+--bandit=exp3-0.03
+--battle-eval=mc
 --policy-mode=n
 --policy-temp=1
---policy-min-prob=0
+--policy-min=0
 --policy-nash-weight=0.5
 --keep-node=true
 --skip-game-prob=0
@@ -275,9 +275,9 @@ we can see a large number of '.build' files. The ratio of build to battle files 
 --modify-team-prob=1
 --pokemon-delete-prob=1
 --move-delete-prob=0
---t1-search-time=4096
---t1-bandit-name=exp3-0.03
---t1-battle-network-path=mc
+--t1-search-budget=4096
+--t1-bandit=exp3-0.03
+--t1-battle-eval=mc
 ```
 
 reports the args used. The build network path is empty/was not provided so a new network was initialized and saved in the work dir as `random.build.net`.

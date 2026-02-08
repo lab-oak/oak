@@ -1,44 +1,55 @@
 #pragma once
 
+#include <util/strings.h>
+
 namespace RuntimePolicy {
 
 struct Options {
-  char mode = 'n';
+  std::string mode = "e";
   double temp = 1;
-  double min_prob = 0;
+  double min = 0;
   double nash_weight = .5;
+};
 
-  std::string to_string() const {
-    std::stringstream ss{};
-    ss << "mode: " << mode;
-    ss << " temp: " << temp;
-    ss << " min-prob: " << min_prob;
-    return ss.str();
-  }
+enum class Mode : char {
+  empirical = 'e',
+  nash = 'n',
+  argmax = 'x',
 };
 
 std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
                                  const auto &options) {
   std::array<double, 9> policy{};
-  if (options.mode == 'x') {
-    policy[std::distance(
-        empirical.begin(),
-        std::max_element(empirical.begin(), empirical.end()))] = 1.0;
-  } else if (options.mode == 'n') {
-    std::copy(nash.begin(), nash.end(), policy.begin());
-  } else if (options.mode == 'e') {
-    std::copy(empirical.begin(), empirical.end(), policy.begin());
-  } else if (options.mode == 'm') {
-    const auto weighted_sum = [](const auto &a, const auto &b,
-                                 const auto alpha) {
-      auto result = a;
-      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
-                     [alpha](const auto &x, const auto &y) {
-                       return alpha * x + (1 - alpha) * y;
-                     });
-      return result;
-    };
-    policy = weighted_sum(nash, empirical, options.nash_weight);
+
+  const auto mode_split = Parse::split(options.mode, '-');
+
+  for (std::string_view word : mode_split) {
+    const double w =
+        (word.size() > 1) ? std::stod(std::string(word.substr(1))) : 1.0;
+
+    switch (static_cast<Mode>(word[0])) {
+    case Mode::empirical: {
+      std::transform(empirical.begin(), empirical.end(), policy.begin(),
+                     policy.begin(),
+                     [w](double e, double p) { return p + w * e; });
+      break;
+    }
+    case Mode::nash: {
+      std::transform(nash.begin(), nash.end(), policy.begin(), policy.begin(),
+                     [w](double n, double p) { return p + w * n; });
+      break;
+    }
+    case Mode::argmax: {
+      const auto it = std::max_element(empirical.begin(), empirical.end());
+      const size_t idx = std::distance(empirical.begin(), it);
+      policy[idx] += w;
+      break;
+    }
+    default: {
+      throw std::runtime_error{"RuntimePolicy: invalid mode char: " + word[0]};
+      break;
+    }
+    }
   }
 
   if (options.temp != 1) {
@@ -52,17 +63,18 @@ std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
     }
   }
 
-  if (options.min_prob > 0) {
-    double sum = 0;
-    for (auto &x : policy) {
-      if (x < options.min_prob) {
-        x = 0;
-      }
-      sum += x;
+  double sum = 0;
+  for (auto &x : policy) {
+    if (x < options.min) {
+      x = 0;
     }
-    for (auto &x : policy) {
-      x /= sum;
-    }
+    sum += x;
+  }
+  if (sum == 0) {
+    throw std::runtime_error{"RuntimePolicy: zero policy"};
+  }
+  for (auto &x : policy) {
+    x /= sum;
   }
 
   return policy;
@@ -70,64 +82,9 @@ std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
 
 int process_and_sample(auto &device, const auto &empirical, const auto &nash,
                        const auto &policy_options) {
-  const double t = policy_options.temp;
-  if (policy_options.temp <= 0) {
-    throw std::runtime_error("Use positive policy power");
-  }
-
-  std::array<double, 9> policy{};
-  if (policy_options.mode == 'e') {
-    policy = empirical;
-  } else if (policy_options.mode == 'n') {
-    policy = nash;
-  } else if (policy_options.mode == 'x') {
-    return std::distance(empirical.begin(),
-                         std::max_element(empirical.begin(), empirical.end()));
-  } else if (policy_options.mode == 'm') {
-    const auto weighted_sum = [](const auto &a, const auto &b,
-                                 const auto alpha) {
-      auto result = a;
-      std::transform(a.begin(), a.end(), b.begin(), result.begin(),
-                     [alpha](const auto &x, const auto &y) {
-                       return alpha * x + (1 - alpha) * y;
-                     });
-      return result;
-    };
-    policy = weighted_sum(nash, empirical, policy_options.nash_weight);
-  } else {
-    throw std::runtime_error("bad policy mode.");
-  }
-
-  // TODO this is the same as using array of 9
-  std::vector<double> p(policy.begin(), policy.end());
-  double sum = 0;
-  if (policy_options.temp != 1.0) {
-    for (auto &val : p) {
-      val = std::pow(val, policy_options.temp);
-      sum += val;
-    }
-  } else {
-    for (auto &val : p) {
-      sum += val;
-    }
-  }
-  if (policy_options.min_prob > 0) {
-    const double l = policy_options.min_prob * sum;
-    sum = 0;
-    for (auto &val : p) {
-      if (val < l)
-        val = 0;
-      sum += val;
-    }
-  }
-  for (auto &val : p) {
-    val /= sum;
-  }
-
+  const auto p = get_policy(empirical, nash, policy_options);
   const auto index = device.sample_pdf(p);
-
   assert(p[index] > 0);
-
   return index;
 }
 
