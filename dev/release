@@ -1,7 +1,7 @@
 mkdir -p cpp/build/release
-cd cpp/build/release || exit 1
-
-cmake ../.. -DCMAKE_BUILD_TYPE=Release
-make "$@"
-
-cd ..
+cmake cpp \
+  -B cpp/build/release \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
+make -C cpp/build/release "$@"
