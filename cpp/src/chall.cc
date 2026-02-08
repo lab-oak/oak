@@ -36,11 +36,11 @@ int main(int argc, char **argv) {
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
   auto agent = RuntimeSearch::Agent{
-      .search_budget = args.search_budget,
-      .bandit = args.bandit,
-      .eval = args.eval,
+      .search_budget = args.search_budget.value_or(std::to_string(1 << 12)),
+      .bandit = args.bandit.value_or("ucb-1.0"),
+      .eval = args.eval.value_or("mc"),
       .discrete_network = args.use_discrete,
-      .matrix_ucb = args.matrix_ucb,
+      .matrix_ucb = args.matrix_ucb.value(),
       .flag = args.use_search_budget ? nullptr : &search_flag};
 
   if (!args.seed.has_value()) {

@@ -59,7 +59,8 @@ MAKE_AGENT_ARGS(AgentArgs, TeamBuildingArgs, Identity, , "")
 MAKE_AGENT_ARGS(AgentArgsOptional, TeamBuildingArgs, std::optional, , "")
 using BenchmarkArgs = AgentArgsOptional;
 
-MAKE_AGENT_POLICY_ARGS(AgentPolicyOptionalArgs, AgentArgs, std::optional, , "")
+MAKE_AGENT_POLICY_ARGS(AgentPolicyOptionalArgs, AgentArgsOptional,
+                       std::optional, , "")
 using ChallArgs = AgentPolicyOptionalArgs;
 
 MAKE_AGENT_POLICY_ARGS(AgentPolicyArgs, AgentArgs, Identity, , "")
