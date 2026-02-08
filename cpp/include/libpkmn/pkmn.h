@@ -259,7 +259,7 @@ auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
   return {p1_labels, p2_labels};
 }
 
-float score(const pkmn_result result) noexcept {
+inline float score(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
   case PKMN_RESULT_NONE: {
     return -1.0;
@@ -280,7 +280,7 @@ float score(const pkmn_result result) noexcept {
   }
 }
 
-uint8_t score2(const pkmn_result result) noexcept {
+inline uint8_t score2(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
   case PKMN_RESULT_NONE: {
     return 1;

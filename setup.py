@@ -20,12 +20,15 @@ setup(
         ],
     },
     data_files=[
-        ("oak/_bin", [
-            "src/oak/_bin/generate",
-            "src/oak/_bin/vs",
-            "src/oak/_bin/chall",
-            "src/oak/_bin/benchmark",
-        ]),
+        (
+            "oak/_bin",
+            [
+                "src/oak/_bin/generate",
+                "src/oak/_bin/vs",
+                "src/oak/_bin/chall",
+                "src/oak/_bin/benchmark",
+            ],
+        ),
     ],
     distclass=BinaryDistribution,
 )
