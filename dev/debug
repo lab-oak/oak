@@ -4,4 +4,4 @@ cmake cpp \
   -DCMAKE_BUILD_TYPE=Debug
 #   -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
 #   -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
-make -C cpp/debug/release "$@"
+make -C cpp/build/release "$@"
