@@ -4,6 +4,6 @@ libpkmn-showdown.a
 pkmn-showdown.lib
 *.so
 *.pyc
-/src/oak.egg-info/
-/src/oak/_bin
-/src/oak/_native
+/src/oaks_lab.egg-info/
+/src/_bin
+/src/_native

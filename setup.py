@@ -23,10 +23,10 @@ setup(
         (
             "oak/_bin",
             [
-                "src/oak/_bin/generate",
-                "src/oak/_bin/vs",
-                "src/oak/_bin/chall",
-                "src/oak/_bin/benchmark",
+                "src/_bin/generate",
+                "src/_bin/vs",
+                "src/_bin/chall",
+                "src/_bin/benchmark",
             ],
         ),
     ],
