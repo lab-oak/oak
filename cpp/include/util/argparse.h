@@ -33,7 +33,8 @@ struct TeamBuildingArgs : public argparse::Args {
         kwarg(B "matrix-ucb", "MatrixUCB start/interval/minimum/c")            \
             .set_default("");                                                  \
                                                                                \
-    WRAPPER<std::string> &A##eval = kwarg(B "eval", "Eval mc/fp/<network-path>");           \
+    WRAPPER<std::string> &A##eval =                                            \
+        kwarg(B "eval", "Eval mc/fp/<network-path>");                          \
                                                                                \
     bool &A##use_discrete =                                                    \
         flag(B "use-discrete", "Enable Stockfish discrete main subnet");       \
