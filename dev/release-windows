@@ -1,0 +1,10 @@
+mkdir -p cpp/build/Release
+rm -rf cpp/build/Release/*
+cmake cpp \
+  -B cpp/build/Release \
+  -G "Ninja" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc \
+  -DCMAKE_CXX_COMPILER=g++ \
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin

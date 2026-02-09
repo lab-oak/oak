@@ -50,8 +50,8 @@ jobs:
       - name: Build Oak (CMake + install Python binaries)
         shell: bash
         run: |
-          chmod +x dev/release
-          ./dev/release
+          chmod +x dev/release-windows
+          ./dev/release-windows
 
       - name: Create venv and build wheel
         shell: bash

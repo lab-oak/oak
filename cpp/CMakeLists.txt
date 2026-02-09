@@ -10,12 +10,25 @@ add_subdirectory(extern/argparse EXCLUDE_FROM_ALL)
 # Libpkmn
 
 function(create_library target mode dir)
+
   add_library(${target} STATIC IMPORTED)
+
+  if (WIN32)
+    set(LIB_EXT lib)
+    set(LIB_PREFIX "")
+  else()
+    set(LIB_EXT a)
+    set(LIB_PREFIX lib)
+  endif()
+
   set_target_properties(${target} PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libpkmn/${mode}/${dir}/libpkmn-showdown.a
+    IMPORTED_LOCATION
+      ${CMAKE_CURRENT_SOURCE_DIR}/libpkmn/${mode}/${dir}/${LIB_PREFIX}pkmn-showdown.${LIB_EXT}
   )
+
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/engine/zig-out/include)
   target_compile_options(${target} INTERFACE -mavx2)
+  
 endfunction()
 
 create_library(libpkmn_client_release release client)
