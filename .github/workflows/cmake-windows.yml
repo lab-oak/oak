@@ -11,57 +11,60 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Ensure newer CMake than runner default
+      # Newer CMake than runner default
       - name: Install latest CMake
         uses: jwlawson/actions-setup-cmake@v2
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-12 g++-12 \
-            libgmp3-dev \
-            ninja-build \
-            python3-venv
+      - name: Setup MSYS2 (MinGW toolchain + GMP)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
 
-      - name: Set GCC 12 as default
-        run: |
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+      - name: Add MinGW to PATH
+        shell: pwsh
+        run: echo "C:\msys64\mingw64\bin" >> $env:GITHUB_PATH
 
       - name: Setup Zig Compiler
         uses: mlugg/setup-zig@v2.2.1
         with:
           version: 0.16.0-dev.2193+fc517bd01
 
-      - name: Build libpkmn
+      - name: Build libpkmn (Windows)
+        shell: bash
         run: |
-          chmod +x dev/libpkmn
-          ./dev/libpkmn
+          chmod +x dev/libpkmn-windows
+          ./dev/libpkmn-windows
 
       - name: Build Oak (CMake + install Python binaries)
+        shell: bash
         run: |
           chmod +x dev/release
           ./dev/release
 
       - name: Create venv and build wheel
+        shell: bash
         run: |
           python3 -m venv .venv
-          source .venv/bin/activate
+          source .venv/Scripts/activate
           pip install --upgrade pip build
           python -m build
 
       - name: Upload built wheel
         uses: actions/upload-artifact@v4
         with:
-          name: oaks-lab-wheel-ubuntu22
+          name: oaks-lab-wheel-windows
           path: dist/*.whl
           if-no-files-found: error
 
