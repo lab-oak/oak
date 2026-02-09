@@ -26,7 +26,7 @@ These programs were all built from a shared header library that is easy to exten
 
 # Building
 
-**Note**: Libpkmn currently only builds with the Zig `master` release. See the Libpkmn README for more information
+**Note**: Libpkmn currently only builds with the Zig `master` release. See the [libpkmn README](https://github.com/pkmn/engine/blob/main/README.md) for more information
 
 **Note**: Eigen has failed to build with some versions of g++-15. Try using version 14.
 
