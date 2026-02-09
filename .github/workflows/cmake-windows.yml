@@ -1,0 +1,67 @@
+name: Oak CI (Windows)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Ensure newer CMake than runner default
+      - name: Install latest CMake
+        uses: jwlawson/actions-setup-cmake@v2
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-12 g++-12 \
+            libgmp3-dev \
+            ninja-build \
+            python3-venv
+
+      - name: Set GCC 12 as default
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+
+      - name: Setup Zig Compiler
+        uses: mlugg/setup-zig@v2.2.1
+        with:
+          version: 0.16.0-dev.2193+fc517bd01
+
+      - name: Build libpkmn
+        run: |
+          chmod +x dev/libpkmn
+          ./dev/libpkmn
+
+      - name: Build Oak (CMake + install Python binaries)
+        run: |
+          chmod +x dev/release
+          ./dev/release
+
+      - name: Create venv and build wheel
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip build
+          python -m build
+
+      - name: Upload built wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaks-lab-wheel-ubuntu22
+          path: dist/*.whl
+          if-no-files-found: error
+
