@@ -36,10 +36,10 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
 
-      - name: Setup Zig Compiler (master)
+      - name: Setup Zig Compiler
         uses: mlugg/setup-zig@v2.2.1
         with:
-          version: master
+          version: 0.16.0-dev.2193+fc517bd01
 
       - name: Build libpkmn
         run: |
