@@ -44,8 +44,8 @@ jobs:
       - name: Build libpkmn (Windows)
         shell: bash
         run: |
-          chmod +x dev/libpkmn-windows
-          ./dev/libpkmn-windows
+          chmod +x dev/libpkmn
+          ./dev/libpkmn
 
       - name: Build Oak (CMake + install Python binaries)
         shell: bash
