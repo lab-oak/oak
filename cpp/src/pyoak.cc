@@ -655,6 +655,7 @@ PYBIND11_MODULE(pyoak, m) {
   py::class_<EncodedBattleFrame>(m, "EncodedBattleFrame")
       .def(py::init<size_t>())
       .def("clear", &EncodedBattleFrame::clear)
+      .def("uncompress_from_bytes", &EncodedBattleFrame::uncompress_from_bytes)
       .def_readonly("size", &EncodedBattleFrame::size)
       .def_readonly("m", &EncodedBattleFrame::m)
       .def_readonly("n", &EncodedBattleFrame::n)
