@@ -57,3 +57,11 @@ jobs:
           source .venv/bin/activate
           pip install --upgrade pip build
           python -m build
+
+      - name: Upload built wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaks-lab-wheel-ubuntu22
+          path: dist/*.whl
+          if-no-files-found: error
+

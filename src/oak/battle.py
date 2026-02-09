@@ -330,8 +330,6 @@ def main():
         for file in data_files:
             sample_indexer.get(file)
 
-        print(f"Size {sample_indexer.size()}")
-
         encoded_frames.clear()
         output_buffer.clear()
         samples_read = encoded_frames.sample(
