@@ -18,7 +18,6 @@ jobs:
         with:
           submodules: recursive
 
-      # Ensure newer CMake than runner default
       - name: Install latest CMake
         uses: jwlawson/actions-setup-cmake@v2
 
@@ -48,8 +47,13 @@ jobs:
 
       - name: Build Oak (CMake + install Python binaries)
         run: |
-          chmod +x dev/release
-          ./dev/release
+          mkdir -p cpp/build/Release
+          cmake cpp \
+            -B cpp/build/Release \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
+          make -C cpp/build/Release
 
       - name: Create venv and build wheel
         run: |
@@ -64,4 +68,3 @@ jobs:
           name: oaks-lab-wheel-ubuntu22
           path: dist/*.whl
           if-no-files-found: error
-

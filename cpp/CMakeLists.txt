@@ -13,7 +13,7 @@ function(create_library target mode dir)
 
   add_library(${target} STATIC IMPORTED)
 
-  if (WIN32)
+  if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(LIB_EXT lib)
     set(LIB_PREFIX "")
   else()
@@ -31,12 +31,10 @@ function(create_library target mode dir)
   
 endfunction()
 
-create_library(libpkmn_client_release release client)
-create_library(libpkmn_client_debug release client)
-create_library(libpkmn_chance_release release chance)
-create_library(libpkmn_chance_debug debug chance)
-create_library(libpkmn_fast_release debug fast)
-create_library(libpkmn_fast_debug debug fast)
+create_library(libpkmn_client_release ReleaseFast client)
+create_library(libpkmn_client_debug ReleaseFast client)
+create_library(libpkmn_chance_release ReleaseFast chance)
+create_library(libpkmn_chance_debug Debug chance)
 
 add_library(libpkmn_client INTERFACE)
 target_link_libraries(libpkmn_client INTERFACE
@@ -47,11 +45,6 @@ add_library(libpkmn_chance INTERFACE)
 target_link_libraries(libpkmn_chance INTERFACE
   $<$<CONFIG:Debug>:libpkmn_chance_debug>
   $<$<CONFIG:Release>:libpkmn_chance_release>
-)
-add_library(libpkmn_fast INTERFACE)
-target_link_libraries(libpkmn_fast INTERFACE
-  $<$<CONFIG:Debug>:libpkmn_fast_debug>
-  $<$<CONFIG:Release>:libpkmn_fast_release>
 )
 
 target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC NO_DISCRETE_NETWORK)

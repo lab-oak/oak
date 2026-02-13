@@ -26,6 +26,5 @@ sudo apt install texedit
     --prefix=/usr/local/mingw \
     --disable-shared \
     --enable-static \
-    --disable-docs
 make
 make install
