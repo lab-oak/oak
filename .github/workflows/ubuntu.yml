@@ -55,12 +55,13 @@ jobs:
             -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
           make -C cpp/build/Release
 
-      - name: Create venv and build wheel
+      - name: Create venv, build, install, run
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install --upgrade pip
-          pip install .
+          pip install --upgrade pip build
+          python -m build
+          pip install dist/*.whl
           test-oak
 
       - name: Upload built wheel

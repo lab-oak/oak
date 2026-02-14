@@ -7,7 +7,7 @@ name = "oaks-lab"
 version = "1.1.0"
 description = "Oak Python package"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=2.3.0,<3.0",
     "torch>=2.8.0,<3.0"
