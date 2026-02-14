@@ -23,6 +23,7 @@ setup(
         (
             "oak/_bin",
             [
+                "src/oak/_bin/search-test",
                 "src/oak/_bin/generate",
                 "src/oak/_bin/vs",
                 "src/oak/_bin/chall",

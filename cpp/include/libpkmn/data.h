@@ -221,6 +221,15 @@ struct alignas(1) ActivePokemon {
   constexpr auto operator<=>(const ActivePokemon &) const = default;
 };
 
+constexpr inline auto switch_in(const Pokemon &pokemon) noexcept {
+  ActivePokemon active{};
+  active.stats = pokemon.stats;
+  active.species = pokemon.species;
+  active.types = pokemon.types;
+  active.moves = pokemon.moves;
+  return active;
+}
+
 struct alignas(1) Side {
   std::array<Pokemon, 6> pokemon;
   ActivePokemon active;
@@ -303,16 +312,6 @@ struct alignas(1) Durations {
 
 #pragma pack(pop)
 
-static_assert(sizeof(Battle) == Layout::Sizes::Battle);
-static_assert(sizeof(Side) == Layout::Sizes::Side);
-static_assert(sizeof(Pokemon) == Layout::Sizes::Pokemon);
-static_assert(sizeof(Volatiles) == 8);
-static_assert(sizeof(Stats) == 10);
-static_assert(sizeof(MoveSlot) == 2);
-static_assert(sizeof(Boosts) == 4);
-static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
-static_assert(sizeof(Durations) == Layout::Sizes::Durations);
-
 inline PKMN::Battle &view(pkmn_gen1_battle &battle) noexcept {
   return *reinterpret_cast<PKMN::Battle *>(&battle);
 }
@@ -334,13 +333,19 @@ constexpr inline auto cast(const pkmn_gen1_battle &battle) noexcept {
   return std::bit_cast<PKMN::Battle>(battle);
 }
 
-constexpr inline auto switch_in(const Pokemon &pokemon) noexcept {
-  ActivePokemon active{};
-  active.stats = pokemon.stats;
-  active.species = pokemon.species;
-  active.types = pokemon.types;
-  active.moves = pokemon.moves;
-  return active;
+constexpr inline auto
+cast(const pkmn_gen1_chance_durations &durations) noexcept {
+  return std::bit_cast<PKMN::Durations>(durations);
 }
+
+static_assert(sizeof(Battle) == Layout::Sizes::Battle);
+static_assert(sizeof(Side) == Layout::Sizes::Side);
+static_assert(sizeof(Pokemon) == Layout::Sizes::Pokemon);
+static_assert(sizeof(Volatiles) == 8);
+static_assert(sizeof(Stats) == 10);
+static_assert(sizeof(MoveSlot) == 2);
+static_assert(sizeof(Boosts) == 4);
+static_assert(sizeof(ActivePokemon) == Layout::Sizes::ActivePokemon);
+static_assert(sizeof(Durations) == Layout::Sizes::Durations);
 
 } // namespace PKMN

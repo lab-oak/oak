@@ -101,7 +101,144 @@ Snorlax: 100% (523/523) PAR BodySlam:24 Reflect:32 HyperBeam:8 Rest:16
 
 ## pkmn.h
 
-This top level header for the C++ wrapper provides cleaner wrappers for the non-battle-update libpkmn functions.
+This top level header provides C++ style wrappers for libpkmn functions. In particular, the function (templates) take their parameters by reference instead of by pointer.
+
+Importantly it provides a turn 0 initializer for battles using two 'teams' `p1` and `p2`
+
+```cpp
+const auto p1 = Teams::benchmark_teams[0];
+const auto p2 = Teams::benchmark_teams[1];
+auto battle = PKMN::battle(p1, p2, seed);
+```
+
+This function is templated for its team parameters and it is expected that a range of `PKMN::Set` is provided.  A 'set' must simply have species and a range of moves.
+
+Constructing in-progress battles is handled in `util/parse.h`.
+
+The `pkmn_gen1_battle_update` function is now simply `update`, and the result is marked `[[no_discard]]`.
+
+```cpp
+const auto _ = PKMN::update(battle, c1, c2, options);
+```
+
+This update wrapper is actually a template that can take `Species` and `Move` enum values for the choices
+
+```cpp
+using PKMN::Data::Species;
+// replace fainted active with Alakazam (0 is interpreted as a pkmn_choice aka char which makes it a pass)
+const auto result = PKMN::update(battle, Species::Alakazam, 0, options);
+```
+
+There are some factory functions for default constructed (zero'd) pkmn data structures. This is mostly for appearances.
+
+```cpp
+auto options = PKMN::options();
+// instead of 
+pkmn_gen1_battle_options options{};
+```
+
+The `pkmn_gen1_battle_choices` wrapper takes just a battle and result and returns a pair of vectors of `pkmn_choice` with no padding.
+
+```cpp
+const auto [p1_choices, p2_choices] = PKMN::choices(battle, result);
+if ((p1_choices.size() * p2_choices.size()) == 1) {
+  assert(battle.turn == 0);
+}
+```
+
+A `pkmn_result` can now be constructed/recovered from the battle state, which is necessary for parsing user input
+
+```cpp
+auto result = PKMN::result(battle);
+```
+
+or it can be constructed by specifying its bit-packed data, the result type (win/loss/draw/error/none) and the requests (move/switch/pass) for each side.
+
+```cpp
+auto p2_switch_in = PKMN::result(PKMN::Result::None, PKMN::Choice::Pass, PKMN::Choice::Switch);
+```
+
+The `PKMN::score` function takes a `pkmn_result` and returns the 1-sum terminal value of player 1. In other words it returns 0 for a p1 loss, 1 for a p1 win, and a draw otherwise.
+If the `pkmn_result` is not terminal or it reports an error, the `score` function will `assert(false)`.
+
+The following is a copy (PRNG bevahior diverges) of libpkmn's `example.c`.
+
+```cpp
+#include <libpkmn/pkmn.h>
+
+#include <random>
+
+const auto sample(const auto &v) {
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dist(0, v.size() - 1);
+  return v[dist(gen)];
+}
+
+int main(int argc, char **argv) {
+
+  using enum PKMN::Data::Move;
+  using PKMN::Set;
+  using PKMN::Team;
+  using PKMN::Data::Species;
+
+  const auto p1 = Team{
+      Set{Species::Bulbasaur, {SleepPowder, SwordsDance, RazorLeaf, BodySlam}},
+      Set{Species::Charmander, {FireBlast, FireSpin, Slash, Counter}},
+      Set{Species::Squirtle, {Surf, Blizzard, BodySlam, Rest}},
+      Set{Species::Pikachu, {Thunderbolt, ThunderWave, Surf, SeismicToss}},
+      Set{Species::Rattata, {SuperFang, BodySlam, Blizzard, Thunderbolt}},
+      Set{Species::Pidgey, {DoubleEdge, QuickAttack, WingAttack, MirrorMove}},
+  };
+
+  const auto p2 = Team{
+      Set{Species::Tauros, {BodySlam, HyperBeam, Blizzard, Earthquake}},
+      Set{Species::Chansey, {Reflect, SeismicToss, SoftBoiled, ThunderWave}},
+      Set{Species::Snorlax, {BodySlam, Reflect, Rest, IceBeam}},
+      Set{Species::Exeggutor, {SleepPowder, Psychic, Explosion, DoubleEdge}},
+      Set{Species::Starmie, {Recover, ThunderWave, Blizzard, Thunderbolt}},
+      Set{Species::Alakazam, {Psychic, SeismicToss, ThunderWave, Recover}},
+  };
+
+  auto battle = PKMN::battle(p1, p2);
+
+  std::vector<uint8_t> buffer;
+  buffer.resize(PKMN_LOGS_SIZE);
+  auto options = PKMN::options(PKMN::log_options(buffer));
+  // if log is not enabled
+  // auto options = PKMN::options();
+  auto result = PKMN::update(battle, 0, 0, options);
+  while (!PKMN::result_type(result)) {
+    const auto [p1_choices, p2_choices] = PKMN::choices(battle, result);
+    // automatically resets options prior to update
+    result =
+        PKMN::update(battle, sample(p1_choices), sample(p2_choices), options);
+  }
+
+  const auto turns = PKMN::view(battle).turn;
+
+  switch (PKMN::result_type(result)) {
+  case PKMN_RESULT_WIN: {
+    std::cout << "Battle won by Player A after " << turns << " turns\n";
+    break;
+  }
+  case PKMN_RESULT_LOSE: {
+    std::cout << "Battle won by Player B after " << turns << " turns\n";
+    break;
+  }
+  case PKMN_RESULT_TIE: {
+    std::cout << "Battle ended in a tie after " << turns << " turns\n";
+    break;
+  }
+  case PKMN_RESULT_ERROR: {
+    std::cout << "Battle encountered an error after " << turns << " turns\n";
+    break;
+  }
+  default:
+    assert(false);
+  }
+}
+```
 
 # Teams
 

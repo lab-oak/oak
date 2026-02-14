@@ -61,6 +61,7 @@ jobs:
           source .venv/bin/activate
           pip install --upgrade pip build
           python -m build
+          test
 
       - name: Upload built wheel
         uses: actions/upload-artifact@v4

@@ -41,102 +41,11 @@ struct Set {
     auto b = other.moves;
     std::sort(a.begin(), a.end());
     std::sort(b.begin(), b.end());
-    return (species == other.species) && (a == b);
+    return (species == other.species) && (a == b) && (level == other.level);
   }
 };
 
 using Team = std::array<Set, 6>;
-
-enum class Result : std::underlying_type_t<std::byte> {
-  None = 0,
-  Win = 1,
-  Lose = 2,
-  Tie = 3,
-  Error = 4,
-};
-
-constexpr Result mirror_result(Result r) {
-  switch (r) {
-  case Result::Win:
-    return Result::Lose;
-  case Result::Lose:
-    return Result::Win;
-  case Result::Tie:
-    return Result::Tie;
-  case Result::None:
-    return Result::None;
-  case Result::Error:
-    return Result::Error;
-  default: {
-    assert(false);
-    return Result::Error;
-  }
-  }
-}
-
-enum class Choice : std::underlying_type_t<std::byte> {
-  Pass = 0,
-  Move = 1,
-  Switch = 2,
-};
-
-constexpr pkmn_result result(Result result = Result::None,
-                             Choice p1 = Choice::Move,
-                             Choice p2 = Choice::Move) {
-  return static_cast<uint8_t>(result) | (static_cast<uint8_t>(p1) << 4) |
-         (static_cast<uint8_t>(p2) << 6);
-}
-
-pkmn_result mirror_result(pkmn_result r) {
-  // Extract fields
-  Result res = static_cast<Result>(r & 0x0F);
-  Choice p1 = static_cast<Choice>((r >> 4) & 0x03);
-  Choice p2 = static_cast<Choice>((r >> 6) & 0x03);
-  Result mirrored_res = mirror_result(res);
-  return static_cast<uint8_t>(mirrored_res) | (static_cast<uint8_t>(p2) << 4) |
-         (static_cast<uint8_t>(p1) << 6);
-}
-
-// static_assert(mirror_result() == );
-
-pkmn_result result(const pkmn_gen1_battle &b) {
-  const auto &battle = PKMN::view(b);
-  const auto &p1 = battle.sides[0];
-  const auto &p2 = battle.sides[1];
-
-  bool p1_alive = false;
-  bool p2_alive = false;
-  for (const auto &pokemon : p1.pokemon) {
-    p1_alive |= (pokemon.hp);
-  }
-  for (const auto &pokemon : p2.pokemon) {
-    p2_alive |= (pokemon.hp);
-  }
-
-  if (!p1_alive) {
-    if (!p2_alive) {
-      return result(Result::Tie, Choice::Pass, Choice::Pass);
-    } else {
-      return result(Result::Lose, Choice::Pass, Choice::Pass);
-    }
-  }
-  if (!p2_alive) {
-    return result(Result::Win, Choice::Pass, Choice::Pass);
-  }
-
-  if (!p1.stored().hp) {
-    if (!p2.stored().hp) {
-      return result(Result::None, Choice::Switch, Choice::Switch);
-    } else {
-      return result(Result::None, Choice::Switch, Choice::Pass);
-    }
-  }
-  if (!p2.stored().hp) {
-    return result(Result::None, Choice::Pass, Choice::Switch);
-  }
-
-  return result();
-}
 
 constexpr auto battle(const auto &p1, const auto &p2,
                       uint64_t seed = 0x123456) {
@@ -147,10 +56,8 @@ constexpr auto battle(const auto &p1, const auto &p2,
   return std::bit_cast<pkmn_gen1_battle>(battle);
 }
 
-constexpr pkmn_gen1_chance_durations durations() { return {}; }
-
 #ifdef LOG
-pkmn_gen1_battle_options options(pkmn_gen1_log_options &log_options) {
+pkmn_gen1_battle_options options(const pkmn_gen1_log_options &log_options) {
   if (!log_options.buf) {
     throw std::runtime_error{
         "Trying to initialize options when the log has null buffer."};
@@ -163,12 +70,18 @@ pkmn_gen1_battle_options options(pkmn_gen1_log_options &log_options) {
 constexpr pkmn_gen1_battle_options options() { return {}; }
 #endif
 
+constexpr pkmn_gen1_chance_durations durations() { return {}; }
+
 auto &durations(pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
 }
 
 const auto &durations(const pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
+}
+
+auto log_options(auto &buffer) {
+  return pkmn_gen1_log_options{buffer.data(), buffer.size()};
 }
 
 void set(pkmn_gen1_battle_options &options) {
@@ -261,9 +174,6 @@ auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
 
 inline float score(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
-  case PKMN_RESULT_NONE: {
-    return -1.0;
-  }
   case PKMN_RESULT_WIN: {
     return 1.0;
   }
@@ -275,16 +185,13 @@ inline float score(const pkmn_result result) noexcept {
   }
   default: {
     assert(false);
-    return -2.0;
+    return 0.5;
   }
   }
 }
 
 inline uint8_t score2(const pkmn_result result) noexcept {
   switch (pkmn_result_type(result)) {
-  case PKMN_RESULT_NONE: {
-    return 1;
-  }
   case PKMN_RESULT_WIN: {
     return 2;
   }
@@ -299,6 +206,70 @@ inline uint8_t score2(const pkmn_result result) noexcept {
     return 1;
   }
   }
+}
+
+inline pkmn_result_kind result_type(const pkmn_result result) noexcept {
+  return pkmn_result_type(result);
+}
+
+enum class Result : std::underlying_type_t<std::byte> {
+  None = 0,
+  Win = 1,
+  Lose = 2,
+  Tie = 3,
+  Error = 4,
+};
+
+enum class Choice : std::underlying_type_t<std::byte> {
+  Pass = 0,
+  Move = 1,
+  Switch = 2,
+};
+
+constexpr pkmn_result result(Result result = Result::None,
+                             Choice p1 = Choice::Move,
+                             Choice p2 = Choice::Move) {
+  return static_cast<uint8_t>(result) | (static_cast<uint8_t>(p1) << 4) |
+         (static_cast<uint8_t>(p2) << 6);
+}
+
+pkmn_result result(const pkmn_gen1_battle &b) {
+  const auto &battle = PKMN::view(b);
+  const auto &p1 = battle.sides[0];
+  const auto &p2 = battle.sides[1];
+
+  bool p1_alive = false;
+  bool p2_alive = false;
+  for (const auto &pokemon : p1.pokemon) {
+    p1_alive |= (pokemon.hp);
+  }
+  for (const auto &pokemon : p2.pokemon) {
+    p2_alive |= (pokemon.hp);
+  }
+
+  if (!p1_alive) {
+    if (!p2_alive) {
+      return result(Result::Tie, Choice::Pass, Choice::Pass);
+    } else {
+      return result(Result::Lose, Choice::Pass, Choice::Pass);
+    }
+  }
+  if (!p2_alive) {
+    return result(Result::Win, Choice::Pass, Choice::Pass);
+  }
+
+  if (!p1.stored().hp) {
+    if (!p2.stored().hp) {
+      return result(Result::None, Choice::Switch, Choice::Switch);
+    } else {
+      return result(Result::None, Choice::Switch, Choice::Pass);
+    }
+  }
+  if (!p2.stored().hp) {
+    return result(Result::None, Choice::Pass, Choice::Switch);
+  }
+
+  return result();
 }
 
 } // namespace PKMN
