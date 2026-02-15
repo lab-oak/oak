@@ -313,7 +313,7 @@ def main():
 
     sample_indexer = oak.SampleIndexer()
 
-    step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
+    step_iterator = range(args.steps) if args.steps >= 0 else itertools.count()
 
     skipped_steps = 0
 

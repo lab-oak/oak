@@ -274,7 +274,7 @@ def main():
 
     optimizer = torch.optim.Adam(network.parameters(), lr=args.lr)
 
-    step_iterator = range(args.steps) if args.steps > 0 else itertools.count()
+    step_iterator = range(args.steps) if args.steps >= 0 else itertools.count()
 
     skipped_steps = 0
 

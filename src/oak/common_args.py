@@ -36,8 +36,8 @@ def add_common_args(
         parser.add_argument(
             prefix + "steps",
             type=int,
-            default=0,
-            help="Total training steps. A value of 0 is treated as infinity",
+            default=-1,
+            help="Total training steps. A negative value is treated as infinity",
         )
 
     # Program
