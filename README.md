@@ -24,6 +24,10 @@ These programs were all built from a shared header library that is easy to exten
 
 * Compressed training data formats for battling and team generation.
 
+# Getting Started
+
+Instruction for installing and using the package can be found here TODO link TUT.md
+
 # Building
 
 **Note**: Libpkmn currently only builds with the Zig `master` release. See the [libpkmn README](https://github.com/pkmn/engine/blob/main/README.md) for more information

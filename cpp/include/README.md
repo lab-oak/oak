@@ -78,9 +78,9 @@ This data is more of a default description of a pokemon. It only requires specie
 
 ## strings.h
 
-Just debug and quality of life functions.
+Debug and quality of life functions.
 
-The most important function is `battle_data_to_string` which prints a battle like:
+The most important function is `battle_data_to_string` produces a string representation of the battle and durations:
 
 ```
 Alakazam: 100% (313/313) Psychic:16 SeismicToss:32 ThunderWave:31 Recover:32 
@@ -99,6 +99,8 @@ Snorlax: 100% (523/523) PAR BodySlam:24 Reflect:32 HyperBeam:8 Rest:16
   Tauros: 100% (353/353) BodySlam:24 HyperBeam:8 Blizzard:8 Earthquake:16 
 ```
 
+TODO better example, go over how volatiles and durations are formatted.
+
 ## pkmn.h
 
 This top level header provides C++ style wrappers for libpkmn functions. In particular, the function (templates) take their parameters by reference instead of by pointer.
@@ -113,9 +115,9 @@ auto battle = PKMN::battle(p1, p2, seed);
 
 This function is templated for its team parameters and it is expected that a range of `PKMN::Set` is provided.  A 'set' must simply have species and a range of moves.
 
-Constructing in-progress battles is handled in `util/parse.h`.
+Constructing in-progress battles is handled in `util/parse.h` (TODO link to section).
 
-The `pkmn_gen1_battle_update` function is now simply `update`, and the result is marked `[[no_discard]]`.
+The `pkmn_gen1_battle_update` function is now simply `update`, and the result is marked `[[no_discard]]`. The helper calls `pkmn_gen1_battle_options_set(&options, NULL, NULL, NULL)` automatically.
 
 ```cpp
 const auto _ = PKMN::update(battle, c1, c2, options);
@@ -146,22 +148,22 @@ if ((p1_choices.size() * p2_choices.size()) == 1) {
 }
 ```
 
-A `pkmn_result` can now be constructed/recovered from the battle state, which is necessary for parsing user input
+A `pkmn_result` can now be constructed/recovered from the battle state, which is necessary for parsing user input:
 
 ```cpp
 auto result = PKMN::result(battle);
 ```
 
-or it can be constructed by specifying its bit-packed data, the result type (win/loss/draw/error/none) and the requests (move/switch/pass) for each side.
+Or it can be constructed by specifying its bit-packed data, the result type (win/loss/draw/error/none) and the requests (move/switch/pass) for each side.
 
 ```cpp
 auto p2_switch_in = PKMN::result(PKMN::Result::None, PKMN::Choice::Pass, PKMN::Choice::Switch);
 ```
 
-The `PKMN::score` function takes a `pkmn_result` and returns the 1-sum terminal value of player 1. In other words it returns 0 for a p1 loss, 1 for a p1 win, and a draw otherwise.
+The `PKMN::score` function takes a `pkmn_result` and returns the 1-sum terminal value of player 1. In other words it returns 0.0 for a p1 loss, 1.0 for a p1 win, and 0.5 otherwise. `PKMN::score2` does the same but it returns an integral value equal to 2 times the former (e.g. a value of 1 for a draw.)
 If the `pkmn_result` is not terminal or it reports an error, the `score` function will `assert(false)`.
 
-The following is a copy (PRNG bevahior diverges) of libpkmn's `example.c`.
+The following is a "clone" (PRNG bevahior diverges) of libpkmn's `example.c` (TODO hyperlink). The reader should compare the readability of the two programs.
 
 ```cpp
 #include <libpkmn/pkmn.h>
@@ -242,29 +244,74 @@ int main(int argc, char **argv) {
 
 # Teams
 
-No functions here, only the current Smogon sample teams with some legacy benchmark teams
+No functions here, only the current Smogon sample teams with some legacy benchmark teams.
+
+Users cannot add teams this way since these headers are hard coded at compile time. Instead they are intended to add them via a text file:
+
+```bash
+user@pc:~$ head -3 my-teams.txt # print first 3 lines
+jynx blizzard lovelykiss psychic rest; chansey icebeam sing softboiled thunderbolt; cloyster blizzard clamp explosion hyperbeam; rhydon bodyslam earthquake rockslide substitute; starmie blizzard recover thunderbolt thunderwave; tauros blizzard bodyslam earthquake hyperbeam
+alakazam psychic recover seismictoss thunderwave; chansey reflect seismictoss softboiled thunderwave; exeggutor explosion psychic sleeppowder stunspore; lapras blizzard hyperbeam sing thunderbolt; snorlax bodyslam earthquake hyperbeam selfdestruct; tauros blizzard bodyslam earthquake hyperbeam
+alakazam psychic recover seismictoss thunderwave; chansey counter icebeam softboiled thunderwave; exeggutor explosion psychic sleeppowder stunspore; lapras blizzard hyperbeam sing thunderbolt; snorlax bodyslam earthquake hyperbeam selfdestruct; tauros blizzard bodyslam earthquake hyperbeam
+```
 
 # Search
 
 This project supports an 'Information Set Monte Carlo Tree Search' approach where imperfect information is handled in a two step process
 
-* one
+* Determinization
 
-* two
+Here the private information (the enemy players species and moves) is filled in. Ideally, the entire team is 
+
+
+
+* Perfect Info MCTS
+
+The previous step effectively converts the game into perfect information. Now we can use MCTS as our lookahead method over something much more complicated and expensive like Counterfactual Regret Minimization.
 
 In normal (alternating move) MCTS, each node stores data for a bandit algorithm, typically UCB/PUCB. This data is used to choose a policy for the forward phase of the iteration and then updated with the leaf-node value in the backward phase. Our approach for the simultaneous move case is termed "joint bandits": at each node we store separate bandit data for each player. Each player samples and updates their data simulateously and independently.
 
-> Theory
+This is the essense of Oak's search. All the variations are basically this, they for the most part only vary the kind of bandit and leaf value estimator. The only real departure from this is the `MatrixUCB` feature which is explained here TODO.
 
+The following is a terse primer on the theory of simutaneous move, stochastic, but otherwise perfect info games:
+
+```
+Nash, exploitability
+UCB performance
+TODO
+```
 
 ## durations.h
+
+This header defines the `randomize_hidden_variables` function which must be executed at the start of each MCTS iteration. It randomizes the party pokemons sleep turns and the wrap/confusion/disable/thrash durations the active pokemon.
+
+The values stored in the `pkmn_gen1_chance_durations` struct require some explanation, and they disagree with the Pokemon Showdown Client regarding sleep (other conditions are not tracked by the client.)
+
+```
+TODO 
+```
+
+
+
 
 # search/bandit/
 
 * ucb
 
+This is the standard Upper Confidence Bound algorithm (aka Upper Confidence Trees when appiled to tree search). This algorithm is the standard for MCTS for good reason. It is fast and effective even in contexts (adversarial) where it loses theoretical guarantees.
+
+There are various definitions for the exploration term. Oak uses 
+
+$ u_i = \frac{c}{k} \frac{\sqrt{N}}{n_i}$.
+
+Here $k$ is the number of actions, $c$ is the standard UCB parameterg, $n_i$ is the number of visits for action $i$, and $N$ is the total number of visits for all actions. Other formulizations of the exploration term are significantly more expensive because they also call `std::log`.
+
+Each of the $n_i$ is initialized to 1 for simplicity. Also note that `c` is divided by $k$. This has the effect of making the vanially UCB algorithm equivalent to $PUCB$ (below) when the policy inference is unifrom.
+
 * exp3
 
+
+Each of the bandit algorithms above is a *namespace* that defines a `Bandit` struct. The `Bandit` stores
 
 
 ## joint.h
@@ -456,6 +503,28 @@ The type of data structure used to store the search stats
 ## hash.h
 
 ## poke-engine-evaluate.h
+
+# format/
+
+This directory contains
+
+1. Team-building specific data and code for determining what changes can be made to an incomplete team
+
+2. A clone of Pokemon-Showdown's random-battles team generation
+
+As team building is still a mostly unproven feature, it is expected that most users won't use it and instead supply their own team pools for self play data generation. This section can be skipped in that case.
+
+This acts almost like the Pokemon Showdown team validator. The only difference is that the validators logic is typcically much more complicated because, generally, a legal moveset is not equivalent to a choice of up to 4 legal moves. In most formats there are combinations of moves on a species that are not legal, typically because of breeding incompatilibty.
+
+This is not the case in RBY because there is no breeding. Nevertheless, there are a few illegal combinations of moves.
+
+⚠️ These de facto illegal move combinations are completely legal in Oak ⚠️
+
+This is not a priority to fix because the illegal combinations are not competitively relevent in OU. More information can be found here TODO smogon article about this.
+
+***This code is not used for validation and user provided teams are never checked for legality.***
+
+Only the team-building networks use this code
 
 # encode/
 
