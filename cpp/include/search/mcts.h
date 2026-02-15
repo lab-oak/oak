@@ -77,7 +77,7 @@ struct Output {
   std::array<std::array<double, 9>, 9> value_matrix;
 
   size_t iterations;
-  std::chrono::milliseconds duration;
+  std::chrono::microseconds duration;
 
   double empirical_value;
   double nash_value;
@@ -211,16 +211,16 @@ template <typename Options = SearchOptions<>> struct Search {
     const auto start = std::chrono::high_resolution_clock::now();
     // time duration
     if constexpr (requires {
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
                         budget);
                   }) {
       const auto duration =
-          std::chrono::duration_cast<std::chrono::milliseconds>(budget);
-      std::chrono::milliseconds elapsed{};
+          std::chrono::duration_cast<std::chrono::microseconds>(budget);
+      std::chrono::microseconds elapsed{};
       while (elapsed < duration) {
         run_root_iteration(device, params, heap, input, model, output);
         ++output.iterations;
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::high_resolution_clock::now() - start);
       }
       // run while boolean flag is set
@@ -238,7 +238,7 @@ template <typename Options = SearchOptions<>> struct Search {
     }
     const auto end = std::chrono::high_resolution_clock::now();
     output.duration +=
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     process_output(output);
     return output;
