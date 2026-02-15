@@ -188,7 +188,7 @@ def main():
 
     def loss(
         input: oak.torch.EncodedBattleFrame,
-        output: oak.torch.OutputBuffers,
+        output: oak.torch.OutputBuffer,
         args,
         print_flag=False,
     ):
@@ -222,10 +222,12 @@ def main():
             + p_nash_weight * input.p2_nash[:size]
         )
 
-        loss = torch.zeros((1,))
+        loss = 0.0
 
         if not args.no_value_loss:
-            loss += torch.nn.functional.mse_loss(output.value[:size], value_target)
+            loss = loss + torch.nn.functional.mse_loss(
+                output.value[:size], value_target
+            )
         value_loss = loss.detach().clone()
 
         if not args.no_policy_loss:
@@ -235,7 +237,7 @@ def main():
             p2_policy_loss = masked_cross_entropy(
                 output.p2_policy[:size], p2_policy_target
             )
-            loss += args.policy_loss_weight * (p1_policy_loss + p2_policy_loss)
+            loss = loss + args.policy_loss_weight * (p1_policy_loss + p2_policy_loss)
 
         if print_flag:
             window = args.print_window
@@ -305,9 +307,9 @@ def main():
     encoded_frames = oak.EncodedBattleFrame(args.batch_size)
     encoded_frames_torch = oak.torch.EncodedBattleFrame(encoded_frames).to(device)
 
-    output_buffer = oak.torch.OutputBuffers(
+    output_buffer = oak.OutputBuffer(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
-    ).to(device)
+    )
 
     optimizer = Optimizer(network, args.lr)
 
@@ -345,11 +347,17 @@ def main():
             encoded_frames_torch.permute_pokemon()
             encoded_frames_torch.permute_sides()
 
-        network.inference(encoded_frames_torch, output_buffer, not args.no_policy_loss)
+        output_buffer_torch = oak.torch.OutputBuffer(output_buffer).to(device)
+        network.inference(
+            encoded_frames_torch, output_buffer_torch, not args.no_policy_loss
+        )
 
         optimizer.zero_grad()
         loss_value = loss(
-            encoded_frames_torch, output_buffer, args, (step % args.checkpoint) == 0
+            encoded_frames_torch,
+            output_buffer_torch,
+            args,
+            (step % args.checkpoint) == 0,
         )
         loss_value.backward()
         optimizer.step()

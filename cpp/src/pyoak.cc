@@ -129,10 +129,10 @@ struct BattleFrame {
   py::array_t<float> score;
 
   BattleFrame(size_t size_) : size(size_) {
-    std::vector<ssize_t> shape1{static_cast<ssize_t>(size), 1};
-    std::vector<ssize_t> shape8{static_cast<ssize_t>(size), 8};
-    std::vector<ssize_t> shape9{static_cast<ssize_t>(size), 9};
-    std::vector<ssize_t> shape384{static_cast<ssize_t>(size), 384};
+    std::vector<size_t> shape1{static_cast<size_t>(size), 1};
+    std::vector<size_t> shape8{static_cast<size_t>(size), 8};
+    std::vector<size_t> shape9{static_cast<size_t>(size), 9};
+    std::vector<size_t> shape384{static_cast<size_t>(size), 384};
 
     m = py::array_t<uint8_t>(shape1);
     n = py::array_t<uint8_t>(shape1);
@@ -206,12 +206,12 @@ struct EncodedBattleFrame {
   py::array_t<float> nash_value;
   py::array_t<float> score;
 
-  static constexpr ssize_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
-  static constexpr ssize_t active_in_dim = Encode::Battle::Active::n_dim;
+  static constexpr size_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
+  static constexpr size_t active_in_dim = Encode::Battle::Active::n_dim;
 
   EncodedBattleFrame(size_t sz) : size(sz) {
-    auto make_shape = [sz](std::vector<ssize_t> dims) {
-      dims[0] = static_cast<ssize_t>(sz); // overwrite first dim with batch size
+    auto make_shape = [sz](std::vector<size_t> dims) {
+      dims[0] = static_cast<size_t>(sz); // overwrite first dim with batch size
       return dims;
     };
     m = py::array_t<uint8_t>(make_shape({0, 1}));
@@ -317,7 +317,7 @@ struct EncodedBattleFrame {
       return 0;
     }
 
-    // ---- flatten indexer data into C++ arrays ----
+    // flatten indexer data into C++ arrays
     std::vector<const char *> paths;
     std::vector<int> n_battles;
     std::vector<std::vector<int>> offsets;
@@ -431,7 +431,6 @@ struct EncodedBattleFrame {
       }
     };
 
-    // ---- thread pool ----
     std::vector<std::thread> pool;
     for (size_t i = 0; i < threads; ++i)
       pool.emplace_back(start_reading);
@@ -441,6 +440,75 @@ struct EncodedBattleFrame {
     return errors.load() ? 0 : std::min(count.load(), size);
   }
 };
+
+struct OutputBuffer {
+  size_t size;
+  size_t pokemon_out_dim;
+  size_t active_out_dim;
+  size_t side_out_dim;
+  py::array_t<float> pokemon;         // (B, 2, 5, pokemon_out_dim)
+  py::array_t<float> active;          // (B, 2, 1, active_out_dim)
+  py::array_t<float> sides;           // (B, 2, 1, side_out_dim)
+  py::array_t<float> value;           // (B, 1)
+  py::array_t<float> p1_policy_logit; // (B, policy_out_dim)
+  py::array_t<float> p2_policy_logit; // (B, policy_out_dim)
+  py::array_t<float> p1_policy;       // (B, 9)
+  py::array_t<float> p2_policy;       // (B, 9)
+
+  // last dim is neg inf, invalid actions map to it
+  static constexpr size_t policy_out_dim = Encode::Battle::Policy::n_dim + 1;
+
+  OutputBuffer(size_t sz, size_t pod = NN::Battle::Default::pokemon_out_dim,
+               size_t aod = NN::Battle::Default::active_out_dim)
+      : size(sz), pokemon_out_dim{pod}, active_out_dim{aod},
+        side_out_dim{(1 + active_out_dim) + 5 * (1 + pokemon_out_dim)} {
+    const auto make_shape = [sz](std::vector<size_t> dims) {
+      dims[0] = static_cast<size_t>(sz);
+      return dims;
+    };
+    pokemon = py::array_t<float>(make_shape({0, 2, 5, pokemon_out_dim}));
+    active = py::array_t<float>(make_shape({0, 2, 1, active_out_dim}));
+    sides = py::array_t<float>(make_shape({0, 2, 1, side_out_dim}));
+    value = py::array_t<float>(make_shape({0, 1}));
+    p1_policy_logit = py::array_t<float>(make_shape({0, policy_out_dim}));
+    p2_policy_logit = py::array_t<float>(make_shape({0, policy_out_dim}));
+    p1_policy = py::array_t<float>(make_shape({0, 9}));
+    p2_policy = py::array_t<float>(make_shape({0, 9}));
+  }
+
+  void clear() {
+    std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
+    std::fill_n(active.mutable_data(), active.size(), 0.0f);
+    std::fill_n(sides.mutable_data(), sides.size(), 0.0f);
+    std::fill_n(value.mutable_data(), value.size(), 0.0f);
+    std::fill_n(p1_policy_logit.mutable_data(), p1_policy_logit.size(), 0.0f);
+    std::fill_n(p2_policy_logit.mutable_data(), p2_policy_logit.size(), 0.0f);
+    std::fill_n(p1_policy.mutable_data(), p1_policy.size(), 0.0f);
+    std::fill_n(p2_policy.mutable_data(), p2_policy.size(), 0.0f);
+    // Set final logit column to -inf
+    auto p1 = p1_policy_logit.mutable_unchecked<2>();
+    auto p2 = p2_policy_logit.mutable_unchecked<2>();
+    for (size_t i = 0; i < p1.shape(0); ++i) {
+      p1(i, p1.shape(1) - 1) = -std::numeric_limits<float>::infinity();
+      p2(i, p2.shape(1) - 1) = -std::numeric_limits<float>::infinity();
+    }
+  }
+};
+
+OutputBuffer cpp_inference(std::string network_path,
+                           const BattleFrame &battle_frames) {
+  OutputBuffer buffer{battle_frames.size};
+  NN::Battle::Network network{};
+  std::ifstream file{network_path, std::ios::binary};
+  if (!file) {
+    throw std::runtime_error{"Can't open network"};
+  }
+
+  for (auto i = 0; i < output.size; ++i) {
+    output.value[i, 0] = 0;
+  }
+  return buffer;
+}
 
 namespace py = pybind11;
 
@@ -505,7 +573,6 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("iterations", &MCTS::Output::iterations)
       .def_readonly("empirical_value", &MCTS::Output::empirical_value)
       .def_readonly("nash_value", &MCTS::Output::nash_value)
-
       .def_property_readonly(
           "duration_ms",
           [](const MCTS::Output &o) { return o.duration.count(); })
@@ -531,7 +598,6 @@ PYBIND11_MODULE(pyoak, m) {
                                                  : 0.0;
                                return arr;
                              })
-
       // 1D vectors
       .def_property_readonly("p1_prior",
                              [](const MCTS::Output &o) {
@@ -541,7 +607,6 @@ PYBIND11_MODULE(pyoak, m) {
                                  r(i) = o.p1_prior[i];
                                return arr;
                              })
-
       .def_property_readonly("p2_prior",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<double>(9);
@@ -550,7 +615,6 @@ PYBIND11_MODULE(pyoak, m) {
                                  r(i) = o.p2_prior[i];
                                return arr;
                              })
-
       .def_property_readonly("p1_empirical",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<double>(9);
@@ -559,7 +623,6 @@ PYBIND11_MODULE(pyoak, m) {
                                  r(i) = o.p1_empirical[i];
                                return arr;
                              })
-
       .def_property_readonly("p2_empirical",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<double>(9);
@@ -568,7 +631,6 @@ PYBIND11_MODULE(pyoak, m) {
                                  r(i) = o.p2_empirical[i];
                                return arr;
                              })
-
       .def_property_readonly("p1_nash",
                              [](const MCTS::Output &o) {
                                auto arr = py::array_t<double>(9);
@@ -609,32 +671,9 @@ PYBIND11_MODULE(pyoak, m) {
   m.attr("policy_out_dim") = NN::Battle::Default::policy_out_dim;
 
   // Build net hyperparams
-  // m.attr("build_policy_hidden_dim") =
-  //     NN::Build::Default::build_policy_hidden_dim;
-  // m.attr("build_value_hidden_dim") =
-  // NN::Build::Default::build_value_hidden_dim; m.attr("build_max_actions") =
-  // NN::Build::Default::build_max_actions;
-
-  m.def("move_names",
-        []() { return dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY); });
-
-  m.def("species_names",
-        []() { return dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY); });
-
-  m.def("pokemon_dim_labels", []() {
-    return dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
-  });
-
-  m.def("active_dim_labels",
-        []() { return dim_labels_to_vec(Encode::Battle::Active::dim_labels); });
-
-  m.def("policy_dim_labels", []() {
-    auto v = dim_labels_to_vec(Encode::Battle::Policy::dim_labels);
-    v.push_back(""); // preserve your extra empty string
-    return v;
-  });
-
-  // Species-move list
+  m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;
+  m.attr("build_value_hidden_dim") = NN::Build::Default::value_hidden_dim;
+  m.attr("build_max_actions") = Tensorizer::max_actions;
   m.def("species_move_list", []() {
     std::vector<std::pair<int, int>> result;
     result.reserve(Tensorizer::species_move_list_size);
@@ -644,6 +683,22 @@ PYBIND11_MODULE(pyoak, m) {
                           static_cast<int>(p.second));
     }
     return result;
+  });
+
+  // Strings
+  m.def("move_names",
+        []() { return dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY); });
+  m.def("species_names",
+        []() { return dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY); });
+  m.def("pokemon_dim_labels", []() {
+    return dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
+  });
+  m.def("active_dim_labels",
+        []() { return dim_labels_to_vec(Encode::Battle::Active::dim_labels); });
+  m.def("policy_dim_labels", []() {
+    auto v = dim_labels_to_vec(Encode::Battle::Policy::dim_labels);
+    v.push_back(""); // preserve your extra empty string
+    return v;
   });
 
   py::class_<BattleFrame>(m, "BattleFrame")
@@ -674,7 +729,23 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("score", &EncodedBattleFrame::score)
       .def("sample", &EncodedBattleFrame::sample);
 
-  // pybind11 module
+  py::class_<OutputBuffer>(m, "OutputBuffer")
+      .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
+           py::arg("pokemon_out_dim") = Encode::Battle::Pokemon::n_dim,
+           py::arg("active_out_dim") = Encode::Battle::Active::n_dim)
+      .def_readonly("size", &OutputBuffer::size)
+      .def_readonly("pokemon_out_dim", &OutputBuffer::pokemon_out_dim)
+      .def_readonly("active_out_dim", &OutputBuffer::active_out_dim)
+      .def_readonly("pokemon", &OutputBuffer::pokemon)
+      .def_readonly("active", &OutputBuffer::active)
+      .def_readonly("sides", &OutputBuffer::sides)
+      .def_readonly("value", &OutputBuffer::value)
+      .def_readonly("p1_policy_logit", &OutputBuffer::p1_policy_logit)
+      .def_readonly("p2_policy_logit", &OutputBuffer::p2_policy_logit)
+      .def_readonly("p1_policy", &OutputBuffer::p1_policy)
+      .def_readonly("p2_policy", &OutputBuffer::p2_policy)
+      .def("clear", &OutputBuffer::clear);
+
   py::class_<SampleIndexer>(m, "SampleIndexer")
       .def(py::init<>())
       .def("get", &SampleIndexer::get)

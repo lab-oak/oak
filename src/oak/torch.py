@@ -275,47 +275,29 @@ class MainNet(nn.Module):
 
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
-class OutputBuffers:
-    def __init__(self, size, pod=oak.pokemon_out_dim, aod=oak.active_out_dim):
-        self.size = size
-        self.pokemon_out_dim = pod
-        self.active_out_dim = aod
-        self.side_out_dim = (1 + aod) + 5 * (1 + pod)
-        self.pokemon = torch.zeros(
-            (size, 2, 5, self.pokemon_out_dim), dtype=torch.float32
-        )
-        self.active = torch.zeros(
-            (size, 2, 1, self.active_out_dim), dtype=torch.float32
-        )
-        self.sides = torch.zeros((size, 2, 1, self.side_out_dim), dtype=torch.float32)
-        self.value = torch.zeros((size, 1), dtype=torch.float32)
-        # last dim is neg inf to supply logit for invalid actions
-        self.p1_policy_logit = torch.zeros(size, oak.policy_out_dim + 1)
-        self.p2_policy_logit = torch.zeros(size, oak.policy_out_dim + 1)
-        self.p1_policy = torch.zeros((size, 9))
-        self.p2_policy = torch.zeros((size, 9))
-
-    def clear(self):
-        self.pokemon.detach_().zero_()
-        self.active.detach_().zero_()
-        self.sides.detach_().zero_()
-        self.value.detach_().zero_()
-        self.p1_policy_logit.detach_().zero_()
-        self.p2_policy_logit.detach_().zero_()
-        self.p1_policy_logit[:, -1] = -torch.inf
-        self.p2_policy_logit[:, -1] = -torch.inf
-        self.p1_policy.detach_().zero_()
-        self.p2_policy.detach_().zero_()
+class OutputBuffer:
+    def __init__(self, buffers: oak.OutputBuffer):
+        self.size = buffers.size
+        self.pokemon_out_dim = buffers.pokemon_out_dim
+        self.active_out_dim = buffers.active_out_dim
+        self.pokemon = torch.from_numpy(buffers.pokemon)
+        self.active = torch.from_numpy(buffers.active)
+        self.sides = torch.from_numpy(buffers.sides)
+        self.value = torch.from_numpy(buffers.value)
+        self.p1_policy_logit = torch.from_numpy(buffers.p1_policy_logit)
+        self.p2_policy_logit = torch.from_numpy(buffers.p2_policy_logit)
+        self.p1_policy = torch.from_numpy(buffers.p1_policy)
+        self.p2_policy = torch.from_numpy(buffers.p2_policy)
 
     def to(self, device):
-        self.pokemon.to(device)
-        self.active.to(device)
-        self.sides.to(device)
-        self.value.to(device)
-        self.p1_policy_logit.to(device)
-        self.p2_policy_logit.to(device)
-        self.p1_policy.to(device)
-        self.p2_policy.to(device)
+        self.pokemon = self.pokemon.to(device)
+        self.active = self.active.to(device)
+        self.sides = self.sides.to(device)
+        self.value = self.value.to(device)
+        self.p1_policy_logit = self.p1_policy_logit.to(device)
+        self.p2_policy_logit = self.p2_policy_logit.to(device)
+        self.p1_policy = self.p1_policy.to(device)
+        self.p2_policy = self.p2_policy.to(device)
         return self
 
 
@@ -375,7 +357,7 @@ class BattleNetwork(torch.nn.Module):
         self.main_net.clamp_parameters()
 
     def inference(
-        self, input: EncodedBattleFrame, output: OutputBuffers, use_policy: bool = True
+        self, input: EncodedBattleFrame, output: OutputBuffer, use_policy: bool = True
     ):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
