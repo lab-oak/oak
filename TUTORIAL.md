@@ -147,6 +147,62 @@ All the Oak programs save their arguments to disk
 
 ## Training
 
+Let's start training by running a quick check.
+
+```bash
+(.venv) user@laptop:~$ tutorial battle-frame-stats fp-data
+Total battle frames: 19373207
+Average battle length: 80.1695282078021
+(.venv) user@laptop:~$ python
+Python 3.13.3 (main, Jan  8 2026, 12:03:54) [GCC 14.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> 19373207 / 80 # number of games
+242165.0875
+>>> 
+```
+
+The keyword args for the battle script are lean enough that we can discuss each of them below. All Oak scripts will list their kwargs if the help flag is provided, e.g.
+
+```bash
+battle --help
+```
+
+
+* `--data-dir=fp-data`
+
+* `--batch-size=4096`
+Pokemon scores have higher variance because of the stochastic nature of the game.
+
+* `--lr=.001`
+A proven constant and the default for Adam (the optimization we use)
+
+* `--threads=8`
+Unlike `generate`, this script uses only one thread by default. This kwarg limits the max number of threads that Torch/CUDA can use and the number of data reading threads.
+
+The following arguements are default and were not explicitly entered, but deserve mention anyway.
+
+* `--value_nash_weight=0.0`
+* `--value_empirical_weight=0.0`
+* `--value_score_weight=1.0`
+The final value target is a weighted sum of 3 different value estimates.
+The empirical value is just the average leaf value that is back progpogated to the root. The nash value is more complicated, but it is the value corresponding to a Nash equilibrium on the root node's "empirical matrix".
+
+Most RL setups use only the score as we have. Additionally, using the PokeEngine eval we used for self play is not intended to be a value estimator. This means that the empirical and Nash values are less meaningful than if we used Monte-Carlo or a Network.
+
+* `--p_nash_weight=0.0`
+Nash solving isnt good when UCB is used.
+
+* `--pokemon_hidden_dim=128`
+* `--active_hidden_dim=128`
+* `--pokemon_out_dim=59`
+* `--active_out_dim=83`
+* `--hidden_dim=64`
+* `--value_hidden_dim=32`
+* `--policy_hidden_dim=64`
+
+
+
+
 
 # Python
 

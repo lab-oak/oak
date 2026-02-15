@@ -280,7 +280,7 @@ def main():
         args.dir = now.strftime("battle-%Y-%m-%d-%H:%M:%S")
 
     os.makedirs(args.dir, exist_ok=False)
-    # oak.util.save_args(args, args.dir)
+    oak.util.save_args(args, args.dir)
 
     network = oak.torch.BattleNetwork(
         args.pokemon_hidden_dim,
