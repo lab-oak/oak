@@ -111,7 +111,7 @@ The max for my system. By default it does max - 1.
 
 * `--dir=fp-data`
 
-The name of the dir where all work will be saved. By default this is a datatime string. It is advised to use short code names.
+The name of the dir where all work will be saved. By default this is a datetime string. It is advised to use short code names.
 
 ```bash
 (.venv) user@laptop:~/oak$ generate --search-budget=1024 --bandit=ucb-1.0 --policy-mode=x --eval=fp --dir=fp-data
@@ -279,6 +279,12 @@ info:
         6: 9, (0/0), (0.501222/0.488281)
         7: 7, (0.595607/0.592076), (0.52585/0.53125)
 score: -nan over 0 games; Elo diff: -nan
+```
+
+The data display is of the format
+
+```
+  {thread}: {update}, ({p1_output.empirical_value}/{p1_output.nash_value}), ({p1_output.empirical_value}/{p1_output.nash_value})
 ```
 
 

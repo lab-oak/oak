@@ -26,7 +26,7 @@ These programs were all built from a shared header library that is easy to exten
 
 # Getting Started
 
-Instruction for installing and using the package can be found here TODO link TUT.md
+Instruction for installing and using the package can be found [here](./TUTORIAL.md).
 
 # Building
 

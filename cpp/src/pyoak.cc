@@ -498,15 +498,44 @@ struct OutputBuffer {
 OutputBuffer cpp_inference(std::string network_path,
                            const BattleFrame &battle_frames) {
   OutputBuffer buffer{battle_frames.size};
-  NN::Battle::Network network{};
+  NN::Battle::Network network;
   std::ifstream file{network_path, std::ios::binary};
   if (!file) {
     throw std::runtime_error{"Can't open network"};
   }
 
-  for (auto i = 0; i < output.size; ++i) {
-    output.value[i, 0] = 0;
+  auto value = buffer.value.mutable_data();
+  auto p1_policy = buffer.p1_policy.mutable_data();
+  auto p2_policy = buffer.p2_policy.mutable_data();
+
+  auto battle_ptr = battle_frames.battle.data();
+  auto durations_ptr = battle_frames.durations.data();
+  auto m = battle_frames.m.data();
+  auto n = battle_frames.n.data();
+
+  auto p1_choices = battle_frames.p1_choices.data();
+  auto p2_choices = battle_frames.p2_choices.data();
+
+  for (auto i = 0; i < battle_frames.size; ++i) {
+
+    const auto &battle =
+        *reinterpret_cast<const pkmn_gen1_battle *>(battle_ptr);
+    const auto &durations =
+        *reinterpret_cast<const pkmn_gen1_chance_durations *>(durations_ptr);
+
+    *value = network.inference(battle, durations, *m, *n, p1_choices,
+                               p2_choices, p1_policy, p2_policy);
+
+    battle_ptr += sizeof(pkmn_gen1_battle);
+    durations_ptr += sizeof(pkmn_gen1_chance_durations);
+    m += 1;
+    n += 1;
+
+    value += 1;
+    p1_policy += 9;
+    p2_policy += 9;
   }
+
   return buffer;
 }
 
@@ -745,6 +774,9 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("p1_policy", &OutputBuffer::p1_policy)
       .def_readonly("p2_policy", &OutputBuffer::p2_policy)
       .def("clear", &OutputBuffer::clear);
+
+  m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
+        py::arg("battle_frames"));
 
   py::class_<SampleIndexer>(m, "SampleIndexer")
       .def(py::init<>())
