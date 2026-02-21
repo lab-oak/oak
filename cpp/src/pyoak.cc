@@ -111,31 +111,6 @@ struct SampleIndexer {
 
 size_t sample(EncodedBattleFrame &encoded_frames, const SampleIndexer &indexer,
               size_t threads, size_t max_battle_length, size_t min_iterations) {
-  using Input = Encode::Battle::FrameInput;
-
-  Input input{
-      .m = encoded_frames.m.mutable_data(),
-      .n = encoded_frames.n.mutable_data(),
-      .p1_choice_indices = encoded_frames.p1_choice_indices.mutable_data(),
-      .p2_choice_indices = encoded_frames.p2_choice_indices.mutable_data(),
-      .pokemon = encoded_frames.pokemon.mutable_data(),
-      .active = encoded_frames.active.mutable_data(),
-      .hp = encoded_frames.hp.mutable_data(),
-      .iterations = encoded_frames.iterations.mutable_data(),
-      .p1_empirical = encoded_frames.p1_empirical.mutable_data(),
-      .p1_nash = encoded_frames.p1_nash.mutable_data(),
-      .p2_empirical = encoded_frames.p2_empirical.mutable_data(),
-      .p2_nash = encoded_frames.p2_nash.mutable_data(),
-      .empirical_value = encoded_frames.empirical_value.mutable_data(),
-      .nash_value = encoded_frames.nash_value.mutable_data(),
-      .score = encoded_frames.score.mutable_data(),
-  };
-
-  const auto ptrs = std::bit_cast<std::array<void *, 15>>(input);
-  if (std::any_of(ptrs.begin(), ptrs.end(), [](auto p) { return !p; })) {
-    std::cerr << "null pointer in input" << std::endl;
-    return 0;
-  }
 
   // flatten indexer data into C++ arrays
   std::vector<const char *> paths;
@@ -233,17 +208,24 @@ size_t sample(EncodedBattleFrame &encoded_frames, const SampleIndexer &indexer,
         if (valid.empty()) {
           continue;
         }
-        const auto frames = Train::Battle::uncompress(compressed);
+
         const auto selected = valid[std::uniform_int_distribution<size_t>(
             0, valid.size() - 1)(mt)];
-        const auto &frame = frames[selected];
+
+        auto battle = compressed.battle;
+        auto options = PKMN::options();
+        auto result = PKMN::result();
+        for (auto i = 0; i < selected; ++i) {
+          const auto &update = compressed.updates[i];
+          result = PKMN::update(battle, update.c1, update.c2, options);
+        }
+
         size_t write_index = count.fetch_add(1);
         if (write_index >= encoded_frames.size) {
           return;
         }
-        // encode the frame and write to tensor
-        input.index(write_index)
-            .write(Encode::Battle::Frame{frame}, frame.target);
+        encoded_frames.write(write_index, battle, PKMN::durations(options),
+                             result, compressed.updates[selected]);
       }
     } catch (const std::exception &e) {
       report_error(e.what());
