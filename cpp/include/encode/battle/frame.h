@@ -5,6 +5,17 @@
 #include <train/battle/frame.h>
 #include <train/battle/target.h>
 
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include <atomic>
+#include <fstream>
+#include <random>
+#include <thread>
+
+namespace py = pybind11;
+
 namespace Encode {
 
 namespace Battle {
@@ -169,3 +180,105 @@ struct FrameInput {
 } // namespace Battle
 
 } // namespace Encode
+
+struct EncodedBattleFrame {
+  size_t size;
+  py::array_t<uint8_t> m;
+  py::array_t<uint8_t> n;
+  py::array_t<int64_t> p1_choice_indices;
+  py::array_t<int64_t> p2_choice_indices;
+  py::array_t<float> pokemon;
+  py::array_t<float> active;
+  py::array_t<float> hp;
+  py::array_t<uint32_t> iterations;
+  py::array_t<float> p1_empirical;
+  py::array_t<float> p1_nash;
+  py::array_t<float> p2_empirical;
+  py::array_t<float> p2_nash;
+  py::array_t<float> empirical_value;
+  py::array_t<float> nash_value;
+  py::array_t<float> score;
+
+  static constexpr size_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
+  static constexpr size_t active_in_dim = Encode::Battle::Active::n_dim;
+
+  EncodedBattleFrame(size_t sz) : size(sz) {
+    auto make_shape = [sz](std::vector<size_t> dims) {
+      dims[0] = static_cast<size_t>(sz); // overwrite first dim with batch size
+      return dims;
+    };
+    m = py::array_t<uint8_t>(make_shape({0, 1}));
+    n = py::array_t<uint8_t>(make_shape({0, 1}));
+    p1_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
+    p2_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
+    pokemon = py::array_t<float>(make_shape({0, 2, 5, pokemon_in_dim}));
+    active = py::array_t<float>(make_shape({0, 2, 1, active_in_dim}));
+    hp = py::array_t<float>(make_shape({0, 2, 6, 1}));
+    iterations = py::array_t<uint32_t>(make_shape({0, 1}));
+    p1_empirical = py::array_t<float>(make_shape({0, 9}));
+    p1_nash = py::array_t<float>(make_shape({0, 9}));
+    p2_empirical = py::array_t<float>(make_shape({0, 9}));
+    p2_nash = py::array_t<float>(make_shape({0, 9}));
+    empirical_value = py::array_t<float>(make_shape({0, 1}));
+    nash_value = py::array_t<float>(make_shape({0, 1}));
+    score = py::array_t<float>(make_shape({0, 1}));
+  }
+
+  void clear() {
+    std::fill_n(m.mutable_data(), m.size(), uint8_t(0));
+    std::fill_n(n.mutable_data(), n.size(), uint8_t(0));
+    std::fill_n(p1_choice_indices.mutable_data(), p1_choice_indices.size(),
+                int64_t(0));
+    std::fill_n(p2_choice_indices.mutable_data(), p2_choice_indices.size(),
+                int64_t(0));
+    std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
+    std::fill_n(active.mutable_data(), active.size(), 0.0f);
+    std::fill_n(hp.mutable_data(), hp.size(), 0.0f);
+    std::fill_n(iterations.mutable_data(), iterations.size(), uint32_t(0));
+    std::fill_n(p1_empirical.mutable_data(), p1_empirical.size(), 0.0f);
+    std::fill_n(p1_nash.mutable_data(), p1_nash.size(), 0.0f);
+    std::fill_n(p2_empirical.mutable_data(), p2_empirical.size(), 0.0f);
+    std::fill_n(p2_nash.mutable_data(), p2_nash.size(), 0.0f);
+    std::fill_n(empirical_value.mutable_data(), empirical_value.size(), 0.0f);
+    std::fill_n(nash_value.mutable_data(), nash_value.size(), 0.0f);
+    std::fill_n(score.mutable_data(), score.size(), 0.0f);
+  }
+
+  void uncompress_from_bytes(const py::bytes &data) {
+    std::string_view sv(data);
+    const char *raw_data = sv.data();
+
+    Train::Battle::CompressedFrames compressed_frames{};
+    compressed_frames.read(raw_data);
+
+    Encode::Battle::FrameInput input{
+        .m = m.mutable_data(),
+        .n = n.mutable_data(),
+        .p1_choice_indices = p1_choice_indices.mutable_data(),
+        .p2_choice_indices = p2_choice_indices.mutable_data(),
+        .pokemon = pokemon.mutable_data(),
+        .active = active.mutable_data(),
+        .hp = hp.mutable_data(),
+        .iterations = iterations.mutable_data(),
+        .p1_empirical = p1_empirical.mutable_data(),
+        .p1_nash = p1_nash.mutable_data(),
+        .p2_empirical = p2_empirical.mutable_data(),
+        .p2_nash = p2_nash.mutable_data(),
+        .empirical_value = empirical_value.mutable_data(),
+        .nash_value = nash_value.mutable_data(),
+        .score = score.mutable_data()};
+
+    const auto frames_vec = uncompress(compressed_frames);
+    for (const auto &frame : frames_vec) {
+      Encode::Battle::Frame encoded{frame};
+      input.write(encoded, frame.target);
+    }
+  }
+
+  // optional static factory
+  static EncodedBattleFrame from_bytes(const py::bytes &data, size_t sz) {
+    EncodedBattleFrame f(sz);
+    f.uncompress_from_bytes(data);
+    return f;
+  }
+};
