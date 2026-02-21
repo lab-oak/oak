@@ -16,7 +16,9 @@
 
 namespace py = pybind11;
 
-struct EncodedBattleFrame {
+namespace Encode::Battle {
+
+struct Frames {
   size_t size;
   py::array_t<uint8_t> m;
   py::array_t<uint8_t> n;
@@ -37,7 +39,7 @@ struct EncodedBattleFrame {
   static constexpr size_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
   static constexpr size_t active_in_dim = Encode::Battle::Active::n_dim;
 
-  EncodedBattleFrame(size_t sz) : size(sz) {
+  Frames(size_t sz) : size(sz) {
     auto make_shape = [sz](std::vector<size_t> dims) {
       dims[0] = static_cast<size_t>(sz); // overwrite first dim with batch size
       return dims;
@@ -212,9 +214,11 @@ struct EncodedBattleFrame {
   }
 
   // optional static factory
-  static EncodedBattleFrame from_bytes(const py::bytes &data, size_t sz) {
-    EncodedBattleFrame f(sz);
+  static Frames from_bytes(const py::bytes &data, size_t sz) {
+    Frames f(sz);
     f.uncompress_from_bytes(data);
     return f;
   }
 };
+
+}

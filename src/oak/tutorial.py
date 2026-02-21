@@ -243,10 +243,10 @@ def test_consistency():
     max_games = 2
 
     for buffer, n_frames in buffer_list[:max_games]:
-        encoded_frames = oak.EncodedBattleFrame(n_frames)
+        encoded_frames = oak.EncodedBattleFrames(n_frames)
         encoded_frames.uncompress_from_bytes(buffer)
         # encoded_frames = oak.get_encoded_frames(buffer, n_frames)
-        encoded_frames_torch = oak.torch.EncodedBattleFrame(encoded_frames)
+        encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
         output = oak.torch.OutputBuffers(encoded_frames.size)
         network.inference(encoded_frames_torch, output)
         print(output.value)

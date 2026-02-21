@@ -13,8 +13,8 @@ from typing import Dict, List
 import torch
 
 
-class EncodedBattleFrame:
-    def __init__(self, frames: oak.EncodedBattleFrame):
+class EncodedBattleFrames:
+    def __init__(self, frames: oak.EncodedBattleFrames):
         self.size = frames.size
         self.m = torch.from_numpy(frames.m)
         self.n = torch.from_numpy(frames.n)
@@ -357,7 +357,7 @@ class BattleNetwork(torch.nn.Module):
         self.main_net.clamp_parameters()
 
     def inference(
-        self, input: EncodedBattleFrame, output: OutputBuffer, use_policy: bool = True
+        self, input: EncodedBattleFrames, output: OutputBuffer, use_policy: bool = True
     ):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])

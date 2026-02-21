@@ -109,7 +109,7 @@ struct SampleIndexer {
   }
 };
 
-size_t sample(EncodedBattleFrame &encoded_frames, const SampleIndexer &indexer,
+size_t sample(Encode::Battle::Frames &encoded_frames, const SampleIndexer &indexer,
               size_t threads, size_t max_battle_length, size_t min_iterations) {
 
   // flatten indexer data into C++ arrays
@@ -345,7 +345,7 @@ PYBIND11_MODULE(pyoak, m) {
   m.doc() = "Python bindings for oak";
   m.def(
       "sample",
-      [](EncodedBattleFrame &encoded_frames, const SampleIndexer &indexer,
+      [](Encode::Battle::Frames &encoded_frames, const SampleIndexer &indexer,
          size_t threads, size_t max_battle_length, size_t min_iterations) {
         return sample(encoded_frames, indexer, threads, max_battle_length,
                       min_iterations);
@@ -545,26 +545,26 @@ PYBIND11_MODULE(pyoak, m) {
       .def_static("from_bytes", &BattleFrame::from_bytes)
       .def_readonly("size", &BattleFrame::size);
 
-  py::class_<EncodedBattleFrame>(m, "EncodedBattleFrame")
+  py::class_<Encode::Battle::Frames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
-      .def("clear", &EncodedBattleFrame::clear)
-      .def("uncompress_from_bytes", &EncodedBattleFrame::uncompress_from_bytes)
-      .def_readonly("size", &EncodedBattleFrame::size)
-      .def_readonly("m", &EncodedBattleFrame::m)
-      .def_readonly("n", &EncodedBattleFrame::n)
-      .def_readonly("p1_choice_indices", &EncodedBattleFrame::p1_choice_indices)
-      .def_readonly("p2_choice_indices", &EncodedBattleFrame::p2_choice_indices)
-      .def_readonly("pokemon", &EncodedBattleFrame::pokemon)
-      .def_readonly("active", &EncodedBattleFrame::active)
-      .def_readonly("hp", &EncodedBattleFrame::hp)
-      .def_readonly("iterations", &EncodedBattleFrame::iterations)
-      .def_readonly("p1_empirical", &EncodedBattleFrame::p1_empirical)
-      .def_readonly("p1_nash", &EncodedBattleFrame::p1_nash)
-      .def_readonly("p2_empirical", &EncodedBattleFrame::p2_empirical)
-      .def_readonly("p2_nash", &EncodedBattleFrame::p2_nash)
-      .def_readonly("empirical_value", &EncodedBattleFrame::empirical_value)
-      .def_readonly("nash_value", &EncodedBattleFrame::nash_value)
-      .def_readonly("score", &EncodedBattleFrame::score);
+      .def("clear", &Encode::Battle::Frames::clear)
+      .def("uncompress_from_bytes", &Encode::Battle::Frames::uncompress_from_bytes)
+      .def_readonly("size", &Encode::Battle::Frames::size)
+      .def_readonly("m", &Encode::Battle::Frames::m)
+      .def_readonly("n", &Encode::Battle::Frames::n)
+      .def_readonly("p1_choice_indices", &Encode::Battle::Frames::p1_choice_indices)
+      .def_readonly("p2_choice_indices", &Encode::Battle::Frames::p2_choice_indices)
+      .def_readonly("pokemon", &Encode::Battle::Frames::pokemon)
+      .def_readonly("active", &Encode::Battle::Frames::active)
+      .def_readonly("hp", &Encode::Battle::Frames::hp)
+      .def_readonly("iterations", &Encode::Battle::Frames::iterations)
+      .def_readonly("p1_empirical", &Encode::Battle::Frames::p1_empirical)
+      .def_readonly("p1_nash", &Encode::Battle::Frames::p1_nash)
+      .def_readonly("p2_empirical", &Encode::Battle::Frames::p2_empirical)
+      .def_readonly("p2_nash", &Encode::Battle::Frames::p2_nash)
+      .def_readonly("empirical_value", &Encode::Battle::Frames::empirical_value)
+      .def_readonly("nash_value", &Encode::Battle::Frames::nash_value)
+      .def_readonly("score", &Encode::Battle::Frames::score);
 
   py::class_<OutputBuffer>(m, "OutputBuffer")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),

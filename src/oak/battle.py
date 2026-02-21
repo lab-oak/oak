@@ -187,7 +187,7 @@ def main():
         return loss_per_sample.mean()
 
     def loss(
-        input: oak.torch.EncodedBattleFrame,
+        input: oak.torch.EncodedBattleFrames,
         output: oak.torch.OutputBuffer,
         args,
         print_flag=False,
@@ -304,8 +304,8 @@ def main():
 
     print(f"Initial network hash: {network.hash()}")
 
-    encoded_frames = oak.EncodedBattleFrame(args.batch_size)
-    encoded_frames_torch = oak.torch.EncodedBattleFrame(encoded_frames).to(device)
+    encoded_frames = oak.EncodedBattleFrames(args.batch_size)
+    encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames).to(device)
 
     output_buffer = oak.OutputBuffer(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
