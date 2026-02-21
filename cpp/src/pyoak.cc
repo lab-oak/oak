@@ -109,85 +109,6 @@ struct SampleIndexer {
   }
 };
 
-struct BattleFrame {
-  size_t size;
-
-  py::array_t<uint8_t> m;
-  py::array_t<uint8_t> n;
-  py::array_t<uint8_t> battle;
-  py::array_t<uint8_t> durations;
-  py::array_t<uint8_t> result;
-  py::array_t<uint8_t> p1_choices;
-  py::array_t<uint8_t> p2_choices;
-  py::array_t<uint32_t> iterations;
-  py::array_t<float> p1_empirical;
-  py::array_t<float> p1_nash;
-  py::array_t<float> p2_empirical;
-  py::array_t<float> p2_nash;
-  py::array_t<float> empirical_value;
-  py::array_t<float> nash_value;
-  py::array_t<float> score;
-
-  BattleFrame(size_t size_) : size(size_) {
-    std::vector<size_t> shape1{static_cast<size_t>(size), 1};
-    std::vector<size_t> shape8{static_cast<size_t>(size), 8};
-    std::vector<size_t> shape9{static_cast<size_t>(size), 9};
-    std::vector<size_t> shape384{static_cast<size_t>(size), 384};
-
-    m = py::array_t<uint8_t>(shape1);
-    n = py::array_t<uint8_t>(shape1);
-    battle = py::array_t<uint8_t>(shape384);
-    durations = py::array_t<uint8_t>(shape8);
-    result = py::array_t<uint8_t>(shape1);
-    p1_choices = py::array_t<uint8_t>(shape9);
-    p2_choices = py::array_t<uint8_t>(shape9);
-    iterations = py::array_t<uint32_t>(shape1);
-    p1_empirical = py::array_t<float>(shape9);
-    p1_nash = py::array_t<float>(shape9);
-    p2_empirical = py::array_t<float>(shape9);
-    p2_nash = py::array_t<float>(shape9);
-    empirical_value = py::array_t<float>(shape1);
-    nash_value = py::array_t<float>(shape1);
-    score = py::array_t<float>(shape1);
-  }
-
-  void uncompress_from_bytes(const py::bytes &data) {
-    std::string_view data_view(data);
-    const char *raw_data = data_view.data();
-
-    Train::Battle::CompressedFrames compressed_frames{};
-    compressed_frames.read(raw_data);
-
-    using In = Train::Battle::FrameInput;
-    In input{.m = m.mutable_data(),
-             .n = n.mutable_data(),
-             .battle = battle.mutable_data(),
-             .durations = durations.mutable_data(),
-             .result = result.mutable_data(),
-             .p1_choices = p1_choices.mutable_data(),
-             .p2_choices = p2_choices.mutable_data(),
-             .iterations = iterations.mutable_data(),
-             .p1_empirical = p1_empirical.mutable_data(),
-             .p1_nash = p1_nash.mutable_data(),
-             .p2_empirical = p2_empirical.mutable_data(),
-             .p2_nash = p2_nash.mutable_data(),
-             .empirical_value = empirical_value.mutable_data(),
-             .nash_value = nash_value.mutable_data(),
-             .score = score.mutable_data()};
-
-    const auto frames_vec = compressed_frames.uncompress();
-    for (const auto &frame : frames_vec) {
-      input.write(frame);
-    }
-  }
-
-  static BattleFrame from_bytes(const py::bytes &data, size_t size) {
-    BattleFrame f(size);
-    f.uncompress_from_bytes(data);
-    return f;
-  }
-};
-
 struct EncodedBattleFrame {
   size_t size;
   py::array_t<uint8_t> m;
@@ -275,7 +196,7 @@ struct EncodedBattleFrame {
         .nash_value = nash_value.mutable_data(),
         .score = score.mutable_data()};
 
-    const auto frames_vec = compressed_frames.uncompress();
+    const auto frames_vec = uncompress(compressed_frames);
     for (const auto &frame : frames_vec) {
       Encode::Battle::Frame encoded{frame};
       input.write(encoded, frame.target);
@@ -414,7 +335,7 @@ struct EncodedBattleFrame {
           if (valid.empty()) {
             continue;
           }
-          const auto frames = compressed.uncompress();
+          const auto frames = Train::Battle::uncompress(compressed);
           const auto selected = valid[std::uniform_int_distribution<size_t>(
               0, valid.size() - 1)(mt)];
           const auto &frame = frames[selected];
