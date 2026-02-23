@@ -560,13 +560,12 @@ PYBIND11_MODULE(pyoak, m) {
   // Build net hyperparams
   m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;
   m.attr("build_value_hidden_dim") = NN::Build::Default::value_hidden_dim;
-  using Tensorizer = Encode::Build::Tensorizer<>;
-  m.attr("build_max_actions") = Tensorizer::max_actions;
+  m.attr("build_max_actions") = Py::Build::Tensorizer::max_actions;
   m.def("species_move_list", []() {
     std::vector<std::pair<int, int>> result;
-    result.reserve(Tensorizer::species_move_list_size);
-    for (int i = 0; i < Tensorizer::species_move_list_size; ++i) {
-      auto p = Tensorizer::species_move_list(i);
+    result.reserve(Py::Build::Tensorizer::species_move_list_size);
+    for (int i = 0; i < Py::Build::Tensorizer::species_move_list_size; ++i) {
+      auto p = Py::Build::Tensorizer::species_move_list(i);
       result.emplace_back(static_cast<int>(p.first),
                           static_cast<int>(p.second));
     }
