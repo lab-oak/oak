@@ -1,5 +1,7 @@
 #pragma once
 
+#include <train/battle/compressed-frame.h>
+
 #include <array>
 
 #include <pybind11/numpy.h>
@@ -8,9 +10,7 @@
 
 namespace py = pybind11;
 
-namespace Train {
-
-namespace Battle {
+namespace Py::Battle {
 
 struct Target {
   size_t size;
@@ -62,6 +62,4 @@ struct Target {
   }
 };
 
-} // namespace Battle
-
-} // namespace Train
+} // namespace Py::Battle

@@ -1,11 +1,12 @@
 #include <encode/battle/battle.h>
-#include <encode/battle/frame.h>
 #include <encode/battle/policy.h>
 #include <encode/build/trajectory.h>
 #include <nn/battle/network.h>
 #include <nn/default-hyperparameters.h>
+#include <py/battle/encoded-frames.h>
+#include <py/battle/frames.h>
+#include <py/battle/output.h>
 #include <train/battle/compressed-frame.h>
-#include <train/battle/frame.h>
 #include <train/build/trajectory.h>
 #include <util/parse.h>
 #include <util/search.h>
@@ -39,6 +40,8 @@ dim_labels_to_vec(const std::array<std::array<char, M>, N> &data) {
 using Tensorizer = Encode::Build::Tensorizer<>;
 
 namespace py = pybind11;
+
+using Py::Battle::OutputBuffer;
 
 py::list read_battle_data(const std::string &path,
                           size_t max_battles = 1'000'000) {
@@ -109,7 +112,7 @@ struct SampleIndexer {
   }
 };
 
-size_t sample(Encode::Battle::Frames &encoded_frames,
+size_t sample(Py::Battle::EncodedFrames &encoded_frames,
               const SampleIndexer &indexer, size_t threads,
               size_t max_battle_length, size_t min_iterations) {
 
@@ -244,62 +247,8 @@ size_t sample(Encode::Battle::Frames &encoded_frames,
   return errors.load() ? 0 : std::min(count.load(), encoded_frames.size);
 }
 
-struct OutputBuffer {
-  size_t size;
-  size_t pokemon_out_dim;
-  size_t active_out_dim;
-  size_t side_out_dim;
-  py::array_t<float> pokemon;         // (B, 2, 5, pokemon_out_dim)
-  py::array_t<float> active;          // (B, 2, 1, active_out_dim)
-  py::array_t<float> sides;           // (B, 2, 1, side_out_dim)
-  py::array_t<float> value;           // (B, 1)
-  py::array_t<float> p1_policy_logit; // (B, policy_out_dim)
-  py::array_t<float> p2_policy_logit; // (B, policy_out_dim)
-  py::array_t<float> p1_policy;       // (B, 9)
-  py::array_t<float> p2_policy;       // (B, 9)
-
-  // last dim is neg inf, invalid actions map to it
-  static constexpr size_t policy_out_dim = Encode::Battle::Policy::n_dim + 1;
-
-  OutputBuffer(size_t sz, size_t pod = NN::Battle::Default::pokemon_out_dim,
-               size_t aod = NN::Battle::Default::active_out_dim)
-      : size(sz), pokemon_out_dim{pod}, active_out_dim{aod},
-        side_out_dim{(1 + active_out_dim) + 5 * (1 + pokemon_out_dim)} {
-    const auto make_shape = [sz](std::vector<size_t> dims) {
-      dims[0] = static_cast<size_t>(sz);
-      return dims;
-    };
-    pokemon = py::array_t<float>(make_shape({0, 2, 5, pokemon_out_dim}));
-    active = py::array_t<float>(make_shape({0, 2, 1, active_out_dim}));
-    sides = py::array_t<float>(make_shape({0, 2, 1, side_out_dim}));
-    value = py::array_t<float>(make_shape({0, 1}));
-    p1_policy_logit = py::array_t<float>(make_shape({0, policy_out_dim}));
-    p2_policy_logit = py::array_t<float>(make_shape({0, policy_out_dim}));
-    p1_policy = py::array_t<float>(make_shape({0, 9}));
-    p2_policy = py::array_t<float>(make_shape({0, 9}));
-  }
-
-  void clear() {
-    std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
-    std::fill_n(active.mutable_data(), active.size(), 0.0f);
-    std::fill_n(sides.mutable_data(), sides.size(), 0.0f);
-    std::fill_n(value.mutable_data(), value.size(), 0.0f);
-    std::fill_n(p1_policy_logit.mutable_data(), p1_policy_logit.size(), 0.0f);
-    std::fill_n(p2_policy_logit.mutable_data(), p2_policy_logit.size(), 0.0f);
-    std::fill_n(p1_policy.mutable_data(), p1_policy.size(), 0.0f);
-    std::fill_n(p2_policy.mutable_data(), p2_policy.size(), 0.0f);
-    // Set final logit column to -inf
-    auto p1 = p1_policy_logit.mutable_unchecked<2>();
-    auto p2 = p2_policy_logit.mutable_unchecked<2>();
-    for (size_t i = 0; i < p1.shape(0); ++i) {
-      p1(i, p1.shape(1) - 1) = -std::numeric_limits<float>::infinity();
-      p2(i, p2.shape(1) - 1) = -std::numeric_limits<float>::infinity();
-    }
-  }
-};
-
 OutputBuffer cpp_inference(std::string network_path,
-                           const Train::Battle::Frames &battle_frames) {
+                           const Py::Battle::Frames &battle_frames) {
   OutputBuffer buffer{battle_frames.size};
   NN::Battle::Network network;
   std::ifstream file{network_path, std::ios::binary};
@@ -309,8 +258,8 @@ OutputBuffer cpp_inference(std::string network_path,
   // network.fill_pokemon_cache() TODO
 
   auto value = buffer.value.mutable_data();
-  auto p1_policy = buffer.p1_policy.mutable_data();
-  auto p2_policy = buffer.p2_policy.mutable_data();
+  auto p1_policy = buffer.policy.mutable_data();
+  auto p2_policy = buffer.policy.mutable_data() + 9;
 
   auto battle_ptr = battle_frames.battle.data();
   auto durations_ptr = battle_frames.durations.data();
@@ -328,14 +277,14 @@ OutputBuffer cpp_inference(std::string network_path,
                                p2_choices, p1_policy, p2_policy);
     // out
     value += 1;
-    p1_policy += 9;
-    p2_policy += 9;
+    p1_policy += 18; // TODO check strides
+    p2_policy += 18;
     // in
     battle_ptr += sizeof(pkmn_gen1_battle);
     durations_ptr += sizeof(pkmn_gen1_chance_durations);
     k += 2;
-    p1_choices += 9;
-    p2_choices += 9;
+    p1_choices += 18;
+    p2_choices += 18;
   }
 
   return buffer;
@@ -347,8 +296,9 @@ PYBIND11_MODULE(pyoak, m) {
   m.doc() = "Python bindings for oak";
   m.def(
       "sample",
-      [](Encode::Battle::Frames &encoded_frames, const SampleIndexer &indexer,
-         size_t threads, size_t max_battle_length, size_t min_iterations) {
+      [](Py::Battle::EncodedFrames &encoded_frames,
+         const SampleIndexer &indexer, size_t threads, size_t max_battle_length,
+         size_t min_iterations) {
         return sample(encoded_frames, indexer, threads, max_battle_length,
                       min_iterations);
       },
@@ -541,31 +491,32 @@ PYBIND11_MODULE(pyoak, m) {
     return v;
   });
 
-  py::class_<Train::Battle::Frames>(m, "BattleFrames")
+  py::class_<Py::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())
-      .def("uncompress_from_bytes",
-           &Train::Battle::Frames::uncompress_from_bytes)
-      .def_static("from_bytes", &Train::Battle::Frames::from_bytes)
-      .def_readonly("size", &Train::Battle::Frames::size);
+      .def("uncompress_from_bytes", &Py::Battle::Frames::uncompress_from_bytes)
+      .def_static("from_bytes", &Py::Battle::Frames::from_bytes)
+      .def_readonly("size", &Py::Battle::Frames::size);
 
-  py::class_<Encode::Battle::Frames>(m, "EncodedBattleFrames")
+  py::class_<Py::Battle::EncodedFrames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
-      .def("clear", &Encode::Battle::Frames::clear)
+      .def("clear", &Py::Battle::EncodedFrames::clear)
       .def("uncompress_from_bytes",
-           &Encode::Battle::Frames::uncompress_from_bytes)
-      .def_readonly("size", &Encode::Battle::Frames::size)
-      .def_readonly("k", &Encode::Battle::Frames::k)
-      .def_readonly("iterations", &Encode::Battle::Frames::iterations)
+           &Py::Battle::EncodedFrames::uncompress_from_bytes)
+      .def_readonly("size", &Py::Battle::EncodedFrames::size)
+      .def_readonly("k", &Py::Battle::EncodedFrames::k)
+      .def_readonly("iterations", &Py::Battle::EncodedFrames::iterations)
       .def_readonly("empirical_policies",
-                    &Encode::Battle::Frames::empirical_policies)
-      .def_readonly("nash_policies", &Encode::Battle::Frames::nash_policies)
-      .def_readonly("empirical_value", &Encode::Battle::Frames::empirical_value)
-      .def_readonly("nash_value", &Encode::Battle::Frames::nash_value)
-      .def_readonly("score", &Encode::Battle::Frames::score)
-      .def_readonly("pokemon", &Encode::Battle::Frames::pokemon)
-      .def_readonly("active", &Encode::Battle::Frames::active)
-      .def_readonly("hp", &Encode::Battle::Frames::hp)
-      .def_readonly("choice_indices", &Encode::Battle::Frames::choice_indices);
+                    &Py::Battle::EncodedFrames::empirical_policies)
+      .def_readonly("nash_policies", &Py::Battle::EncodedFrames::nash_policies)
+      .def_readonly("empirical_value",
+                    &Py::Battle::EncodedFrames::empirical_value)
+      .def_readonly("nash_value", &Py::Battle::EncodedFrames::nash_value)
+      .def_readonly("score", &Py::Battle::EncodedFrames::score)
+      .def_readonly("pokemon", &Py::Battle::EncodedFrames::pokemon)
+      .def_readonly("active", &Py::Battle::EncodedFrames::active)
+      .def_readonly("hp", &Py::Battle::EncodedFrames::hp)
+      .def_readonly("choice_indices",
+                    &Py::Battle::EncodedFrames::choice_indices);
 
   py::class_<OutputBuffer>(m, "OutputBuffer")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
@@ -578,10 +529,8 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("active", &OutputBuffer::active)
       .def_readonly("sides", &OutputBuffer::sides)
       .def_readonly("value", &OutputBuffer::value)
-      .def_readonly("p1_policy_logit", &OutputBuffer::p1_policy_logit)
-      .def_readonly("p2_policy_logit", &OutputBuffer::p2_policy_logit)
-      .def_readonly("p1_policy", &OutputBuffer::p1_policy)
-      .def_readonly("p2_policy", &OutputBuffer::p2_policy)
+      .def_readonly("policy_logit", &OutputBuffer::policy_logit)
+      .def_readonly("policy", &OutputBuffer::policy)
       .def("clear", &OutputBuffer::clear);
 
   m.def("cpp_inference", &cpp_inference, py::arg("network_path"),

@@ -2,8 +2,8 @@
 
 #include <encode/battle/battle.h>
 #include <encode/battle/policy.h>
-#include <train/battle/frame.h>
-#include <train/battle/target.h>
+#include <py/battle/frames.h>
+#include <py/battle/target.h>
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -14,11 +14,11 @@
 #include <random>
 #include <thread>
 
+namespace Py::Battle {
+
 namespace py = pybind11;
 
-namespace Encode::Battle {
-
-struct Frames : public Train::Battle::Target {
+struct EncodedFrames : public Py::Battle::Target {
   py::array_t<float> pokemon;
   py::array_t<float> active;
   py::array_t<float> hp;
@@ -29,7 +29,7 @@ struct Frames : public Train::Battle::Target {
   using PokemonEncoding = std::array<float, pokemon_in_dim>;
   using ActiveEncoding = std::array<float, active_in_dim>;
 
-  Frames(size_t sz) : Train::Battle::Target{sz} {
+  EncodedFrames(size_t sz) : Py::Battle::Target{sz} {
     auto make_shape = [sz](std::vector<size_t> dims) {
       dims[0] = static_cast<size_t>(sz);
       return dims;
@@ -41,7 +41,7 @@ struct Frames : public Train::Battle::Target {
   }
 
   void clear() {
-    Train::Battle::Target::clear();
+    Py::Battle::Target::clear();
     std::fill_n(choice_indices.mutable_data(), choice_indices.size(),
                 int64_t(0));
     std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
@@ -54,7 +54,7 @@ struct Frames : public Train::Battle::Target {
              const Train::Battle::CompressedFrames::Update &update,
              float terminal) {
 
-    Train::Battle::Target::write(index, update);
+    Py::Battle::Target::write(index, update);
     score.mutable_data()[index] = terminal;
 
     // auto [hp_, pokemon_, active_, choice_] = view(index);
@@ -134,8 +134,8 @@ struct Frames : public Train::Battle::Target {
     assert(result == compressed_frames.result);
   }
 
-  static Frames from_bytes(const py::bytes &data, size_t sz) {
-    Frames f(sz);
+  static EncodedFrames from_bytes(const py::bytes &data, size_t sz) {
+    EncodedFrames f(sz);
     f.uncompress_from_bytes(data);
     return f;
   }
@@ -156,4 +156,4 @@ struct Frames : public Train::Battle::Target {
   }
 };
 
-} // namespace Encode::Battle
+} // namespace Py::Battle

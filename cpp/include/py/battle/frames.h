@@ -1,15 +1,15 @@
 #pragma once
 
+#include <py/battle/target.h>
 #include <train/battle/compressed-frame.h>
-#include <train/battle/target.h>
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-namespace py = pybind11;
+namespace Py::Battle {
 
-namespace Train::Battle {
+namespace py = pybind11;
 
 struct Frames : public Target {
   py::array_t<uint8_t> battle;
@@ -28,7 +28,7 @@ struct Frames : public Target {
              const pkmn_gen1_chance_durations &d, pkmn_result r,
              const Train::Battle::CompressedFrames::Update &update,
              float terminal) {
-    Train::Battle::Target::write(index, update);
+    Py::Battle::Target::write(index, update);
     score.mutable_data()[index] = terminal;
     std::memcpy(battle.mutable_data() + (index * 384), b.bytes, 384);
     std::memcpy(durations.mutable_data() + (index * 8), d.bytes, 8);
@@ -60,4 +60,4 @@ struct Frames : public Target {
   }
 };
 
-} // namespace Train::Battle
+} // namespace Py::Battle

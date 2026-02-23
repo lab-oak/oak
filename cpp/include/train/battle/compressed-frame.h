@@ -4,6 +4,8 @@
 
 #include <istream>
 
+std::tuple<uint16_t, uint16_t, uint16_t> VERSION = {1, 1, 0};
+
 namespace Train::Battle {
 
 template <typename in_type, typename out_type>

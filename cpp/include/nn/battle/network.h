@@ -45,12 +45,12 @@ struct Network {
         battle_cache.pokemon[s][p].fill(pokemon_net,
                                         battle.sides[s].pokemon[p]);
         // rather than calling fill again, just copy
-        for (auto j = 0; j < PokemonCache<float>::n_embeddings; ++j) {
-          for (auto i = 0; i < pokemon_out_dim; ++i) {
-            discrete_battle_cache.pokemon[s][p].embeddings[j][i] =
-                battle_cache.pokemon[s][p].embeddings[j][i] * 127;
-          }
-        }
+        // for (auto j = 0; j < PokemonCache<float>::n_embeddings; ++j) {
+        //   for (auto i = 0; i < pokemon_out_dim; ++i) {
+        //     discrete_battle_cache.pokemon[s][p].embeddings[j][i] =
+        //         battle_cache.pokemon[s][p].embeddings[j][i] * 127;
+        //   }
+        // }
       }
     }
   }
