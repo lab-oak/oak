@@ -76,12 +76,12 @@ struct Trajectory {
     uint32_t index;
     float probability;
   };
-
-  std::vector<PKMN::Set> initial;
+  using Team = std::vector<PKMN::Set>;
+  Team initial;
   std::vector<Update> updates;
-  std::vector<PKMN::Set> terminal;
+  Team terminal;
 
-  std::optional<std::vector<PKMN::Set>> opponent;
+  std::optional<Team> opponent;
   float value;
   std::optional<float> score;
 };
