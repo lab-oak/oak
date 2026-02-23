@@ -22,7 +22,7 @@ struct Frames : public Train::Battle::Target {
   py::array_t<float> pokemon;
   py::array_t<float> active;
   py::array_t<float> hp;
-  py::array_t<int64_t> choice;
+  py::array_t<int64_t> choice_indices;
 
   static constexpr size_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
   static constexpr size_t active_in_dim = Encode::Battle::Active::n_dim;
@@ -37,30 +37,16 @@ struct Frames : public Train::Battle::Target {
     pokemon = py::array_t<float>(std::vector<size_t>{0, 2, 5, pokemon_in_dim});
     active = py::array_t<float>(make_shape({0, 2, 1, active_in_dim}));
     hp = py::array_t<float>(make_shape({0, 2, 6, 1}));
-    choice = py::array_t<int64_t>(make_shape({0, 2, 9}));
+    choice_indices = py::array_t<int64_t>(make_shape({0, 2, 9}));
   }
 
   void clear() {
     Train::Battle::Target::clear();
-    std::fill_n(choice.mutable_data(), choice.size(), int64_t(0));
+    std::fill_n(choice_indices.mutable_data(), choice_indices.size(),
+                int64_t(0));
     std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
     std::fill_n(active.mutable_data(), active.size(), 0.0f);
     std::fill_n(hp.mutable_data(), hp.size(), 0.0f);
-  }
-
-  auto view(const auto index) {
-    // using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
-    // using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
-    // using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
-    // auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
-    //     hp.mutable_data() + index * (2 * 6 * 1));
-    // auto &pokemon_ = *reinterpret_cast<Bench *>(
-    //     pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
-    // auto &active_ = *reinterpret_cast<Actives *>(
-    //     active.mutable_data() + index * (2 * 1 * active_in_dim));
-    // auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
-    //     choice.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
-    // return std::tie(hp_, pokemon_, active_, choice_);
   }
 
   void write(const auto index, const pkmn_gen1_battle &b,
@@ -81,8 +67,8 @@ struct Frames : public Train::Battle::Target {
         pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
     auto &active_ = *reinterpret_cast<Actives *>(
         active.mutable_data() + index * (2 * 1 * active_in_dim));
-    auto &choice_ = *reinterpret_cast<ChoiceIndices *>(choice.mutable_data() +
-                                                       index * (2 * 1 * 9));
+    auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
+        choice_indices.mutable_data() + index * (2 * 1 * 9));
 
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
@@ -152,6 +138,21 @@ struct Frames : public Train::Battle::Target {
     Frames f(sz);
     f.uncompress_from_bytes(data);
     return f;
+  }
+
+  auto view(const auto index) {
+    // using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
+    // using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
+    // using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
+    // auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
+    //     hp.mutable_data() + index * (2 * 6 * 1));
+    // auto &pokemon_ = *reinterpret_cast<Bench *>(
+    //     pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
+    // auto &active_ = *reinterpret_cast<Actives *>(
+    //     active.mutable_data() + index * (2 * 1 * active_in_dim));
+    // auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
+    //     choice_indices.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
+    // return std::tie(hp_, pokemon_, active_, choice_);
   }
 };
 

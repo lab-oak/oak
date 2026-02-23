@@ -299,13 +299,14 @@ struct OutputBuffer {
 };
 
 OutputBuffer cpp_inference(std::string network_path,
-                           const BattleFrame &battle_frames) {
+                           const Train::Battle::Frames &battle_frames) {
   OutputBuffer buffer{battle_frames.size};
   NN::Battle::Network network;
   std::ifstream file{network_path, std::ios::binary};
   if (!file) {
     throw std::runtime_error{"Can't open network"};
   }
+  // network.fill_pokemon_cache() TODO
 
   auto value = buffer.value.mutable_data();
   auto p1_policy = buffer.p1_policy.mutable_data();
@@ -313,13 +314,11 @@ OutputBuffer cpp_inference(std::string network_path,
 
   auto battle_ptr = battle_frames.battle.data();
   auto durations_ptr = battle_frames.durations.data();
-  auto k = battle_frames.target.k.data();
-
-  auto p1_choices = battle_frames.p1_choices.data();
-  auto p2_choices = battle_frames.p2_choices.data();
+  auto k = battle_frames.k.data();
+  auto p1_choices = battle_frames.choices.data();
+  auto p2_choices = battle_frames.choices.data() + 9;
 
   for (auto i = 0; i < battle_frames.size; ++i) {
-
     const auto &battle =
         *reinterpret_cast<const pkmn_gen1_battle *>(battle_ptr);
     const auto &durations =
@@ -327,14 +326,16 @@ OutputBuffer cpp_inference(std::string network_path,
 
     *value = network.inference(battle, durations, k[0], k[1], p1_choices,
                                p2_choices, p1_policy, p2_policy);
-
-    battle_ptr += sizeof(pkmn_gen1_battle);
-    durations_ptr += sizeof(pkmn_gen1_chance_durations);
-    k += 2;
-
+    // out
     value += 1;
     p1_policy += 9;
     p2_policy += 9;
+    // in
+    battle_ptr += sizeof(pkmn_gen1_battle);
+    durations_ptr += sizeof(pkmn_gen1_chance_durations);
+    k += 2;
+    p1_choices += 9;
+    p2_choices += 9;
   }
 
   return buffer;
@@ -540,11 +541,12 @@ PYBIND11_MODULE(pyoak, m) {
     return v;
   });
 
-  py::class_<BattleFrame>(m, "BattleFrame")
+  py::class_<Train::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())
-      .def("uncompress_from_bytes", &BattleFrame::uncompress_from_bytes)
-      .def_static("from_bytes", &BattleFrame::from_bytes)
-      .def_readonly("size", &BattleFrame::size);
+      .def("uncompress_from_bytes",
+           &Train::Battle::Frames::uncompress_from_bytes)
+      .def_static("from_bytes", &Train::Battle::Frames::from_bytes)
+      .def_readonly("size", &Train::Battle::Frames::size);
 
   py::class_<Encode::Battle::Frames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
@@ -552,10 +554,6 @@ PYBIND11_MODULE(pyoak, m) {
       .def("uncompress_from_bytes",
            &Encode::Battle::Frames::uncompress_from_bytes)
       .def_readonly("size", &Encode::Battle::Frames::size)
-      .def_readonly("choice", &Encode::Battle::Frames::choice)
-      .def_readonly("pokemon", &Encode::Battle::Frames::pokemon)
-      .def_readonly("active", &Encode::Battle::Frames::active)
-      .def_readonly("hp", &Encode::Battle::Frames::hp)
       .def_readonly("k", &Encode::Battle::Frames::k)
       .def_readonly("iterations", &Encode::Battle::Frames::iterations)
       .def_readonly("empirical_policies",
@@ -563,7 +561,11 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("nash_policies", &Encode::Battle::Frames::nash_policies)
       .def_readonly("empirical_value", &Encode::Battle::Frames::empirical_value)
       .def_readonly("nash_value", &Encode::Battle::Frames::nash_value)
-      .def_readonly("score", &Encode::Battle::Frames::score);
+      .def_readonly("score", &Encode::Battle::Frames::score)
+      .def_readonly("pokemon", &Encode::Battle::Frames::pokemon)
+      .def_readonly("active", &Encode::Battle::Frames::active)
+      .def_readonly("hp", &Encode::Battle::Frames::hp)
+      .def_readonly("choice_indices", &Encode::Battle::Frames::choice_indices);
 
   py::class_<OutputBuffer>(m, "OutputBuffer")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
