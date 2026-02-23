@@ -59,19 +59,7 @@ struct EncodedFrames : public Py::Battle::Target {
     Py::Battle::Target::write(index, update);
     score.mutable_data()[index] = terminal;
 
-    // auto [hp_, pokemon_, active_, choice_] = view(index);
-    using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
-    using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
-    using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
-    auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
-        hp.mutable_data() + index * (2 * 6 * 1));
-    auto &pokemon_ = *reinterpret_cast<Bench *>(
-        pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
-    auto &active_ = *reinterpret_cast<Actives *>(
-        active.mutable_data() + index * (2 * 1 * active_in_dim));
-    auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
-        choice_indices.mutable_data() + index * (2 * 1 * 9));
-
+    auto [hp_, pokemon_, active_, choice_] = view(index);
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     const auto [p1_choices, p2_choices] = PKMN::choices(b, result);
@@ -143,18 +131,19 @@ struct EncodedFrames : public Py::Battle::Target {
   }
 
   auto view(const auto index) {
-    // using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
-    // using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
-    // using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
-    // auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
-    //     hp.mutable_data() + index * (2 * 6 * 1));
-    // auto &pokemon_ = *reinterpret_cast<Bench *>(
-    //     pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
-    // auto &active_ = *reinterpret_cast<Actives *>(
-    //     active.mutable_data() + index * (2 * 1 * active_in_dim));
-    // auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
-    //     choice_indices.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
-    // return std::tie(hp_, pokemon_, active_, choice_);
+    // TODO make sure GPT isnt lying about refs :o
+    using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
+    using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
+    using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
+    auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
+        hp.mutable_data() + index * (2 * 6 * 1));
+    auto &pokemon_ = *reinterpret_cast<Bench *>(
+        pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
+    auto &active_ = *reinterpret_cast<Actives *>(
+        active.mutable_data() + index * (2 * 1 * active_in_dim));
+    auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
+        choice_indices.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
+    return std::tie(hp_, pokemon_, active_, choice_);
   }
 };
 
