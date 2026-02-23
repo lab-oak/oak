@@ -188,7 +188,7 @@ def main():
 
     def loss(
         input: oak.torch.EncodedBattleFrames,
-        output: oak.torch.OutputBuffer,
+        output: oak.torch.Output,
         args,
         print_flag=False,
     ):
@@ -307,7 +307,7 @@ def main():
     encoded_frames = oak.EncodedBattleFrames(args.batch_size)
     encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames).to(device)
 
-    output_buffer = oak.OutputBuffer(
+    output_buffer = oak.Output(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
     )
 
@@ -347,7 +347,7 @@ def main():
             encoded_frames_torch.permute_pokemon()
             encoded_frames_torch.permute_sides()
 
-        output_buffer_torch = oak.torch.OutputBuffer(output_buffer).to(device)
+        output_buffer_torch = oak.torch.Output(output_buffer).to(device)
         network.inference(
             encoded_frames_torch, output_buffer_torch, not args.no_policy_loss
         )

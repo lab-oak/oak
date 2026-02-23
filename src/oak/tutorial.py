@@ -247,7 +247,7 @@ def test_consistency():
         encoded_frames.uncompress_from_bytes(buffer)
         # encoded_frames = oak.get_encoded_frames(buffer, n_frames)
         encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
-        output = oak.torch.OutputBuffers(encoded_frames.size)
+        output = oak.torch.Outputs(encoded_frames.size)
         network.inference(encoded_frames_torch, output)
         print(output.value)
         # policies = torch.cat([output.p1_policy.unsqueeze(1), output.p2_policy.unsqueeze(1)], dim=1)

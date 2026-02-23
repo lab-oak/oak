@@ -12,7 +12,6 @@
 #include <util/search.h>
 
 #include <atomic>
-#include <bit>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -37,11 +36,9 @@ dim_labels_to_vec(const std::array<std::array<char, M>, N> &data) {
   return result;
 }
 
-using Tensorizer = Encode::Build::Tensorizer<>;
-
 namespace py = pybind11;
 
-using Py::Battle::OutputBuffer;
+using Py::Battle::Output;
 
 py::list read_battle_data(const std::string &path,
                           size_t max_battles = 1'000'000) {
@@ -247,9 +244,9 @@ size_t sample(Py::Battle::EncodedFrames &encoded_frames,
   return errors.load() ? 0 : std::min(count.load(), encoded_frames.size);
 }
 
-OutputBuffer cpp_inference(std::string network_path,
+Output cpp_inference(std::string network_path,
                            const Py::Battle::Frames &battle_frames) {
-  OutputBuffer buffer{battle_frames.size};
+  Output buffer{battle_frames.size};
   NN::Battle::Network network;
   std::ifstream file{network_path, std::ios::binary};
   if (!file) {
@@ -289,8 +286,6 @@ OutputBuffer cpp_inference(std::string network_path,
 
   return buffer;
 }
-
-namespace py = pybind11;
 
 PYBIND11_MODULE(pyoak, m) {
   m.doc() = "Python bindings for oak";
@@ -463,6 +458,7 @@ PYBIND11_MODULE(pyoak, m) {
   // Build net hyperparams
   m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;
   m.attr("build_value_hidden_dim") = NN::Build::Default::value_hidden_dim;
+  using Tensorizer = Encode::Build::Tensorizer<>;
   m.attr("build_max_actions") = Tensorizer::max_actions;
   m.def("species_move_list", []() {
     std::vector<std::pair<int, int>> result;
@@ -518,20 +514,20 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("choice_indices",
                     &Py::Battle::EncodedFrames::choice_indices);
 
-  py::class_<OutputBuffer>(m, "OutputBuffer")
+  py::class_<Output>(m, "Output")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
            py::arg("pokemon_out_dim") = Encode::Battle::Pokemon::n_dim,
            py::arg("active_out_dim") = Encode::Battle::Active::n_dim)
-      .def_readonly("size", &OutputBuffer::size)
-      .def_readonly("pokemon_out_dim", &OutputBuffer::pokemon_out_dim)
-      .def_readonly("active_out_dim", &OutputBuffer::active_out_dim)
-      .def_readonly("pokemon", &OutputBuffer::pokemon)
-      .def_readonly("active", &OutputBuffer::active)
-      .def_readonly("sides", &OutputBuffer::sides)
-      .def_readonly("value", &OutputBuffer::value)
-      .def_readonly("policy_logit", &OutputBuffer::policy_logit)
-      .def_readonly("policy", &OutputBuffer::policy)
-      .def("clear", &OutputBuffer::clear);
+      .def_readonly("size", &Output::size)
+      .def_readonly("pokemon_out_dim", &Output::pokemon_out_dim)
+      .def_readonly("active_out_dim", &Output::active_out_dim)
+      .def_readonly("pokemon", &Output::pokemon)
+      .def_readonly("active", &Output::active)
+      .def_readonly("sides", &Output::sides)
+      .def_readonly("value", &Output::value)
+      .def_readonly("policy_logit", &Output::policy_logit)
+      .def_readonly("policy", &Output::policy)
+      .def("clear", &Output::clear);
 
   m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
         py::arg("battle_frames"));
