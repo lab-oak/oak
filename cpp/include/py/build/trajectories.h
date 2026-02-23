@@ -42,6 +42,9 @@ struct Trajectories {
     std::fill_n(value.mutable_data(), value.size(), float{});
     std::fill_n(score.mutable_data(), score.size(), float{});
   }
+
+  void write(const size_t index,
+             const Encode::Build::CompressedTrajectory<> &traj) {}
 };
 
 // // These two structs store what is *missing* so they can quickly write the
@@ -242,7 +245,6 @@ struct Trajectories {
 //     return;
 //   }
 // };
-
 
 } // namespace
 
