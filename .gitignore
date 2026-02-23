@@ -1,4 +1,4 @@
-build/
+/build/
 cpp/build/
 libpkmn-showdown.a
 pkmn-showdown.lib

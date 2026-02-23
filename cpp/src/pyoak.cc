@@ -1,13 +1,13 @@
 #include <encode/battle/battle.h>
 #include <encode/battle/policy.h>
-#include <encode/build/trajectory.h>
+#include <encode/build/compressed-trajectory.h>
 #include <nn/battle/network.h>
 #include <nn/default-hyperparameters.h>
 #include <py/battle/encoded-frames.h>
 #include <py/battle/frames.h>
 #include <py/battle/output.h>
+#include <py/build/trajectories.h>
 #include <train/battle/compressed-frame.h>
-#include <train/build/trajectory.h>
 #include <util/parse.h>
 #include <util/search.h>
 
@@ -244,8 +244,110 @@ size_t sample(Py::Battle::EncodedFrames &encoded_frames,
   return errors.load() ? 0 : std::min(count.load(), encoded_frames.size);
 }
 
+// extern "C" size_t
+// read_build_trajectories(size_t max_count, size_t threads, size_t n_paths,
+//                         const char *const *paths, int64_t *action,
+//                         int64_t *mask, float *policy, float *value,
+//                         float *score, int64_t *start, int64_t *end) {
+
+//   constexpr auto traj_size =
+//       Encode::Build::CompressedTrajectory<>::size_no_team;
+
+//   using In = Encode::Build::TrajectoryInput<>;
+//   In input{.action = action,
+//            .mask = mask,
+//            .policy = policy,
+//            .value = value,
+//            .score = score,
+//            .start = start,
+//            .end = end};
+
+//   const auto ptrs = std::bit_cast<std::array<void *, 7>>(input);
+//   if (std::any_of(ptrs.begin(), ptrs.end(), [](const auto x) { return !x; }))
+//   {
+//     std::cerr << "null pointer in input" << std::endl;
+//     return 0;
+//   }
+
+//   std::atomic<size_t> count{};
+//   std::atomic<size_t> errors{};
+
+//   const auto start_reading = [&]() {
+//     std::mt19937 mt{std::random_device{}()};
+//     std::uniform_int_distribution<size_t> file_dist{0, n_paths - 1};
+
+//     const auto report_error = [&](const auto &msg) -> void {
+//       std::cerr << msg << std::endl;
+//       errors.fetch_add(1);
+//       return;
+//     };
+
+//     try {
+//       while (true) {
+
+//         const auto path_index = file_dist(mt);
+//         std::ifstream file(paths[path_index], std::ios::binary);
+//         if (!file) {
+//           return report_error("Failed to open file " +
+//                               std::to_string(path_index));
+//         }
+//         file.seekg(0, std::ios::end);
+//         auto size = file.tellg();
+//         file.seekg(0);
+//         if ((size % traj_size) != 0) {
+//           return report_error("File " + std::to_string(path_index) + " size "
+//           +
+//                               std::to_string(size) + " is not a multiple of "
+//                               + std::to_string(traj_size));
+//         }
+
+//         const auto n_trajectories = size / traj_size;
+
+//         const auto trajectory_index =
+//             std::uniform_int_distribution<size_t>{0, n_trajectories - 1}(mt);
+//         file.seekg(trajectory_index * traj_size);
+
+//         Encode::Build::CompressedTrajectory<> traj;
+//         file.read(reinterpret_cast<char *>(&traj), traj_size);
+//         if (file.gcount() < traj_size) {
+//           return report_error("Bad trajectory read");
+//         }
+//         const auto format = static_cast<uint8_t>(traj.header.format);
+//         if (format != 0) {
+//           return report_error("Only NoTeam trajectories are supported");
+//         }
+
+//         const auto write_index = count.fetch_add(1);
+//         if (write_index >= max_count) {
+//           return;
+//         } else {
+//           input.index(write_index).write(traj);
+//         }
+//       }
+//     } catch (const std::exception &e) {
+//       return report_error(e.what());
+//     }
+//   };
+
+//   const auto start_ = std::chrono::high_resolution_clock::now();
+
+//   std::vector<std::thread> thread_pool{};
+//   for (auto i = 0; i < threads; ++i) {
+//     thread_pool.emplace_back(std::thread{start_reading});
+//   }
+//   for (auto i = 0; i < threads; ++i) {
+//     thread_pool[i].join();
+//   }
+
+//   const auto end_ = std::chrono::high_resolution_clock::now();
+//   const auto ms =
+//       std::chrono::duration_cast<std::chrono::milliseconds>(end_ - start_);
+//   // std::cout << ms.count() << std::endl;
+//   return errors.load() ? 0 : std::min(count.load(), max_count);
+// }
+
 Output cpp_inference(std::string network_path,
-                           const Py::Battle::Frames &battle_frames) {
+                     const Py::Battle::Frames &battle_frames) {
   Output buffer{battle_frames.size};
   NN::Battle::Network network;
   std::ifstream file{network_path, std::ios::binary};

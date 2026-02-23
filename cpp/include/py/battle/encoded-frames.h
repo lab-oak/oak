@@ -158,6 +158,6 @@ struct EncodedFrames : public Py::Battle::Target {
   }
 };
 
-}
+} // namespace
 
 } // namespace Py::Battle

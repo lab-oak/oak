@@ -64,6 +64,6 @@ struct Target {
   }
 };
 
-}
+} // namespace
 
 } // namespace Py::Battle

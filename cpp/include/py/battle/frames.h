@@ -62,6 +62,6 @@ struct Frames : public Target {
   }
 };
 
-}
+} // namespace
 
 } // namespace Py::Battle

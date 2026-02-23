@@ -1,6 +1,6 @@
 #pragma once
 
-#include <encode/build/trajectory.h>
+#include <encode/build/compressed-trajectory.h>
 #include <format/ou/data.h>
 #include <nn/default-hyperparameters.h>
 #include <nn/embedding-net.h>
