@@ -18,202 +18,136 @@ namespace py = pybind11;
 
 namespace Encode::Battle {
 
-struct Frames {
-  size_t size;
-  py::array_t<uint8_t> m;
-  py::array_t<uint8_t> n;
-  py::array_t<int64_t> p1_choice_indices;
-  py::array_t<int64_t> p2_choice_indices;
+struct Frames : public Train::Battle::Target {
   py::array_t<float> pokemon;
   py::array_t<float> active;
   py::array_t<float> hp;
-  py::array_t<uint32_t> iterations;
-  py::array_t<float> p1_empirical;
-  py::array_t<float> p1_nash;
-  py::array_t<float> p2_empirical;
-  py::array_t<float> p2_nash;
-  py::array_t<float> empirical_value;
-  py::array_t<float> nash_value;
-  py::array_t<float> score;
+  py::array_t<int64_t> choice;
 
   static constexpr size_t pokemon_in_dim = Encode::Battle::Pokemon::n_dim;
   static constexpr size_t active_in_dim = Encode::Battle::Active::n_dim;
+  using PokemonEncoding = std::array<float, pokemon_in_dim>;
+  using ActiveEncoding = std::array<float, active_in_dim>;
 
-  Frames(size_t sz) : size(sz) {
+  Frames(size_t sz) : Train::Battle::Target{sz} {
     auto make_shape = [sz](std::vector<size_t> dims) {
-      dims[0] = static_cast<size_t>(sz); // overwrite first dim with batch size
+      dims[0] = static_cast<size_t>(sz);
       return dims;
     };
-    m = py::array_t<uint8_t>(make_shape({0, 1}));
-    n = py::array_t<uint8_t>(make_shape({0, 1}));
-    p1_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
-    p2_choice_indices = py::array_t<int64_t>(make_shape({0, 9}));
-    pokemon = py::array_t<float>(make_shape({0, 2, 5, pokemon_in_dim}));
+    pokemon = py::array_t<float>(std::vector<size_t>{0, 2, 5, pokemon_in_dim});
     active = py::array_t<float>(make_shape({0, 2, 1, active_in_dim}));
     hp = py::array_t<float>(make_shape({0, 2, 6, 1}));
-    iterations = py::array_t<uint32_t>(make_shape({0, 1}));
-    p1_empirical = py::array_t<float>(make_shape({0, 9}));
-    p1_nash = py::array_t<float>(make_shape({0, 9}));
-    p2_empirical = py::array_t<float>(make_shape({0, 9}));
-    p2_nash = py::array_t<float>(make_shape({0, 9}));
-    empirical_value = py::array_t<float>(make_shape({0, 1}));
-    nash_value = py::array_t<float>(make_shape({0, 1}));
-    score = py::array_t<float>(make_shape({0, 1}));
+    choice = py::array_t<int64_t>(make_shape({0, 2, 9}));
   }
 
   void clear() {
-    std::fill_n(m.mutable_data(), m.size(), uint8_t(0));
-    std::fill_n(n.mutable_data(), n.size(), uint8_t(0));
-    std::fill_n(p1_choice_indices.mutable_data(), p1_choice_indices.size(),
-                int64_t(0));
-    std::fill_n(p2_choice_indices.mutable_data(), p2_choice_indices.size(),
-                int64_t(0));
+    Train::Battle::Target::clear();
+    std::fill_n(choice.mutable_data(), choice.size(), int64_t(0));
     std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
     std::fill_n(active.mutable_data(), active.size(), 0.0f);
     std::fill_n(hp.mutable_data(), hp.size(), 0.0f);
-    std::fill_n(iterations.mutable_data(), iterations.size(), uint32_t(0));
-    std::fill_n(p1_empirical.mutable_data(), p1_empirical.size(), 0.0f);
-    std::fill_n(p1_nash.mutable_data(), p1_nash.size(), 0.0f);
-    std::fill_n(p2_empirical.mutable_data(), p2_empirical.size(), 0.0f);
-    std::fill_n(p2_nash.mutable_data(), p2_nash.size(), 0.0f);
-    std::fill_n(empirical_value.mutable_data(), empirical_value.size(), 0.0f);
-    std::fill_n(nash_value.mutable_data(), nash_value.size(), 0.0f);
-    std::fill_n(score.mutable_data(), score.size(), 0.0f);
+  }
+
+  auto view(const auto index) {
+    // using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
+    // using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
+    // using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
+    // auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
+    //     hp.mutable_data() + index * (2 * 6 * 1));
+    // auto &pokemon_ = *reinterpret_cast<Bench *>(
+    //     pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
+    // auto &active_ = *reinterpret_cast<Actives *>(
+    //     active.mutable_data() + index * (2 * 1 * active_in_dim));
+    // auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
+    //     choice.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
+    // return std::tie(hp_, pokemon_, active_, choice_);
   }
 
   void write(const auto index, const pkmn_gen1_battle &b,
              const pkmn_gen1_chance_durations &d, pkmn_result result,
-             const Train::Battle::CompressedFrames::Update &update) {
+             const Train::Battle::CompressedFrames::Update &update,
+             float terminal) {
 
-    // const auto &battle = PKMN::view(b);
-    // const auto &durations = PKMN::view(d);
-    // for (auto s = 0; s < 2; ++s) {
-    //   const auto &side = battle.sides[s];
-    //   const auto &duration = durations.get(s);
-    //   const auto &stored = side.stored();
+    Train::Battle::Target::write(index, update);
+    score.mutable_data()[index] = terminal;
 
-    //   if (stored.hp == 0) {
-    //     hp[s][0] = 0;
-    //     std::fill(active[s][0].begin(), active[s][0].end(), 0);
-    //   } else {
-    //     hp[s][0] = (float)stored.hp / stored.stats.hp;
-    //     Encode::Battle::Active::write(stored, side.active, duration,
-    //                                   active[s][0].data());
-    //   }
+    // auto [hp_, pokemon_, active_, choice_] = view(index);
+    using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
+    using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
+    using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
+    auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
+        hp.mutable_data() + index * (2 * 6 * 1));
+    auto &pokemon_ = *reinterpret_cast<Bench *>(
+        pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
+    auto &active_ = *reinterpret_cast<Actives *>(
+        active.mutable_data() + index * (2 * 1 * active_in_dim));
+    auto &choice_ = *reinterpret_cast<ChoiceIndices *>(choice.mutable_data() +
+                                                       index * (2 * 1 * 9));
 
-    //   for (auto slot = 2; slot <= 6; ++slot) {
-    //     const auto id = side.order[slot - 1];
-    //     if (id == 0) {
-    //       hp[s][slot - 1] = 0;
-    //       std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot - 2].end(),
-    //                 0);
-    //     } else {
-    //       const auto &poke = side.pokemon[id - 1];
-    //       if (poke.hp == 0) {
-    //         hp[s][slot - 1] = 0;
-    //         std::fill(pokemon[s][slot - 2].begin(), pokemon[s][slot -
-    //         2].end(),
-    //                   0);
-    //       } else {
-    //         const auto sleep = duration.sleep(slot - 1);
-    //         hp[s][slot - 1] = (float)poke.hp / poke.stats.hp;
-    //         Encode::Battle::Pokemon::write(poke, sleep,
-    //                                        pokemon[s][slot - 2].data());
-    //       }
-    //     }
-    //   }
-    // }
+    const auto &battle = PKMN::view(b);
+    const auto &durations = PKMN::view(d);
+    const auto [p1_choices, p2_choices] = PKMN::choices(b, result);
 
-    // m = frame.m;
-    // n = frame.n;
-    // for (auto i = 0; i < frame.m; ++i) {
-    //   p1_choice_indices[i] = Encode::Battle::Policy::get_index(
-    //       battle.sides[0], frame.p1_choices[i]);
-    // }
-    // for (auto i = 0; i < frame.n; ++i) {
-    //   p2_choice_indices[i] = Encode::Battle::Policy::get_index(
-    //       battle.sides[1], frame.p2_choices[i]);
-    // }
+    for (auto s = 0; s < 2; ++s) {
+      const auto &side = battle.sides[s];
+      const auto &duration = durations.get(s);
+      const auto &stored = side.stored();
 
-    // *(m.mutable_data() + index) = update.m;
-    // *(n.mutable_data() + index) = update.n;
-    // constexpr auto pokemon_size = 2 * 5 * Pokemon::n_dim;
-    // constexpr auto active_size = 2 * 1 * Active::n_dim;
-    // std::memcpy(pokemon.mutable_data() + index * pokemon_size,
-    //             reinterpret_cast<const float *>(&frame.pokemon),
-    //             sizeof(float) * pokemon_size);
-    // std::memcpy(active, reinterpret_cast<const float *>(&frame.active),
-    //             sizeof(float) * 2 * 1 * Active::n_dim);
-    // std::memcpy(hp, reinterpret_cast<const float *>(&frame.hp),
-    //             sizeof(float) * 12);
-    // hp += 12;
+      if (stored.hp == 0) {
+        hp_[s][0] = {};
+        active_[s][0] = {};
+      } else {
+        hp_[s][0] = (float)stored.hp / stored.stats.hp;
+        Encode::Battle::Active::write(stored, side.active, duration,
+                                      active_[s][0].data());
+      }
 
-    // *iterations++ = target.iterations;
-    // std::fill_n(p1_empirical, 9, 0.f);
-    // std::fill_n(p1_nash, 9, 0.f);
-    // // we use 'one after last' index to encode invalid index.
-    // // this way we can just cat a -neg inf onto the logits for softmax
-    // std::fill_n(p1_choice_indices, 9, Encode::Battle::Policy::n_dim);
-    // std::fill_n(p2_empirical, 9, 0.f);
-    // std::fill_n(p2_nash, 9, 0.f);
-    // std::fill_n(p2_choice_indices, 9, Encode::Battle::Policy::n_dim);
+      for (auto slot = 2; slot <= 6; ++slot) {
+        const auto id = side.order[slot - 1];
+        if (id == 0) {
+          hp_[s][slot - 1] = {};
+          pokemon_[s][slot - 2] = {};
+        } else {
+          const auto &poke = side.pokemon[id - 1];
+          if (poke.hp == 0) {
+            hp_[s][slot - 1] = {};
+            pokemon_[s][slot - 2] = {};
+          } else {
+            const auto sleep = duration.sleep(slot - 1);
+            hp_[s][slot - 1] = (float)poke.hp / poke.stats.hp;
+            Encode::Battle::Pokemon::write(poke, sleep,
+                                           pokemon_[s][slot - 2].data());
+          }
+        }
+      }
 
-    // for (int i = 0; i < frame.m; ++i) {
-    //   p1_empirical[i] = target.p1_empirical[i];
-    //   p1_nash[i] = target.p1_nash[i];
-    //   p1_choice_indices[i] = frame.p1_choice_indices[i];
-    // }
-    // for (int i = 0; i < frame.n; ++i) {
-    //   p2_empirical[i] = target.p2_empirical[i];
-    //   p2_nash[i] = target.p2_nash[i];
-    //   p2_choice_indices[i] = frame.p2_choice_indices[i];
-    // }
-
-    // p1_empirical += 9;
-    // p1_nash += 9;
-    // p1_choice_indices += 9;
-
-    // p2_empirical += 9;
-    // p2_nash += 9;
-    // p2_choice_indices += 9;
-
-    // *empirical_value++ = target.empirical_value;
-    // *nash_value++ = target.nash_value;
-    // *score++ = target.score;
+      std::fill_n(choice_[s].data(), 9, Encode::Battle::Policy::n_dim);
+      auto j = s ? update.n : update.m;
+      auto &choices = s ? p2_choices : p1_choices;
+      for (auto i = 0; i < j; ++i) {
+        choice_[s][i] =
+            Encode::Battle::Policy::get_index(battle.sides[s], choices[i]);
+      }
+    }
   }
 
   void uncompress_from_bytes(const py::bytes &data) {
-    // std::string_view sv(data);
-    // const char *raw_data = sv.data();
-
-    // Train::Battle::CompressedFrames compressed_frames{};
-    // compressed_frames.read(raw_data);
-
-    // Encode::Battle::FrameInput input{
-    //     .m = m.mutable_data(),
-    //     .n = n.mutable_data(),
-    //     .p1_choice_indices = p1_choice_indices.mutable_data(),
-    //     .p2_choice_indices = p2_choice_indices.mutable_data(),
-    //     .pokemon = pokemon.mutable_data(),
-    //     .active = active.mutable_data(),
-    //     .hp = hp.mutable_data(),
-    //     .iterations = iterations.mutable_data(),
-    //     .p1_empirical = p1_empirical.mutable_data(),
-    //     .p1_nash = p1_nash.mutable_data(),
-    //     .p2_empirical = p2_empirical.mutable_data(),
-    //     .p2_nash = p2_nash.mutable_data(),
-    //     .empirical_value = empirical_value.mutable_data(),
-    //     .nash_value = nash_value.mutable_data(),
-    //     .score = score.mutable_data()};
-
-    // const auto frames_vec = uncompress(compressed_frames);
-    // for (const auto &frame : frames_vec) {
-    //   Encode::Battle::Frame encoded{frame};
-    //   input.write(encoded, frame.target);
-    // }
+    std::string_view sv(data);
+    const char *raw_data = sv.data();
+    Train::Battle::CompressedFrames compressed_frames{};
+    compressed_frames.read(raw_data);
+    auto battle = compressed_frames.battle;
+    auto options = PKMN::options();
+    auto result = PKMN::result();
+    const auto score = PKMN::score(compressed_frames.result);
+    for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
+      const auto &update = compressed_frames.updates[i];
+      write(i, battle, PKMN::durations(options), result, update, score);
+      result = PKMN::update(battle, update.c1, update.c2, options);
+    }
+    assert(result == compressed_frames.result);
   }
 
-  // optional static factory
   static Frames from_bytes(const py::bytes &data, size_t sz) {
     Frames f(sz);
     f.uncompress_from_bytes(data);
@@ -221,4 +155,4 @@ struct Frames {
   }
 };
 
-}
+} // namespace Encode::Battle

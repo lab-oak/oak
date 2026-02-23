@@ -163,6 +163,27 @@ struct CompressedFramesImpl {
       assert(index + n * sizeof(policy_type) == n_bytes());
       return true;
     }
+
+    void write_to_tensor(uint8_t *k, Iter *iter, float *empirical_policies,
+                         float *nash_policies, float *ev, float *nv) const {
+      k[0] = m;
+      k[1] = n;
+      iter[0] = iterations;
+      std::fill_n(empirical_policies, 18, 0);
+      std::fill_n(nash_policies, 18, 0);
+      for (auto i = 0; i < m; ++i) {
+        empirical_policies[0 + i] =
+            uncompress_probs<policy_type, float>(p1_empirical[i]);
+        nash_policies[0 + i] = uncompress_probs<policy_type, float>(p1_nash[i]);
+      }
+      for (auto i = 0; i < n; ++i) {
+        empirical_policies[9 + i] =
+            uncompress_probs<policy_type, float>(p2_empirical[i]);
+        nash_policies[9 + i] = uncompress_probs<policy_type, float>(p2_nash[i]);
+      }
+      ev[0] = uncompress_probs<value_type, float>(empirical_value);
+      nv[0] = uncompress_probs<value_type, float>(nash_value);
+    }
   };
 
   pkmn_gen1_battle battle;

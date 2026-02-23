@@ -109,8 +109,9 @@ struct SampleIndexer {
   }
 };
 
-size_t sample(Encode::Battle::Frames &encoded_frames, const SampleIndexer &indexer,
-              size_t threads, size_t max_battle_length, size_t min_iterations) {
+size_t sample(Encode::Battle::Frames &encoded_frames,
+              const SampleIndexer &indexer, size_t threads,
+              size_t max_battle_length, size_t min_iterations) {
 
   // flatten indexer data into C++ arrays
   std::vector<const char *> paths;
@@ -142,7 +143,7 @@ size_t sample(Encode::Battle::Frames &encoded_frames, const SampleIndexer &index
     std::uniform_int_distribution<size_t> battle_dist(0, total_battles - 1);
     std::vector<char> buffer{};
 
-    auto report_error = [&](const std::string &msg) {
+    auto report_error = [&errors](const std::string &msg) {
       std::cerr << msg << std::endl;
       errors.fetch_add(1);
     };
@@ -202,8 +203,9 @@ size_t sample(Encode::Battle::Frames &encoded_frames, const SampleIndexer &index
 
         std::vector<size_t> valid;
         for (size_t i = 0; i < compressed.updates.size(); ++i) {
-          if (compressed.updates[i].iterations >= min_iterations)
+          if (compressed.updates[i].iterations >= min_iterations) {
             valid.push_back(i);
+          }
         }
         if (valid.empty()) {
           continue;
@@ -225,7 +227,8 @@ size_t sample(Encode::Battle::Frames &encoded_frames, const SampleIndexer &index
           return;
         }
         encoded_frames.write(write_index, battle, PKMN::durations(options),
-                             result, compressed.updates[selected]);
+                             result, compressed.updates[selected],
+                             PKMN::score(compressed.result));
       }
     } catch (const std::exception &e) {
       report_error(e.what());
@@ -310,8 +313,7 @@ OutputBuffer cpp_inference(std::string network_path,
 
   auto battle_ptr = battle_frames.battle.data();
   auto durations_ptr = battle_frames.durations.data();
-  auto m = battle_frames.m.data();
-  auto n = battle_frames.n.data();
+  auto k = battle_frames.target.k.data();
 
   auto p1_choices = battle_frames.p1_choices.data();
   auto p2_choices = battle_frames.p2_choices.data();
@@ -323,13 +325,12 @@ OutputBuffer cpp_inference(std::string network_path,
     const auto &durations =
         *reinterpret_cast<const pkmn_gen1_chance_durations *>(durations_ptr);
 
-    *value = network.inference(battle, durations, *m, *n, p1_choices,
+    *value = network.inference(battle, durations, k[0], k[1], p1_choices,
                                p2_choices, p1_policy, p2_policy);
 
     battle_ptr += sizeof(pkmn_gen1_battle);
     durations_ptr += sizeof(pkmn_gen1_chance_durations);
-    m += 1;
-    n += 1;
+    k += 2;
 
     value += 1;
     p1_policy += 9;
@@ -548,20 +549,18 @@ PYBIND11_MODULE(pyoak, m) {
   py::class_<Encode::Battle::Frames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
       .def("clear", &Encode::Battle::Frames::clear)
-      .def("uncompress_from_bytes", &Encode::Battle::Frames::uncompress_from_bytes)
+      .def("uncompress_from_bytes",
+           &Encode::Battle::Frames::uncompress_from_bytes)
       .def_readonly("size", &Encode::Battle::Frames::size)
-      .def_readonly("m", &Encode::Battle::Frames::m)
-      .def_readonly("n", &Encode::Battle::Frames::n)
-      .def_readonly("p1_choice_indices", &Encode::Battle::Frames::p1_choice_indices)
-      .def_readonly("p2_choice_indices", &Encode::Battle::Frames::p2_choice_indices)
+      .def_readonly("choice", &Encode::Battle::Frames::choice)
       .def_readonly("pokemon", &Encode::Battle::Frames::pokemon)
       .def_readonly("active", &Encode::Battle::Frames::active)
       .def_readonly("hp", &Encode::Battle::Frames::hp)
+      .def_readonly("k", &Encode::Battle::Frames::k)
       .def_readonly("iterations", &Encode::Battle::Frames::iterations)
-      .def_readonly("p1_empirical", &Encode::Battle::Frames::p1_empirical)
-      .def_readonly("p1_nash", &Encode::Battle::Frames::p1_nash)
-      .def_readonly("p2_empirical", &Encode::Battle::Frames::p2_empirical)
-      .def_readonly("p2_nash", &Encode::Battle::Frames::p2_nash)
+      .def_readonly("empirical_policies",
+                    &Encode::Battle::Frames::empirical_policies)
+      .def_readonly("nash_policies", &Encode::Battle::Frames::nash_policies)
       .def_readonly("empirical_value", &Encode::Battle::Frames::empirical_value)
       .def_readonly("nash_value", &Encode::Battle::Frames::nash_value)
       .def_readonly("score", &Encode::Battle::Frames::score);
