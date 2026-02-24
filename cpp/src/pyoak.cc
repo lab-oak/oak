@@ -336,7 +336,10 @@ Output cpp_inference(std::string network_path,
   if (!file) {
     throw std::runtime_error{"Can't open network"};
   }
-  // network.fill_pokemon_cache() TODO
+
+  const auto &initial_battle =
+      *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
+  network.fill_pokemon_caches(initial_battle);
 
   auto value = buffer.value.mutable_data();
   auto p1_policy = buffer.policy.mutable_data();
@@ -597,7 +600,7 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("choice_indices",
                     &Py::Battle::EncodedFrames::choice_indices);
 
-  py::class_<Output>(m, "Output")
+  py::class_<Output>(m, "OutputBuffer")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
            py::arg("pokemon_out_dim") = Encode::Battle::Pokemon::n_dim,
            py::arg("active_out_dim") = Encode::Battle::Active::n_dim)
@@ -612,14 +615,17 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("policy", &Output::policy)
       .def("clear", &Output::clear);
 
-  m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
-        py::arg("battle_frames"));
-
   py::class_<SampleIndexer>(m, "SampleIndexer")
       .def(py::init<>())
       .def("get", &SampleIndexer::get)
       .def("prune", &SampleIndexer::prune)
       .def("size", &SampleIndexer::size);
+
+  py::class_<Py::Build::Trajectories>(m, "BuildTrajectories")
+      .def(py::init<size_t>());
+
+  m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
+        py::arg("battle_frames"));
 
   m.def("read_battle_data", &read_battle_data, py::arg("path"),
         py::arg("max_battles") = 1'000'000);

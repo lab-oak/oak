@@ -16,20 +16,16 @@ import torch
 class EncodedBattleFrames:
     def __init__(self, frames: oak.EncodedBattleFrames):
         self.size = frames.size
-        self.m = torch.from_numpy(frames.m)
-        self.n = torch.from_numpy(frames.n)
-        self.p1_choice_indices = torch.from_numpy(frames.p1_choice_indices)
-        self.p2_choice_indices = torch.from_numpy(frames.p2_choice_indices)
-        self.pokemon = torch.from_numpy(frames.pokemon)
-        self.active = torch.from_numpy(frames.active)
-        self.hp = torch.from_numpy(frames.hp)
-        self.p1_empirical = torch.from_numpy(frames.p1_empirical)
-        self.p1_nash = torch.from_numpy(frames.p1_nash)
-        self.p2_empirical = torch.from_numpy(frames.p2_empirical)
-        self.p2_nash = torch.from_numpy(frames.p2_nash)
+        self.k = torch.from_numpy(frames.k)
+        self.empirical_policies = torch.from_numpy(frames.empirical_policies)
+        self.nash_policies = torch.from_numpy(frames.nash_policies)
         self.empirical_value = torch.from_numpy(frames.empirical_value)
         self.nash_value = torch.from_numpy(frames.nash_value)
         self.score = torch.from_numpy(frames.score)
+        self.hp = torch.from_numpy(frames.hp)
+        self.pokemon = torch.from_numpy(frames.pokemon)
+        self.active = torch.from_numpy(frames.active)
+        self.choice_indices = torch.from_numpy(frames.choice_indices)
 
     def permute_pokemon(self):
         perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
@@ -38,40 +34,28 @@ class EncodedBattleFrames:
 
     def permute_sides(self, prob=0.5):
         mask = torch.rand(self.size) < prob
-
-        self.pokemon[mask] = self.pokemon[mask].flip(dims=[1])
-        self.active[mask] = self.active[mask].flip(dims=[1])
-        self.hp[mask] = self.hp[mask].flip(dims=[1])
-
+        self.k[mask] = self.k[mask].flip(dims=[1])
+        self.empirical_policies[mask] = self.empirical_policies[mask].flip(dims=[1])
+        self.nash_policies[mask] = self.nash_policies[mask].flip(dims=[1])
         self.empirical_value[mask] = 1 - self.empirical_value[mask]
         self.nash_value[mask] = 1 - self.nash_value[mask]
         self.score[mask] = 1 - self.score[mask]
-
-        def swap(mask, x, y):
-            temp = x[mask].clone().detach()
-            x[mask] = y[mask]
-            y[mask] = temp
-
-        swap(mask, self.m, self.n)
-        swap(mask, self.p1_choice_indices, self.p2_choice_indices)
-        swap(mask, self.p1_empirical, self.p2_empirical)
-        swap(mask, self.p1_nash, self.p2_nash)
+        self.pokemon[mask] = self.pokemon[mask].flip(dims=[1])
+        self.active[mask] = self.active[mask].flip(dims=[1])
+        self.hp[mask] = self.hp[mask].flip(dims=[1])
+        self.choice_indices[mask] = self.choice_indices[mask].flip(dims=[1])
 
     def to(self, device):
-        self.m = self.m.to(device)
-        self.n = self.n.to(device)
-        self.p1_choice_indices = self.p1_choice_indices.to(device)
-        self.p2_choice_indices = self.p2_choice_indices.to(device)
-        self.pokemon = self.pokemon.to(device)
-        self.active = self.active.to(device)
-        self.hp = self.hp.to(device)
-        self.p1_empirical = self.p1_empirical.to(device)
-        self.p1_nash = self.p1_nash.to(device)
-        self.p2_empirical = self.p2_empirical.to(device)
-        self.p2_nash = self.p2_nash.to(device)
+        self.k = self.k.to(device)
+        self.empirical_policies = self.empirical_policies.to(device)
+        self.nash_policies = self.nash_policies.to(device)
         self.empirical_value = self.empirical_value.to(device)
         self.nash_value = self.nash_value.to(device)
         self.score = self.score.to(device)
+        self.pokemon = self.pokemon.to(device)
+        self.active = self.active.to(device)
+        self.hp = self.hp.to(device)
+        self.choice_indices = self.choice_indices.to(device)
         return self
 
 
@@ -84,30 +68,30 @@ def combine_hash(h1: int, h2: int) -> int:
     return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) & 0xFFFFFFFFFFFFFFFF
 
 
-# class BuildTrajectories:
-#     def __init__(self, traj: oak.BuildTrajectories, n=None, device="cpu"):
-#         if n is None:
-#             n = 31
-#         self.size = traj.size
-#         self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
-#         self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
-#         self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
-#         self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
-#         self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
-#         self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
-#         self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
+class BuildTrajectories:
+    def __init__(self, traj: oak.BuildTrajectories, n=None, device="cpu"):
+        if n is None:
+            n = 31
+        self.size = traj.size
+        self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
+        self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
+        self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
+        self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
+        self.score = torch.from_numpy(traj.score[:, :n]).float().to(device)
+        self.start = torch.from_numpy(traj.start[:, :n]).long().to(device)
+        self.end = torch.from_numpy(traj.end[:, :n]).long().to(device)
 
-#     def sample(self, p=1):
-#         r = torch.rand((self.size,)) < p
-#         with torch.no_grad():
-#             self.actions = self.actions[r].clone()
-#             self.mask = self.mask[r].clone()
-#             self.policy = self.policy[r].clone()
-#             self.value = self.value[r].clone()
-#             self.score = self.score[r].clone()
-#             self.start = self.start[r].clone()
-#             self.end = self.end[r].clone()
-#         self.size = sum(r).item()
+    def sample(self, p=1):
+        r = torch.rand((self.size,)) < p
+        with torch.no_grad():
+            self.actions = self.actions[r].clone()
+            self.mask = self.mask[r].clone()
+            self.policy = self.policy[r].clone()
+            self.value = self.value[r].clone()
+            self.score = self.score[r].clone()
+            self.start = self.start[r].clone()
+            self.end = self.end[r].clone()
+        self.size = sum(r).item()
 
 
 # Networks
@@ -276,7 +260,7 @@ class MainNet(nn.Module):
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
 class Output:
-    def __init__(self, buffers: oak.Output):
+    def __init__(self, buffers: oak.OutputBuffer):
         self.size = buffers.size
         self.pokemon_out_dim = buffers.pokemon_out_dim
         self.active_out_dim = buffers.active_out_dim

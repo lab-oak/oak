@@ -32,14 +32,11 @@ struct EncodedFrames : public Py::Battle::Target {
   using ActiveEncoding = std::array<float, active_in_dim>;
 
   EncodedFrames(size_t sz) : Py::Battle::Target{sz} {
-    auto make_shape = [sz](std::vector<size_t> dims) {
-      dims[0] = static_cast<size_t>(sz);
-      return dims;
-    };
-    pokemon = py::array_t<float>(std::vector<size_t>{0, 2, 5, pokemon_in_dim});
-    active = py::array_t<float>(make_shape({0, 2, 1, active_in_dim}));
-    hp = py::array_t<float>(make_shape({0, 2, 6, 1}));
-    choice_indices = py::array_t<int64_t>(make_shape({0, 2, 9}));
+    pokemon =
+        py::array_t<float>(std::vector<size_t>{size, 2, 5, pokemon_in_dim});
+    active = py::array_t<float>(std::vector<size_t>{size, 2, 1, active_in_dim});
+    hp = py::array_t<float>(std::vector<size_t>{size, 2, 6, 1});
+    choice_indices = py::array_t<int64_t>(std::vector<size_t>{size, 2, 9});
   }
 
   void clear() {

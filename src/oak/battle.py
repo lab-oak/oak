@@ -307,7 +307,7 @@ def main():
     encoded_frames = oak.EncodedBattleFrames(args.batch_size)
     encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames).to(device)
 
-    output_buffer = oak.Output(
+    output_buffer = oak.OutputBuffer(
         args.batch_size, args.pokemon_out_dim, args.active_out_dim
     )
 
@@ -334,8 +334,12 @@ def main():
 
         encoded_frames.clear()
         output_buffer.clear()
-        samples_read = encoded_frames.sample(
-            sample_indexer, args.threads, args.max_battle_length, args.min_iterations
+        samples_read = oak.sample(
+            encoded_frames,
+            sample_indexer,
+            args.threads,
+            args.max_battle_length,
+            args.min_iterations,
         )
 
         if samples_read < args.batch_size:

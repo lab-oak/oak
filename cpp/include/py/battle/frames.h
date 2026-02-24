@@ -34,7 +34,9 @@ struct Frames : public Target {
     score.mutable_data()[index] = terminal;
     std::memcpy(battle.mutable_data() + (index * 384), b.bytes, 384);
     std::memcpy(durations.mutable_data() + (index * 8), d.bytes, 8);
-    // TODO get choices and write
+    const auto [p1_choices, p2_choices] = PKMN::choices(b, r);
+    std::fill_n(choices.mutable_data() + (index * 18), 0, 18);
+    // std::copy()
     result.mutable_data()[index] = r;
   }
 
