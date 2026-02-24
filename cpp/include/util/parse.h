@@ -95,8 +95,8 @@ auto parse_set(const auto &words) {
   return set;
 }
 
-// TODO moves
-// struct alignas(1) ActivePokemon {
+// TODO moves (presumably no way to parse active moves when they diverge from
+// stored moves) struct alignas(1) ActivePokemon {
 //   Stats stats;
 //   PKMN::Data::Species species;
 //   uint8_t types;

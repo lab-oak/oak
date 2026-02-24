@@ -480,8 +480,7 @@ constexpr void write(const PKMN::Pokemon &pokemon,
   t = MoveSlots::write(active.moves, t);
   // disable
   if (const auto slot = active.volatiles.disable_move()) {
-    assert(slot != 0);
-    t[static_cast<uint8_t>(active.moves[slot].id)] = 0; // TODO
+    t[static_cast<uint8_t>(active.moves[slot].id)] = 0; // TODO check with pre
   }
   t = Duration::write(duration, t);
   Pokemon::write(pokemon, duration.sleep(0), t);

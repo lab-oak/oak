@@ -621,9 +621,6 @@ template <typename Options = SearchOptions<>> struct Search {
     // output.empirical_value = output.total_value / output.iterations;
     double total_value = 0;
 
-    // emprically shown to be reliable for 9x9 matrices, 128 bit lrslib
-    // TODO maybe use gmp since this is not the hot part of the code
-
     output.p1_empirical = {};
     output.p2_empirical = {};
 

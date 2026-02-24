@@ -131,9 +131,6 @@ void set(pkmn_gen1_battle_options &options,
     }
   };
   auto &battle = *std::bit_cast<pkmn_gen1_battle *>(&b);
-  if constexpr (Options::log) {
-    // TODO libpkmn does not support checking that the buffer is not null
-  }
   pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
   return pkmn_gen1_battle_update(
       &battle, get_choice(c1, battle.bytes),
