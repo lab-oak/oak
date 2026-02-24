@@ -51,7 +51,7 @@ struct Target {
 
   void write(const auto index,
              const Train::Battle::CompressedFrames::Update &update) {
-    auto k_ = k.mutable_data() + index * (2 * 9);
+    auto k_ = k.mutable_data() + index * (2 * 1);
     auto iterations_ = iterations.mutable_data() + index * (1);
     auto empirical_policies_ =
         empirical_policies.mutable_data() + index * (2 * 9);

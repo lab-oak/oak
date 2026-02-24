@@ -575,15 +575,13 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<Py::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())
-      .def("uncompress_from_bytes", &Py::Battle::Frames::uncompress_from_bytes)
       .def_static("from_bytes", &Py::Battle::Frames::from_bytes)
       .def_readonly("size", &Py::Battle::Frames::size);
 
   py::class_<Py::Battle::EncodedFrames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
       .def("clear", &Py::Battle::EncodedFrames::clear)
-      .def("uncompress_from_bytes",
-           &Py::Battle::EncodedFrames::uncompress_from_bytes)
+      .def_static("from_bytes", &Py::Battle::EncodedFrames::from_bytes)
       .def_readonly("size", &Py::Battle::EncodedFrames::size)
       .def_readonly("k", &Py::Battle::EncodedFrames::k)
       .def_readonly("iterations", &Py::Battle::EncodedFrames::iterations)

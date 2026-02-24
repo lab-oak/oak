@@ -139,7 +139,7 @@ struct EncodedFrames : public Py::Battle::Target {
     auto &active_ = *reinterpret_cast<Actives *>(
         active.mutable_data() + index * (2 * 1 * active_in_dim));
     auto &choice_ = *reinterpret_cast<ChoiceIndices *>(
-        choice_indices.mutable_data() + index * (2 * 9 * sizeof(int64_t)));
+        choice_indices.mutable_data() + index * (2 * 9 * 1));
     return std::tie(hp_, pokemon_, active_, choice_);
   }
 };
