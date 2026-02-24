@@ -268,20 +268,16 @@ class Output:
         self.active = torch.from_numpy(buffers.active)
         self.sides = torch.from_numpy(buffers.sides)
         self.value = torch.from_numpy(buffers.value)
-        self.p1_policy_logit = torch.from_numpy(buffers.p1_policy_logit)
-        self.p2_policy_logit = torch.from_numpy(buffers.p2_policy_logit)
-        self.p1_policy = torch.from_numpy(buffers.p1_policy)
-        self.p2_policy = torch.from_numpy(buffers.p2_policy)
+        self.policy_logit = torch.from_numpy(buffers.policy_logit)
+        self.policy = torch.from_numpy(buffers.policy)
 
     def to(self, device):
         self.pokemon = self.pokemon.to(device)
         self.active = self.active.to(device)
         self.sides = self.sides.to(device)
         self.value = self.value.to(device)
-        self.p1_policy_logit = self.p1_policy_logit.to(device)
-        self.p2_policy_logit = self.p2_policy_logit.to(device)
-        self.p1_policy = self.p1_policy.to(device)
-        self.p2_policy = self.p2_policy.to(device)
+        self.policy_logit = self.policy_logit.to(device)
+        self.policy = self.policy.to(device)
         return self
 
 
@@ -363,17 +359,17 @@ class BattleNetwork(torch.nn.Module):
         if use_policy:
             (
                 output.value[:size],
-                output.p1_policy_logit[:size, :-1],
-                output.p2_policy_logit[:size, :-1],
+                output.policy_logit[:size, 0, :-1],
+                output.policy_logit[:size, 1, :-1],
             ) = self.main_net.forward(battle)
         else:
             output.value = self.main_net.forward_value_only(battle)
 
-        output.p1_policy[:size] = torch.gather(
-            output.p1_policy_logit, 1, input.p1_choice_indices[:size]
+        output.policy[:size, 0] = torch.gather(
+            output.policy_logit[:size, 0], 1, input.choice_indices[:size, 0]
         )
-        output.p2_policy[:size] = torch.gather(
-            output.p2_policy_logit, 1, input.p2_choice_indices[:size]
+        output.policy[:size, 1] = torch.gather(
+            output.policy_logit[:size, 1], 1, input.choice_indices[:size, 1]
         )
 
     def hash(self) -> int:
@@ -383,31 +379,31 @@ class BattleNetwork(torch.nn.Module):
         return h & 0xFFFFFFFFFFFFFFFF
 
 
-# class BuildNetwork(nn.Module):
-#     def __init__(
-#         self,
-#         policy_hidden_dim=oak.build_policy_hidden_dim,
-#         value_hidden_dim=oak.build_value_hidden_dim,
-#     ):
-#         super().__init__()
-#         self.policy_net = EmbeddingNet(
-#             oak.species_move_list_size,
-#             policy_hidden_dim,
-#             oak.species_move_list_size,
-#             True,
-#             False,
-#         )
-#         self.value_net = EmbeddingNet(
-#             oak.species_move_list_size, value_hidden_dim, 1, True, False
-#         )
+class BuildNetwork(nn.Module):
+    def __init__(
+        self,
+        policy_hidden_dim=oak.build_policy_hidden_dim,
+        value_hidden_dim=oak.build_value_hidden_dim,
+    ):
+        super().__init__()
+        self.policy_net = EmbeddingNet(
+            oak.species_move_list_size,
+            policy_hidden_dim,
+            oak.species_move_list_size,
+            True,
+            False,
+        )
+        self.value_net = EmbeddingNet(
+            oak.species_move_list_size, value_hidden_dim, 1, True, False
+        )
 
-#     def read_parameters(self, f):
-#         self.policy_net.read_parameters(f)
-#         self.value_net.read_parameters(f)
+    def read_parameters(self, f):
+        self.policy_net.read_parameters(f)
+        self.value_net.read_parameters(f)
 
-#     def write_parameters(self, f):
-#         self.policy_net.write_parameters(f)
-#         self.value_net.write_parameters(f)
+    def write_parameters(self, f):
+        self.policy_net.write_parameters(f)
+        self.value_net.write_parameters(f)
 
-#     def forward(self, x):
-#         return self.policy_net.forward(x), self.value_net.forward(x)
+    def forward(self, x):
+        return self.policy_net.forward(x), self.value_net.forward(x)

@@ -214,12 +214,12 @@ def main():
         assert (p_nash_weight + value_empirical_weight_p) == 1
 
         p1_policy_target = (
-            value_empirical_weight_p * input.p1_empirical[:size]
-            + p_nash_weight * input.p1_nash[:size]
+            value_empirical_weight_p * input.empirical_policies[:size, 0]
+            + p_nash_weight * input.nash_policies[:size, 0]
         )
         p2_policy_target = (
-            value_empirical_weight_p * input.p2_empirical[:size]
-            + p_nash_weight * input.p2_nash[:size]
+            value_empirical_weight_p * input.empirical_policies[:size, 1]
+            + p_nash_weight * input.nash_policies[:size, 1]
         )
 
         loss = 0.0
@@ -232,10 +232,10 @@ def main():
 
         if not args.no_policy_loss:
             p1_policy_loss = masked_cross_entropy(
-                output.p1_policy[:size], p1_policy_target
+                output.policy[:size, 0], p1_policy_target
             )
             p2_policy_loss = masked_cross_entropy(
-                output.p2_policy[:size], p2_policy_target
+                output.policy[:size, 1], p2_policy_target
             )
             loss = loss + args.policy_loss_weight * (p1_policy_loss + p2_policy_loss)
 
@@ -255,12 +255,13 @@ def main():
             )
             if not args.no_policy_loss:
                 print("P1 policy inference/target")
-                x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
-                    window, 1, 9
-                )
-                y = p1_policy_target[:window].view(window, 1, 9)
-                print(torch.cat([x, y], dim=1))
-                print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
+                # TODO
+                # x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
+                #     window, 1, 9
+                # )
+                # y = p1_policy_target[:window].view(window, 1, 9)
+                # print(torch.cat([x, y], dim=1))
+                # print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
             if not args.no_value_loss:
                 print(f"loss: v:{value_loss.mean()}")
 
