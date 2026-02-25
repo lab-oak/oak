@@ -556,20 +556,17 @@ PYBIND11_MODULE(pyoak, m) {
   m.attr("species_move_list") = species_move_list;
 
   // Strings
-  m.def("move_names",
-        []() { return dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY); });
-  m.def("species_names",
-        []() { return dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY); });
-  m.def("pokemon_dim_labels", []() {
-    return dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
-  });
-  m.def("active_dim_labels",
-        []() { return dim_labels_to_vec(Encode::Battle::Active::dim_labels); });
-  m.def("policy_dim_labels", []() {
+  m.attr("move_names") = dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY);
+  m.attr("species_names") = dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY);
+  m.attr("pokemon_dim_labels") =
+      dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
+  m.attr("active_dim_labels") =
+      dim_labels_to_vec(Encode::Battle::Active::dim_labels);
+  {
     auto v = dim_labels_to_vec(Encode::Battle::Policy::dim_labels);
-    v.push_back(""); // preserve your extra empty string
-    return v;
-  });
+    v.push_back(""); // preserve extra empty string
+    m.attr("policy_dim_labels") = v;
+  }
 
   py::class_<Py::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())

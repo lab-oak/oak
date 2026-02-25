@@ -125,11 +125,11 @@ def read_build_trajectories():
 
 
 def show_species_probs():
-    import oak.src.oak.torch as torch
+    import oak.torch
     import torch
     import math
 
-    network = torch.BuildNetwork()
+    network = oak.torch.BuildNetwork()
 
     path = sys.argv[2]
     with open(path, "rb") as file:
@@ -138,7 +138,7 @@ def show_species_probs():
     weights = dict()
     logits_d = dict()
 
-    logits, _ = network.forward(torch.zeros((1, oak.species_move_list_size)))
+    logits, _ = network.forward(torch.zeros((1, len(oak.species_move_list))))
 
     for index, pair in enumerate(oak.species_move_list):
         s, m = pair
@@ -160,7 +160,7 @@ def show_species_probs():
 
 def create_set():
 
-    from oak.src.oak.torch import BuildNetwork
+    from oak.torch import BuildNetwork
 
     network = BuildNetwork()
 
@@ -177,10 +177,10 @@ def create_set():
     import torch
 
     for _ in range(n):
-        team = torch.zeros([oak.species_move_list_size])
+        team = torch.zeros([len(oak.species_move_list)])
 
         # create mask for choosing the first species
-        mask = torch.zeros([oak.species_move_list_size])
+        mask = torch.zeros([len(oak.species_move_list)])
         for index, pair in enumerate(oak.species_move_list):
             s, m = pair
             if m == 0:
