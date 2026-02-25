@@ -4,7 +4,7 @@
 
 #include <istream>
 
-std::tuple<uint16_t, uint16_t, uint16_t> VERSION = {1, 1, 0};
+// std::tuple<uint16_t, uint16_t, uint16_t> VERSION = {1, 1, 0};
 
 namespace Train::Battle {
 
