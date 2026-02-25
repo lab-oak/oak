@@ -546,16 +546,14 @@ PYBIND11_MODULE(pyoak, m) {
   m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;
   m.attr("build_value_hidden_dim") = NN::Build::Default::value_hidden_dim;
   m.attr("build_max_actions") = Py::Build::Tensorizer<>::max_actions;
-  m.def("species_move_list", []() {
-    std::vector<std::pair<int, int>> result;
-    result.reserve(Py::Build::Tensorizer<>::species_move_list_size);
-    for (int i = 0; i < Py::Build::Tensorizer<>::species_move_list_size; ++i) {
-      auto p = Py::Build::Tensorizer<>::species_move_list(i);
-      result.emplace_back(static_cast<int>(p.first),
-                          static_cast<int>(p.second));
-    }
-    return result;
-  });
+  std::vector<std::pair<int, int>> species_move_list;
+  species_move_list.reserve(Py::Build::Tensorizer<>::species_move_list_size);
+  for (int i = 0; i < Py::Build::Tensorizer<>::species_move_list_size; ++i) {
+    auto p = Py::Build::Tensorizer<>::species_move_list(i);
+    species_move_list.emplace_back(static_cast<int>(p.first),
+                                   static_cast<int>(p.second));
+  }
+  m.attr("species_move_list") = species_move_list;
 
   // Strings
   m.def("move_names",
@@ -620,13 +618,23 @@ PYBIND11_MODULE(pyoak, m) {
       .def("size", &SampleIndexer::size);
 
   py::class_<Py::Build::Trajectories>(m, "BuildTrajectories")
-      .def(py::init<size_t>());
+      .def(py::init<size_t>())
+      .def_readonly("size", &Py::Build::Trajectories::size)
+      .def_readonly("action", &Py::Build::Trajectories::action)
+      .def_readonly("mask", &Py::Build::Trajectories::mask)
+      .def_readonly("policy", &Py::Build::Trajectories::policy)
+      .def_readonly("value", &Py::Build::Trajectories::value)
+      .def_readonly("score", &Py::Build::Trajectories::score)
+      .def_readonly("start", &Py::Build::Trajectories::start)
+      .def_readonly("end", &Py::Build::Trajectories::end)
+      .def("clear", &Py::Build::Trajectories::clear);
 
   m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
         py::arg("battle_frames"));
 
   m.def("read_battle_data", &read_battle_data, py::arg("path"),
         py::arg("max_battles") = 1'000'000);
+  m.def("read_build_trajectories", &read_build_trajectories);
 }
 
 } // namespace

@@ -73,7 +73,7 @@ class BuildTrajectories:
         if n is None:
             n = 31
         self.size = traj.size
-        self.actions = torch.from_numpy(traj.actions[:, :n]).long().to(device)
+        self.action = torch.from_numpy(traj.action[:, :n]).long().to(device)
         self.mask = torch.from_numpy(traj.mask[:, :n]).long().to(device)
         self.policy = torch.from_numpy(traj.policy[:, :n]).float().to(device)
         self.value = torch.from_numpy(traj.value[:, :n]).float().to(device)
@@ -84,7 +84,7 @@ class BuildTrajectories:
     def sample(self, p=1):
         r = torch.rand((self.size,)) < p
         with torch.no_grad():
-            self.actions = self.actions[r].clone()
+            self.action = self.action[r].clone()
             self.mask = self.mask[r].clone()
             self.policy = self.policy[r].clone()
             self.value = self.value[r].clone()
@@ -387,14 +387,14 @@ class BuildNetwork(nn.Module):
     ):
         super().__init__()
         self.policy_net = EmbeddingNet(
-            oak.species_move_list_size,
+            len(oak.species_move_list),
             policy_hidden_dim,
-            oak.species_move_list_size,
+            len(oak.species_move_list),
             True,
             False,
         )
         self.value_net = EmbeddingNet(
-            oak.species_move_list_size, value_hidden_dim, 1, True, False
+            len(oak.species_move_list), value_hidden_dim, 1, True, False
         )
 
     def read_parameters(self, f):

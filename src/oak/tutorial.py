@@ -88,7 +88,7 @@ def read_build_trajectories():
         print(f"Sample {index}:")
         species_move = [
             oak.species_move_list[_]
-            for _ in build_trajectories.actions[index].reshape(-1)
+            for _ in build_trajectories.action[index].reshape(-1)
         ]
         names = []
         for sm in species_move:
@@ -98,7 +98,7 @@ def read_build_trajectories():
             int(1000 * float(_)) / 10
             for _ in build_trajectories.policy[index].reshape(-1)
         ]
-        actions = build_trajectories.actions[index].reshape(-1)
+        actions = build_trajectories.action[index].reshape(-1)
 
         data = [
             f"{n}:{p}" for n, p, a in zip(names, selection_probs, actions) if a >= 0
@@ -109,7 +109,7 @@ def read_build_trajectories():
         print("value", build_trajectories.value[index].item())
         print("score", build_trajectories.score[index].item())
         # continue
-        print("actions", build_trajectories.actions[index, :l])
+        print("actions", build_trajectories.action[index, :l])
         print("legal actions mask", build_trajectories.mask[index, :l, :20])
         print("log probs", np.log(build_trajectories.policy[index, :l]))
         print(

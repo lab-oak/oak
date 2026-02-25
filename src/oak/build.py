@@ -120,7 +120,7 @@ def main():
     def get_state(actions):
         b, T, _ = actions.shape
         state = torch.zeros(
-            (b, T, oak.species_move_list_size + 1), dtype=torch.float32
+            (b, T, len(oak.species_move_list) + 1), dtype=torch.float32
         )  # [b, T, N+1]
         state = state.scatter(2, actions + 1, 1.0)
         state = torch.cumsum(state, dim=1).clamp_max(1.0)
@@ -158,11 +158,11 @@ def main():
         # only do up to max traj length
         T = torch.max(traj.end).item()
 
-        valid_actions = traj.actions != -1  # [b, T, 1]
+        valid_actions = traj.action != -1  # [b, T, 1]
         valid_choices = traj.policy > 0  # [b, T, 1]
         valid = torch.logical_and(valid_actions, valid_choices).squeeze(-1)
 
-        state = get_state(traj.actions)
+        state = get_state(traj.action)
         valid_state = state[valid]
         logits, v = network.forward(valid_state)
         value = torch.sigmoid(v)
@@ -293,9 +293,10 @@ def main():
         b = 0
         # break batches up by file to limit memory use
         while b < args.batch_size:
-            trajectories, n_read = oak.read_build_trajectories(
-                data_files, args.trajectories_per_step, args.threads
-            )
+
+            trajectories = oak.BuildTrajectories(args.trajectories_per_step)
+
+            n_read = oak.read_build_trajectories(trajectories, data_files, args.threads)
 
             if n_read < trajectories.size:
                 print(f"Error reading files, continuing")
