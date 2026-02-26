@@ -69,7 +69,7 @@ struct Bandit {
   }
 
   void update(const auto &outcome) noexcept {
-    if ((gains[outcome.index] += (outcome.value - 0.5) / outcome.prob) >= 0) {
+    if ((gains[outcome.index] += (outcome.value - 0.5) / outcome.prob) > 0) {
       const auto max = gains[outcome.index];
       for (auto &v : gains) {
         v -= max;

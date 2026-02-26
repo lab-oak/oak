@@ -171,7 +171,8 @@ struct ActivePokemon {
   };
 
   struct Duration {
-    static constexpr int max_duration = 6;
+    static constexpr int max_duration =
+        9; // TODO Claude found OOB. Make bounds tight?
     std::array<uint64_t, max_duration> confusion;
     std::array<uint64_t, max_duration> disable;
     std::array<uint64_t, max_duration> attacking;

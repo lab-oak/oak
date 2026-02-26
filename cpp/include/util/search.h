@@ -306,7 +306,7 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       return search_1(number);
     } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
       return search_1(std::chrono::milliseconds{number});
-    } else if (unit == "s" || unit == "sec" || "seconds") {
+    } else if (unit == "s" || unit == "sec" || unit == "seconds") {
       return search_1(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
