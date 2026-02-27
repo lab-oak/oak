@@ -27,12 +27,11 @@ function(create_library target mode dir)
   )
 
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/engine/zig-out/include)
-  target_compile_options(${target} INTERFACE -mavx2)
   
 endfunction()
 
 create_library(libpkmn_client_release ReleaseFast client)
-create_library(libpkmn_client_debug ReleaseFast client)
+create_library(libpkmn_client_debug Debug client)
 create_library(libpkmn_chance_release ReleaseFast chance)
 create_library(libpkmn_chance_debug Debug chance)
 
@@ -92,10 +91,10 @@ add_executable(log src/log.cc)
 target_include_directories(log PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(log PRIVATE libpkmn_client)
 
+add_executable(dur src/dur.cc)
+target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(dur PRIVATE libpkmn_client lrslibgmp)
+
 # add_executable(randbat src/randbat.cc)
 # target_include_directories(randbat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # target_link_libraries(randbat PRIVATE libpkmn_chance)
-
-# add_executable(dur src/dur.cc)
-# target_include_directories(dur PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-# target_link_libraries(dur PRIVATE libpkmn_client lrslibgmp)

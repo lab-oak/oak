@@ -304,14 +304,6 @@ void generate(const ProgramArgs *args_ptr) {
             agent.uses_network() && (agent.search_budget == "1");
 
         if (policy_rollout_only) {
-
-          if (args.keep_node) {
-            throw std::runtime_error{
-                "--keep-node not allowed when using policy rollouts: there's a "
-                "bug I don't understand just yet."};
-            return;
-          }
-
           std::array<float, 9> p1_logits{};
           std::array<float, 9> p2_logits{};
           output.m = pkmn_gen1_battle_choices(

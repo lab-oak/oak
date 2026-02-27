@@ -80,25 +80,26 @@ struct Nodes {
   }
 
   bool update(auto i1, auto i2, const auto &obs) {
-    reset();
-    return false;
-    // auto update_node = [&](auto &node) -> bool {
-    // if (!node || !node->stats.is_init()) {
-    //   return false;
-    // }
-    // auto child = node->children.find({i1, i2, obs});
-    // if (child == node->children.end()) {
-    //   node = std::make_unique<std::decay_t<decltype(*node)>>();
-    //   return false;
-    // } else {
-    //   auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
-    //       std::move((*child).second));
-    //   node.swap(unique_child);
-    //   return true;
-    // }
-    // };
-    // return update_node(exp3) || update_node(pexp3) || update_node(ucb) ||
-    //        update_node(ucb1) || update_node(pucb);
+    // reset();
+    // return false;
+    auto update_node = [&](auto &node) -> bool {
+      if (!node || !node->stats.is_init()) {
+        return false;
+      }
+      auto child = node->children.find({i1, i2, obs});
+      if (child == node->children.end()) {
+        node = std::make_unique<std::decay_t<decltype(*node)>>();
+        return false;
+      } else {
+        auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
+            std::move((*child).second));
+        node.swap(unique_child);
+        return true;
+      }
+    };
+    return update_node(exp3.node) || update_node(pexp3.node) ||
+           update_node(ucb.node) || update_node(ucb1.node) ||
+           update_node(pucb.node);
   }
 };
 
