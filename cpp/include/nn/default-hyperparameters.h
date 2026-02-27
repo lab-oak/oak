@@ -16,9 +16,6 @@ static constexpr int side_out_dim =
 static constexpr int hidden_dim = 64;
 static constexpr int value_hidden_dim = 32;
 static constexpr int policy_hidden_dim = 64;
-static constexpr int policy_out_dim =
-    static_cast<int>(PKMN::Data::Species::Mew) +
-    (static_cast<int>(PKMN::Data::Move::Struggle) - 1); // no Struggle, None
 } // namespace Battle::Default
 
 namespace Build::Default {

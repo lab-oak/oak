@@ -12,6 +12,94 @@ using PKMN::Data::Species;
 // using Tensorizer = Encode::Build::Tensorizer<>;
 using Encode::Build::Tensorizer;
 
+// These two structs store what is *missing* so they can quickly write the
+// actions masks
+template <typename F = Format::OU> struct SetHelper {
+  Species species;
+  std::array<Move, F::max_move_pool_size> move_pool;
+  uint32_t n_moves;
+  uint32_t move_pool_size;
+
+  SetHelper() = default;
+  SetHelper(const auto species)
+      : species{static_cast<Species>(species)}, n_moves{},
+        move_pool_size{F::move_pool_size(species)},
+        move_pool{F::move_pool(species)} {}
+
+  auto begin() { return move_pool.begin(); }
+  const auto begin() const { return move_pool.begin(); }
+  auto end() { return move_pool.begin() + move_pool_size; }
+  const auto end() const { return move_pool.begin() + move_pool_size; }
+
+  void add_move(const auto m) {
+    const auto move_pool_end =
+        std::remove(begin(), end(), static_cast<Move>(m));
+    if (move_pool_end != end()) {
+      --move_pool_size;
+      ++n_moves;
+    }
+  }
+
+  bool complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
+};
+
+template <typename F = Format::OU> struct TeamHelper {
+  TeamHelper() : sets{}, size{} {
+    available_species = {F::legal_species.begin(), F::legal_species.end()};
+  }
+
+  std::array<SetHelper<F>, 6> sets;
+  int size;
+  std::vector<Species> available_species;
+
+  auto begin() { return sets.begin(); }
+  const auto begin() const { return sets.begin(); }
+  auto end() { return sets.begin() + size; }
+  const auto end() const { return sets.begin() + size; }
+
+  void apply_action(const auto action) {
+    const auto [s, m] = Tensorizer<F>::species_move_list(action);
+    const auto species = static_cast<Species>(s);
+    const auto move = static_cast<Move>(m);
+    if (move == Move::None) {
+      sets[size++] = SetHelper{species};
+      std::erase(available_species, species);
+    } else {
+      auto it = std::find_if(begin(), end(), [species](const auto &set) {
+        return set.species == species;
+      });
+      assert(it != end());
+      auto &set = *it;
+      set.add_move(move);
+    }
+  }
+
+  auto write_moves(auto *mask) const {
+    for (const auto &set : (*this)) {
+      if (!set.complete()) {
+        for (const auto move : set) {
+          *mask++ = Tensorizer<F>::species_move_table(set.species, move);
+        }
+      }
+    }
+    return mask;
+  }
+
+  auto write_species(auto *mask) {
+    for (const auto species : available_species) {
+      *mask++ = Tensorizer<F>::species_move_table(species, Move::None);
+    }
+    return mask;
+  }
+
+  auto write_swaps(auto *mask) const {
+    for (const auto &set : (*this)) {
+      *mask++ = Tensorizer<F>::species_move_table(set.species, Move::None);
+    }
+    return mask;
+  }
+};
+
 namespace {
 
 struct Trajectories {
@@ -56,95 +144,6 @@ struct Trajectories {
 
   void write(const size_t index,
              const Encode::Build::CompressedTrajectory<> &traj) {
-
-    // These two structs store what is *missing* so they can quickly write the
-    // actions masks
-    template <typename F = Format::OU> struct SetHelper {
-      Species species;
-      std::array<Move, F::max_move_pool_size> move_pool;
-      uint32_t n_moves;
-      uint32_t move_pool_size;
-
-      SetHelper() = default;
-      SetHelper(const auto species)
-          : species{static_cast<Species>(species)}, n_moves{},
-            move_pool_size{F::move_pool_size(species)},
-            move_pool{F::move_pool(species)} {}
-
-      auto begin() { return move_pool.begin(); }
-      const auto begin() const { return move_pool.begin(); }
-      auto end() { return move_pool.begin() + move_pool_size; }
-      const auto end() const { return move_pool.begin() + move_pool_size; }
-
-      void add_move(const auto m) {
-        const auto move_pool_end =
-            std::remove(begin(), end(), static_cast<Move>(m));
-        if (move_pool_end != end()) {
-          --move_pool_size;
-          ++n_moves;
-        }
-      }
-
-      bool complete() const { return (n_moves >= 4) || (move_pool_size == 0); }
-    };
-
-    template <typename F = Format::OU> struct TeamHelper {
-      TeamHelper() : sets{}, size{} {
-        available_species = {F::legal_species.begin(), F::legal_species.end()};
-      }
-
-      std::array<SetHelper<F>, 6> sets;
-      int size;
-      std::vector<Species> available_species;
-
-      auto begin() { return sets.begin(); }
-      const auto begin() const { return sets.begin(); }
-      auto end() { return sets.begin() + size; }
-      const auto end() const { return sets.begin() + size; }
-
-      void apply_action(const auto action) {
-        const auto [s, m] = Tensorizer<F>::species_move_list(action);
-        const auto species = static_cast<Species>(s);
-        const auto move = static_cast<Move>(m);
-        if (move == Move::None) {
-          sets[size++] = SetHelper{species};
-          std::erase(available_species, species);
-        } else {
-          auto it = std::find_if(begin(), end(), [species](const auto &set) {
-            return set.species == species;
-          });
-          assert(it != end());
-          auto &set = *it;
-          set.add_move(move);
-        }
-      }
-
-      auto write_moves(auto *mask) const {
-        for (const auto &set : (*this)) {
-          if (!set.complete()) {
-            for (const auto move : set) {
-              *mask++ = Tensorizer<F>::species_move_table(set.species, move);
-            }
-          }
-        }
-        return mask;
-      }
-
-      auto write_species(auto *mask) {
-        for (const auto species : available_species) {
-          *mask++ = Tensorizer<F>::species_move_table(species, Move::None);
-        }
-        return mask;
-      }
-
-      auto write_swaps(auto *mask) const {
-        for (const auto &set : (*this)) {
-          *mask++ = Tensorizer<F>::species_move_table(set.species, Move::None);
-        }
-        return mask;
-      }
-    };
-
     constexpr float den = std::numeric_limits<uint16_t>::max();
 
     auto [action_, mask_, policy_, value_, score_, start_, end_] = view(index);

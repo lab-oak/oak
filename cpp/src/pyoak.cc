@@ -540,7 +540,7 @@ PYBIND11_MODULE(pyoak, m) {
   m.attr("hidden_dim") = NN::Battle::Default::hidden_dim;
   m.attr("value_hidden_dim") = NN::Battle::Default::value_hidden_dim;
   m.attr("policy_hidden_dim") = NN::Battle::Default::policy_hidden_dim;
-  m.attr("policy_out_dim") = NN::Battle::Default::policy_out_dim;
+  m.attr("policy_out_dim") = Encode::Battle::Policy::n_dim;
 
   // Build net hyperparams
   m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <libpkmn/data/moves.h>
+#include <libpkmn/data/species.h>
 #include <libpkmn/data/strings.h>
 
 #include <cassert>
@@ -21,8 +22,9 @@ are legal, so we don't have to compute the entire logit layer.
 
 namespace Encode::Battle::Policy {
 
-// all moves besides struggle, all pokemon. No None.
-constexpr auto n_dim = 164 + 151;
+static constexpr int n_dim =
+    static_cast<int>(PKMN::Data::Species::Mew) +
+    (static_cast<int>(PKMN::Data::Move::Struggle) - 1); // no Struggle, None
 
 uint16_t get_index(const PKMN::Side &side, auto choice) {
   const auto choice_type = choice & 3;
