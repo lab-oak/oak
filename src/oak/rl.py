@@ -87,12 +87,6 @@ generate_parser.add_argument(
     help="P-norm exponent applied just before clipping and sampling",
 )
 generate_parser.add_argument(
-    "--policy-nash-weight",
-    type=float,
-    default=1.0,
-    help="Weight of nash policy when using mixed policy mode (m)",
-)
-generate_parser.add_argument(
     "--policy-min",
     type=float,
     default=0,
@@ -127,15 +121,15 @@ generate_parser.add_argument(
 )
 
 # get args from battle.py/build.py
-import common_args
-import battle
-import build
+import oak.common_args
+import oak.battle
+import oak.build
 
 oak.common_args.add_common_args(battle_parser, "", True)
-battle.add_local_args(battle_parser, "", True)
+oak.battle.add_local_args(battle_parser, "", True)
 
 oak.common_args.add_common_args(build_parser, "build", True)
-build.add_local_args(build_parser, "build", True)
+oak.build.add_local_args(build_parser, "build", True)
 
 parser.add_argument(
     "--generate-path",
@@ -169,11 +163,6 @@ def main():
     )
     if not use_build:
         print("Skipping build.py")
-
-    # arg check
-    assert (
-        args.policy_mode != "m" or args.policy_nash_weight
-    ), "Missing --policy-nash-weight while using (m)ixed -policy_mode"
 
     import oak
     import torch
@@ -226,7 +215,7 @@ def main():
             build_network.write_parameters(f)
 
     generate_cmd = [
-        f"./{args.generate_path}",
+        "generate",
         f"--search-budget={args.search_budget}",
         f"--fast-search-budget={args.fast_search_budget}",
         f"--t1-search-budget={args.t1_search_budget}",
@@ -235,7 +224,6 @@ def main():
         f"--policy-mode={args.policy_mode}",
         f"--fast-policy-mode={args.fast_policy_mode}",
         f"--policy-temp={args.policy_temp}",
-        f"--policy-nash-weight={args.policy_nash_weight}",
         f"--policy-min={args.policy_min}",
         f"--dir={data_dir}",
         f"--threads={args.generate_threads}",
@@ -259,7 +247,7 @@ def main():
     def get_common_cmd(args, prefix):
         p = prefix or ""
         return [
-            f"--network_path={network_path if prefix == "" else build_network_path}",
+            f"--network-path={network_path if prefix == "" else build_network_path}",
             f"--data-dir={data_dir}",
             "--in-place",
             f"--device={getattr(args, f'{p}device')}",
@@ -278,9 +266,7 @@ def main():
 
     battle_cmd = (
         [
-            f"{sys.executable}",
-            "-u",
-            f"{args.battle_path}",
+            "battle",
             f"--dir={nets_dir}",
         ]
         + get_common_cmd(args, "")
@@ -298,9 +284,7 @@ def main():
 
     build_cmd = (
         [
-            f"{sys.executable}",
-            "-u",
-            f"{args.build_path}",
+            "build",
             f"--dir={build_nets_dir}",
         ]
         + get_common_cmd(args, "build_")
