@@ -449,7 +449,6 @@ void handle_suspend(int signal) {
 void handle_terminate(int signal) {
   RuntimeData::terminated = true;
   RuntimeData::suspended = false;
-  std::cout << "Terminated." << std::endl;
 }
 
 void setup(auto &args) {
@@ -459,7 +458,8 @@ void setup(auto &args) {
   const auto check_args = [](auto x, auto y, auto z, const auto &name) {
     if (!x.has_value()) {
       if (!y.has_value() || !z.has_value()) {
-        throw std::runtime_error{name};
+        throw std::runtime_error{std::string{"--"} + name +
+                                 " kwarg is required."};
       }
     }
   };
@@ -511,6 +511,15 @@ void setup(auto &args) {
   RuntimeData::battle_outputs.resize(args.threads);
 }
 
+void thread_fn_wrapper(ProgramArgs *args) {
+  try {
+    thread_fn(args);
+  } catch (const std::exception &e) {
+    std::cerr << e.what() << std::endl;
+    std::exit(1);
+  }
+}
+
 int main(int argc, char **argv) {
 
   std::signal(SIGINT, handle_terminate);
@@ -522,7 +531,7 @@ int main(int argc, char **argv) {
 
   std::vector<std::thread> thread_pool{};
   for (auto t = 0; t < args.threads; ++t) {
-    thread_pool.emplace_back(std::thread{&thread_fn, &args});
+    thread_pool.emplace_back(std::thread{&thread_fn_wrapper, &args});
   }
   auto progress_thread = std::thread(&progress_thread_fn, &args);
   for (auto &thread : thread_pool) {

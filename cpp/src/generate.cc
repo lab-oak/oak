@@ -586,7 +586,6 @@ void handle_suspend(int signal) {
 void handle_terminate(int signal) {
   RuntimeData::terminated = true;
   RuntimeData::suspended = false;
-  std::cout << "Terminated." << std::endl;
 }
 
 int main(int argc, char **argv) {

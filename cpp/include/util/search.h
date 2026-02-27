@@ -34,7 +34,7 @@ template <typename T> struct UniqueStats {
       node->stats = {};
     }
     if (table) {
-      table->entries[table->root_key] = {};
+      // table->entries[table->root_key] = {}; TODO
     }
   }
 };
@@ -72,11 +72,11 @@ struct Nodes {
   // the empirical policies may have 0.0 at some actions.
   // This is a clumsy fix though. TODO
   void reset_stats() {
-    // exp3.reset_stats();
-    // pexp3.reset_stats();
-    // ucb.reset_stats();
-    // ucb1.reset_stats();
-    // pucb.reset_stats();
+    exp3.reset_stats();
+    pexp3.reset_stats();
+    ucb.reset_stats();
+    ucb1.reset_stats();
+    pucb.reset_stats();
   }
 
   bool update(auto i1, auto i2, const auto &obs) {
