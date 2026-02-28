@@ -17,7 +17,7 @@ usage: battle [-h] [--network-path NETWORK_PATH] [--dir DIR] [--data-dir DATA_DI
               [--lr-decay-interval LR_DECAY_INTERVAL] [--data-window DATA_WINDOW] [--min-files MIN_FILES]
               [--sleep SLEEP] [--checkpoint CHECKPOINT] [--delete-window DELETE_WINDOW] [--seed SEED]
               [--max-battle-length MAX_BATTLE_LENGTH] [--min-iterations MIN_ITERATIONS]
-              [--no-clamp-parameters] [--value-nash-weight VALUE_NASH_WEIGHT]
+              [--clamp-parameters] [--value-nash-weight VALUE_NASH_WEIGHT]
               [--value-empirical-weight VALUE_EMPIRICAL_WEIGHT] [--value-score-weight VALUE_SCORE_WEIGHT]
               [--p-nash-weight P_NASH_WEIGHT] [--no-value-loss] [--no-policy-loss]
               [--policy-loss-weight POLICY_LOSS_WEIGHT] [--no-apply-symmetries]

@@ -213,15 +213,14 @@ class MainNet(nn.Module):
         self.policy2_fc2.write_parameters(f)
 
     def clamp_parameters(self):
-        pass
-        # self.fc0.clamp_parameters()
-        # self.fc1.clamp_parameters()
-        # self.value_fc1.clamp_parameters()
-        # self.value_fc2.clamp_parameters()
-        # self.policy1_fc1.clamp_parameters()
-        # self.policy1_fc2.clamp_parameters()
-        # self.policy2_fc1.clamp_parameters()
-        # self.policy2_fc2.clamp_parameters()
+        self.fc0.clamp_parameters()
+        self.fc1.clamp_parameters()
+        self.value_fc1.clamp_parameters()
+        self.value_fc2.clamp_parameters()
+        self.policy1_fc1.clamp_parameters()
+        self.policy1_fc2.clamp_parameters()
+        self.policy2_fc1.clamp_parameters()
+        self.policy2_fc2.clamp_parameters()
 
     def forward(self, x):
         b0 = self.fc0(x)

@@ -39,9 +39,9 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
             help="Ignore samples with fewer than these iterations.",
         )
     parser.add_argument(
-        prefix + "no-clamp-parameters",
+        prefix + "clamp-parameters",
         action="store_true",
-        help="Clamp parameters [-2, 2] to support Stockfish style quantization",
+        help="Clamp parameters [-2, 2] to support Stockfish-style quantization",
     )
     parser.add_argument(
         prefix + "value-nash-weight",
@@ -367,7 +367,7 @@ def main():
         loss_value.backward()
         optimizer.step()
 
-        if not args.no_clamp_parameters:
+        if args.clamp_parameters:
             network.clamp_parameters()
 
         oak.common_args.save_and_decay(

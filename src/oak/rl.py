@@ -241,8 +241,8 @@ def main():
     ]
     if args.no_apply_symmetries:
         generate_cmd.append("--no-apply-symmetries")
-    if args.no_clamp_parameters:
-        generate_cmd.append("--no-clamp-parameters")
+    if args.clamp_parameters:
+        generate_cmd.append("--clamp-parameters")
 
     def get_common_cmd(args, prefix):
         p = prefix or ""
