@@ -400,7 +400,8 @@ void generate(const ProgramArgs *args_ptr) {
           const bool node_kept = nodes.update(p1_index, p2_index, obs);
           RuntimeData::update_with_node_counter.fetch_add(node_kept);
           // TODO
-          nodes.reset_stats();
+          nodes.reset_node_stats();
+          // nodes.reset_table_stats(); TODO
         } else {
           nodes.reset();
         }

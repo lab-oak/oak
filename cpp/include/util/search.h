@@ -29,12 +29,15 @@ template <typename T> struct UniqueStats {
     node.reset();
     table.reset();
   }
-  void reset_stats() noexcept {
+  void reset_node_stats() noexcept {
     if (node) {
       node->stats = {};
     }
+  }
+
+  void reset_table_stats(const auto &state) {
     if (table) {
-      // table->entries[table->root_key] = {}; TODO
+      table->entries[state.s1.last ^ state.s2.last] = {};
     }
   }
 };
@@ -71,17 +74,23 @@ struct Nodes {
   // For UCB game generation, if a node is kept and its stats are not reset
   // the empirical policies may have 0.0 at some actions.
   // This is a clumsy fix though. TODO
-  void reset_stats() {
-    exp3.reset_stats();
-    pexp3.reset_stats();
-    ucb.reset_stats();
-    ucb1.reset_stats();
-    pucb.reset_stats();
+  void reset_node_stats() {
+    exp3.reset_node_stats();
+    pexp3.reset_node_stats();
+    ucb.reset_node_stats();
+    ucb1.reset_node_stats();
+    pucb.reset_node_stats();
+  }
+
+  void reset_table_stats(const auto &state) {
+    exp3.reset_table_stats(state);
+    pexp3.reset_table_stats(state);
+    ucb.reset_table_stats(state);
+    ucb1.reset_table_stats(state);
+    pucb.reset_table_stats(state);
   }
 
   bool update(auto i1, auto i2, const auto &obs) {
-    // reset();
-    // return false;
     auto update_node = [&](auto &node) -> bool {
       if (!node || !node->stats.is_init()) {
         return false;
@@ -97,6 +106,7 @@ struct Nodes {
         return true;
       }
     };
+    // No action is required to update a table
     return update_node(exp3.node) || update_node(pexp3.node) ||
            update_node(ucb.node) || update_node(ucb1.node) ||
            update_node(pucb.node);

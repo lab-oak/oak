@@ -30,7 +30,8 @@ struct Pokemon {
     }
   };
 
-  // static_assert(HP::get_key(800, 800) == 7);
+  // Commented out because not sure how many buckets to use - 8 vs 16 tests were
+  // inconclusive static_assert(HP::get_key(800, 800) == 7);
   // static_assert(HP::get_key(800, 799) == 7);
   // static_assert(HP::get_key(800, 100) == 1);
   // static_assert(HP::get_key(800, 99) == 0);
