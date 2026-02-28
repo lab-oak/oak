@@ -266,7 +266,10 @@ def main():
 
     battle_cmd = (
         [
-            "battle",
+            sys.executable,
+            "-u",
+            "-m",
+            "oak.battle",
             f"--dir={nets_dir}",
         ]
         + get_common_cmd(args, "")
@@ -284,7 +287,10 @@ def main():
 
     build_cmd = (
         [
-            "build",
+            sys.executable,
+            "-u",
+            "-m",
+            "oak.build",
             f"--dir={build_nets_dir}",
         ]
         + get_common_cmd(args, "build_")
