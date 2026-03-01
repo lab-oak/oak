@@ -23,7 +23,7 @@ struct ProgramArgs : public VsArgs {
   size_t &threads =
       kwarg("threads",
             "Number of parallel eval game pairs (players swap teams) to run")
-          .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
+          .set_default(std::max(1u, std::thread::hardware_concurrency()));
   size_t &max_games =
       kwarg("max-games", "Number of games to play before program termination")
           .set_default(1 << 14);
