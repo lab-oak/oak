@@ -103,11 +103,11 @@ constexpr PKMN::Pokemon init_pokemon(const auto &set) {
   }
   // stats
   const auto base_stats = get_species_data(pokemon.species).base_stats;
-  pokemon.stats.hp = compute_stat(base_stats[0], true, pokemon.level);
-  pokemon.stats.atk = compute_stat(base_stats[1], false, pokemon.level);
-  pokemon.stats.def = compute_stat(base_stats[2], false, pokemon.level);
-  pokemon.stats.spe = compute_stat(base_stats[3], false, pokemon.level);
-  pokemon.stats.spc = compute_stat(base_stats[4], false, pokemon.level);
+  pokemon.stats.hp = compute_stat(base_stats.hp, true, pokemon.level);
+  pokemon.stats.atk = compute_stat(base_stats.atk, false, pokemon.level);
+  pokemon.stats.def = compute_stat(base_stats.def, false, pokemon.level);
+  pokemon.stats.spe = compute_stat(base_stats.spe, false, pokemon.level);
+  pokemon.stats.spc = compute_stat(base_stats.spc, false, pokemon.level);
   // moves
   for (auto m = 0; m < 4; ++m) {
     pokemon.moves[m].id = static_cast<Move>(set.moves[m]);

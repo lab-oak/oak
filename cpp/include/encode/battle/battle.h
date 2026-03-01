@@ -2,8 +2,8 @@
 
 #include <libpkmn/data.h>
 #include <libpkmn/data/status.h>
+#include <libpkmn/init.h>
 #include <libpkmn/pkmn.h>
-#include <teams/ou-sample-teams.h>
 
 #include <array>
 #include <cassert>
@@ -18,7 +18,8 @@ using PKMN::Data::Type;
 
 namespace Stats {
 constexpr float max_stat_value = 999;
-constexpr float max_hp_value = 706;
+constexpr float max_hp_value = PKMN::Init::compute_stat(
+    get_species_data(Species::Chansey).base_stats.hp, true);
 constexpr auto n_dim = 5;
 constexpr float *write(const PKMN::Stats &stats, float *t) {
   t[0] = stats.hp / max_hp_value;

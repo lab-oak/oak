@@ -166,8 +166,16 @@ enum class Species : std::underlying_type_t<std::byte> {
 
 static_assert(sizeof(Species) == 1);
 
+struct BaseStats {
+  uint8_t hp;
+  uint8_t atk;
+  uint8_t def;
+  uint8_t spe;
+  uint8_t spc;
+};
+
 struct SpeciesData {
-  std::array<uint8_t, 5> base_stats;
+  BaseStats base_stats;
   std::array<Type, 2> types;
 };
 
