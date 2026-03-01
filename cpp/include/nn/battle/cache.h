@@ -165,8 +165,8 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
 
   uint32_t embedding_size;
   std::map<Key, Embedding> embeddings;
-  std::array<float, Encode::Battle::Active::n_dim> encoding_input;
-  std::array<uint16_t, Encode::Battle::Active::n_dim> encoding_indices;
+  std::array<float, Encode::Battle::ActivePokemon::n_dim> encoding_input;
+  std::array<uint16_t, Encode::Battle::ActivePokemon::n_dim> encoding_indices;
   std::vector<float> embedding;
 
   ActivePokemonCache(int d = 0) : embedding_size{dim} {
