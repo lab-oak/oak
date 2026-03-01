@@ -241,7 +241,8 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     } else {
       auto *input = encoding_input.data();
       auto *indices = encoding_indices.data();
-      Encode::Battle::Active::write(pokemon, active, duration, input, indices);
+      Encode::Battle::ActivePokemon::write(pokemon, active, duration, input,
+                                           indices);
       const auto n = std::distance(encoding_input.data(), input);
 
       if constexpr (is_dynamic) {

@@ -71,8 +71,8 @@ struct EncodedFrames : public Py::Battle::Target {
         active_[s][0] = {};
       } else {
         hp_[s][0] = (float)stored.hp / stored.stats.hp;
-        Encode::Battle::Active::write(stored, side.active, duration,
-                                      active_[s][0].data());
+        Encode::Battle::ActivePokemon::write(stored, side.active, duration,
+                                             active_[s][0].data());
       }
 
       for (auto slot = 2; slot <= 6; ++slot) {

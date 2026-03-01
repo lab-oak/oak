@@ -207,6 +207,7 @@ constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *t) {
   t = Types::write(pokemon.types, t);
 }
 
+// TODO is this a valid reference???
 constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *&t,
                      uint16_t *&index, uint16_t offset = 0) {
   Stats::write(pokemon.stats, t, index, offset);
@@ -468,12 +469,10 @@ consteval auto dim_labels() {
 namespace Active {
 
 constexpr auto n_dim = Stats::n_dim + Types::n_dim + Boosts::n_dim +
-                       Volatiles::n_dim + MoveSlots::n_dim + Duration::n_dim +
-                       Pokemon::n_dim;
+                       Volatiles::n_dim + MoveSlots::n_dim + Duration::n_dim;
 
-constexpr void write(const PKMN::Pokemon &pokemon,
-                     const PKMN::ActivePokemon &active,
-                     const PKMN::Duration &duration, float *t) {
+constexpr float *write(const PKMN::ActivePokemon &active,
+                       const PKMN::Duration &duration, float *t) {
   t = Stats::write(active.stats, t);
   t = Types::write(active.types, t);
   t = Boosts::write(active, t);
@@ -485,21 +484,18 @@ constexpr void write(const PKMN::Pokemon &pokemon,
         0; // TODO check with pre
   }
   t = Duration::write(duration, t);
-  Pokemon::write(pokemon, duration.sleep(0), t);
+  return t;
 }
 
-constexpr void write(const PKMN::Pokemon &pokemon,
-                     const PKMN::ActivePokemon &active,
+constexpr void write(const PKMN::ActivePokemon &active,
                      const PKMN::Duration &duration, float *&t,
-                     uint16_t *&index) {
-  uint16_t offset = 0;
+                     uint16_t *&index, uint16_t &offset) {
   Stats::write(active.stats, t, index, offset);
   Types::write(active.types, t, index, offset);
   Boosts::write(active, t, index, offset);
   Volatiles::write(active.volatiles, t, index, offset);
   MoveSlots::write(active.moves, t, index, offset);
   Duration::write(duration, t, index, offset);
-  Pokemon::write(pokemon, duration.sleep(0), t, index, offset);
 }
 
 consteval auto get_dim_labels() {
@@ -542,9 +538,6 @@ consteval auto get_dim_labels() {
   }
   index += Duration::n_dim;
 
-  for (auto i = 0; i < Pokemon::n_dim; ++i) {
-    copy(Pokemon::dim_labels[i], result[index + i]);
-  }
   return result;
 }
 
@@ -552,16 +545,25 @@ constexpr auto dim_labels = get_dim_labels();
 
 } // namespace Active
 
-// TODO comptime checks that encoding is working as intended
-consteval bool check() {
-  const auto &teams = Teams::ou_sample_teams;
-  auto battle_0 = PKMN::battle(teams[0], teams[1]);
-  auto options = PKMN::options();
-  // const auto _ = PKMN::update(battle_0, 0, 0, options);
-  return (PKMN::cast(battle_0).turn == 0);
+namespace ActivePokemon {
+constexpr auto n_dim = Active::n_dim + Pokemon::n_dim;
+
+constexpr void write(const PKMN::Pokemon &pokemon,
+                     const PKMN::ActivePokemon &active,
+                     const PKMN::Duration &duration, float *t) {
+  t = Active::write(active, duration, t);
+  Pokemon::write(pokemon, duration.sleep(0), t);
 }
 
-static_assert(check());
+constexpr void write(const PKMN::Pokemon &pokemon,
+                     const PKMN::ActivePokemon &active,
+                     const PKMN::Duration &duration, float *&t,
+                     uint16_t *&index) {
+  uint16_t offset = 0;
+  Active::write(active, duration, t, index, offset);
+  Pokemon::write(pokemon, duration.sleep(0), t, index, offset);
+}
+} // namespace ActivePokemon
 
 } // namespace Battle
 
