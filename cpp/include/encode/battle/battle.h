@@ -8,9 +8,7 @@
 #include <array>
 #include <cassert>
 
-namespace Encode {
-
-namespace Battle {
+namespace Encode::Battle {
 
 using PKMN::Data::Move;
 using PKMN::Data::Species;
@@ -29,7 +27,6 @@ constexpr float *write(const PKMN::Stats &stats, float *t) {
   t[4] = stats.spc / max_stat_value;
   return t + n_dim;
 }
-
 constexpr void write(const PKMN::Stats &stats, float *&t, uint16_t *&index,
                      uint16_t &offset) {
   *t++ = stats.hp / max_hp_value;
@@ -55,10 +52,11 @@ constexpr auto read(const float *t) {
   return stats;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"HP", "ATK", "DEF", "SPE", "SPC"}};
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace Stats
 
 namespace MoveSlots {
@@ -72,7 +70,6 @@ constexpr float *write(const std::array<PKMN::MoveSlot, 4> &move_slots,
   }
   return t + n_dim;
 }
-
 constexpr void write(const std::array<PKMN::MoveSlot, 4> &move_slots, float *&t,
                      uint16_t *&index, uint16_t &offset) {
   for (const auto [id, pp] : move_slots) {
@@ -95,13 +92,14 @@ constexpr auto read(const float *t) {
   return move_slots;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
     result[i] = PKMN::Data::MOVE_CHAR_ARRAY[i + 1];
   }
   return result;
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace MoveSlots
 
 namespace Status {
@@ -151,7 +149,6 @@ constexpr float *write(const auto status, const auto sleep, float *t) {
   }
   return t + n_dim;
 }
-
 constexpr void write(const auto status, const auto sleep, float *&t,
                      uint16_t *&index, uint16_t &offset) {
   if (static_cast<bool>(status)) {
@@ -161,11 +158,12 @@ constexpr void write(const auto status, const auto sleep, float *&t,
   offset += n_dim;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   return std::array<std::array<char, 5>, n_dim>{
       {"PSN", "BRN", "FRZ", "PAR", "SLP1", "SLP2", "SLP3", "SLP4", "SLP5",
        "SLP6", "SLP7", "RST1", "RST2", "RST3"}};
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace Status
 
 namespace Types {
@@ -225,15 +223,15 @@ consteval auto get_dim_labels() {
   };
   auto index = 0;
   for (auto i = 0; i < Stats::n_dim; ++i) {
-    copy(Stats::dim_labels()[i], result[index + i]);
+    copy(Stats::dim_labels[i], result[index + i]);
   }
   index += Stats::n_dim;
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
-    copy(MoveSlots::dim_labels()[i], result[index + i]);
+    copy(MoveSlots::dim_labels[i], result[index + i]);
   }
   index += MoveSlots::n_dim;
   for (auto i = 0; i < Status::n_dim; ++i) {
-    copy(Status::dim_labels()[i], result[index + i]);
+    copy(Status::dim_labels[i], result[index + i]);
   }
   index += Status::n_dim;
   for (auto i = 0; i < Types::n_dim; ++i) {
@@ -265,7 +263,6 @@ constexpr float *write(const PKMN::ActivePokemon &active, float *t) {
   t[5] = get_multiplier(active.boosts.eva()) * scale_acceva;
   return t + n_dim;
 }
-
 constexpr void write(const PKMN::ActivePokemon &active, float *&t,
                      uint16_t *&index, uint16_t &offset) {
   const auto get_multiplier = [](auto i) -> float {
@@ -289,18 +286,17 @@ constexpr void write(const PKMN::ActivePokemon &active, float *&t,
   offset += n_dim;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"atk", "def", "spe", "spc", "acc", "eva"}};
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace Boosts
 
 namespace Volatiles {
 constexpr auto n_dim = 19;
 constexpr float *write(const PKMN::Volatiles &vol, float *t) {
-
   constexpr float chansey_sub = 706 / 4 + 1;
-
   // See data layout in extern/engine/src/lib/gen1/readme.md
   // hidden data is replaced with normalized durations
   t[0] = vol.bide();
@@ -329,12 +325,9 @@ constexpr float *write(const PKMN::Volatiles &vol, float *t) {
   t[18] = vol.toxic_counter() / 16.0;
   return t + n_dim;
 }
-
 constexpr void write(const PKMN::Volatiles &vol, float *&t, uint16_t *&index,
                      uint16_t &offset) {
-
   constexpr float chansey_sub = 706 / 4 + 1;
-
   const float vals[n_dim] = {static_cast<float>(vol.bide()),
                              static_cast<float>(vol.thrashing()),
                              static_cast<float>(vol.charging()),
@@ -355,23 +348,22 @@ constexpr void write(const PKMN::Volatiles &vol, float *&t, uint16_t *&index,
                                  (float)std::numeric_limits<uint16_t>::max(),
                              vol.substitute_hp() / chansey_sub,
                              vol.toxic_counter() / 16.0f};
-
   for (uint16_t i = 0; i < n_dim; ++i) {
     if (vals[i] != 0.0f) {
       *t++ = vals[i];
       *index++ = offset + i;
     }
   }
-
   offset += n_dim;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
       {"bide", "thrashing", "charging", "binding", "invulner", "confusion",
        "mist", "focus_energy", "substitute", "recharging", "rage", "leech_seed",
        "toxic", "light_screen", "reflect", "transform", "state", "sub_hp"}};
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace Volatiles
 
 namespace Duration {
@@ -407,7 +399,6 @@ constexpr float *write(const PKMN::Duration &duration, float *t) {
   t += n_binding;
   return t;
 }
-
 constexpr void write(const PKMN::Duration &duration, float *&t,
                      uint16_t *&index, uint16_t &offset) {
 
@@ -436,7 +427,7 @@ constexpr void write(const PKMN::Duration &duration, float *&t,
   offset += n_binding;
 }
 
-consteval auto dim_labels() {
+consteval auto get_dim_labels() {
   std::array<std::array<char, 10>, n_dim> result;
 
   auto index = 0;
@@ -464,6 +455,7 @@ consteval auto dim_labels() {
   }
   return result;
 }
+constexpr auto dim_labels = get_dim_labels();
 } // namespace Duration
 
 namespace Active {
@@ -486,7 +478,6 @@ constexpr float *write(const PKMN::ActivePokemon &active,
   t = Duration::write(duration, t);
   return t;
 }
-
 constexpr void write(const PKMN::ActivePokemon &active,
                      const PKMN::Duration &duration, float *&t,
                      uint16_t *&index, uint16_t &offset) {
@@ -509,7 +500,7 @@ consteval auto get_dim_labels() {
 
   auto index = 0;
   for (auto i = 0; i < Stats::n_dim; ++i) {
-    copy(Stats::dim_labels()[i], result[index + i]);
+    copy(Stats::dim_labels[i], result[index + i]);
   }
   index += Stats::n_dim;
 
@@ -519,42 +510,38 @@ consteval auto get_dim_labels() {
   index += Types::n_dim;
 
   for (auto i = 0; i < Boosts::n_dim; ++i) {
-    copy(Boosts::dim_labels()[i], result[index + i]);
+    copy(Boosts::dim_labels[i], result[index + i]);
   }
   index += Boosts::n_dim;
 
   for (auto i = 0; i < Volatiles::n_dim; ++i) {
-    copy(Volatiles::dim_labels()[i], result[index + i]);
+    copy(Volatiles::dim_labels[i], result[index + i]);
   }
   index += Volatiles::n_dim;
 
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
-    copy(MoveSlots::dim_labels()[i], result[index + i]);
+    copy(MoveSlots::dim_labels[i], result[index + i]);
   }
   index += MoveSlots::n_dim;
 
   for (auto i = 0; i < Duration::n_dim; ++i) {
-    copy(Duration::dim_labels()[i], result[index + i]);
+    copy(Duration::dim_labels[i], result[index + i]);
   }
   index += Duration::n_dim;
 
   return result;
 }
-
 constexpr auto dim_labels = get_dim_labels();
-
 } // namespace Active
 
 namespace ActivePokemon {
 constexpr auto n_dim = Active::n_dim + Pokemon::n_dim;
-
 constexpr void write(const PKMN::Pokemon &pokemon,
                      const PKMN::ActivePokemon &active,
                      const PKMN::Duration &duration, float *t) {
   t = Active::write(active, duration, t);
   Pokemon::write(pokemon, duration.sleep(0), t);
 }
-
 constexpr void write(const PKMN::Pokemon &pokemon,
                      const PKMN::ActivePokemon &active,
                      const PKMN::Duration &duration, float *&t,
@@ -563,8 +550,27 @@ constexpr void write(const PKMN::Pokemon &pokemon,
   Active::write(active, duration, t, index, offset);
   Pokemon::write(pokemon, duration.sleep(0), t, index, offset);
 }
+
+consteval auto get_dim_labels() {
+  std::array<std::array<char, 13>, n_dim> result{};
+  const auto copy = [](const auto &src, auto &dest) {
+    for (auto i = 0; i < src.size(); ++i) {
+      dest[i] = src[i];
+    }
+  };
+  auto index = 0;
+  for (auto i = 0; i < Active::n_dim; ++i) {
+    copy(Active::dim_labels[i], result[index + i]);
+  }
+  index += Active::n_dim;
+
+  for (auto i = 0; i < Pokemon::n_dim; ++i) {
+    copy(Pokemon::dim_labels[i], result[index + i]);
+  }
+  index += Pokemon::n_dim;
+  return result;
+}
+constexpr auto dim_labels = get_dim_labels();
 } // namespace ActivePokemon
 
-} // namespace Battle
-
-} // namespace Encode
+} // namespace Encode::Battle
