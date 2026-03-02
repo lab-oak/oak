@@ -33,7 +33,7 @@ struct EncodedFrames : public Py::Battle::Target {
 
   EncodedFrames(size_t sz) : Py::Battle::Target{sz} {
     pokemon =
-        py::array_t<float>(std::vector<size_t>{size, 2, 5, pokemon_in_dim});
+        py::array_t<float>(std::vector<size_t>{size, 2, 6, pokemon_in_dim});
     active = py::array_t<float>(std::vector<size_t>{size, 2, 1, active_in_dim});
     hp = py::array_t<float>(std::vector<size_t>{size, 2, 6, 1});
     choice_indices = py::array_t<int64_t>(std::vector<size_t>{size, 2, 9});
@@ -69,27 +69,30 @@ struct EncodedFrames : public Py::Battle::Target {
       if (stored.hp == 0) {
         hp_[s][0] = {};
         active_[s][0] = {};
+        pokemon_[s][0] = {};
       } else {
         hp_[s][0] = (float)stored.hp / stored.stats.hp;
-        Encode::Battle::ActivePokemon::write(stored, side.active, duration,
-                                             active_[s][0].data());
+        Encode::Battle::Active::write(side.active, duration,
+                                      active_[s][0].data());
+        Encode::Battle::Pokemon::write(stored, duration.sleep(0),
+                                       pokemon_[s][0].data());
       }
 
       for (auto slot = 2; slot <= 6; ++slot) {
         const auto id = side.order[slot - 1];
         if (id == 0) {
           hp_[s][slot - 1] = {};
-          pokemon_[s][slot - 2] = {};
+          pokemon_[s][slot - 1] = {};
         } else {
           const auto &poke = side.pokemon[id - 1];
           if (poke.hp == 0) {
             hp_[s][slot - 1] = {};
-            pokemon_[s][slot - 2] = {};
+            pokemon_[s][slot - 1] = {};
           } else {
             const auto sleep = duration.sleep(slot - 1);
             hp_[s][slot - 1] = (float)poke.hp / poke.stats.hp;
             Encode::Battle::Pokemon::write(poke, sleep,
-                                           pokemon_[s][slot - 2].data());
+                                           pokemon_[s][slot - 1].data());
           }
         }
       }
@@ -128,14 +131,13 @@ struct EncodedFrames : public Py::Battle::Target {
   }
 
   auto view(const auto index) {
-    // TODO make sure GPT isnt lying about refs :o
-    using Bench = std::array<std::array<PokemonEncoding, 5>, 2>;
+    using Bench = std::array<std::array<PokemonEncoding, 6>, 2>;
     using Actives = std::array<std::array<ActiveEncoding, 1>, 2>;
     using ChoiceIndices = std::array<std::array<int64_t, 9>, 2>;
     auto &hp_ = *reinterpret_cast<std::array<std::array<float, 6>, 2> *>(
         hp.mutable_data() + index * (2 * 6 * 1));
     auto &pokemon_ = *reinterpret_cast<Bench *>(
-        pokemon.mutable_data() + index * (2 * 5 * pokemon_in_dim));
+        pokemon.mutable_data() + index * (2 * 6 * pokemon_in_dim));
     auto &active_ = *reinterpret_cast<Actives *>(
         active.mutable_data() + index * (2 * 1 * active_in_dim));
     auto &choice_ = *reinterpret_cast<ChoiceIndices *>(

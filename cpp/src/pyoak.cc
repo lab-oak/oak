@@ -531,7 +531,7 @@ PYBIND11_MODULE(pyoak, m) {
 
   // Battle net hyperparams
   m.attr("pokemon_in_dim") = Encode::Battle::Pokemon::n_dim;
-  m.attr("active_in_dim") = Encode::Battle::Active::n_dim;
+  m.attr("active_in_dim") = Encode::Battle::ActivePokemon::n_dim;
   m.attr("pokemon_hidden_dim") = NN::Battle::Default::pokemon_hidden_dim;
   m.attr("pokemon_out_dim") = NN::Battle::Default::pokemon_out_dim;
   m.attr("active_hidden_dim") = NN::Battle::Default::active_hidden_dim;
@@ -595,13 +595,13 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<Output>(m, "OutputBuffer")
       .def(py::init<size_t, size_t, size_t>(), py::arg("size"),
-           py::arg("pokemon_out_dim") = Encode::Battle::Pokemon::n_dim,
-           py::arg("active_out_dim") = Encode::Battle::Active::n_dim)
+           py::arg("pokemon_out_dim") = NN::Battle::Default::pokemon_out_dim,
+           py::arg("active_out_dim") = NN::Battle::Default::active_out_dim)
       .def_readonly("size", &Output::size)
       .def_readonly("pokemon_out_dim", &Output::pokemon_out_dim)
       .def_readonly("active_out_dim", &Output::active_out_dim)
       .def_readonly("pokemon", &Output::pokemon)
-      .def_readonly("active", &Output::active)
+      .def_readonly("active_pokemon", &Output::active_pokemon)
       .def_readonly("sides", &Output::sides)
       .def_readonly("value", &Output::value)
       .def_readonly("policy_logit", &Output::policy_logit)

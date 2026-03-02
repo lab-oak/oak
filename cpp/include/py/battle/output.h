@@ -16,7 +16,7 @@ struct Output {
   size_t active_out_dim;
   size_t side_out_dim;
   py::array_t<float> pokemon;
-  py::array_t<float> active;
+  py::array_t<float> active_pokemon;
   py::array_t<float> sides;
   py::array_t<float> value;
   py::array_t<float> policy_logit;
@@ -31,7 +31,7 @@ struct Output {
         side_out_dim{(1 + active_out_dim) + 5 * (1 + pokemon_out_dim)} {
     pokemon =
         py::array_t<float>(std::vector<size_t>{size, 2, 5, pokemon_out_dim});
-    active =
+    active_pokemon =
         py::array_t<float>(std::vector<size_t>{size, 2, 1, active_out_dim});
     sides = py::array_t<float>(std::vector<size_t>{size, 2, 1, side_out_dim});
     value = py::array_t<float>(std::vector<size_t>{size, 1});
@@ -42,7 +42,7 @@ struct Output {
 
   void clear() {
     std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
-    std::fill_n(active.mutable_data(), active.size(), 0.0f);
+    std::fill_n(active_pokemon.mutable_data(), active_pokemon.size(), 0.0f);
     std::fill_n(sides.mutable_data(), sides.size(), 0.0f);
     std::fill_n(value.mutable_data(), value.size(), 0.0f);
     std::fill_n(policy_logit.mutable_data(), policy_logit.size(), 0.0f);

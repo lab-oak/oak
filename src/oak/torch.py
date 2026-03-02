@@ -264,7 +264,7 @@ class Output:
         self.pokemon_out_dim = buffers.pokemon_out_dim
         self.active_out_dim = buffers.active_out_dim
         self.pokemon = torch.from_numpy(buffers.pokemon)
-        self.active = torch.from_numpy(buffers.active)
+        self.active_pokemon = torch.from_numpy(buffers.active_pokemon)
         self.sides = torch.from_numpy(buffers.sides)
         self.value = torch.from_numpy(buffers.value)
         self.policy_logit = torch.from_numpy(buffers.policy_logit)
@@ -272,7 +272,7 @@ class Output:
 
     def to(self, device):
         self.pokemon = self.pokemon.to(device)
-        self.active = self.active.to(device)
+        self.active_pokemon = self.active_pokemon.to(device)
         self.sides = self.sides.to(device)
         self.value = self.value.to(device)
         self.policy_logit = self.policy_logit.to(device)
@@ -339,15 +339,19 @@ class BattleNetwork(torch.nn.Module):
         self, input: EncodedBattleFrames, output: Output, use_policy: bool = True
     ):
         size = min(input.size, output.size)
-        output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size])
-        output.active[:size] = self.active_net.forward(input.active[:size])
+        output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size, :, 1:])
+        output.active_pokemon[:size] = self.active_net.forward(
+            torch.cat([input.active[:size], input.pokemon[:size, :, :1]], dim=3)
+        )
         # mask output for hp
         output.pokemon[:size] *= (input.hp[:size, :, 1:] != 0).float()
-        output.active[:size] *= (input.hp[:size, :, :1] != 0).float()
+        output.active_pokemon[:size] *= (input.hp[:size, :, :1] != 0).float()
         # active hp
         output.sides[:size, :, :, 0] = input.hp[:size, :, :1, 0]
         # active word
-        output.sides[:size, :, :, 1 : self.active_out_dim + 1] = output.active[:size]
+        output.sides[:size, :, :, 1 : self.active_out_dim + 1] = output.active_pokemon[
+            :size
+        ]
         # pokemon hp/word
         pokemon_flat = torch.cat(
             (input.hp[:size, :, 1:], output.pokemon[:size]), dim=3
