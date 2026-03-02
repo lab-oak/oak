@@ -38,6 +38,7 @@ struct Output {
     policy_logit =
         py::array_t<float>(std::vector<size_t>{size, 2, policy_out_dim});
     policy = py::array_t<float>(std::vector<size_t>{size, 2, 9});
+    clear();
   }
 
   void clear() {

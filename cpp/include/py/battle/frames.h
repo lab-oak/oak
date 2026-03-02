@@ -24,13 +24,22 @@ struct Frames : public Target {
     durations = py::array_t<uint8_t>(std::vector<size_t>{size, 8});
     result = py::array_t<uint8_t>(std::vector<size_t>{size, 1});
     choices = py::array_t<uint8_t>(std::vector<size_t>{size, 2, 9});
+    clear();
+  }
+
+  void clear() {
+    Target::clear();
+    std::fill_n(battle.mutable_data(), battle.size(), uint8_t{});
+    std::fill_n(durations.mutable_data(), durations.size(), uint8_t{});
+    std::fill_n(result.mutable_data(), result.size(), uint8_t{});
+    std::fill_n(choices.mutable_data(), choices.size(), uint8_t{});
   }
 
   void write(const auto index, const pkmn_gen1_battle &b,
              const pkmn_gen1_chance_durations &d, pkmn_result r,
              const Train::Battle::CompressedFrames::Update &update,
              float terminal) {
-    Py::Battle::Target::write(index, update);
+    Target::write(index, update);
     score.mutable_data()[index] = terminal;
     std::memcpy(battle.mutable_data() + (index * 384), b.bytes, 384);
     std::memcpy(durations.mutable_data() + (index * 8), d.bytes, 8);

@@ -20,7 +20,7 @@ namespace py = pybind11;
 
 namespace {
 
-struct EncodedFrames : public Py::Battle::Target {
+struct EncodedFrames : public Target {
   py::array_t<float> pokemon;
   py::array_t<float> active;
   py::array_t<float> hp;
@@ -37,10 +37,11 @@ struct EncodedFrames : public Py::Battle::Target {
     active = py::array_t<float>(std::vector<size_t>{size, 2, 1, active_in_dim});
     hp = py::array_t<float>(std::vector<size_t>{size, 2, 6, 1});
     choice_indices = py::array_t<int64_t>(std::vector<size_t>{size, 2, 9});
+    clear();
   }
 
   void clear() {
-    Py::Battle::Target::clear();
+    Target::clear();
     std::fill_n(choice_indices.mutable_data(), choice_indices.size(),
                 int64_t(0));
     std::fill_n(pokemon.mutable_data(), pokemon.size(), 0.0f);
