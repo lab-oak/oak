@@ -40,8 +40,7 @@ namespace py = pybind11;
 
 using Py::Battle::Output;
 
-py::list read_battle_data(const std::string &path,
-                          size_t max_battles = 1'000'000) {
+py::list read_battle_data(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     throw std::runtime_error("read_battle_data: Failed to open file: " + path);
@@ -49,7 +48,7 @@ py::list read_battle_data(const std::string &path,
   py::list result;
   size_t total_battles = 0;
   std::vector<char> buffer{};
-  while (file.peek() != EOF && total_battles < max_battles) {
+  while (file.peek() != EOF) {
     uint32_t offset;
     uint16_t frame_count;
     file.read(reinterpret_cast<char *>(&offset), sizeof(offset));
@@ -558,10 +557,12 @@ PYBIND11_MODULE(pyoak, m) {
   // Strings
   m.attr("move_names") = dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY);
   m.attr("species_names") = dim_labels_to_vec(PKMN::Data::SPECIES_CHAR_ARRAY);
-  m.attr("pokemon_dim_labels") =
-      dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
   m.attr("active_dim_labels") =
       dim_labels_to_vec(Encode::Battle::Active::dim_labels);
+  m.attr("pokemon_dim_labels") =
+      dim_labels_to_vec(Encode::Battle::Pokemon::dim_labels);
+  m.attr("active_pokemon_dim_labels") =
+      dim_labels_to_vec(Encode::Battle::ActivePokemon::dim_labels);
   {
     auto v = dim_labels_to_vec(Encode::Battle::Policy::dim_labels);
     v.push_back(""); // preserve extra empty string
@@ -629,8 +630,7 @@ PYBIND11_MODULE(pyoak, m) {
   m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
         py::arg("battle_frames"));
 
-  m.def("read_battle_data", &read_battle_data, py::arg("path"),
-        py::arg("max_battles") = 1'000'000);
+  m.def("read_battle_data", &read_battle_data, py::arg("path"));
   m.def("read_build_trajectories", &read_build_trajectories);
 }
 
