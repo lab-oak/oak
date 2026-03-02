@@ -335,6 +335,7 @@ Output cpp_inference(std::string network_path,
   if (!file) {
     throw std::runtime_error{"Can't open network"};
   }
+  network.read_parameters(file);
 
   const auto &initial_battle =
       *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
