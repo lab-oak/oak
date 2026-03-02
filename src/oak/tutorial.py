@@ -240,19 +240,22 @@ def test_consistency():
 
     buffer_list = oak.read_battle_data(data_path)
 
-    max_games = 2
+    max_games = len(buffer_list)
 
     for buffer, n_frames in buffer_list[:max_games]:
-        encoded_frames = oak.EncodedBattleFrames(n_frames)
-        encoded_frames.uncompress_from_bytes(buffer)
-        # encoded_frames = oak.get_encoded_frames(buffer, n_frames)
+        encoded_frames = oak.EncodedBattleFrames.from_bytes(buffer, n_frames)
         encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
-        output = oak.torch.Outputs(encoded_frames.size)
-        network.inference(encoded_frames_torch, output)
-        print(output.value)
-        # policies = torch.cat([output.p1_policy.unsqueeze(1), output.p2_policy.unsqueeze(1)], dim=1)
+        output = oak.OutputBuffer(encoded_frames.size)
+        output_torch = oak.torch.OutputBuffer(output)
+        network.inference(encoded_frames_torch, output_torch)
 
-    oak.test_consistency(max_games, network_path, data_path)
+        output_2 = oak.cpp_inference(
+            network_path, oak.BattleFrames.from_bytes(buffer, n_frames)
+        )
+        output_torch_2 = oak.torch.OutputBuffer(output_2)
+
+        assert torch.all(output_2.value == output_torch_2.value)
+        assert torch.all(output_2.policy == output_torch_2.policy)
 
 
 def main():

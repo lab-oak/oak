@@ -260,7 +260,7 @@ class MainNet(nn.Module):
 
 
 # holds the output of the embedding nets, the input to main net, and value/policy output of main net
-class Output:
+class OutputBuffer:
     def __init__(self, buffers: oak.OutputBuffer):
         self.size = buffers.size
         self.pokemon_out_dim = buffers.pokemon_out_dim
@@ -338,7 +338,7 @@ class BattleNetwork(torch.nn.Module):
         self.main_net.clamp_parameters()
 
     def inference(
-        self, input: EncodedBattleFrames, output: Output, use_policy: bool = True
+        self, input: EncodedBattleFrames, output: OutputBuffer, use_policy: bool = True
     ):
         size = min(input.size, output.size)
         output.pokemon[:size] = self.pokemon_net.forward(input.pokemon[:size, :, 1:])
