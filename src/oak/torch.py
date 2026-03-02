@@ -30,7 +30,7 @@ class EncodedBattleFrames:
     def permute_pokemon(self):
         perms = torch.stack([torch.randperm(5) for _ in range(self.size)], dim=0)
         perms_expanded = perms[:, None, :, None].expand(-1, 2, -1, oak.pokemon_in_dim)
-        torch.gather(self.pokemon[:, :, 1:, :], dim=2, index=perms_expanded)
+        self.pokemon[:, :, 1:, :] = torch.gather(self.pokemon[:, :, 1:, :], dim=2, index=perms_expanded)
 
     def permute_sides(self, prob=0.5):
         mask = torch.rand(self.size) < prob
