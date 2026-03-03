@@ -1,78 +1,75 @@
 import sys
 
-import oak
-import numpy as np
+import argparse
 
+parser = argparse.ArgumentParser(description="Oak Tutorial")
+parser.add_argument("--main", required=True, type=str)
+parser.add_argument("--data-path", default=None, type=str)
+parser.add_argument("--network", default=None, type=str)
+
+
+def test_consistency():
+    fn_parser = parser.add_argument_group("")
+    fn_parser.add_argument("--games", default=None, type=int)
+    args = parser.parse_args()
+    assert args.data_path, "Provide path to data file to inspect"
+    assert args.network, "Provide path to network to test"
+
+    import torch
+    import oak
+    import oak.torch
+
+
+    network = oak.torch.BattleNetwork()
+
+    with open(args.network, "rb") as f:
+        network.read_parameters(f)
+
+    buffer_list = oak.read_battle_data(args.data_path)
+
+    max_games = min(args.games or len(buffer_list), len(buffer_list))
+
+    for buffer, n_frames in buffer_list[: max_games]:
+        encoded_frames = oak.EncodedBattleFrames.from_bytes(buffer, n_frames)
+        encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
+        output = oak.OutputBuffer(encoded_frames.size)
+        output_torch = oak.torch.OutputBuffer(output)
+        network.inference(encoded_frames_torch, output_torch)
+
+        output_2 = oak.cpp_inference(
+            args.network, oak.BattleFrames.from_bytes(buffer, n_frames)
+        )
+        output_torch_2 = oak.torch.OutputBuffer(output_2)
+
+        assert torch.all(output_2.value == output_torch_2.value)
+        assert torch.all(output_2.policy == output_torch_2.policy)
+
+    print(f"CPP and Python agree on value/policy inference for the first {max_games} games of the data file.")
 
 def battle_frame_stats():
+    fn_parser = parser.add_argument_group("")
+    args = parser.parse_args()
+    assert args.data_path, "Provide path to recursively search for .battle.data files"
+
+    files = oak.util.find_data_files(args.data_path, ext=".battle.data")
+    print(f"Found {len(files)} data files")
+
     total_frames = 0
     total_battles = 0
-    path = "."
-    if len(sys.argv) >= 3:
-        path = sys.argv[2]
 
-    files = oak.util.find_data_files(path, ext=".battle.data")
     for file in files:
         data = oak.read_battle_data(file)
         for buf, n in data:
             total_battles += 1
             total_frames += n
+
     print(f"Total battle frames: {total_frames}")
     print(f"Average battle length: {total_frames / total_battles}")
 
 
-def read_battle_trajectories():
-
-    path = "."
-    if len(sys.argv) >= 3:
-        path = sys.argv[2]
-
-    # using only the head gives most recent files
-    files = oak.util.find_data_files(path, ext=".battle.data")
-
-    assert len(files) > 0, f"No battle files found in {path}"
-
-    from random import sample, randint, shuffle
-
-    file = sample(files, 1)[0]
-    # file = files[0]
-
-    data = oak.read_battle_data(file)
-
-    shuffle(data)
-
-    for buf, n in data:
-        frames = oak.get_encoded_frames(buf, n)
-
-        # i = randint(0, frames.size - 1)
-        i = -1
-        print(i, frames.m[i].item(), frames.n[i].item())
-
-        print("score", frames.score[i])
-        print("value", frames.empirical_value[i])
-        print("e1", frames.p1_empirical[i])
-        print("e2", frames.p2_empirical[i])
-        print("n1", frames.p1_nash[i])
-        print("n2", frames.p2_nash[i])
-        print(
-            "c1",
-            [oak.policy_dim_labels[_.item()] for _ in frames.p1_choice_indices[i]],
-        )
-        print(
-            "c2",
-            [oak.policy_dim_labels[_.item()] for _ in frames.p2_choice_indices[i]],
-        )
-        raw_frames = oak.get_frames(buf, n)
-
-        print("iterations", frames.iterations[i])
-
-        # print(raw_frames.battle[i])
-        # print(raw_frames.battle[i, 23])
-        # print(raw_frames.durations[i])
-        oak.print_battle_data(raw_frames, i)
-
-
-def read_build_trajectories():
+def build_trajectory_stats():
+    fn_parser = parser.add_argument_group("")
+    args = parser.parse_args()
 
     # using only the head gives most recent files
     files = oak.util.find_data_files(".", ext=".build.data")
@@ -124,41 +121,11 @@ def read_build_trajectories():
         )
 
 
-def show_species_probs():
-    import oak.torch
-    import torch
-    import math
+def create_team():
+    fn_parser = parser.add_argument_group("")
+    parser.add_argument("--max-pokemon", default=1, type=int)
+    args = parser.parse_args()
 
-    network = oak.torch.BuildNetwork()
-
-    path = sys.argv[2]
-    with open(path, "rb") as file:
-        network.read_parameters(file)
-
-    weights = dict()
-    logits_d = dict()
-
-    logits, _ = network.forward(torch.zeros((1, len(oak.species_move_list))))
-
-    for index, pair in enumerate(oak.species_move_list):
-        s, m = pair
-        if m != 0:
-            continue
-
-        name = oak.species_names[s]
-        weights[name] = math.exp(logits[0, index])
-        logits_d[name] = logits[0, index]
-
-    s = 0
-    for x in weights:
-        s += weights[x]
-    probs = [(species, weights[species] / s, logits_d[species]) for species in weights]
-    probs = sorted(probs, key=lambda x: x[1])
-    for x in probs:
-        print(x[0], int(1000 * x[1]) / 1000, x[2].item())
-
-
-def create_set():
 
     from oak.torch import BuildNetwork
 
@@ -220,63 +187,19 @@ def create_set():
             mask[index] = 0
 
 
-def test_consistency():
-
-    if len(sys.argv) < 4:
-        print("Provide path to battle network and data file to test")
-        exit()
-
-    import torch
-    import oak
-    import oak.torch
-
-    network_path = sys.argv[2]
-    data_path = sys.argv[3]
-
-    network = oak.torch.BattleNetwork()
-
-    with open(network_path, "rb") as f:
-        network.read_parameters(f)
-
-    buffer_list = oak.read_battle_data(data_path)
-
-    max_games = len(buffer_list)
-
-    for buffer, n_frames in buffer_list[:max_games]:
-        encoded_frames = oak.EncodedBattleFrames.from_bytes(buffer, n_frames)
-        encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
-        output = oak.OutputBuffer(encoded_frames.size)
-        output_torch = oak.torch.OutputBuffer(output)
-        network.inference(encoded_frames_torch, output_torch)
-
-        output_2 = oak.cpp_inference(
-            network_path, oak.BattleFrames.from_bytes(buffer, n_frames)
-        )
-        output_torch_2 = oak.torch.OutputBuffer(output_2)
-
-        assert torch.all(output_2.value == output_torch_2.value)
-        assert torch.all(output_2.policy == output_torch_2.policy)
-
-
 def main():
-    key = sys.argv[1]
-    if key == "read-build-trajectories":
-        # print the first 10 trajectories in cwd
-        read_build_trajectories()
-    elif key == "read-battle-trajectories":
-        read_battle_trajectories()
-    elif key == "create-set":
-        # recreates the build networking rollout code to create a single pokemon set
-        create_set()
-    elif key == "show-species-probs":
-        # basic check that PPO works. We expect to see less ratata and more snorlax no matter what
-        show_species_probs()
-    elif key == "battle-frame-stats":
-        battle_frame_stats()
-    elif key == "test-consistency":
+
+    args = parser.parse_args()
+    if args.main == "test-consistency":
         test_consistency()
+    elif args.main == "battle-frame-stats":
+        battle_frame_stats()
+    elif args.main == "build-trajectory-stats":
+        build_trajectory_stats()
+    elif args.main == "create-team":
+        create_team()
     else:
-        print("Invalid keyword. See TUTORIAL.md")
+        assert False, "Bad --main arg"
 
 
 if __name__ == "__main__":
