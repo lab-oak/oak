@@ -554,6 +554,19 @@ PYBIND11_MODULE(pyoak, m) {
                                    static_cast<int>(p.second));
   }
   m.attr("species_move_list") = species_move_list;
+  // TODO crappy
+  std::vector<std::vector<int>> species_move_table;
+  for (const auto &x : Py::Build::Tensorizer<>::SPECIES_MOVE_TABLE) {
+    species_move_table.emplace_back();
+    species_move_table.back().resize(x.size());
+  }
+  for (auto i = 0; i < species_move_table.size(); ++i) {
+    for (auto j = 0; j < species_move_table[0].size(); ++j) {
+      species_move_list[i][j] =
+          Py::Build::Tensorizer<>::species_move_table(i, j);
+    }
+  }
+  m.attr("species_move_table") = species_move_table;
 
   // Strings
   m.attr("move_names") = dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY);
@@ -570,10 +583,23 @@ PYBIND11_MODULE(pyoak, m) {
     m.attr("policy_dim_labels") = v;
   }
 
+  // TODO make Target a class to reduce boilerplate
   py::class_<Py::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())
       .def_static("from_bytes", &Py::Battle::Frames::from_bytes)
-      .def_readonly("size", &Py::Battle::Frames::size);
+      .def_readonly("size", &Py::Battle::Frames::size)
+      .def_readonly("k", &Py::Battle::Frames::k)
+      .def_readonly("iterations", &Py::Battle::Frames::iterations)
+      .def_readonly("empirical_policies",
+                    &Py::Battle::Frames::empirical_policies)
+      .def_readonly("nash_policies", &Py::Battle::Frames::nash_policies)
+      .def_readonly("empirical_value", &Py::Battle::Frames::empirical_value)
+      .def_readonly("nash_value", &Py::Battle::Frames::nash_value)
+      .def_readonly("score", &Py::Battle::Frames::score)
+      .def_readonly("battle", &Py::Battle::Frames::battle)
+      .def_readonly("durations", &Py::Battle::Frames::durations)
+      .def_readonly("result", &Py::Battle::Frames::result)
+      .def_readonly("choices", &Py::Battle::Frames::choices);
 
   py::class_<Py::Battle::EncodedFrames>(m, "EncodedBattleFrames")
       .def(py::init<size_t>())
