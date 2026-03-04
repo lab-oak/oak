@@ -546,27 +546,26 @@ PYBIND11_MODULE(pyoak, m) {
   m.attr("build_policy_hidden_dim") = NN::Build::Default::policy_hidden_dim;
   m.attr("build_value_hidden_dim") = NN::Build::Default::value_hidden_dim;
   m.attr("build_max_actions") = Py::Build::Tensorizer<>::max_actions;
-  std::vector<std::pair<int, int>> species_move_list;
-  species_move_list.reserve(Py::Build::Tensorizer<>::species_move_list_size);
-  for (int i = 0; i < Py::Build::Tensorizer<>::species_move_list_size; ++i) {
-    auto p = Py::Build::Tensorizer<>::species_move_list(i);
-    species_move_list.emplace_back(static_cast<int>(p.first),
-                                   static_cast<int>(p.second));
-  }
-  m.attr("species_move_list") = species_move_list;
-  // TODO crappy
-  std::vector<std::vector<int>> species_move_table;
-  for (const auto &x : Py::Build::Tensorizer<>::SPECIES_MOVE_TABLE) {
-    species_move_table.emplace_back();
-    species_move_table.back().resize(x.size());
-  }
-  for (auto i = 0; i < species_move_table.size(); ++i) {
-    for (auto j = 0; j < species_move_table[0].size(); ++j) {
-      species_move_list[i][j] =
-          Py::Build::Tensorizer<>::species_move_table(i, j);
+  {
+    std::vector<std::pair<int, int>> species_move_list;
+    species_move_list.reserve(Py::Build::Tensorizer<>::species_move_list_size);
+    for (int i = 0; i < Py::Build::Tensorizer<>::species_move_list_size; ++i) {
+      auto p = Py::Build::Tensorizer<>::species_move_list(i);
+      species_move_list.emplace_back(static_cast<int>(p.first),
+                                     static_cast<int>(p.second));
     }
+    m.attr("species_move_list") = std::move(species_move_list);
   }
-  m.attr("species_move_table") = species_move_table;
+  {
+    const auto &src = Py::Build::Tensorizer<>::SPECIES_MOVE_TABLE;
+    std::vector<std::vector<int>> species_move_table;
+    species_move_table.reserve(src.size());
+    std::transform(src.begin(), src.end(),
+                   std::back_inserter(species_move_table), [](const auto &row) {
+                     return std::vector<int>(row.begin(), row.end());
+                   });
+    m.attr("species_move_table") = std::move(species_move_table);
+  }
 
   // Strings
   m.attr("move_names") = dim_labels_to_vec(PKMN::Data::MOVE_CHAR_ARRAY);
