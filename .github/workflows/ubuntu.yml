@@ -12,11 +12,19 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install latest CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -55,18 +63,25 @@ jobs:
             -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
           make -C cpp/build/Release
 
-      - name: Create venv, build, install, run
+      - name: Build, repair, install, and test wheel
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install --upgrade pip build
+          pip install --upgrade pip build auditwheel
           python -m build
-          pip install dist/*.whl
+          auditwheel repair dist/*.whl \
+            --exclude 'search-test' \
+            --exclude 'generate' \
+            --exclude 'vs' \
+            --exclude 'chall' \
+            --exclude 'benchmark' \
+            --wheel-dir dist/repaired
+          pip install dist/repaired/*.whl
           test-oak
 
       - name: Upload built wheel
         uses: actions/upload-artifact@v4
         with:
-          name: oaks-lab-wheel-ubuntu22
-          path: dist/*.whl
+          name: oaks-lab-wheel-ubuntu22-py${{ matrix.python-version }}
+          path: dist/repaired/*.whl
           if-no-files-found: error

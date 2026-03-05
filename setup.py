@@ -1,12 +1,9 @@
 from setuptools import setup, find_packages
 from setuptools import Distribution
 
-
-# Makes wheel platform-specific (because of .so)
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
-
 
 setup(
     name="oaks-lab",
@@ -17,19 +14,12 @@ setup(
     package_data={
         "oak": [
             "_native/*.so",
+            "_bin/search-test",
+            "_bin/generate",
+            "_bin/vs",
+            "_bin/chall",
+            "_bin/benchmark",
         ],
     },
-    data_files=[
-        (
-            "oak/_bin",
-            [
-                "src/oak/_bin/search-test",
-                "src/oak/_bin/generate",
-                "src/oak/_bin/vs",
-                "src/oak/_bin/chall",
-                "src/oak/_bin/benchmark",
-            ],
-        ),
-    ],
     distclass=BinaryDistribution,
 )
