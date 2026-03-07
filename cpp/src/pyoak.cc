@@ -374,6 +374,40 @@ Output cpp_inference(std::string network_path,
   return buffer;
 }
 
+const auto solve_matrix(py::array_t<float> p1_payoffs,
+                        const int discretize_factor = 256) {
+  if (p1_payoffs.ndim() != 2) {
+    throw std::runtime_error{"Expecting 2d array"};
+  }
+  const auto m = p1_payoffs.shape(0);
+  const auto n = p1_payoffs.shape(1);
+  auto r = p1_payoffs.unchecked<2>();
+  std::vector<int> disc;
+  disc.resize(m * n);
+  for (auto i = 0; i < m; ++i) {
+    for (auto j = 0; j < n; ++j) {
+      disc[i * n + j] = static_cast<int>(r(i, j) * discretize_factor);
+    }
+  }
+  LRSNash::FastInput solve_input{static_cast<int>(m), static_cast<int>(n),
+                                 disc.data(), discretize_factor};
+  std::vector<float> nash1;
+  std::vector<float> nash2;
+  nash1.resize(m + 2);
+  nash2.resize(n + 2);
+  LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
+  LRSNash::solve_fast(&solve_input, &solve_output);
+  auto p1 = py::array_t<float>(std::vector<size_t>{m});
+  auto p2 = py::array_t<float>(std::vector<size_t>{n});
+  for (int i = 0; i < m; ++i) {
+    p1.mutable_unchecked<1>()(i) = nash1[i];
+  }
+  for (int j = 0; j < n; ++j) {
+    p2.mutable_unchecked<1>()(j) = nash2[j];
+  }
+  return py::make_tuple(p1, p2, solve_output.value);
+}
+
 PYBIND11_MODULE(pyoak, m) {
   m.doc() = "Python bindings for Oak";
   m.def(
@@ -655,6 +689,8 @@ PYBIND11_MODULE(pyoak, m) {
 
   m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
         py::arg("battle_frames"));
+  m.def("solve_matrix", &solve_matrix, py::arg("row_payoff"),
+        py::arg("discretize_factor"));
 
   m.def("read_battle_data", &read_battle_data, py::arg("path"));
   m.def("read_build_trajectories", &read_build_trajectories);
