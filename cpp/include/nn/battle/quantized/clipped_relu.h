@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <iosfwd>
 
-#include <nn/battle/stockfish/common.h>
+#include <nn/battle/quantized/common.h>
 
 namespace NN::Battle::Stockfish {
 

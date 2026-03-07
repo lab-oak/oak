@@ -4,7 +4,7 @@
 #include <encode/battle/policy.h>
 #include <nn/battle/cache.h>
 #include <nn/battle/main-net.h>
-#include <nn/battle/stockfish/network.h>
+#include <nn/battle/quantized/network.h>
 #include <nn/default-hyperparameters.h>
 #include <nn/embedding-net.h>
 #include <util/random.h>
