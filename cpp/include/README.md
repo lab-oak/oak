@@ -1,8 +1,14 @@
 # Warning: Incomplete/WIP
 
+This readme is probably at least 50% done and is intended to aid developers. However there may be information here which ought to be in [TUTORIAL.md](../../TUTORIAL.md)
+
+# Project Structure
+
+The core of Oak is a C++ header library that fleshes out the barebones C API and closely resembles the Zig source-code interface. This code is all contained in 
+
 # libpkmn
 
-The simulator is the core of any search library. We use `libpkmn` since it matches Showdown's behaviour and was designed with search in mind.
+We use `libpkmn` since it matches Showdown's behaviour and was designed with search in mind.
 
 There are various comptime options when building libpkmn that need to be mentioned.
 
@@ -12,7 +18,7 @@ Theese are the most important options by far since MCTS is not really possible w
 
 * `log`
 
-This enables log output like Showdown's omniscient log. We do not use this information for search even though that requires us to somehow keep track of what happened during a battle update to keep the game in sync with the tree. Although the log would work for this, the `pkmn_gen1_chance_actions` from the `chance` option is better for this.
+This enables log output that closely matches Showdown's omniscient log. We do not use this information for search although this data can also solve the problem of matching the battle updates with tree traversal. Instead we use `pkmn_gen1_chance_actions` per the the previous options.
 
 The following options are minor in comparison:
 
@@ -22,21 +28,21 @@ Competitive teams are not in danger of endless battles, so disabling improves pe
 
 * `miss=false`
 
-The infamous "255" is patched for no reason other that than its too unlikely to meaningfully impact search behaviour or output.
+The infamous "255" is patched for no reason other that than its too unlikely to meaningfully impact search behaviour or output, and disabling this mechanic might improve learning by decreasing variance in game outcomes.
 
 * `advance=false`
 
-This option is only needed to exactly rng match, but as long as the sampling behaviour is the same we don't care.
+This option is only needed to exactly rng-match Showdown, but disabling it improves performance and the sampling behaviour is 'equilvalent'.
 
 * `key=true`
 
-Just an improvement for the `chance` flag.
+Automatically masks *secret* (not private) information in the `pkmnn_gen1_chance_actions` so that it can be used as a key for the `std::map` that defines `Node` trees.
 
-From now until stated otherwise, the sections refer to directories in the `include` folder and subsections will refer to files.. 
+From now until stated otherwise, the sections refer to directories in the `include` folder and subsections will refer to files.
 
 # libpkmn/data/
 
-These headers just deplicate the Move, Speices, Types, Status enums and some tables like boosts and the type chart. Necessary quality of life.
+These headers just deplicate the Move, Speices, Types, and Status enums and some tables like boosts and the type chart. Necessary quality of life.
 
 ## data.h
 
