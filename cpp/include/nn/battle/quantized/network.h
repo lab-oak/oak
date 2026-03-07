@@ -39,9 +39,9 @@ std::shared_ptr<Network> make_network(int in, int h1, int h2) {
 #include <iosfwd>
 
 #include <nn/affine.h>
-#include <nn/battle/stockfish/affine.h>
-#include <nn/battle/stockfish/clipped_relu.h>
-#include <nn/battle/stockfish/common.h>
+#include <nn/battle/quantized/affine.h>
+#include <nn/battle/quantized/clipped_relu.h>
+#include <nn/battle/quantized/common.h>
 
 namespace NN::Battle::Stockfish {
 

@@ -70,6 +70,37 @@ uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
   return key;
 }
 
+// TODO move set embeddings
+
+inline constexpr uint8_t ceil_log2_u8(uint8_t x) {
+  return (uint8_t)(31 - __builtin_clz((2 * x + 1)));
+}
+
+consteval bool is_bucket_step(const auto i) {
+  return (ceil_log2_u8(i) + 1) == ceil_log2_u8(i + 1);
+}
+
+// This determines all values since its an increasing function
+static_assert(ceil_log2_u8(0) == 0);
+static_assert(is_bucket_step(0));
+static_assert(is_bucket_step(1));
+static_assert(is_bucket_step(3));
+static_assert(is_bucket_step(7));
+static_assert(is_bucket_step(15));
+static_assert(is_bucket_step(31));
+static_assert(ceil_log2_u8(61) == 6);
+
+inline constexpr uint16_t pp_index(uint64_t bytes) {
+  constexpr auto base = ceil_log2_u8(61) + 1;
+  uint16_t index = 0;
+  for (auto i = 0; i < 4; ++i) {
+    index *= base;
+    index += ceil_log2_u8(bytes & 255);
+    bytes = bytes >> 16;
+  }
+  return index;
+}
+
 } // namespace Battle
 
 } // namespace Encode

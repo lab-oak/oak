@@ -1,11 +1,14 @@
 from setuptools import setup, find_packages
 from setuptools import Distribution
 
+
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
+
     def get_tag(self):
         return "py3", "none", "linux_x86_64"
+
 
 setup(
     name="oaks-lab",
