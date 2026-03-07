@@ -80,6 +80,7 @@ consteval bool is_bucket_step(const auto i) {
   return (ceil_log2_u8(i) + 1) == ceil_log2_u8(i + 1);
 }
 
+// This determines all values since its an increasing function
 static_assert(ceil_log2_u8(0) == 0);
 static_assert(is_bucket_step(0));
 static_assert(is_bucket_step(1));

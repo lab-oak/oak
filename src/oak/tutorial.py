@@ -151,56 +151,67 @@ def create_team():
 
     import oak
 
+    def get_index(s: int, m: int):
+        x = oak.species_move_table[s][m]
+        assert x >= 0, f"Invalid species move table access: {s}, {m}"
+        return x
+
     class Set:
         def __init__(self, species: int = 0):
             self.species = species
             self.moves = set()
             self.moves_remaining = set()
-            if species:
-                for i, sm in enumerate(oak.species_move_list):
-                    s, m = sm
-                    if s == self.species and m > 0:
-                        self.moves_remaining.add(i)
-                    if s > self.species:
-                        break
+            if species > 0:
+                for m, index in enumerate(oak.species_move_table[species]):
+                    if index >= 0 and m > 0:
+                        self.moves_remaining.add(m)
 
-        def add_move(self, index):
-            self.moves.add(index)
-            self.moves_remaining.remove(index)
+        def add_move(self, m):
+            self.moves.add(m)
+            self.moves_remaining.remove(m)
             if len(moves) >= 4:
                 self.moves_remaining = {}
+
+        def write_to_input(self, t):
+            if self.species > 0:
+                t[get_index(self.species, 0)] = 1.0
+                for m in self.moves:
+                    t[get_index(self.species, m)] = 1.0
+
+        def write_to_mask(self, t):
+            if len(self.moves_remaining):
+                for m in self.moves_remaining:
+                    t[get_index(self.species, m)] = 1.0
+            else:
+                # if self.species:
+                for m, index in enumerate(oak.species_move_table[self.species]):
+                    if index >= 0:
+                        t[index] = 0.0
 
         def print_(
             self,
         ):
-            print(f"{self.species}: {[i for i in self.moves]}")
+            print(
+                f"{oak.species_names[self.species]}: {[oak.move_names[m] for m in self.moves]} | {[oak.move_names[m] for m in self.moves_remaining]}"
+            )
 
-        def write_to_input(self, t):
-            if self.species > 0:
-                t[oak.species_move_table[self.species][0]] = 1.0
-                for i in self.moves:
-                    t[i] = 1.0
+    def update_team(team, s, m):
+        if m == 0:
+            assert any(s.species == 0 for s in team), "No empty slots for species pick"
+            for set_ in team:
+                if set_.species == 0:
+                    set_ = Set(s)
+                    set_.print_()
+                    break
+        else:
+            for set_ in team:
+                if set_.species == s:
+                    set_.add_move(m)
+                    break
 
-        def write_to_mask(self, t):
-            t[oak.species_move_table[self.species][0]] = 0.0
-            # requires adds?
-            if len(self.moves_remaining):
-                for i in self.moves_remaining:
-                    t[i] = 1.0
-            else:
-                # clear all species, _ from mask
-                for i, sm in enumerate(oak.species_move_list):
-                    s, m = sm
-                    if s == self.species:
-                        t[i] = 0.0
-                    if s > self.species:
-                        break
-
-    def apply_index_to_team(team, index):
-        s, m = oak.species_move_list[index]
+    def print_team(team):
         for set_ in team:
-            if s == set_.species:
-                set_.add_move(index)
+            set_.print_()
 
     if args.network:
         print("--network was provided but --build-network has priority")
@@ -231,56 +242,42 @@ def create_team():
             int(probs_p[sampled].item() * 10000) / 100,
         )
 
-    def write_all_species_to_mask(mask, val):
+    def initial_mask():
+        mask = torch.zeros([len(oak.species_move_list)])
         for i, sm in enumerate(oak.species_move_list):
             s, m = sm
             if m == 0:
-                mask[i] = val
+                mask[i] = 1
+        return mask
 
     for _ in range(args.teams):
 
         team = [Set() for _ in range(args.max_pokemon)]
 
         encoded_team = torch.zeros([len(oak.species_move_list)])
-        mask = torch.zeros([len(oak.species_move_list)])
-        # init mask with species
-        write_all_species_to_mask(mask, 1.0)
+        mask = initial_mask()
 
-        while (any(len(s.moves_remaining)) for s in team):
+        steps = 5
+
+        while any((s.species == 0) or len(s.moves_remaining) for s in team):
+
+            steps += -1
+            if steps == 0:
+                exit()
+
+            print("Team sum", sum(encoded_team))
 
             for set_ in team:
                 set_.write_to_input(encoded_team)
+                set_.write_to_mask(mask)
 
-            # # create mask for choosing the first species
-            # mask = torch.zeros([len(oak.species_move_list)])
-            # for index, pair in enumerate(oak.species_move_list):
-            #     s, m = pair
-            #     if m == 0:
-            #         mask[index] = 1
-
-            # logits, _ = network.forward(team)
-            # index, p, q = sample_masked_logits(logits, mask)
-            # species, _ = oak.species_move_list[index]
-            # print(f"{oak.species_names[species]} : {p}% ~ {q}%")
-            # team[index] = 1
-
-            # # reset mask and fill with legal moves
-            # mask.zero_()
-            # n_moves = 0
-            # for index, pair in enumerate(oak.species_move_list):
-            #     s, m = pair
-            #     if s == species and m != 0:
-            #         n_moves += 1
-            #         mask[index] = 1
-
-            # for _ in range(min(4, n_moves)):
-            #     index, p, q = sample_masked_logits(network.forward(team)[0], mask)
-            #     _, move = oak.species_move_list[index]
-            #     print(f"    {oak.move_names[move]} : {p}% ~ {q}%")
-            #     team[index] = 1
-            #     mask[index] = 0
-
-        team.print_()
+            logits, _ = network.forward(encoded_team)
+            index, p, q = sample_masked_logits(logits, mask)
+            species, move = oak.species_move_list[index]
+            # print(species, move)
+            update_team(team, species, move)
+            print(team)
+            print_team(team)
 
 
 def main():
