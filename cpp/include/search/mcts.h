@@ -123,18 +123,21 @@ template <typename BanditParams> struct MatrixUCBParams {
   float c;
 };
 
-template <size_t _root_rolls = 3, size_t _other_rolls = 1,
-          bool _debug_print = false>
 struct SearchOptions {
-  static constexpr size_t root_rolls = _root_rolls;
-  static constexpr size_t other_rolls = _other_rolls;
-  static constexpr bool debug_print = _debug_print;
-  // secondary
-  static constexpr bool rolls_same = (root_rolls == other_rolls);
-  static constexpr bool clamping = (root_rolls != 39) || (other_rolls != 39);
+  size_t root_rolls;
+  size_t other_rolls;
+  bool debug_print;
+  bool rolls_same;
+  bool clamping;
 };
 
-template <typename Options = SearchOptions<>> struct Search {
+constexpr SearchOptions default_search{.root_rolls = 3,
+                                       .other_rolls = 1,
+                                       .debug_print = false,
+                                       .rolls_same = false,
+                                       .clamping = true};
+
+template <SearchOptions Options = default_search> struct Search {
 
   pkmn_gen1_battle_options options;
   pkmn_gen1_chance_options chance_options;
@@ -565,22 +568,22 @@ template <typename Options = SearchOptions<>> struct Search {
 
   // pkmn_gen1_battle_options_set with constexpr logic
   void battle_options_set(pkmn_gen1_battle &battle, size_t depth) {
-    if constexpr (!Options::clamping) {
+    if constexpr (!Options.clamping) {
       pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
     } else {
       // last two bytes of battle rng
       const auto *rand = battle.bytes + PKMN::Layout::Offsets::Battle::rng + 6;
       auto *over = this->calc_options.overrides.bytes;
-      if constexpr (Options::rolls_same) {
-        over[0] = roll_byte<Options::root_rolls>(rand[0]);
-        over[8] = roll_byte<Options::root_rolls>(rand[1]);
+      if constexpr (Options.rolls_same) {
+        over[0] = roll_byte<Options.root_rolls>(rand[0]);
+        over[8] = roll_byte<Options.root_rolls>(rand[1]);
       } else {
         if (depth == 0) {
-          over[0] = roll_byte<Options::root_rolls>(rand[0]);
-          over[8] = roll_byte<Options::root_rolls>(rand[1]);
+          over[0] = roll_byte<Options.root_rolls>(rand[0]);
+          over[8] = roll_byte<Options.root_rolls>(rand[1]);
         } else {
-          over[0] = roll_byte<Options::other_rolls>(rand[0]);
-          over[8] = roll_byte<Options::other_rolls>(rand[1]);
+          over[0] = roll_byte<Options.other_rolls>(rand[0]);
+          over[8] = roll_byte<Options.other_rolls>(rand[1]);
         }
       }
       pkmn_gen1_battle_options_set(&options, nullptr, nullptr, &calc_options);
