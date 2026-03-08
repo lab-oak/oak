@@ -3,8 +3,12 @@ import sys
 import subprocess
 import signal
 
+# from setup import directory
+directory = "Release"
+# TODO sync with setup.py
 
-def _run_binary(binary_name, prefix="_bin"):
+
+def _run_binary(binary_name, prefix=f"_bin/{directory}"):
     bin_path = os.path.join(os.path.dirname(__file__), prefix, binary_name)
 
     if os.name != "nt":
