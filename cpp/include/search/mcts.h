@@ -771,9 +771,11 @@ template <SearchOptions Options = default_search> struct Search {
       std::array<float, 9 + 2> nash1{}, nash2{};
       LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
       LRSNash::solve_fast(&solve_input, &solve_output);
-      for (auto j = 0; j < 9; ++j) {
-        output.p1.beta[j] += nash1[j] / beta_n;
-        output.p2.beta[j] += nash2[j] / beta_n;
+      for (auto i = 0; i < output.p1.k; ++i) {
+        output.p1.beta[i] += nash1[i] / beta_n;
+      }
+      for (auto i = 0; i < output.p2.k; ++i) {
+        output.p2.beta[i] += nash2[i] / beta_n;
       }
     }
   }
