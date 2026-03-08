@@ -218,7 +218,8 @@ size_t sample(Py::Battle::EncodedFrames &encoded_frames,
         auto result = PKMN::result();
         for (auto i = 0; i < selected; ++i) {
           const auto &update = compressed.updates[i];
-          result = PKMN::update(battle, update.c1, update.c2, options);
+          result =
+              PKMN::update(battle, update.p1.choice, update.p2.choice, options);
         }
 
         size_t write_index = count.fetch_add(1);
@@ -397,8 +398,8 @@ const auto solve_matrix(py::array_t<float> p1_payoffs,
   nash2.resize(n + 2);
   LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
   LRSNash::solve_fast(&solve_input, &solve_output);
-  auto p1 = py::array_t<float>(std::vector<size_t>{m});
-  auto p2 = py::array_t<float>(std::vector<size_t>{n});
+  auto p1 = py::array_t<float>(std::vector<ssize_t>{m});
+  auto p2 = py::array_t<float>(std::vector<ssize_t>{n});
   for (int i = 0; i < m; ++i) {
     p1.mutable_unchecked<1>()(i) = nash1[i];
   }

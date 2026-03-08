@@ -61,7 +61,8 @@ struct Frames : public Target {
     for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
       const auto &update = compressed_frames.updates[i];
       write(i, battle, PKMN::durations(options), result, update, score);
-      result = PKMN::update(battle, update.c1, update.c2, options);
+      result =
+          PKMN::update(battle, update.p1.choice, update.p2.choice, options);
     }
     assert(result == compressed_frames.result);
   }

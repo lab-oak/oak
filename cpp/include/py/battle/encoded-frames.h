@@ -99,7 +99,7 @@ struct EncodedFrames : public Target {
       }
 
       std::fill_n(choice_[s].data(), 9, Encode::Battle::Policy::n_dim);
-      auto j = s ? update.n : update.m;
+      auto j = s ? update.p2.k : update.p1.k;
       auto &choices = s ? p2_choices : p1_choices;
       for (auto i = 0; i < j; ++i) {
         choice_[s][i] =
@@ -120,7 +120,8 @@ struct EncodedFrames : public Target {
     for (auto i = 0; i < compressed_frames.updates.size(); ++i) {
       const auto &update = compressed_frames.updates[i];
       write(i, battle, PKMN::durations(options), result, update, score);
-      result = PKMN::update(battle, update.c1, update.c2, options);
+      result =
+          PKMN::update(battle, update.p1.choice, update.p2.choice, options);
     }
     assert(result == compressed_frames.result);
   }
