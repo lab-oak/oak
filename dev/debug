@@ -2,6 +2,6 @@ mkdir -p cpp/build/Debug
 cmake cpp \
   -B cpp/build/Debug \
   -DCMAKE_BUILD_TYPE=Debug
-#   -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
-#   -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native/Debug \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin/Debug
 make -C cpp/build/Debug "$@"
