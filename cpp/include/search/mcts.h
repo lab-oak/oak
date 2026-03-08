@@ -184,15 +184,18 @@ struct SearchOptions {
   size_t root_rolls;
   size_t other_rolls;
   bool debug_print;
+  // dependent
   bool rolls_same;
   bool clamping;
+
+  constexpr SearchOptions(size_t root_rolls = 39, size_t other_rolls = 39,
+                          bool debug_print = false)
+      : root_rolls{root_rolls}, other_rolls{other_rolls},
+        debug_print{debug_print}, rolls_same{root_rolls == other_rolls},
+        clamping{(root_rolls != 39) || (other_rolls != 39)} {}
 };
 
-constexpr SearchOptions default_search{.root_rolls = 3,
-                                       .other_rolls = 1,
-                                       .debug_print = false,
-                                       .rolls_same = false,
-                                       .clamping = true};
+constexpr SearchOptions default_search{3, 1};
 
 template <SearchOptions Options = default_search> struct Search {
 
