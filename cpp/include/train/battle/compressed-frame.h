@@ -103,7 +103,6 @@ struct CompressedFramesImpl {
       write(iterations, sizeof(Iter));
       write(empirical_value, sizeof(value_type));
       write(nash_value, sizeof(value_type));
-      write(empirical_value, sizeof(value_type));
       write(p1.empirical, p1.k * sizeof(policy_type));
       write(p1.nash, p1.k * sizeof(policy_type));
       write(p2.empirical, p2.k * sizeof(policy_type));
