@@ -261,7 +261,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                         p1_output.p1.nash, p1_policy_options);
           if (print_search_outputs) {
             print("P1:");
-            MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
+            std::cout << MCTS::output_string(p1_output, input.battle, p1_labels,
+                                             p2_labels);
           }
         }
 
@@ -276,7 +277,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                         p2_output.p2.nash, p2_policy_options);
           if (print_search_outputs) {
             print("P2:");
-            MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);
+            std::cout << MCTS::output_string(p2_output, input.battle, p1_labels,
+                                             p2_labels);
           }
         }
 

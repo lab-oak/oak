@@ -363,10 +363,10 @@ void generate(const ProgramArgs *args_ptr) {
               std::cout << PKMN::battle_data_to_string(battle_data.battle,
                                                        battle_data.durations)
                         << std::endl;
-              MCTS::print_output(output, battle_data.battle, p1_labels,
-                                 p2_labels);
-              MCTS::print_output(after_output, battle_data.battle, p1_labels,
-                                 p2_labels);
+              std::cout << MCTS::output_string(output, battle_data.battle,
+                                               p1_labels, p2_labels);
+              std::cout << MCTS::output_string(after_output, battle_data.battle,
+                                               p1_labels, p2_labels);
             }
           }
           if (battle_length == 0) {

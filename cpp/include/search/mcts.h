@@ -745,16 +745,18 @@ template <SearchOptions Options = default_search> struct Search {
   }
 };
 
-void print_output(const Output &output, const pkmn_gen1_battle &battle,
-                  const auto &p1_labels, const auto &p2_labels) {
+auto output_string(const Output &output, const pkmn_gen1_battle &battle,
+                   const auto &p1_labels, const auto &p2_labels) {
   constexpr auto label_width = 8;
+
+  std::stringstream ss{};
 
   auto print_arr = [](const auto &arr, size_t k) {
     for (size_t i = 0; i < k; ++i) {
-      std::cout << std::left << std::fixed << std::setw(label_width)
-                << std::setprecision(3) << arr[i] << "  ";
+      ss << std::left << std::fixed << std::setw(label_width)
+         << std::setprecision(3) << arr[i] << "  ";
     }
-    std::cout << '\n';
+    ss << '\n';
   };
 
   const auto fix_label = [label_width](auto label) {
@@ -764,64 +766,66 @@ void print_output(const Output &output, const pkmn_gen1_battle &battle,
     return ss.str();
   };
 
-  std::cout << "Iterations: " << output.iterations
-            << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
-  std::cout << "Value: " << std::fixed << std::setprecision(3)
-            << output.empirical_value << "\n";
+  ss << "Iterations: " << output.iterations
+     << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
+  ss << "Value: " << std::fixed << std::setprecision(3)
+     << output.empirical_value << "\n";
 
-  std::cout << "\nP1" << std::endl;
+  ss << "\nP1" << std::endl;
   print_arr(p1_labels, output.p1.k);
   print_arr(output.p1.empirical, output.p1.k);
   print_arr(output.p1.nash, output.p1.k);
-  std::cout << "P2" << std::endl;
+  ss << "P2" << std::endl;
   print_arr(p2_labels, output.p2.k);
   print_arr(output.p2.empirical, output.p2.k);
   print_arr(output.p2.nash, output.p2.k);
 
-  std::cout << "\nMatrix:\n";
+  ss << "\nMatrix:\n";
   std::array<char, label_width + 1> col_offset{};
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  std::cout << fix_label(std::string{col_offset.data()}) << ' ';
+  ss << fix_label(std::string{col_offset.data()}) << ' ';
 
   for (size_t j = 0; j < output.p2.k; ++j)
-    std::cout << fix_label(p2_labels[j]) << " ";
-  std::cout << "\n";
+    ss << fix_label(p2_labels[j]) << " ";
+  ss << "\n";
 
   for (size_t i = 0; i < output.p1.k; ++i) {
-    std::cout << fix_label(p1_labels[i]) << " ";
+    ss << fix_label(p1_labels[i]) << " ";
     for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
-        std::cout << " ----    ";
+        ss << " ----    ";
       } else {
         double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
-        std::cout << std::left << std::fixed << std::setw(label_width)
-                  << std::setprecision(3) << avg << " ";
+        ss << std::left << std::fixed << std::setw(label_width)
+           << std::setprecision(3) << avg << " ";
       }
     }
-    std::cout << '\n';
+    ss << '\n';
   }
 
-  std::cout << "\nVisits:\n";
+  ss << "\nVisits:\n";
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  std::cout << fix_label(std::string{col_offset.data()}) << ' ';
+  ss << fix_label(std::string{col_offset.data()}) << ' ';
 
   for (size_t j = 0; j < output.p2.k; ++j)
-    std::cout << fix_label(p2_labels[j]) << " ";
-  std::cout << "\n";
+    ss << fix_label(p2_labels[j]) << " ";
+  ss << "\n";
 
   for (size_t i = 0; i < output.p1.k; ++i) {
-    std::cout << fix_label(p1_labels[i]) << " ";
+    ss << fix_label(p1_labels[i]) << " ";
     for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
-        std::cout << " ----    ";
+        ss << " ----    ";
       } else {
         auto avg = output.visit_matrix[i][j];
-        std::cout << std::left << std::fixed << std::setw(label_width)
-                  << std::setprecision(3) << avg << " ";
+        ss << std::left << std::fixed << std::setw(label_width)
+           << std::setprecision(3) << avg << " ";
       }
     }
-    std::cout << '\n';
+    ss << '\n';
   }
+
+  return ss.str();
 }
 
 std::string output_string(const MCTS::Output &output,
