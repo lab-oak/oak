@@ -263,10 +263,10 @@ template <SearchOptions Options = default_search> struct Search {
                     is_policy_network<decltype(model)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
-        const float value =
-            model.inference(input.battle, input.durations, output.p1.k, output.p2.k,
-                            output.p1.choices.data(), output.p2.choices.data(),
-                            p1_logits.data(), p2_logits.data());
+        const float value = model.inference(
+            input.battle, input.durations, output.p1.k, output.p2.k,
+            output.p1.choices.data(), output.p2.choices.data(),
+            p1_logits.data(), p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
       }

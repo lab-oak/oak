@@ -20,7 +20,7 @@ class EncodedBattleFrames:
         self.empirical_policies = torch.from_numpy(frames.empirical_policies)
         self.nash_policies = torch.from_numpy(frames.nash_policies)
         self.empirical_value = torch.from_numpy(frames.empirical_value)
-        self._nash_value = torch.from_numpy(frames._nash_value)
+        self.nash_value = torch.from_numpy(frames.nash_value)
         self.score = torch.from_numpy(frames.score)
         self.hp = torch.from_numpy(frames.hp)
         self.pokemon = torch.from_numpy(frames.pokemon)
@@ -40,7 +40,7 @@ class EncodedBattleFrames:
         self.empirical_policies[mask] = self.empirical_policies[mask].flip(dims=[1])
         self.nash_policies[mask] = self.nash_policies[mask].flip(dims=[1])
         self.empirical_value[mask] = 1 - self.empirical_value[mask]
-        self._nash_value[mask] = 1 - self._nash_value[mask]
+        self.nash_value[mask] = 1 - self.nash_value[mask]
         self.score[mask] = 1 - self.score[mask]
         self.pokemon[mask] = self.pokemon[mask].flip(dims=[1])
         self.active[mask] = self.active[mask].flip(dims=[1])
@@ -52,7 +52,7 @@ class EncodedBattleFrames:
         self.empirical_policies = self.empirical_policies.to(device)
         self.nash_policies = self.nash_policies.to(device)
         self.empirical_value = self.empirical_value.to(device)
-        self._nash_value = self._nash_value.to(device)
+        self.nash_value = self.nash_value.to(device)
         self.score = self.score.to(device)
         self.pokemon = self.pokemon.to(device)
         self.active = self.active.to(device)
