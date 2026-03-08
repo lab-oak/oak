@@ -257,8 +257,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                          p1_output);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
-          p1_index = process_and_sample(device, p1_output.p1_empirical,
-                                        p1_output.p1_nash, p1_policy_options);
+          p1_index = process_and_sample(device, p1_output.p1.empirical,
+                                        p1_output.p1.nash, p1_policy_options);
           if (print_search_outputs) {
             print("P1:");
             MCTS::print_output(p1_output, input.battle, p1_labels, p2_labels);
@@ -272,8 +272,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                          p2_output);
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
-          p2_index = process_and_sample(device, p2_output.p2_empirical,
-                                        p2_output.p2_nash, p2_policy_options);
+          p2_index = process_and_sample(device, p2_output.p2.empirical,
+                                        p2_output.p2.nash, p2_policy_options);
           if (print_search_outputs) {
             print("P2:");
             MCTS::print_output(p2_output, input.battle, p1_labels, p2_labels);

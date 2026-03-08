@@ -125,10 +125,15 @@ struct Input {
 
 // strategies, value estimate, etc. All info the search produces
 struct Output {
-  uint8_t m;
-  uint8_t n;
-  std::array<pkmn_choice, 9> p1_choices;
-  std::array<pkmn_choice, 9> p2_choices;
+  struct Side {
+    uint8_t k;
+    std::array<pkmn_choice, 9> choices;
+    std::array<double, 9> prior;
+    std::array<double, 9> empirical;
+    std::array<double, 9> nash;
+    // std::array<>
+    // std::array<double, 9> ;
+  };
 
   std::array<std::array<size_t, 9>, 9> visit_matrix;
   std::array<std::array<double, 9>, 9> value_matrix;
@@ -138,12 +143,8 @@ struct Output {
 
   double empirical_value;
   double nash_value;
-  std::array<double, 9> p1_prior;
-  std::array<double, 9> p2_prior;
-  std::array<double, 9> p1_empirical;
-  std::array<double, 9> p2_empirical;
-  std::array<double, 9> p1_nash;
-  std::array<double, 9> p2_nash;
+  Side p1;
+  Side p2;
 };
 
 // for std::map compatibility
@@ -222,14 +223,14 @@ template <SearchOptions Options = default_search> struct Search {
     *this = {};
 
     // get choices data here for matrix ucb
-    output.m = pkmn_gen1_battle_choices(
+    output.p1.k = pkmn_gen1_battle_choices(
         &input.battle, PKMN_PLAYER_P1, pkmn_result_p1(input.result),
-        output.p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
-    output.n = pkmn_gen1_battle_choices(
+        output.p1.choices.data(), PKMN_GEN1_MAX_CHOICES);
+    output.p2.k = pkmn_gen1_battle_choices(
         &input.battle, PKMN_PLAYER_P2, pkmn_result_p2(input.result),
-        output.p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+        output.p2.choices.data(), PKMN_GEN1_MAX_CHOICES);
     if constexpr (requires { params.bandit_params; }) {
-      ucb_weight = std::log(2 * output.m * output.n);
+      ucb_weight = std::log(2 * output.p1.k * output.p2.k);
     }
 
     if constexpr (is_poke_engine<decltype(model)>) {
@@ -248,7 +249,7 @@ template <SearchOptions Options = default_search> struct Search {
 
     if (!stats.is_init()) {
 
-      stats.init(output.m, output.n);
+      stats.init(output.p1.k, output.p2.k);
 
       const auto bandit_params = [](const auto &params) -> const auto & {
         if constexpr (requires { params.bandit_params; }) {
@@ -263,8 +264,8 @@ template <SearchOptions Options = default_search> struct Search {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
         const float value =
-            model.inference(input.battle, input.durations, output.m, output.n,
-                            output.p1_choices.data(), output.p2_choices.data(),
+            model.inference(input.battle, input.durations, output.p1.k, output.p2.k,
+                            output.p1.choices.data(), output.p2.choices.data(),
                             p1_logits.data(), p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
@@ -332,8 +333,8 @@ template <SearchOptions Options = default_search> struct Search {
         // const auto start = std::chrono::high_resolution_clock::now();
         const auto [p1_index, p2_index] =
             solve_root_matrix_and_sample(device, params, copy, output);
-        const auto c1 = output.p1_choices[p1_index];
-        const auto c2 = output.p2_choices[p2_index];
+        const auto c1 = output.p1.choices[p1_index];
+        const auto c2 = output.p2.choices[p2_index];
         battle_options_set(copy.battle, 0);
         copy.result = pkmn_gen1_battle_update(&copy.battle, c1, c2, &options);
 
@@ -567,8 +568,8 @@ template <SearchOptions Options = default_search> struct Search {
       std::array<int, 9 * 9> p2_ucb_matrix;
       constexpr int discretize_factor = 256;
       const float log_T = std::log(output.iterations);
-      for (auto i = 0; i < output.m; ++i) {
-        for (auto j = 0; j < output.n; ++j) {
+      for (auto i = 0; i < output.p1.k; ++i) {
+        for (auto j = 0; j < output.p2.k; ++j) {
           float p1_entry = 0;
           float p2_entry = 1;
           if (output.visit_matrix[i][j] < params.minimum) {
@@ -583,21 +584,21 @@ template <SearchOptions Options = default_search> struct Search {
                                    (output.visit_matrix[i][j] + 1));
           p1_entry += exploration;
           p2_entry -= exploration;
-          p1_ucb_matrix[i * output.n + j] = p1_entry * discretize_factor;
-          p2_ucb_matrix[i * output.n + j] = p2_entry * discretize_factor;
+          p1_ucb_matrix[i * output.p2.k + j] = p1_entry * discretize_factor;
+          p2_ucb_matrix[i * output.p2.k + j] = p2_entry * discretize_factor;
         }
       }
 
       // solve and sample
       std::array<float, 9 + 2> dummy;
       LRSNash::FastInput p1_solve_input{
-          static_cast<int>(output.m), static_cast<int>(output.n),
+          static_cast<int>(output.p1.k), static_cast<int>(output.p2.k),
           p1_ucb_matrix.data(), discretize_factor};
       LRSNash::FloatOneSumOutput p1_solve_output{p1_nash.data(), dummy.data(),
                                                  0};
       LRSNash::solve_fast(&p1_solve_input, &p1_solve_output);
       LRSNash::FastInput p2_solve_input{
-          static_cast<int>(output.m), static_cast<int>(output.n),
+          static_cast<int>(output.p1.k), static_cast<int>(output.p2.k),
           p2_ucb_matrix.data(), discretize_factor};
       LRSNash::FloatOneSumOutput p2_solve_output{dummy.data(), p2_nash.data(),
                                                  0};
@@ -607,7 +608,7 @@ template <SearchOptions Options = default_search> struct Search {
     }
 
     float p = device.uniform();
-    for (auto i = 0; i < output.m; ++i) {
+    for (auto i = 0; i < output.p1.k; ++i) {
       p -= p1_nash[i];
       if (p <= 0) {
         p1_index = i;
@@ -615,7 +616,7 @@ template <SearchOptions Options = default_search> struct Search {
       }
     }
     p = device.uniform();
-    for (auto i = 0; i < output.n; ++i) {
+    for (auto i = 0; i < output.p2.k; ++i) {
       p -= p2_nash[i];
       if (p <= 0) {
         p2_index = i;
@@ -684,26 +685,26 @@ template <SearchOptions Options = default_search> struct Search {
     // output.empirical_value = output.total_value / output.iterations;
     double total_value = 0;
 
-    output.p1_empirical = {};
-    output.p2_empirical = {};
+    output.p1.empirical = {};
+    output.p2.empirical = {};
 
     constexpr int discretize_factor = 256;
     std::array<int, 9 * 9> solve_matrix;
-    for (int i = 0; i < output.m; ++i) {
-      for (int j = 0; j < output.n; ++j) {
+    for (int i = 0; i < output.p1.k; ++i) {
+      for (int j = 0; j < output.p2.k; ++j) {
         total_value += output.value_matrix[i][j];
         auto n = output.visit_matrix[i][j];
-        output.p1_empirical[i] += n;
-        output.p2_empirical[j] += n;
+        output.p1.empirical[i] += n;
+        output.p2.empirical[j] += n;
         n += !n;
-        solve_matrix[output.n * i + j] =
+        solve_matrix[output.p2.k * i + j] =
             output.value_matrix[i][j] / n * discretize_factor;
       }
     }
 
     output.empirical_value = total_value / output.iterations;
-    LRSNash::FastInput solve_input{static_cast<int>(output.m),
-                                   static_cast<int>(output.n),
+    LRSNash::FastInput solve_input{static_cast<int>(output.p1.k),
+                                   static_cast<int>(output.p2.k),
                                    solve_matrix.data(), discretize_factor};
     // LRSNash convention: 2 extra entries needed for output denom, nash value
     std::array<float, 9 + 2> nash1{}, nash2{};
@@ -716,8 +717,8 @@ template <SearchOptions Options = default_search> struct Search {
       success = false;
       // print offending matrix in lossless form
       std::cout << "value matrix" << std::endl;
-      for (auto i = 0; i < output.m; ++i) {
-        for (auto j = 0; j < output.n; ++j) {
+      for (auto i = 0; i < output.p1.k; ++i) {
+        for (auto j = 0; j < output.p2.k; ++j) {
           std::cerr << "(" << output.value_matrix[i][j] << ", "
                     << output.visit_matrix[i][j] << ") ";
         }
@@ -725,20 +726,20 @@ template <SearchOptions Options = default_search> struct Search {
       }
     }
 
-    for (int i = 0; i < output.m; ++i) {
-      output.p1_empirical[i] /= (float)output.iterations;
-      output.p1_nash[i] = nash1[i];
+    for (int i = 0; i < output.p1.k; ++i) {
+      output.p1.empirical[i] /= (float)output.iterations;
+      output.p1.nash[i] = nash1[i];
     }
-    for (int j = 0; j < output.n; ++j) {
-      output.p2_empirical[j] /= (float)output.iterations;
-      output.p2_nash[j] = nash2[j];
+    for (int j = 0; j < output.p2.k; ++j) {
+      output.p2.empirical[j] /= (float)output.iterations;
+      output.p2.nash[j] = nash2[j];
     }
     output.nash_value = solve_output.value;
 
     // set nash data to emprical rather than leave as garbage/zeros/etc
     if (!success) {
-      output.p1_nash = output.p1_empirical;
-      output.p2_nash = output.p2_empirical;
+      output.p1.nash = output.p1.empirical;
+      output.p2.nash = output.p2.empirical;
       output.nash_value = output.empirical_value;
     }
   }
@@ -769,26 +770,26 @@ void print_output(const Output &output, const pkmn_gen1_battle &battle,
             << output.empirical_value << "\n";
 
   std::cout << "\nP1" << std::endl;
-  print_arr(p1_labels, output.m);
-  print_arr(output.p1_empirical, output.m);
-  print_arr(output.p1_nash, output.m);
+  print_arr(p1_labels, output.p1.k);
+  print_arr(output.p1.empirical, output.p1.k);
+  print_arr(output.p1.nash, output.p1.k);
   std::cout << "P2" << std::endl;
-  print_arr(p2_labels, output.n);
-  print_arr(output.p2_empirical, output.n);
-  print_arr(output.p2_nash, output.n);
+  print_arr(p2_labels, output.p2.k);
+  print_arr(output.p2.empirical, output.p2.k);
+  print_arr(output.p2.nash, output.p2.k);
 
   std::cout << "\nMatrix:\n";
   std::array<char, label_width + 1> col_offset{};
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   std::cout << fix_label(std::string{col_offset.data()}) << ' ';
 
-  for (size_t j = 0; j < output.n; ++j)
+  for (size_t j = 0; j < output.p2.k; ++j)
     std::cout << fix_label(p2_labels[j]) << " ";
   std::cout << "\n";
 
-  for (size_t i = 0; i < output.m; ++i) {
+  for (size_t i = 0; i < output.p1.k; ++i) {
     std::cout << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
+    for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
         std::cout << " ----    ";
       } else {
@@ -804,13 +805,13 @@ void print_output(const Output &output, const pkmn_gen1_battle &battle,
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   std::cout << fix_label(std::string{col_offset.data()}) << ' ';
 
-  for (size_t j = 0; j < output.n; ++j)
+  for (size_t j = 0; j < output.p2.k; ++j)
     std::cout << fix_label(p2_labels[j]) << " ";
   std::cout << "\n";
 
-  for (size_t i = 0; i < output.m; ++i) {
+  for (size_t i = 0; i < output.p1.k; ++i) {
     std::cout << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
+    for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
         std::cout << " ----    ";
       } else {
@@ -853,26 +854,26 @@ std::string output_string(const MCTS::Output &output,
      << output.empirical_value << "\n";
 
   ss << "\nP1" << std::endl;
-  print_arr(p1_labels, output.m);
-  print_arr(output.p1_empirical, output.m);
-  print_arr(output.p1_nash, output.m);
+  print_arr(p1_labels, output.p1.k);
+  print_arr(output.p1.empirical, output.p1.k);
+  print_arr(output.p1.nash, output.p1.k);
   ss << "P2" << std::endl;
-  print_arr(p2_labels, output.n);
-  print_arr(output.p2_empirical, output.n);
-  print_arr(output.p2_nash, output.n);
+  print_arr(p2_labels, output.p2.k);
+  print_arr(output.p2.empirical, output.p2.k);
+  print_arr(output.p2.nash, output.p2.k);
 
   ss << "\nMatrix:\n";
   std::array<char, label_width + 1> col_offset{};
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   ss << fix_label(std::string{col_offset.data()}) << ' ';
 
-  for (size_t j = 0; j < output.n; ++j)
+  for (size_t j = 0; j < output.p2.k; ++j)
     ss << fix_label(p2_labels[j]) << " ";
   ss << "\n";
 
-  for (size_t i = 0; i < output.m; ++i) {
+  for (size_t i = 0; i < output.p1.k; ++i) {
     ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
+    for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
         ss << " ----    ";
       } else {
@@ -888,13 +889,13 @@ std::string output_string(const MCTS::Output &output,
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   ss << fix_label(std::string{col_offset.data()}) << ' ';
 
-  for (size_t j = 0; j < output.n; ++j)
+  for (size_t j = 0; j < output.p2.k; ++j)
     ss << fix_label(p2_labels[j]) << " ";
   ss << "\n";
 
-  for (size_t i = 0; i < output.m; ++i) {
+  for (size_t i = 0; i < output.p1.k; ++i) {
     ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.n; ++j) {
+    for (size_t j = 0; j < output.p2.k; ++j) {
       if (output.visit_matrix[i][j] == 0) {
         ss << " ----    ";
       } else {

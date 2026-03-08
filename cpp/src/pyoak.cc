@@ -474,8 +474,8 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<MCTS::Output>(m, "Output")
       .def(py::init<>())
-      .def_readonly("m", &MCTS::Output::m)
-      .def_readonly("n", &MCTS::Output::n)
+      // .def_readonly("m", &MCTS::Output::m)
+      // .def_readonly("n", &MCTS::Output::n)
       .def_readonly("iterations", &MCTS::Output::iterations)
       .def_readonly("empirical_value", &MCTS::Output::empirical_value)
       .def_readonly("nash_value", &MCTS::Output::nash_value)
@@ -488,7 +488,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto r = arr.mutable_unchecked<2>();
                                for (size_t i = 0; i < 9; ++i)
                                  for (size_t j = 0; j < 9; ++j)
-                                   r(i, j) = (i < o.m && j < o.n)
+                                   r(i, j) = (i < o.p1.k && j < o.p2.k)
                                                  ? o.visit_matrix[i][j]
                                                  : 0;
                                return arr;
@@ -499,7 +499,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto r = arr.mutable_unchecked<2>();
                                for (size_t i = 0; i < 9; ++i)
                                  for (size_t j = 0; j < 9; ++j)
-                                   r(i, j) = (i < o.m && j < o.n)
+                                   r(i, j) = (i < o.p1.k && j < o.p2.k)
                                                  ? o.value_matrix[i][j]
                                                  : 0.0;
                                return arr;
@@ -510,7 +510,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto arr = py::array_t<double>(9);
                                auto r = arr.mutable_unchecked<1>();
                                for (size_t i = 0; i < 9; ++i)
-                                 r(i) = o.p1_prior[i];
+                                 r(i) = o.p1.prior[i];
                                return arr;
                              })
       .def_property_readonly("p2_prior",
@@ -518,7 +518,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto arr = py::array_t<double>(9);
                                auto r = arr.mutable_unchecked<1>();
                                for (size_t i = 0; i < 9; ++i)
-                                 r(i) = o.p2_prior[i];
+                                 r(i) = o.p2.prior[i];
                                return arr;
                              })
       .def_property_readonly("p1_empirical",
@@ -526,7 +526,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto arr = py::array_t<double>(9);
                                auto r = arr.mutable_unchecked<1>();
                                for (size_t i = 0; i < 9; ++i)
-                                 r(i) = o.p1_empirical[i];
+                                 r(i) = o.p1.empirical[i];
                                return arr;
                              })
       .def_property_readonly("p2_empirical",
@@ -534,7 +534,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto arr = py::array_t<double>(9);
                                auto r = arr.mutable_unchecked<1>();
                                for (size_t i = 0; i < 9; ++i)
-                                 r(i) = o.p2_empirical[i];
+                                 r(i) = o.p2.empirical[i];
                                return arr;
                              })
       .def_property_readonly("p1_nash",
@@ -542,7 +542,7 @@ PYBIND11_MODULE(pyoak, m) {
                                auto arr = py::array_t<double>(9);
                                auto r = arr.mutable_unchecked<1>();
                                for (size_t i = 0; i < 9; ++i)
-                                 r(i) = o.p1_nash[i];
+                                 r(i) = o.p1.nash[i];
                                return arr;
                              })
 
@@ -550,7 +550,7 @@ PYBIND11_MODULE(pyoak, m) {
         auto arr = py::array_t<double>(9);
         auto r = arr.mutable_unchecked<1>();
         for (size_t i = 0; i < 9; ++i)
-          r(i) = o.p2_nash[i];
+          r(i) = o.p2.nash[i];
         return arr;
       });
   m.def(

@@ -67,8 +67,8 @@ struct CompressedFramesImpl {
 
     Update() = default;
     Update(const auto &search_output, pkmn_choice c1, pkmn_choice c2)
-        : m{static_cast<uint8_t>(search_output.m)},
-          n{static_cast<uint8_t>(search_output.n)}, c1{c1}, c2{c2},
+        : m{static_cast<uint8_t>(search_output.p1.k)},
+          n{static_cast<uint8_t>(search_output.p2.k)}, c1{c1}, c2{c2},
           iterations{static_cast<uint32_t>(search_output.iterations)},
           empirical_value{compress_probs<double, value_type>(
               search_output.empirical_value)},
@@ -80,15 +80,15 @@ struct CompressedFramesImpl {
       p2_nash.resize(n);
       for (auto i = 0; i < m; ++i) {
         p1_empirical[i] =
-            compress_probs<double, policy_type>(search_output.p1_empirical[i]);
+            compress_probs<double, policy_type>(search_output.p1.empirical[i]);
         p1_nash[i] =
-            compress_probs<double, policy_type>(search_output.p1_nash[i]);
+            compress_probs<double, policy_type>(search_output.p1.nash[i]);
       }
       for (auto i = 0; i < n; ++i) {
         p2_empirical[i] =
-            compress_probs<double, policy_type>(search_output.p2_empirical[i]);
+            compress_probs<double, policy_type>(search_output.p2.empirical[i]);
         p2_nash[i] =
-            compress_probs<double, policy_type>(search_output.p2_nash[i]);
+            compress_probs<double, policy_type>(search_output.p2.nash[i]);
       }
     }
 

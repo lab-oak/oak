@@ -306,35 +306,35 @@ void generate(const ProgramArgs *args_ptr) {
         if (policy_rollout_only) {
           std::array<float, 9> p1_logits{};
           std::array<float, 9> p2_logits{};
-          output.m = pkmn_gen1_battle_choices(
+          output.p1.k = pkmn_gen1_battle_choices(
               &battle_data.battle, PKMN_PLAYER_P1,
-              pkmn_result_p1(battle_data.result), output.p1_choices.data(),
+              pkmn_result_p1(battle_data.result), output.p1.choices.data(),
               PKMN_GEN1_MAX_CHOICES);
-          output.n = pkmn_gen1_battle_choices(
+          output.p2.k = pkmn_gen1_battle_choices(
               &battle_data.battle, PKMN_PLAYER_P2,
-              pkmn_result_p2(battle_data.result), output.p2_choices.data(),
+              pkmn_result_p2(battle_data.result), output.p2.choices.data(),
               PKMN_GEN1_MAX_CHOICES);
           agent.network.value().inference<false>(
               battle_data.battle,
-              *pkmn_gen1_battle_options_chance_durations(&options), output.m,
-              output.n, output.p1_choices.data(), output.p2_choices.data(),
+              *pkmn_gen1_battle_options_chance_durations(&options), output.p1.k,
+              output.p2.k, output.p1.choices.data(), output.p2.choices.data(),
               p1_logits.data(), p2_logits.data());
-          softmax(output.p1_empirical.data(), p1_logits.data(), output.m);
-          softmax(output.p2_empirical.data(), p2_logits.data(), output.n);
+          softmax(output.p1.empirical.data(), p1_logits.data(), output.p1.k);
+          softmax(output.p2.empirical.data(), p2_logits.data(), output.p2.k);
 
           if constexpr (debug) {
             const auto [p1_labels, p2_labels] =
                 PKMN::choice_labels(battle_data.battle, battle_data.result);
 
             std::cout << "\nP1 policy:" << std::endl;
-            for (auto i = 0; i < output.m; ++i) {
-              std::cout << p1_labels[i] << ": " << output.p1_empirical[i]
+            for (auto i = 0; i < output.p1.k; ++i) {
+              std::cout << p1_labels[i] << ": " << output.p1.empirical[i]
                         << ' ';
             }
             std::cout << std::endl;
             std::cout << "P2 policy:" << std::endl;
-            for (auto i = 0; i < output.n; ++i) {
-              std::cout << p2_labels[i] << ": " << output.p2_empirical[i]
+            for (auto i = 0; i < output.p2.k; ++i) {
+              std::cout << p2_labels[i] << ": " << output.p2.empirical[i]
                         << ' ';
             }
             std::cout << std::endl;
@@ -379,13 +379,13 @@ void generate(const ProgramArgs *args_ptr) {
         }
 
         const auto p1_index = RuntimePolicy::process_and_sample(
-            device, output.p1_empirical, output.p1_nash,
+            device, output.p1.empirical, output.p1.nash,
             policy_rollout_only ? rollout_policy_options : policy_options);
         const auto p2_index = RuntimePolicy::process_and_sample(
-            device, output.p2_empirical, output.p2_nash,
+            device, output.p2.empirical, output.p2.nash,
             policy_rollout_only ? rollout_policy_options : policy_options);
-        const auto p1_choice = output.p1_choices[p1_index];
-        const auto p2_choice = output.p2_choices[p2_index];
+        const auto p1_choice = output.p1.choices[p1_index];
+        const auto p2_choice = output.p2.choices[p2_index];
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
 
         // update battle, durations, result (state info)

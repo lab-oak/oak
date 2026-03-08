@@ -116,9 +116,9 @@ int main(int argc, char **argv) {
 
       std::istringstream iss(line);
       if (iss >> p1_index) {
-        if (p1_index < (int)output.m) {
+        if (p1_index < (int)output.p1.k) {
           if (iss >> p2_index) {
-            if (p2_index < (int)output.n) {
+            if (p2_index < (int)output.p2.k) {
               break;
             }
           } else {
@@ -132,12 +132,12 @@ int main(int argc, char **argv) {
     if (p1_index < 0) {
       std::cout << "Sampling Player 1" << std::endl;
       p1_index = RuntimePolicy::process_and_sample(
-          device, output.p1_empirical, output.p1_nash, policy_options);
+          device, output.p1.empirical, output.p1.nash, policy_options);
     }
     if (p2_index < 0) {
       std::cout << "Sampling Player 2" << std::endl;
       p2_index = RuntimePolicy::process_and_sample(
-          device, output.p2_empirical, output.p2_nash, policy_options);
+          device, output.p2.empirical, output.p2.nash, policy_options);
     }
 
     auto c1 = p1_choices[p1_index];
