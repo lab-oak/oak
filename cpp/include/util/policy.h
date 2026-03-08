@@ -9,7 +9,6 @@ struct Options {
   std::string mode = "e";
   double temp = 1;
   double min = 0;
-  double nash_weight = .5;
 };
 
 enum class Mode : char {
@@ -52,12 +51,11 @@ std::array<double, 9> get_policy(const auto &side, const auto &options) {
     }
     case Mode::beta: {
       std::transform(beta.begin(), beta.end(), policy.begin(), policy.begin(),
-                     [w](double e, double p) { return p + w * e; });
+                     [w](double b, double p) { return p + w * b; });
       break;
     }
     default: {
       throw std::runtime_error{"RuntimePolicy: invalid mode char: " + word[0]};
-      break;
     }
     }
   }
