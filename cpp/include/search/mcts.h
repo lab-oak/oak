@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <random>
+#include <unordered_map>
 
 template <class RNG> double gamma_sample(double a, RNG &rng) {
   static std::normal_distribution<double> norm(0.0, 1.0);
@@ -131,6 +132,7 @@ struct Output {
     std::array<double, 9> prior;
     std::array<double, 9> empirical;
     std::array<double, 9> nash;
+    std::array<double, 9> beta;
     // std::array<>
     // std::array<double, 9> ;
   };
@@ -212,6 +214,9 @@ template <SearchOptions Options = default_search> struct Search {
   float ucb_weight;
   std::array<float, 9 + 2> p1_nash;
   std::array<float, 9 + 2> p2_nash;
+
+  // beta
+  size_t beta_n = 10;
 
   size_t total_depth;
   size_t errors;
@@ -304,7 +309,7 @@ template <SearchOptions Options = default_search> struct Search {
     output.duration +=
         std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    process_output(output);
+    process_output(output, beta_n);
     return output;
   }
 
@@ -679,8 +684,7 @@ template <SearchOptions Options = default_search> struct Search {
     return *pkmn_gen1_battle_options_chance_durations(&options);
   }
 
-  void process_output(Output &output) {
-
+  void process_output(Output &output, size_t beta_n = 0) {
     // prepare output, solve empirical root matrix if enabled
     // output.empirical_value = output.total_value / output.iterations;
     double total_value = 0;
@@ -742,8 +746,51 @@ template <SearchOptions Options = default_search> struct Search {
       output.p2.nash = output.p2.empirical;
       output.nash_value = output.empirical_value;
     }
+
+    output.p1.beta = {};
+    output.p2.beta = {};
+
+    std::mt19937 rd{std::random_device{}()};
+
+    for (auto k = 0; k < beta_n; ++k) {
+      for (int i = 0; i < output.p1.k; ++i) {
+        for (int j = 0; j < output.p2.k; ++j) {
+          auto n = output.visit_matrix[i][j];
+          double v = output.value_matrix[i][j];
+          if (n == 0) {
+            n = 1;
+            v = .5;
+          }
+          auto w = beta_sample(v, n, rd);
+          solve_matrix[output.p2.k * i + j] = w * discretize_factor;
+        }
+      }
+      LRSNash::FastInput solve_input{static_cast<int>(output.p1.k),
+                                     static_cast<int>(output.p2.k),
+                                     solve_matrix.data(), discretize_factor};
+      std::array<float, 9 + 2> nash1{}, nash2{};
+      LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
+      LRSNash::solve_fast(&solve_input, &solve_output);
+      for (auto j = 0; j < 9; ++j) {
+        output.p1.beta[j] += nash1[j] / beta_n;
+        output.p2.beta[j] += nash2[j] / beta_n;
+      }
+    }
   }
 };
+
+void print_side(const Output::Side &side) {
+  constexpr auto label_width = 8;
+  auto print_arr = [](const auto &arr, size_t k) {
+    for (size_t i = 0; i < k; ++i) {
+      std::cout << arr[i] << "  ";
+    }
+    std::cout << '\n';
+  };
+  print_arr(side.empirical, side.k);
+  print_arr(side.nash, side.k);
+  print_arr(side.beta, side.k);
+}
 
 auto output_string(const Output &output, const pkmn_gen1_battle &battle,
                    const auto &p1_labels, const auto &p2_labels) {
@@ -751,7 +798,7 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
 
   std::stringstream ss{};
 
-  auto print_arr = [](const auto &arr, size_t k) {
+  auto print_arr = [&ss](const auto &arr, size_t k) {
     for (size_t i = 0; i < k; ++i) {
       ss << std::left << std::fixed << std::setw(label_width)
          << std::setprecision(3) << arr[i] << "  ";
@@ -775,10 +822,12 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
   print_arr(p1_labels, output.p1.k);
   print_arr(output.p1.empirical, output.p1.k);
   print_arr(output.p1.nash, output.p1.k);
+  print_arr(output.p1.beta, output.p1.k);
   ss << "P2" << std::endl;
   print_arr(p2_labels, output.p2.k);
   print_arr(output.p2.empirical, output.p2.k);
   print_arr(output.p2.nash, output.p2.k);
+  print_arr(output.p2.beta, output.p2.k);
 
   ss << "\nMatrix:\n";
   std::array<char, label_width + 1> col_offset{};

@@ -169,13 +169,20 @@ struct Agent {
     }
     return ss.str();
   }
+
+  constexpr bool operator==(const Agent &other) const {
+    return (search_budget == other.search_budget) && (bandit == other.bandit) &&
+           (eval == other.eval) &&
+           (discrete_network == other.discrete_network) &&
+           (matrix_ucb == other.matrix_ucb) && (use_table == other.use_table);
+  }
 };
 
 std::tuple<double, double, double> expl(const MCTS::Output &a,
                                         const MCTS::Output &o,
                                         const RuntimePolicy::Options &p) {
-  auto p1_policy = RuntimePolicy::get_policy(o.p1.empirical, o.p1.nash, p);
-  auto p2_policy = RuntimePolicy::get_policy(o.p2.empirical, o.p2.nash, p);
+  auto p1_policy = RuntimePolicy::get_policy(o.p1, p);
+  auto p2_policy = RuntimePolicy::get_policy(o.p2, p);
   std::array<double, 9> p1_rewards{};
   std::array<double, 9> p2_rewards{};
   for (auto i = 0; i < a.p1.k; ++i) {

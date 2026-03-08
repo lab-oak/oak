@@ -1,5 +1,6 @@
 #pragma once
 
+#include <search/mcts.h> // TODO remove
 #include <util/strings.h>
 
 namespace RuntimePolicy {
@@ -15,10 +16,14 @@ enum class Mode : char {
   empirical = 'e',
   nash = 'n',
   argmax = 'x',
+  beta = 'b',
 };
 
-std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
-                                 const auto &options) {
+std::array<double, 9> get_policy(const auto &side, const auto &options) {
+  const auto &empirical = side.empirical;
+  const auto &nash = side.nash;
+  const auto &beta = side.beta;
+
   std::array<double, 9> policy{};
 
   const auto mode_split = Parse::split(options.mode, '-');
@@ -43,6 +48,11 @@ std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
       const auto it = std::max_element(empirical.begin(), empirical.end());
       const size_t idx = std::distance(empirical.begin(), it);
       policy[idx] += w;
+      break;
+    }
+    case Mode::beta: {
+      std::transform(beta.begin(), beta.end(), policy.begin(), policy.begin(),
+                     [w](double e, double p) { return p + w * e; });
       break;
     }
     default: {
@@ -71,7 +81,9 @@ std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
     sum += x;
   }
   if (sum == 0) {
-    throw std::runtime_error{"RuntimePolicy: zero policy"};
+    MCTS::print_side(side);
+    throw std::runtime_error{"RuntimePolicy: zero policy, mode: " +
+                             options.mode};
   }
   for (auto &x : policy) {
     x /= sum;
@@ -80,9 +92,9 @@ std::array<double, 9> get_policy(const auto &empirical, const auto &nash,
   return policy;
 }
 
-int process_and_sample(auto &device, const auto &empirical, const auto &nash,
+int process_and_sample(auto &device, const auto &side,
                        const auto &policy_options) {
-  const auto p = get_policy(empirical, nash, policy_options);
+  const auto p = get_policy(side, policy_options);
   const auto index = device.sample_pdf(p);
   assert(p[index] > 0);
   return index;
