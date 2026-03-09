@@ -146,7 +146,6 @@ def create_team():
     fn_parser.add_argument("--teams", default=1, type=int)
     fn_parser.add_argument("--max-pokemon", default=1, type=int)
     fn_parser.add_argument("--temp", default=1, type=float)
-    fn_parser.add_argument("--max", default=1, type=float)
     args = parser.parse_args()
 
     import oak
@@ -179,14 +178,18 @@ def create_team():
                     t[get_index(self.species, m)] = 1.0
 
         def write_to_mask(self, t):
-            if len(self.moves_remaining):
-                for m in self.moves_remaining:
-                    t[get_index(self.species, m)] = 1.0
-            else:
-                # if self.species:
-                for m, index in enumerate(oak.species_move_table[self.species]):
-                    if index >= 0:
-                        t[index] = 0.0
+            if self.species > 0:
+                t[get_index(self.species, 0)] = 0.0
+                for m in self.moves:
+                    t[get_index(self.species, m)] = 0.0
+                if len(self.moves_remaining):
+                    for m in self.moves_remaining:
+                        t[get_index(self.species, m)] = 1.0
+                else:
+                    # delete move choices
+                    for m, index in enumerate(oak.species_move_table[self.species]):
+                        if index >= 0:
+                            t[index] = 0.0
 
         def print_(
             self,
@@ -200,7 +203,6 @@ def create_team():
             for i, set_ in enumerate(team):
                 if set_.species == 0:
                     team[i] = Set(s)
-                    # team[i].print_()
                     break
         else:
             for set_ in team:
@@ -255,7 +257,7 @@ def create_team():
             if m == 0:
                 mask[i] = 0
 
-    for _ in range(args.teams):
+    for t in range(args.teams):
 
         team = [Set() for _ in range(args.max_pokemon)]
 
@@ -270,23 +272,19 @@ def create_team():
             if steps == 0:
                 exit()
 
-            print("\nLINE")
-
-            print("Team sum", sum(encoded_team))
-
             for set_ in team:
                 set_.write_to_input(encoded_team)
                 set_.write_to_mask(mask)
             if all(s.species > 0 for s in team):
-                print("All species done")
                 clear_species(mask)
 
             logits, _ = network.forward(encoded_team)
-            index, p, q = sample_masked_logits(logits, mask)
+            index, p, q = sample_masked_logits(logits * args.temp, mask)
             species, move = oak.species_move_list[index]
-            print(f"Selected: {oak.species_names[species]}, {oak.move_names[move]}")
             update_team(team, species, move)
-            print_team(team)
+
+        print("\nTeam", t)
+        print_team(team)
 
 
 def main():
