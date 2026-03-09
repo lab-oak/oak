@@ -60,8 +60,7 @@ jobs:
             -B cpp/build/Release \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native/Release \
-            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin/Release \
-            -DPython3_EXECUTABLE=$(which python)
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin/Release
           make -C cpp/build/Release
 
       - name: Build, repair, install, and test wheel

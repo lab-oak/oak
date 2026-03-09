@@ -46,8 +46,9 @@ target_link_libraries(libpkmn_chance INTERFACE
   $<$<CONFIG:Release>:libpkmn_chance_release>
 )
 
-target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC NO_DISCRETE_NETWORK)
-target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC NO_DISCRETE_NETWORK)
+# Add NO_DISCRETE_NETWORK to disable
+target_compile_definitions(libpkmn_client INTERFACE LOG CHANCE CALC)
+target_compile_definitions(libpkmn_chance INTERFACE CHANCE CALC)
 
 ## Pybind
 
