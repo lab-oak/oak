@@ -27,7 +27,8 @@ function(create_library target mode dir)
   )
 
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/engine/zig-out/include)
-  
+  target_compile_options(${target} INTERFACE -mavx2)
+
 endfunction()
 
 create_library(libpkmn_client_release ReleaseFast client)

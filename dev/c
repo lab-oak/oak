@@ -1,1 +1,1 @@
-rm -r cpp/extern/engine/zig-out; rm -r cpp/extern/engine/.zig-cache
+rm -rf cpp/extern/engine/zig-out cpp/extern/engine/.zig-cache
