@@ -14,12 +14,10 @@ dependencies = [
 ]
 
 [project.scripts]
-tutorial = "oak.tutorial:main"
+lab = "oak.lab:main"
 battle   = "oak.battle:main"
-rl       = "oak.rl:main"
 build    = "oak.build:main"
-elo      = "oak.elo:main"
-test-oak = "oak.cli:test_oak"
+rl       = "oak.rl:main"
 vs = "oak.cli:vs"
 generate = "oak.cli:generate"
 benchmark = "oak.cli:benchmark"
