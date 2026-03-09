@@ -132,13 +132,13 @@ int main(int argc, char **argv) {
 
     if (p1_index < 0) {
       std::cout << "Sampling Player 1" << std::endl;
-      p1_index = RuntimePolicy::process_and_sample(
-          device, output.p1.empirical, output.p1.nash, policy_options);
+      p1_index =
+          RuntimePolicy::process_and_sample(device, output.p1, policy_options);
     }
     if (p2_index < 0) {
       std::cout << "Sampling Player 2" << std::endl;
-      p2_index = RuntimePolicy::process_and_sample(
-          device, output.p2.empirical, output.p2.nash, policy_options);
+      p2_index =
+          RuntimePolicy::process_and_sample(device, output.p2, policy_options);
     }
 
     auto c1 = p1_choices[p1_index];

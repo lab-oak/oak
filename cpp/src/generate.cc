@@ -379,10 +379,10 @@ void generate(const ProgramArgs *args_ptr) {
         }
 
         const auto p1_index = RuntimePolicy::process_and_sample(
-            device, output.p1.empirical, output.p1.nash,
+            device, output.p1,
             policy_rollout_only ? rollout_policy_options : policy_options);
         const auto p2_index = RuntimePolicy::process_and_sample(
-            device, output.p2.empirical, output.p2.nash,
+            device, output.p2,
             policy_rollout_only ? rollout_policy_options : policy_options);
         const auto p1_choice = output.p1.choices[p1_index];
         const auto p2_choice = output.p2.choices[p2_index];
