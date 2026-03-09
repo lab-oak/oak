@@ -59,8 +59,8 @@ jobs:
           cmake cpp \
             -B cpp/build/Release \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native \
-            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=../../../src/oak/_native/Release \
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=../../../src/oak/_bin/Release \
             -DPython3_EXECUTABLE=$(which python)
           make -C cpp/build/Release
 
