@@ -20,7 +20,7 @@ def get_paths(directory):
         f"_bin/{directory}/benchmark",
     ]
 
--
+
 setup(
     name="oaks-lab",
     version="1.1.0",
