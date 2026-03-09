@@ -195,6 +195,9 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .min = args.p2_policy_min.or_else([&] { return args.policy_min; })
                    .value_or(0)};
 
+    const bool same_search =
+        (p1_agent == p2_agent) && (p1_agent_after == p2_agent_after);
+
     const auto &p1_team = p1_build_traj.terminal;
     const auto &p2_team = p2_build_traj.terminal;
 
@@ -257,8 +260,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                                          p1_output);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
-          p1_index = process_and_sample(device, p1_output.p1.empirical,
-                                        p1_output.p1.nash, p1_policy_options);
+          p1_index =
+              process_and_sample(device, p1_output.p1, p1_policy_options);
           if (print_search_outputs) {
             print("P1:");
             std::cout << MCTS::output_string(p1_output, input.battle, p1_labels,
@@ -267,19 +270,23 @@ void thread_fn(const ProgramArgs *args_ptr) {
         }
 
         if (p2_choices.size() > 1) {
-          RuntimeSearch::Nodes nodes{};
-          p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
-          p2_output = RuntimeSearch::run(device, input, nodes, p2_agent_after,
-                                         p2_output);
+          if (same_search && p1_choices.size() > 1) {
+            p2_output = p1_output;
+          } else {
+            RuntimeSearch::Nodes nodes{};
+            p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
+            p2_output = RuntimeSearch::run(device, input, nodes, p2_agent_after,
+                                           p2_output);
+            if (print_search_outputs) {
+              print("P2:");
+              std::cout << MCTS::output_string(p2_output, input.battle,
+                                               p1_labels, p2_labels);
+            }
+          }
           p2_early_stop =
               inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
-          p2_index = process_and_sample(device, p2_output.p2.empirical,
-                                        p2_output.p2.nash, p2_policy_options);
-          if (print_search_outputs) {
-            print("P2:");
-            std::cout << MCTS::output_string(p2_output, input.battle, p1_labels,
-                                             p2_labels);
-          }
+          p2_index =
+              process_and_sample(device, p2_output.p2, p2_policy_options);
         }
 
         RuntimeData::battle_outputs[id] = {p1_output, p2_output};
