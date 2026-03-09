@@ -10,8 +10,17 @@ class BinaryDistribution(Distribution):
         return "py3", "none", "linux_x86_64"
 
 
-directory = "Release"
+def get_paths(directory):
+    return [
+        f"_native/{directory}/*.so",
+        f"_bin/{directory}/search-test",
+        f"_bin/{directory}/generate",
+        f"_bin/{directory}/vs",
+        f"_bin/{directory}/chall",
+        f"_bin/{directory}/benchmark",
+    ]
 
+-
 setup(
     name="oaks-lab",
     version="1.1.0",
@@ -19,14 +28,7 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={
-        "oak": [
-            f"_native/{directory}/*.so",
-            f"_bin/{directory}/search-test",
-            f"_bin/{directory}/generate",
-            f"_bin/{directory}/vs",
-            f"_bin/{directory}/chall",
-            f"_bin/{directory}/benchmark",
-        ],
+        "oak": get_paths("Release"),
     },
     distclass=BinaryDistribution,
 )

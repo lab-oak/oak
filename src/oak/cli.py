@@ -3,9 +3,7 @@ import sys
 import subprocess
 import signal
 
-# from setup import directory
-directory = "Release"
-# TODO sync with setup.py
+directory = "Debug" if "OAK_DEBUG" in os.environ else "Release"
 
 
 def _run_binary(binary_name, prefix=f"_bin/{directory}"):

@@ -1,4 +1,10 @@
-from ._native.pyoak import *  # pull all symbols from your prebuilt extension
+import os
+
+if "OAK_DEBUG" in os.environ:
+    from ._native.Debug.pyoak import *
+else:
+    from ._native.Release.pyoak import *
+
 from . import util
 from . import common_args
 
