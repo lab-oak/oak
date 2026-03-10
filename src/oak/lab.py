@@ -3,10 +3,19 @@ import sys
 import argparse
 
 parser = argparse.ArgumentParser(description="Oak Tutorial")
-parser.add_argument("--main", default=None, type=str)
-parser.add_argument("--data-path", default=None, type=str)
-parser.add_argument("--network", default=None, type=str)
-parser.add_argument("--build-network", default=None, type=str)
+parser.add_argument("main", default=None, type=str, help="Utility to run")
+parser.add_argument(
+    "--data-path",
+    default=None,
+    type=str,
+    help="Path to data file or directory containing data files",
+)
+parser.add_argument(
+    "--network", default=None, type=str, help="Path to battle/build network"
+)
+parser.add_argument(
+    "--build-network", default=None, type=str, help="Path to build network"
+)
 
 
 def test_consistency():
@@ -301,7 +310,7 @@ def main():
     elif args.main == "create-team":
         create_team()
     else:
-        assert False, "Bad --main arg"
+        assert False, "Bad positional arg"
 
 
 if __name__ == "__main__":
