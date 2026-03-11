@@ -13,8 +13,13 @@ uint64_t combine_hash(uint64_t h1, uint64_t h2) {
          0xFFFFFFFFFFFFFFFF;
 }
 
-template <bool relu = true, bool clamp = false, int Order = Eigen::RowMajor>
-class Affine {
+enum class Activation {
+  none = 0,
+  relu = 1,
+  clamp = 2,
+};
+
+template <Activation activation, int Order = Eigen::RowMajor> class Affine {
 public:
   using Vector = Eigen::VectorXf;
   using Matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Order>;
@@ -87,15 +92,15 @@ public:
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
-    if constexpr (relu) {
-      for (std::size_t i = 0; i < out_dim; ++i) {
-        if constexpr (clamp) {
-          output(i) = std::clamp(output(i), 0.0f, 1.0f);
-        } else {
-          output(i) = std::max(output(i), {});
-        }
-      }
-    }
+    // if constexpr (relu) {
+    //   for (std::size_t i = 0; i < out_dim; ++i) {
+    //     if constexpr (clamp) {
+    //       output(i) = std::clamp(output(i), 0.0f, 1.0f);
+    //     } else {
+    //       output(i) = std::max(output(i), {});
+    //     }
+    //   }
+    // }
   }
 
   void propagate(const float *input_data, const auto *index_data,
@@ -108,13 +113,14 @@ public:
       float val = input_data[k];
       output.noalias() += weights.col(idx) * val;
     }
-    if constexpr (relu) {
-      for (std::size_t i = 0; i < out_dim; ++i) {
-        if constexpr (clamp) {
-          output(i) = std::clamp(output(i), 0.0f, 1.0f);
-        } else {
-          output(i) = std::max(output(i), {});
-        }
+    if constexpr (std::is_same_v<activation, Activation::none>) {
+      return;
+    }
+    for (auto i = 0; i < out_dim; ++i) {
+      if constexpr (std::is_same_v<activation, Activation::relu>) {
+        output(i) = std::max(output(i), {});
+      } else {
+        output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }
     }
   }
@@ -127,15 +133,15 @@ public:
       auto idx = index_data[k];
       output.noalias() += weights.col(idx);
     }
-    if constexpr (relu) {
-      for (std::size_t i = 0; i < out_dim; ++i) {
-        if constexpr (clamp) {
-          output(i) = std::clamp(output(i), 0.0f, 1.0f);
-        } else {
-          output(i) = std::max(output(i), {});
-        }
-      }
-    }
+    // if constexpr (relu) {
+    //   for (std::size_t i = 0; i < out_dim; ++i) {
+    //     if constexpr (clamp) {
+    //       output(i) = std::clamp(output(i), 0.0f, 1.0f);
+    //     } else {
+    //       output(i) = std::max(output(i), {});
+    //     }
+    //   }
+    // }
   }
 
   bool operator==(const Affine &other) const {

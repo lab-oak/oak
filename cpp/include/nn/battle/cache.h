@@ -278,6 +278,9 @@ template <typename T> struct BattleCaches {
   BattleSet<PokemonCache<T>> pokemon;
   BattleSet<ActivePokemonCache<T>> active;
 
+  using Team = std::array<PKMN::Set, 6>;
+  std::array<Team, 2> teams;
+
   BattleCaches() = default;
 
   BattleCaches(uint32_t pod, uint32_t aod)
@@ -297,6 +300,20 @@ template <typename T> struct BattleCaches {
                    ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
                    ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
                    ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)}} {}
+
+  void check(const pkmn_gen1_battle &battle) {
+    if (teams == {}) {
+      const auto &b = PKMN::view(battle);
+      for (auto s = 0; s < 2; ++s) {
+        for (auto p = 0; p < 6; ++p) {
+          const auto &poke = b.sides[s].pokemon[p];
+          teams[s][p] = PKMN::Set{poke.species, poke.moves};
+        }
+      }
+    } else {
+    }
+    // set team
+  }
 };
 
 } // namespace NN::Battle

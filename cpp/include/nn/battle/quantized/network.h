@@ -2,28 +2,16 @@
 
 #include <memory>
 
-#ifdef NO_DISCRETE_NETWORK
-namespace NN::Battle::Stockfish {
-struct Network {
-  float propagate(const uint8_t *transformedFeatures) const { return 0; }
-  void copy_parameters(const Affine<> &, const Affine<> &, const Affine<> &,
-                       const Affine<false> &) {};
-};
-std::shared_ptr<Network> make_network(int in, int h1, int h2) {
-  throw std::runtime_error{"Discrete networks not supported in release."};
-}
-} // namespace NN::Battle::Stockfish
-#else
 /*
-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Stockfish developers (see AUTHORS file)
+  Quantized, a UCI chess playing engine derived from Glaurung 2.1
+  Copyright (C) 2004-2025 The Quantized developers (see AUTHORS file)
 
-  Stockfish is free software: you can redistribute it and/or modify
+  Quantized is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  Stockfish is distributed in the hope that it will be useful,
+  Quantized is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
@@ -43,16 +31,12 @@ std::shared_ptr<Network> make_network(int in, int h1, int h2) {
 #include <nn/battle/quantized/clipped_relu.h>
 #include <nn/battle/quantized/common.h>
 
-namespace NN::Battle::Stockfish {
+namespace NN::Battle::Quantized {
 
-struct Network {
-  virtual float
-  propagate(const TransformedFeatureType *transformedFeatures) const = 0;
-  virtual void copy_parameters(const Affine<> &, const Affine<> &,
-                               const Affine<> &, const Affine<false> &) = 0;
-};
+template <int In, int Out1, int Out2> struct MainNet {
 
-template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
+  using T = uint8_t;
+
   static constexpr IndexType ConcatenatedSidesDims = In;
   static constexpr int FC_0_OUTPUTS = Out1;
   static constexpr int FC_1_OUTPUTS = Out2;
@@ -64,14 +48,6 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
   AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_2;
   ClippedReLU<FC_1_OUTPUTS> ac_2;
   AffineTransform<FC_1_OUTPUTS, 1> fc_3;
-
-  void copy_parameters(const Affine<> &affine0, const Affine<> &affine1,
-                       const Affine<> &affine2, const Affine<false> &affine3) {
-    fc_0.copy_parameters(affine0);
-    fc_1.copy_parameters(affine1);
-    fc_2.copy_parameters(affine2);
-    fc_3.copy_parameters(affine3);
-  }
 
   float
   propagate(const TransformedFeatureType *transformedFeatures) const override {
@@ -113,53 +89,4 @@ template <int In, int Out1, int Out2> struct NetworkArchitecture : Network {
   }
 };
 
-namespace Impl {
-std::shared_ptr<Network> invalid(const std::string &msg) {
-  throw std::runtime_error{"Invalid layer size for quantized net " + msg +
-                           " (check code for valid sizes)."};
-  return std::shared_ptr<Network>{nullptr};
-}
-template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {
-  if (H1 < h2) {
-    throw std::runtime_error{"Quantized net must have decreasing layer size."};
-    return std::shared_ptr<Network>{nullptr};
-  }
-
-  switch (h2) {
-  case 32:
-    return std::make_shared<NetworkArchitecture<In, H1, 32>>();
-  case 64:
-    return std::make_shared<NetworkArchitecture<In, H1, 64>>();
-  default:
-    return Impl::invalid("H2: " + std::to_string(h2));
-  }
-}
-template <int In> std::shared_ptr<Network> make_network_1(int h1, int h2) {
-  switch (h1) {
-  case 32:
-    return make_network_2<In, 32>(h2);
-  case 64:
-    return make_network_2<In, 64>(h2);
-  case 128:
-    return make_network_2<In, 128>(h2);
-  default:
-    return Impl::invalid("H1: " + std::to_string(h1));
-  }
-}
-} // namespace Impl
-
-std::shared_ptr<Network> make_network(int in, int h1, int h2) {
-  switch (in) {
-  case 512:
-    return Impl::make_network_1<512>(h1, h2);
-  case 768:
-    return Impl::make_network_1<768>(h1, h2);
-  case 1024:
-  default:
-    return Impl::invalid("Side dim: " + std::to_string(in));
-  }
-}
-
-} // namespace NN::Battle::Stockfish
-
-#endif
+} // namespace NN::Battle::Quantized

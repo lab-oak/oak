@@ -30,6 +30,11 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
         default=10000,
         help="Ignore games past this length (in updates not turns.)",
     )
+    parser.add_argument(
+        prefix + "discrete",
+        action="store_true",
+        help="Use clamping for activation [0, 1] and parameters [-2, 2], for discrete network usage",
+    )
 
     if not rl:
         parser.add_argument(
@@ -41,7 +46,7 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
     parser.add_argument(
         prefix + "clamp-parameters",
         action="store_true",
-        help="Clamp parameters [-2, 2] to support Stockfish-style quantization",
+        help="Clamp parameters [-2, 2] to support Quantized-style quantization",
     )
     parser.add_argument(
         prefix + "value-nash-weight",
@@ -293,6 +298,9 @@ def main():
         args.hidden_dim,
         args.value_hidden_dim,
         args.policy_hidden_dim,
+        activation=(
+            oak.torch.Activation.clamp if args.discrete else oak.torch.Activation.relu
+        ),
     ).to(device)
 
     if args.network_path:
@@ -367,7 +375,7 @@ def main():
         loss_value.backward()
         optimizer.step()
 
-        if args.clamp_parameters:
+        if args.discrete or args.clamp_parameters:
             network.clamp_parameters()
 
         oak.common_args.save_and_decay(

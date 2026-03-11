@@ -37,7 +37,7 @@ struct TeamBuildingArgs : public argparse::Args {
         kwarg(B "eval", "Eval mc/fp/<network-path>");                          \
                                                                                \
     bool &A##use_discrete =                                                    \
-        flag(B "use-discrete", "Enable Stockfish discrete main subnet");       \
+        flag(B "use-discrete", "Enable Quantized discrete main subnet");       \
                                                                                \
     bool &A##use_table =                                                       \
         flag(B "use-table", "Use a transposition table instead of a tree");    \

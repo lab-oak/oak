@@ -99,13 +99,19 @@ class BuildTrajectories:
 # Networks
 
 
+class Activation:
+    none: int = 0
+    relu: int = 1
+    clamp: int = 2
+
+
 class Affine(nn.Module):
-    def __init__(self, in_dim, out_dim, clamp=True):
+    def __init__(self, in_dim, out_dim, activation=Activation.relu):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.layer = torch.nn.Linear(in_dim, out_dim)
-        self.clamp = clamp
+        self.activation = activation
 
     def read_parameters(self, f):
         dims = f.read(8)
@@ -135,24 +141,36 @@ class Affine(nn.Module):
 
     def forward(self, x):
         x = self.layer(x)
-        if self.clamp:
+        if self.activation == Activation.none:
+            return x
+        elif self.activation == Activation.relu:
             return torch.nn.functional.relu(x)
-        return x
+        elif self.activation == Activation.clamp:
+            return torch.clamp(x, 0, 1)
+        else:
+            assert False, "Affine: Bad activation"
 
     def hash(self) -> int:
         data = (
             self.layer.weight.detach().cpu().numpy().astype("f4").tobytes()
             + self.layer.bias.detach().cpu().numpy().astype("f4").tobytes()
-            + struct.pack("<?II", self.clamp, self.in_dim, self.out_dim)
+            + struct.pack("<?II", self.activation, self.in_dim, self.out_dim)
         )
         return hash_bytes(data)
 
 
 class EmbeddingNet(nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim, clamp0=True, clamp1=True):
+    def __init__(
+        self,
+        in_dim,
+        hidden_dim,
+        out_dim,
+        activation0=Activation.relu,
+        activation1=Activation.relu,
+    ):
         super().__init__()
-        self.fc0 = Affine(in_dim, hidden_dim, clamp=clamp0)
-        self.fc1 = Affine(hidden_dim, out_dim, clamp=clamp1)
+        self.fc0 = Affine(in_dim, hidden_dim, activation=activation0)
+        self.fc1 = Affine(hidden_dim, out_dim, activation=activation1)
 
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
@@ -177,17 +195,23 @@ class EmbeddingNet(nn.Module):
 
 class MainNet(nn.Module):
     def __init__(
-        self, in_dim, hidden_dim, value_hidden_dim, policy_hidden_dim, policy_out_dim
+        self,
+        in_dim,
+        hidden_dim,
+        value_hidden_dim,
+        policy_hidden_dim,
+        policy_out_dim,
+        activation=Activation.relu,
     ):
         super().__init__()
-        self.fc0 = Affine(in_dim, hidden_dim)
-        self.fc1 = Affine(hidden_dim, hidden_dim)
-        self.value_fc1 = Affine(hidden_dim, value_hidden_dim)
-        self.value_fc2 = Affine(value_hidden_dim, 1, clamp=False)
-        self.policy1_fc1 = Affine(hidden_dim, policy_hidden_dim)
-        self.policy1_fc2 = Affine(policy_hidden_dim, policy_out_dim, clamp=False)
-        self.policy2_fc1 = Affine(hidden_dim, policy_hidden_dim)
-        self.policy2_fc2 = Affine(policy_hidden_dim, policy_out_dim, clamp=False)
+        self.fc0 = Affine(in_dim, hidden_dim, activation)
+        self.fc1 = Affine(hidden_dim, hidden_dim, activation)
+        self.value_fc1 = Affine(hidden_dim, value_hidden_dim, activation)
+        self.value_fc2 = Affine(value_hidden_dim, 1, Activation.none)
+        self.policy1_fc1 = Affine(hidden_dim, policy_hidden_dim, activation)
+        self.policy1_fc2 = Affine(policy_hidden_dim, policy_out_dim, Activation.none)
+        self.policy2_fc1 = Affine(hidden_dim, policy_hidden_dim, activation)
+        self.policy2_fc2 = Affine(policy_hidden_dim, policy_out_dim, Activation.none)
 
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
@@ -297,6 +321,7 @@ class BattleNetwork(torch.nn.Module):
         hd=oak.hidden_dim,
         vhd=oak.value_hidden_dim,
         pohd=oak.policy_hidden_dim,
+        activation=Activation.relu,
     ):
         super().__init__()
         self.pokemon_hidden_dim = phd
@@ -309,10 +334,18 @@ class BattleNetwork(torch.nn.Module):
         self.policy_hidden_dim = pohd
 
         self.pokemon_net = EmbeddingNet(
-            self.pokemon_in_dim, self.pokemon_hidden_dim, self.pokemon_out_dim
+            self.pokemon_in_dim,
+            self.pokemon_hidden_dim,
+            self.pokemon_out_dim,
+            activation,
+            activation,
         )
         self.active_net = EmbeddingNet(
-            self.active_in_dim, self.active_hidden_dim, self.active_out_dim
+            self.active_in_dim,
+            self.active_hidden_dim,
+            self.active_out_dim,
+            activation,
+            activation,
         )
         self.main_net = MainNet(
             2 * self.side_out_dim,
@@ -320,6 +353,7 @@ class BattleNetwork(torch.nn.Module):
             self.value_hidden_dim,
             self.policy_hidden_dim,
             self.policy_out_dim,
+            activation=activation,
         )
 
     def read_parameters(self, f):
@@ -395,8 +429,8 @@ class BuildNetwork(nn.Module):
             len(oak.species_move_list),
             policy_hidden_dim,
             len(oak.species_move_list),
-            True,
-            False,
+            Activation.relu,
+            Activation.none,
         )
         self.value_net = EmbeddingNet(
             len(oak.species_move_list), value_hidden_dim, 1, True, False

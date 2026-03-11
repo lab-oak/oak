@@ -10,16 +10,19 @@
 
 namespace NN::Battle {
 
-struct MainNet {
+template <Activation activation> struct MainNet {
 
-  Affine<> fc0;
-  Affine<> fc1;
-  Affine<> value_fc2;
-  Affine<false> value_fc3;
-  Affine<> p1_policy_fc2;
-  Affine<false> p1_policy_fc3;
-  Affine<> p2_policy_fc2;
-  Affine<false> p2_policy_fc3;
+  using T = float;
+  static constexpr Activation act{activation};
+
+  Affine<activation> fc0;
+  Affine<activation> fc1;
+  Affine<activation> value_fc2;
+  Affine<Activation::none> value_fc3;
+  Affine<activation> p1_policy_fc2;
+  Affine<Activation::none> p1_policy_fc3;
+  Affine<activation> p2_policy_fc2;
+  Affine<Activation::none> p2_policy_fc3;
 
   std::vector<float> buffer0;
   std::vector<float> buffer1;

@@ -31,8 +31,10 @@ battle: error: the following arguments are required: --batch-size, --lr
 
 The package is available on PyPI here and can be installed with
 
-```
-TODO make venv, activate, install
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install lab-oak
 ```
 
 Alternatively, the wheel can also be downloaded from the Github releases.
@@ -49,9 +51,9 @@ The general plan:
 
 * Fast self-play using `generate --eval=fp`
 
-* Train battle script from scratch using `battle`
+* Train value and policy network using `battle`
 
-* Compare strength using `vs`
+* Compare strength (relative to FoulPlay and Monte-Carlo) using `vs`
 
 First let's use the benchmark tool to get an idea of how fast data generation is 
 

@@ -121,7 +121,7 @@ struct Agent {
   std::string matrix_ucb;
   bool use_table;
   // valid if already loaded/cache set
-  std::optional<NN::Battle::Network> network;
+  std::unique_ptr<NN::Battle::NetworkBase> network;
   bool *flag;
 
   bool uses_network() const {

@@ -230,4 +230,4 @@ std::string output_string(const MCTS::Output &output,
   return ss.str();
 }
 
-}
+} // namespace MCTS
