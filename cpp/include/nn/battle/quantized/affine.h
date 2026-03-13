@@ -56,6 +56,12 @@ public:
       ceil_to_multiple<IndexType>(OutputDimensions, MaxSimdWidth);
 
   using OutputBuffer = OutputType[PaddedOutputDimensions];
+  using BiasType = OutputType;
+  using WeightType = std::int8_t;
+
+  alignas(CacheLineSize) BiasType biases[OutputDimensions];
+  alignas(CacheLineSize)
+      WeightType weights[OutputDimensions * PaddedInputDimensions];
 
   static constexpr IndexType get_weight_index_scrambled(IndexType i) {
     return (i / 4) % (PaddedInputDimensions / 4) * OutputDimensions * 4 +
@@ -67,18 +73,22 @@ public:
   }
 
   void copy_parameters(const auto &affine) {
-    assert(InputDimensions == affine.in_dim);
-    assert(OutputDimensions == affine.out_dim);
+    const auto assert_ = [](const bool x, const auto &msg) {
+      if (!x) {
+        throw std::runtime_error(msg);
+      }
+    };
+    assert_(InputDimensions == affine.in_dim, "bad in dim");
+    assert_(OutputDimensions == affine.out_dim, "bad out dim");
     for (auto i = 0; i < OutputDimensions; ++i) {
       biases[i] = static_cast<int32_t>(affine.biases.data()[i] * 64 * 127);
     }
     for (auto i = 0; i < OutputDimensions * InputDimensions; ++i) {
       weights[get_weight_index(i)] =
           static_cast<int8_t>(affine.weights.data()[i] * 64);
-      assert(affine.weights.data()[i] < 2);
-      assert(affine.weights.data()[i] > -2);
+      assert_(affine.weights.data()[i] < 2, "non clamped");
+      assert_(affine.weights.data()[i] > -2, "non clamped");
     }
-    // assert(std::none_of());
   }
 
   // Forward propagation
@@ -152,14 +162,6 @@ public:
 #undef vec_hadd
     }
   }
-
-public:
-  using BiasType = OutputType;
-  using WeightType = std::int8_t;
-
-  alignas(CacheLineSize) BiasType biases[OutputDimensions];
-  alignas(CacheLineSize)
-      WeightType weights[OutputDimensions * PaddedInputDimensions];
 };
 
 } // namespace NN::Battle::Quantized

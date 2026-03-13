@@ -90,12 +90,12 @@ public:
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
-    if constexpr (std::is_same_v<activation, Activation::none>) {
+    if constexpr (activation == Activation::none) {
       return;
     }
     for (auto i = 0; i < out_dim; ++i) {
-      if constexpr (std::is_same_v<activation, Activation::relu>) {
-        output(i) = std::max(output(i), {});
+      if constexpr (activation == Activation::relu) {
+        output(i) = std::max(output(i), 0.0f);
       } else {
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }
@@ -109,12 +109,12 @@ public:
     for (auto k = 0; k < n; ++k) {
       output.noalias() += weights.col(index_data[k]) * input_data[k];
     }
-    if constexpr (std::is_same_v<activation, Activation::none>) {
+    if constexpr (activation == Activation::none) {
       return;
     }
     for (auto i = 0; i < out_dim; ++i) {
-      if constexpr (std::is_same_v<activation, Activation::relu>) {
-        output(i) = std::max(output(i), 0.0);
+      if constexpr (activation == Activation::relu) {
+        output(i) = std::max(output(i), 0.0f);
       } else {
         output(i) = std::clamp(output(i), 0.0f, 1.0f);
       }

@@ -299,7 +299,7 @@ template <typename T> struct BattleCaches {
                    ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)}} {}
 
   void check(const pkmn_gen1_battle &battle) {
-    if (teams == {}) {
+    if (teams == std::array<Team, 2>{}) {
       const auto &b = PKMN::view(battle);
       for (auto s = 0; s < 2; ++s) {
         for (auto p = 0; p < 6; ++p) {

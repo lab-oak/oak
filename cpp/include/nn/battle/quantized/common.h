@@ -38,10 +38,6 @@ constexpr int WeightScaleBits = 6;
 // Size of cache line (in bytes)
 constexpr std::size_t CacheLineSize = 64;
 
-constexpr const char Leb128MagicString[] = "COMPRESSED_LEB128";
-constexpr const std::size_t Leb128MagicStringSize =
-    sizeof(Leb128MagicString) - 1;
-
 // SIMD width (in bytes)
 constexpr std::size_t SimdWidth = 32;
 

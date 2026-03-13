@@ -4,7 +4,7 @@
 #include <encode/battle/policy.h>
 #include <nn/battle/cache.h>
 #include <nn/battle/main-net.h>
-#include <nn/battle/quantized/network.h>
+#include <nn/battle/quantized/main-net.h>
 #include <nn/default-hyperparameters.h>
 #include <nn/embedding-net.h>
 #include <util/random.h>
@@ -177,21 +177,41 @@ private:
   }
 };
 
+template <typename M>
+auto quantize_network(const Network<MainNet> &network) -> Network<M> {
+  const auto &main = network.main_net;
+  auto unique_quantized =
+      make_discrete_network(main.fc0.in_dim, main.fc0.out_dim,
+                            main.value_fc2.out_dim, main.p1_policy_fc2.out_dim);
+  auto &q = *unique_quantized;
+  q.fc0.copy_parameters(main.fc0);
+
+  // fc1.copy_parameters(main.fc0);
+  // value_fc2.copy_parameters(main.fc0);
+  // value_fc3.copy_parameters(main.fc0);
+  // p.copy_parameters(main.fc0);
+  // fc0.copy_parameters(main.fc0);
+  // TODO
+
+  q.battle_cache()
+}
+
 namespace Impl {
-std::unique_ptr<MainNet> invalid(const std::string &msg) {
+std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
                            " (check code for valid sizes)."};
-  return std::unique_ptr<MainNet>{nullptr};
+  return std::unique_ptr<NetworkBase>{nullptr};
 }
 
 template <int In, int Hidden, int ValueHidden>
-std::unique_ptr<MainNet> make_network_3(int policy_hidden) {
+std::unique_ptr<NetworkBase> make_network_3(int policy_hidden) {
   // if (Hidden < policy_hidden) {
   // return Impl::invalid("Policy hidden cannot be larget than hidden.");
   // }
   switch (policy_hidden) {
   case 64:
-    return std::make_unique<MainNet<In, Hidden, ValueHidden, 64>>(
+    return std::make_unique<
+        Network<Quantized::MainNet<In, Hidden, ValueHidden, 64>>>(
         policy_hidden);
   default:
     return Impl::invalid("Policy hidden: " + std::to_string(policy_hidden));
@@ -199,7 +219,8 @@ std::unique_ptr<MainNet> make_network_3(int policy_hidden) {
 }
 
 template <int In, int Hidden>
-std::unique_ptr<MainNet> make_network_2(int value_hidden, int policy_hidden) {
+std::unique_ptr<NetworkBase> make_network_2(int value_hidden,
+                                            int policy_hidden) {
   if (Hidden < value_hidden) {
     return Impl::invalid("Value hidden cannot be larget than hidden.");
   }
@@ -213,11 +234,11 @@ std::unique_ptr<MainNet> make_network_2(int value_hidden, int policy_hidden) {
   }
 }
 template <int In>
-std::unique_ptr<MainNet> make_network_1(int hidden, int value_hidden,
-                                        int policy_hidden) {
+std::unique_ptr<NetworkBase> make_network_1(int hidden, int value_hidden,
+                                            int policy_hidden) {
   switch (hidden) {
   case 32:
-    return make_network_2<In, 32>(value_hidden);
+    return make_network_2<In, 32>(value_hidden, policy_hidden);
   case 64:
     return make_network_2<In, 64>(value_hidden, policy_hidden);
   // case 128:
@@ -228,8 +249,9 @@ std::unique_ptr<MainNet> make_network_1(int hidden, int value_hidden,
 }
 } // namespace Impl
 
-std::unique_ptr<MainNet> make_discrete_main(int in, int hidden, int value_hidden,
-                                      int policy_hidden) {
+std::unique_ptr<NetworkBase> make_quantized_network(int in, int hidden,
+                                                    int value_hidden,
+                                                    int policy_hidden) {
   switch (in) {
   // case 512:
   // return Impl::make_network_1<512>(hidden, value_hidden);

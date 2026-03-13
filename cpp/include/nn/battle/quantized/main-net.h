@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
 #include <memory>
+#include <type_traits>
 
 #include <nn/affine.h>
 #include <nn/battle/quantized/affine.h>
@@ -12,56 +14,104 @@
 
 namespace NN::Battle::Quantized {
 
-template <int In, int Out1, int Out2> struct MainNet {
+template <int In, int Hidden, int ValueHidden, int PolicyHidden>
+struct MainNet {
 
   using T = uint8_t;
+  static constexpr int PolicyOut = 320;
 
-  static constexpr int FC_0_OUTPUTS = Out1;
-  static constexpr int FC_1_OUTPUTS = Out2;
+  AffineTransform<In, Hidden> fc0;
+  ClippedReLU<Hidden> ac0;
+  AffineTransform<Hidden, Hidden> fc1;
+  ClippedReLU<Hidden> ac1;
+  // value head
+  AffineTransform<Hidden, ValueHidden> value_fc2;
+  ClippedReLU<ValueHidden> value_ac2;
+  AffineTransform<ValueHidden, 1> value_fc3;
+  // policy head
+  AffineTransform<Hidden, PolicyHidden> p1_policy_fc2;
+  ClippedReLU<PolicyHidden> p1_policy_ac2;
+  AffineTransform<PolicyHidden, PolicyOut> p1_policy_fc3;
+  AffineTransform<Hidden, PolicyHidden> p2_policy_fc2;
+  ClippedReLU<PolicyHidden> p2_policy_ac2;
+  AffineTransform<PolicyHidden, PolicyOut> p2_policy_fc3;
 
-  AffineTransform<In, FC_0_OUTPUTS> fc_0;
-  ClippedReLU<FC_0_OUTPUTS> ac_0;
-  AffineTransform<FC_0_OUTPUTS, FC_0_OUTPUTS> fc_1;
-  ClippedReLU<FC_0_OUTPUTS> ac_1;
-  AffineTransform<FC_0_OUTPUTS, FC_1_OUTPUTS> fc_2;
-  ClippedReLU<FC_1_OUTPUTS> ac_2;
-  AffineTransform<FC_1_OUTPUTS, 1> fc_3;
+  struct alignas(CacheLineSize) ValueBuffer {
+    alignas(CacheLineSize) typename decltype(fc0)::OutputBuffer fc0_out;
+    alignas(CacheLineSize) typename decltype(ac0)::OutputBuffer ac0_out;
+    alignas(CacheLineSize) typename decltype(fc1)::OutputBuffer fc1_out;
+    alignas(CacheLineSize) typename decltype(ac1)::OutputBuffer ac1_out;
+    alignas(CacheLineSize)
+        typename decltype(value_fc2)::OutputBuffer value_fc2_out;
+    alignas(CacheLineSize)
+        typename decltype(value_ac2)::OutputBuffer value_ac2_out;
+    alignas(CacheLineSize)
+        typename decltype(value_fc3)::OutputBuffer value_fc3_out;
+    ValueBuffer() { std::memset(this, 0, sizeof(*this)); }
+  };
 
-  float propagate(const uint8_t *battle_embedding) const override {
-    struct alignas(CacheLineSize) Buffer {
-      alignas(CacheLineSize) typename decltype(fc_0)::OutputBuffer fc_0_out;
-      alignas(CacheLineSize) typename decltype(ac_0)::OutputBuffer ac_0_out;
-      alignas(CacheLineSize) typename decltype(fc_1)::OutputBuffer fc_1_out;
-      alignas(CacheLineSize) typename decltype(ac_1)::OutputBuffer ac_1_out;
-      alignas(CacheLineSize) typename decltype(fc_2)::OutputBuffer fc_2_out;
-      alignas(CacheLineSize) typename decltype(ac_2)::OutputBuffer ac_2_out;
-      alignas(CacheLineSize) typename decltype(fc_3)::OutputBuffer fc_3_out;
+  struct alignas(CacheLineSize) ValuePolicyBuffer : ValueBuffer {
+    alignas(CacheLineSize)
+        typename decltype(p1_policy_fc2)::OutputBuffer p1_policy_fc2_out;
+    alignas(CacheLineSize)
+        typename decltype(p1_policy_ac2)::OutputBuffer p1_policy_ac2_out;
+    alignas(CacheLineSize)
+        typename decltype(p1_policy_fc3)::OutputBuffer p1_policy_fc3_out;
+    alignas(CacheLineSize)
+        typename decltype(p2_policy_fc2)::OutputBuffer p2_policy_fc2_out;
+    alignas(CacheLineSize)
+        typename decltype(p2_policy_ac2)::OutputBuffer p2_policy_ac2_out;
+    alignas(CacheLineSize)
+        typename decltype(p2_policy_fc3)::OutputBuffer p2_policy_fc3_out;
+    ValuePolicyBuffer() { std::memset(this, 0, sizeof(*this)); }
+  };
 
-      Buffer() { std::memset(this, 0, sizeof(*this)); }
-    };
+  float propagate(const uint8_t *input_data) const {
+    alignas(CacheLineSize) static thread_local ValueBuffer buffer;
+    fc0.propagate(input_data, buffer.fc0_out);
+    ac0.propagate(buffer.fc0_out, buffer.ac0_out);
+    fc1.propagate(buffer.ac0_out, buffer.fc1_out);
+    ac1.propagate(buffer.fc1_out, buffer.ac1_out);
+    value_fc2.propagate(buffer.ac1_out, buffer.value_fc2_out);
+    value_ac2.propagate(buffer.value_fc2_out, buffer.value_ac2_out);
+    value_fc3.propagate(buffer.value_ac2_out, buffer.value_fc3_out);
+    const float value = buffer.value_fc3_out[0] / float(127 * (1 << 6));
+    assert(!std::isnan(value));
+    return value;
+  }
 
-#if defined(__clang__) && (__APPLE__)
-    // workaround for a bug reported with xcode 12
-    static thread_local auto tlsBuffer = std::make_shared<Buffer>();
-    // Access TLS only once, cache result.
-    Buffer &buffer = *tlsBuffer;
-#else
-    alignas(CacheLineSize) static thread_local Buffer buffer;
-#endif
-
-    fc_0.propagate(battle_embedding, buffer.fc_0_out);
-    ac_0.propagate(buffer.fc_0_out, buffer.ac_0_out);
-    fc_1.propagate(buffer.ac_0_out, buffer.fc_1_out);
-    ac_1.propagate(buffer.fc_1_out, buffer.ac_1_out);
-    fc_2.propagate(buffer.ac_1_out, buffer.fc_2_out);
-    ac_2.propagate(buffer.fc_2_out, buffer.ac_2_out);
-    fc_3.propagate(buffer.ac_2_out, buffer.fc_3_out);
-
-    // buffer.fc_0_out[FC_0_OUTPUTS] is such that 1.0 is equal to
-    // 127*(1<<WeightScaleBits) in quantized form, but we want 1.0 to be equal
-    // to 600*OutputScale
-    auto outputValue = buffer.fc_3_out[0] / float(127 * (1 << 6));
-    return outputValue;
+  template <bool use_value = true>
+  auto inference(const uint8_t *input_data, const int m, const int n,
+                 const auto *p1_choice_index, const auto *p2_choice_index,
+                 float *p1, float *p2)
+      -> std::conditional_t<use_value, float, void> {
+    alignas(CacheLineSize) static thread_local ValuePolicyBuffer buffer;
+    fc0.propagate(input_data, buffer.fc0_out);
+    ac0.propagate(buffer.fc0_out, buffer.ac0_out);
+    fc1.propagate(buffer.ac0_out, buffer.fc1_out);
+    ac1.propagate(buffer.fc1_out, buffer.ac1_out);
+    if constexpr (use_value) {
+      value_fc2.propagate(buffer.ac1_out, buffer.value_fc2_out);
+      value_ac2.propagate(buffer.value_fc2_out, buffer.value_ac2_out);
+      value_fc3.propagate(buffer.value_ac2_out, buffer.value_fc3_out);
+    }
+    p1_policy_fc2.propagate(buffer.ac1_out, buffer.p1_policy_fc2_out);
+    p1_policy_ac2.propagate(buffer.p1_policy_fc2_out, buffer.p1_policy_ac2_out);
+    p1_policy_fc3.propagate(buffer.p1_policy_ac2_out, buffer.p1_policy_fc3_out);
+    p2_policy_fc2.propagate(buffer.ac1_out, buffer.p2_policy_fc2_out);
+    p2_policy_ac2.propagate(buffer.p2_policy_fc2_out, buffer.p2_policy_ac2_out);
+    p2_policy_fc3.propagate(buffer.p2_policy_ac2_out, buffer.p2_policy_fc3_out);
+    for (int i = 0; i < m; ++i) {
+      p1[i] = buffer.p1_policy_fc3_out[p1_choice_index[i]];
+    }
+    for (int i = 0; i < n; ++i) {
+      p2[i] = buffer.p2_policy_fc3_out[p2_choice_index[i]];
+    }
+    if constexpr (use_value) {
+      const float value = buffer.value_fc3_out[0] / float(127 * (1 << 6));
+      assert(!std::isnan(value));
+      return value;
+    }
   }
 };
 
