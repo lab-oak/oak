@@ -8,7 +8,6 @@
 #include <search/bandit/ucb1.h>
 #include <search/mcts.h>
 #include <search/poke-engine-evalulate.h>
-#include <util/policy.h>
 #include <util/strings.h>
 
 #include <chrono>
@@ -41,7 +40,7 @@ template <typename T> struct UniqueStats {
     }
   }
 };
-
+// TODO just let claude unfuck this
 struct Nodes {
   UniqueStats<Exp3::JointBandit> exp3;
   UniqueStats<PExp3::JointBandit> pexp3;
@@ -113,112 +112,75 @@ struct Nodes {
   }
 };
 
-struct Agent {
+struct AgentParams {
   std::string search_budget;
   std::string bandit;
   std::string eval;
-  bool discrete_network;
   std::string matrix_ucb;
-  bool use_table;
-  // valid if already loaded/cache set
-  std::unique_ptr<NN::Battle::NetworkBase> network;
-  bool *flag;
+  bool discrete;
+  bool table;
+};
 
-  bool uses_network() const {
-    return !eval.empty() && eval != "mc" && eval != "montecarlo" &&
-           eval != "monte-carlo" && eval != "fp";
+struct Agent : AgentParams {
+
+  std::unique_ptr<NN::Battle::NetworkBase> pointer;
+
+  Agent() = default;
+  Agent(const Agent &other) : AgentParams{static_cast<AgentParams>(other)} {}
+
+  constexpr bool operator==(const Agent &other) const {
+    return static_cast<AgentParams>(*this) == static_cast<AgentParams>(other);
   }
 
-  void initialize_network(const pkmn_gen1_battle &b) {
-    network.emplace();
+  bool is_monte_carlo() const {
+    return eval.empty() || eval == "mc" || eval == "montecarlo" ||
+           eval == "monte-carlo";
+  }
+  bool is_foul_play() const { return eval == "fp"; }
+  bool uses_network() const { return !is_monte_carlo() && !is_fp(); }
 
-    constexpr auto tries = 3;
+  void initialize_network(const pkmn_gen1_battle &b) {
+    network = std::make_unique<NN::Battle::Network<NN::Battle::MainNet>>();
     // sometimes reads fail because python is writing to that file. just retry
-    for (auto i = 0; i < tries; ++i) {
-      std::ifstream file{eval};
-      if (network.value().read_parameters(file)) {
-        break;
-      } else {
-        if (i == (tries - 1)) {
-          throw std::runtime_error{
-              "Agent could not read network parameters at: " + eval};
+    const auto try_read_parameters = [&network, eval]() {
+      constexpr auto tries = 3;
+      bool read_success = false;
+      for (auto i = 0; i < tries; ++i) {
+        std::ifstream file{eval};
+        if (network->read_parameters(file)) {
+          read_success = true;
+          break;
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
+      if (!read_success) {
+        throw std::runtime_error{
+            "Agent could not read network parameters at: " + eval};
+      }
+    };
+    try_read_parameters();
+    if (discrete) {
+      network = try_make_quantized_network(network);
     }
-    if (discrete_network) {
-      network.value().enable_discrete();
-    }
-    network.value().fill_pokemon_caches(b);
-  }
-
-  std::string to_string() const {
-    std::stringstream ss{};
-    ss << "search_budget: ";
-    if (flag) {
-      ss << "(flag)";
-    } else {
-      ss << search_budget;
-    }
-    ss << " bandit: " << bandit;
-    ss << " eval: ";
-    if (uses_network()) {
-      ss << eval;
-    } else {
-      ss << "(monte-carlo)";
-    }
-    return ss.str();
-  }
-
-  constexpr bool operator==(const Agent &other) const {
-    return (search_budget == other.search_budget) && (bandit == other.bandit) &&
-           (eval == other.eval) &&
-           (discrete_network == other.discrete_network) &&
-           (matrix_ucb == other.matrix_ucb) && (use_table == other.use_table);
+    network->init_caches(b);
   }
 };
 
-std::tuple<double, double, double> expl(const MCTS::Output &a,
-                                        const MCTS::Output &o,
-                                        const RuntimePolicy::Options &p) {
-  auto p1_policy = RuntimePolicy::get_policy(o.p1, p);
-  auto p2_policy = RuntimePolicy::get_policy(o.p2, p);
-  std::array<double, 9> p1_rewards{};
-  std::array<double, 9> p2_rewards{};
-  for (auto i = 0; i < a.p1.k; ++i) {
-    for (auto j = 0; j < a.p2.k; ++j) {
-      auto value = a.visit_matrix[i][j] == 0
-                       ? .5
-                       : a.value_matrix[i][j] / a.visit_matrix[i][j];
-      p1_rewards[i] += p2_policy[j] * value;
-      p2_rewards[j] += p1_policy[i] * value;
-    }
-  }
-  auto min = *std::min_element(p2_rewards.begin(), p2_rewards.begin() + a.p2.k);
-  auto max = *std::max_element(p1_rewards.begin(), p1_rewards.begin() + a.p1.k);
-  double u = 0;
-  for (auto i = 0; i < a.p1.k; ++i) {
-    u += p1_policy[i] * p1_rewards[i];
-  }
-  return {min, u, max};
-}
-
 auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
-         MCTS::Output output = {}) {
+         MCTS::Output output = {}, bool *const flag = nullptr) {
 
-  // Finally the MCTS::run call
-  const auto run_5 = [&](auto dur, auto &model, auto &params,
-                         auto &node) -> MCTS::Output {
-    MCTS::Search search{};
-    const auto o = search.run(device, dur, params, node, model, input, output);
-    // std::cout << "depth: " << (float)search.total_depth / o.iterations
-    //           << " errors: " << search.errors << std::endl;
+  const auto search = [&](auto dur, auto &model, auto &params,
+                          auto &node) -> MCTS::Output {
+    MCTS::Search s{};
+    const auto o = s.run(device, dur, params, node, model, input, output);
+    // std::cout << "depth: " << (float)s.total_depth / o.iterations
+    //           << " errors: " << s.errors << std::endl;
     return o;
   };
 
-  // Whether to use MatrixUCB params or normal
-  const auto run_4 = [&](auto dur, auto &model, auto &bandit_params,
-                         auto &node) -> MCTS::Output {
+  const auto parse_matrix_ucb_and_search = [&](auto dur, auto &model,
+                                               auto &bandit_params,
+                                               auto &node) -> MCTS::Output {
     const auto &matrix_ucb = agent.matrix_ucb;
     if (!matrix_ucb.empty()) {
       const auto matrix_ucb_split = Parse::split(agent.matrix_ucb, '-');
@@ -232,26 +194,25 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       matrix_ucb_params.interval = std::stoull(matrix_ucb_split[1]);
       matrix_ucb_params.minimum = std::stoull(matrix_ucb_split[2]);
       matrix_ucb_params.c = std::stof(matrix_ucb_split[3]);
-      return run_5(dur, model, matrix_ucb_params, node);
+      return search(dur, model, matrix_ucb_params, node);
     } else {
-      return run_5(dur, model, bandit_params, node);
+      return search(dur, model, bandit_params, node);
     }
   };
 
-  // Whether to use tree nodes or transposition table
-  const auto run_3 = [&](const auto dur, auto &model, const auto &params,
-                         auto &both) {
+  const auto parse_heap_and_search = [&](const auto dur, auto &model,
+                                         const auto &params, auto &both) {
     if (agent.use_table) {
       auto &table = nodes.get(both.table);
       table.hasher = {device};
-      return run_4(dur, model, params, table);
+      return parse_matrix_ucb_and_search(dur, model, params, table);
     } else {
-      return run_4(dur, model, params, nodes.get(both.node));
+      return parse_matrix_ucb_and_search(dur, model, params,
+                                         nodes.get(both.node));
     }
   };
 
-  // Parse bandit algorithm and parameters
-  const auto run_2 = [&](auto dur, auto &model) {
+  const auto parse_bandit_and_search = [&](auto dur, auto &model) {
     const auto bandit_split = Parse::split(agent.bandit, '-');
 
     if (bandit_split.size() < 2) {
@@ -264,13 +225,13 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
 
     if (name == "ucb") {
       UCB::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, nodes.ucb);
+      return parse_heap_and_search(dur, model, params, nodes.ucb);
     } else if (name == "ucb1") {
       UCB1::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, nodes.ucb1);
+      return parse_heap_and_search(dur, model, params, nodes.ucb1);
     } else if (name == "pucb") {
       PUCB::Bandit::Params params{.c = f1};
-      return run_3(dur, model, params, nodes.pucb);
+      return parse_heap_and_search(dur, model, params, nodes.pucb);
     }
 
     float alpha = .05;
@@ -283,56 +244,58 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
                                   .one_minus_gamma = (1 - f1),
                                   .alpha = alpha,
                                   .one_minus_alpha = (1 - alpha)};
-      return run_3(dur, model, params, nodes.exp3);
+      return parse_heap_and_search(dur, model, params, nodes.exp3);
     } else if (name == "pexp3") {
       PExp3::Bandit::Params params{.gamma = f1,
                                    .one_minus_gamma = (1 - f1),
                                    .alpha = alpha,
                                    .one_minus_alpha = (1 - alpha)};
-      return run_3(dur, model, params, nodes.pexp3);
+      return parse_heap_and_search(dur, model, params, nodes.pexp3);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + name);
     }
   };
 
-  // Whether to use a network, Monte Carlo, or Poke-Engine
-  const auto search_1 = [&](const auto dur) {
-    if (agent.uses_network()) {
-      if (!agent.network.has_value()) {
-        agent.initialize_network(input.battle);
-      }
-      return run_2(dur, agent.network.value());
-    } else if (agent.eval == "fp") {
-      PokeEngine::Model model{};
-      return run_2(dur, model);
-    } else {
+  const auto parse_eval_and_search = [&](const auto dur) {
+    if (agent.is_monte_carlo()) {
       MCTS::MonteCarlo model{};
-      return run_2(dur, model);
+      return parse_bandit_and_search(dur, model);
+    } else if (agent.is_foul_play()) {
+      PokeEngine::Model model{};
+      return parse_bandit_and_search(dur, model);
+    } else {
+      if (!agent.network) {
+        agent.initialize_network(input.battle);
+      } else {
+        if (!agent.network->check_cache()) {
+          throw std::runtime_error{"Cache mismatch."};
+        }
+      }
+      return parse_bandit_and_search(dur, agent.network.value());
     }
   };
 
-  // Parse search budget
-  const auto search_0 = [&]() {
-    if (agent.flag != nullptr) {
-      return search_1(agent.flag);
+  const auto parse_budget_and_search = [&]() {
+    if (flag != nullptr) {
+      return parse_eval_and_search(flag);
     }
     const auto pos = agent.search_budget.find_first_not_of("0123456789");
     size_t number = std::stoll(agent.search_budget.substr(0, pos));
     std::string unit =
         (pos == std::string::npos) ? "" : agent.search_budget.substr(pos);
     if (unit.empty()) {
-      return search_1(number);
+      return parse_eval_and_search(number);
     } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
-      return search_1(std::chrono::milliseconds{number});
+      return parse_eval_and_search(std::chrono::milliseconds{number});
     } else if (unit == "s" || unit == "sec" || unit == "seconds") {
-      return search_1(std::chrono::seconds{number});
+      return parse_eval_and_search(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
                                agent.search_budget);
     }
   };
 
-  return search_0();
+  return parse_budget_and_search();
 }
 
 } // namespace RuntimeSearch

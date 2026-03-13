@@ -36,6 +36,10 @@ struct MainNet {
   ClippedReLU<PolicyHidden> p2_policy_ac2;
   AffineTransform<PolicyHidden, PolicyOut> p2_policy_fc3;
 
+  std::tuple<int, int, int, int> shape() const noexcept {
+    return {In, Hidden, ValueHidden, PolicyHidden};
+  }
+
   struct alignas(CacheLineSize) ValueBuffer {
     alignas(CacheLineSize) typename decltype(fc0)::OutputBuffer fc0_out;
     alignas(CacheLineSize) typename decltype(ac0)::OutputBuffer ac0_out;
@@ -84,7 +88,7 @@ struct MainNet {
   auto inference(const uint8_t *input_data, const int m, const int n,
                  const auto *p1_choice_index, const auto *p2_choice_index,
                  float *p1, float *p2)
-      -> std::conditional_t<use_value, float, void> {
+      -> std::conditional_t<use_value, float, void> const {
     alignas(CacheLineSize) static thread_local ValuePolicyBuffer buffer;
     fc0.propagate(input_data, buffer.fc0_out);
     ac0.propagate(buffer.fc0_out, buffer.ac0_out);

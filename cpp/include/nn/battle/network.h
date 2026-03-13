@@ -22,24 +22,25 @@ struct NetworkBase {
                                 const pkmn_gen1_chance_durations &d) = 0;
   virtual void policy_inference(const pkmn_gen1_battle &b,
                                 const pkmn_gen1_chance_durations &d,
-                                const auto m, const auto n,
-                                const auto *p1_choice, const auto *p2_choice,
-                                float *p1, float *p2) = 0;
+                                const uint8_t m, const uint8_t n,
+                                const uint16_t *p1_choice,
+                                const uint16_t *p2_choice, float *p1,
+                                float *p2) = 0;
   virtual float value_policy_inference(const pkmn_gen1_battle &b,
                                        const pkmn_gen1_chance_durations &d,
-                                       const auto m, const auto n,
-                                       const auto *p1_choice,
-                                       const auto *p2_choice, float *p1,
+                                       const uint8_t m, const uint8_t n,
+                                       const uint16_t *p1_choice,
+                                       const uint16_t *p2_choice, float *p1,
                                        float *p2) = 0;
 };
 
-template <typename MainNet> class Network : public NetworkBase {
+template <typename Main> class Network : public NetworkBase {
   static constexpr auto activation = MainNet::activation;
-  using T = typename MainNet::T;
+  using T = typename Main::T;
 
   EmbeddingNet<activation> pokemon_net;
   EmbeddingNet<activation> active_net;
-  MainNet main_net;
+  Main main_net;
   BattleCaches<T> battle_cache;
 
   uint32_t pokemon_out_dim;
@@ -63,7 +64,6 @@ public:
       active_out_dim = active_net.fc1.out_dim;
       side_embedding_dim = (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
       battle_embedding.resize(2 * side_embedding_dim);
-      battle_embedding_d.resize(2 * side_embedding_dim);
       battle_cache = BattleCaches<T>{pokemon_out_dim, active_out_dim};
       return true;
     }
@@ -99,8 +99,9 @@ public:
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
     write_battle_embedding(b, d);
-    main_net.propagate<false>(battle_embedding.data(), m, n, p1_choice_index,
-                              p2_choice_index, p1, p2);
+    main_net.template propagate<false>(battle_embedding.data(), m, n,
+                                       p1_choice_index, p2_choice_index, p1,
+                                       p2);
   }
 
   auto value_policy_inference(const pkmn_gen1_battle &b,
@@ -119,9 +120,9 @@ public:
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
     write_battle_embedding(b, d);
-    const auto value = sigmoid(
-        main_net.propagate<true>(battle_embedding.data(), m, n, p1_choice_index,
-                                 p2_choice_index, p1, p2));
+    const auto value = sigmoid(main_net.template propagate<true>(
+        battle_embedding.data(), m, n, p1_choice_index, p2_choice_index, p1,
+        p2));
     assert(!std::isnan(value));
     return value;
   }
@@ -178,7 +179,8 @@ private:
 };
 
 template <typename M>
-auto quantize_network(const Network<MainNet> &network) -> Network<M> {
+auto quantize_network(const Network<MainNet> &network)
+    -> std::unique_ptr<NetworkBase<M>> {
   const auto &main = network.main_net;
   auto unique_quantized =
       make_discrete_network(main.fc0.in_dim, main.fc0.out_dim,
@@ -193,7 +195,8 @@ auto quantize_network(const Network<MainNet> &network) -> Network<M> {
   // fc0.copy_parameters(main.fc0);
   // TODO
 
-  q.battle_cache()
+  // q.battle_cache()
+  return std::dynamic_pointer_cast<Network<M> *>(unique_quantized);
 }
 
 namespace Impl {
@@ -249,9 +252,8 @@ std::unique_ptr<NetworkBase> make_network_1(int hidden, int value_hidden,
 }
 } // namespace Impl
 
-std::unique_ptr<NetworkBase> make_quantized_network(int in, int hidden,
-                                                    int value_hidden,
-                                                    int policy_hidden) {
+std::unique_ptr<NetworkBase> try_make_quantized_network(Network<MainNet> &net) {
+  const auto [in, hidden, value_hidden, policy_hidden] = net.shape();
   switch (in) {
   // case 512:
   // return Impl::make_network_1<512>(hidden, value_hidden);
