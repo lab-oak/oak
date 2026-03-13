@@ -12,11 +12,6 @@ template <NN::Activation activation> struct EmbeddingNet {
   Affine<activation> fc1;
   std::vector<float> buf;
 
-  void initialize(auto &device) {
-    fc0.initialize(device);
-    fc1.initialize(device);
-  }
-
   bool read_parameters(std::istream &stream) {
     const bool ok = fc0.read_parameters(stream) && fc1.read_parameters(stream);
     if (!ok) {
@@ -39,6 +34,11 @@ template <NN::Activation activation> struct EmbeddingNet {
                  auto n) {
     fc0.propagate(input, index, buf.data(), n);
     fc1.propagate(buf.data(), output_data);
+  }
+
+  void initialize(auto &device) {
+    fc0.initialize(device);
+    fc1.initialize(device);
   }
 };
 

@@ -1,30 +1,9 @@
 #pragma once
 
-#include <memory>
-
-/*
-  Quantized, a UCI chess playing engine derived from Glaurung 2.1
-  Copyright (C) 2004-2025 The Quantized developers (see AUTHORS file)
-
-  Quantized is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  Quantized is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-// Input features and network structure used in NNUE evaluation function
-
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
+#include <memory>
 
 #include <nn/affine.h>
 #include <nn/battle/quantized/affine.h>
@@ -37,11 +16,10 @@ template <int In, int Out1, int Out2> struct MainNet {
 
   using T = uint8_t;
 
-  static constexpr IndexType ConcatenatedSidesDims = In;
   static constexpr int FC_0_OUTPUTS = Out1;
   static constexpr int FC_1_OUTPUTS = Out2;
 
-  AffineTransform<ConcatenatedSidesDims, FC_0_OUTPUTS> fc_0;
+  AffineTransform<In, FC_0_OUTPUTS> fc_0;
   ClippedReLU<FC_0_OUTPUTS> ac_0;
   AffineTransform<FC_0_OUTPUTS, FC_0_OUTPUTS> fc_1;
   ClippedReLU<FC_0_OUTPUTS> ac_1;
@@ -49,8 +27,7 @@ template <int In, int Out1, int Out2> struct MainNet {
   ClippedReLU<FC_1_OUTPUTS> ac_2;
   AffineTransform<FC_1_OUTPUTS, 1> fc_3;
 
-  float
-  propagate(const TransformedFeatureType *transformedFeatures) const override {
+  float propagate(const uint8_t *battle_embedding) const override {
     struct alignas(CacheLineSize) Buffer {
       alignas(CacheLineSize) typename decltype(fc_0)::OutputBuffer fc_0_out;
       alignas(CacheLineSize) typename decltype(ac_0)::OutputBuffer ac_0_out;
@@ -72,7 +49,7 @@ template <int In, int Out1, int Out2> struct MainNet {
     alignas(CacheLineSize) static thread_local Buffer buffer;
 #endif
 
-    fc_0.propagate(transformedFeatures, buffer.fc_0_out);
+    fc_0.propagate(battle_embedding, buffer.fc_0_out);
     ac_0.propagate(buffer.fc_0_out, buffer.ac_0_out);
     fc_1.propagate(buffer.ac_0_out, buffer.fc_1_out);
     ac_1.propagate(buffer.fc_1_out, buffer.ac_1_out);
@@ -84,7 +61,6 @@ template <int In, int Out1, int Out2> struct MainNet {
     // 127*(1<<WeightScaleBits) in quantized form, but we want 1.0 to be equal
     // to 600*OutputScale
     auto outputValue = buffer.fc_3_out[0] / float(127 * (1 << 6));
-
     return outputValue;
   }
 };

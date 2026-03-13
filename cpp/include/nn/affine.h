@@ -65,7 +65,6 @@ public:
         assert(!std::isnan(weights(i, j)));
       }
     }
-
     return true;
   }
 
@@ -77,7 +76,6 @@ public:
     if constexpr (Order == Eigen::RowMajor) {
       stream.write(reinterpret_cast<const char *>(weights.data()),
                    out_dim * in_dim * sizeof(float));
-
     } else {
       MatrixRowMajor row_major_matrix;
       row_major_matrix.resize(out_dim, in_dim);
@@ -92,27 +90,6 @@ public:
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
-    // if constexpr (relu) {
-    //   for (std::size_t i = 0; i < out_dim; ++i) {
-    //     if constexpr (clamp) {
-    //       output(i) = std::clamp(output(i), 0.0f, 1.0f);
-    //     } else {
-    //       output(i) = std::max(output(i), {});
-    //     }
-    //   }
-    // }
-  }
-
-  void propagate(const float *input_data, const auto *index_data,
-                 float *output_data, uint32_t n) const {
-    Eigen::Map<Vector> output(output_data, out_dim);
-    output = biases;
-
-    for (std::size_t k = 0; k < n; ++k) {
-      auto idx = index_data[k];
-      float val = input_data[k];
-      output.noalias() += weights.col(idx) * val;
-    }
     if constexpr (std::is_same_v<activation, Activation::none>) {
       return;
     }
@@ -125,23 +102,23 @@ public:
     }
   }
 
-  void propagate(const auto *index_data, float *output_data, size_t n) const {
+  void propagate(const float *input_data, const auto *index_data,
+                 float *output_data, uint32_t n) const {
     Eigen::Map<Vector> output(output_data, out_dim);
     output = biases;
-
-    for (std::size_t k = 0; k < n; ++k) {
-      auto idx = index_data[k];
-      output.noalias() += weights.col(idx);
+    for (auto k = 0; k < n; ++k) {
+      output.noalias() += weights.col(index_data[k]) * input_data[k];
     }
-    // if constexpr (relu) {
-    //   for (std::size_t i = 0; i < out_dim; ++i) {
-    //     if constexpr (clamp) {
-    //       output(i) = std::clamp(output(i), 0.0f, 1.0f);
-    //     } else {
-    //       output(i) = std::max(output(i), {});
-    //     }
-    //   }
-    // }
+    if constexpr (std::is_same_v<activation, Activation::none>) {
+      return;
+    }
+    for (auto i = 0; i < out_dim; ++i) {
+      if constexpr (std::is_same_v<activation, Activation::relu>) {
+        output(i) = std::max(output(i), 0.0);
+      } else {
+        output(i) = std::clamp(output(i), 0.0f, 1.0f);
+      }
+    }
   }
 
   bool operator==(const Affine &other) const {
@@ -150,11 +127,11 @@ public:
 
   void initialize(auto &device) {
     const float k = 1.0f / std::sqrt(static_cast<float>(in_dim));
-    for (std::size_t i = 0; i < out_dim; ++i) {
+    for (auto i = 0; i < out_dim; ++i) {
       biases(i) = device.uniform() * 2 * k - k;
     }
-    for (std::size_t i = 0; i < out_dim; ++i) {
-      for (std::size_t j = 0; j < in_dim; ++j) {
+    for (auto i = 0; i < out_dim; ++i) {
+      for (auto j = 0; j < in_dim; ++j) {
         weights(i, j) = device.uniform() * 2 * k - k;
       }
     }

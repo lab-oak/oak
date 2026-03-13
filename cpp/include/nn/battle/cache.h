@@ -227,9 +227,6 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     }
   }
 
-  // TODO warm start
-  void fill(auto &, const PKMN::Pokemon &) {}
-
   const T *get(auto &active_net, const auto &active, const auto &pokemon,
                const auto &duration) {
     const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{

@@ -34,12 +34,12 @@ struct NetworkBase {
 };
 
 template <typename MainNet> class Network : public NetworkBase {
+  static constexpr auto activation = MainNet::activation;
+  using T = typename MainNet::T;
+
   EmbeddingNet<activation> pokemon_net;
   EmbeddingNet<activation> active_net;
-
-  using T = std::conditional_t<discrete, uint8_t, float>;
-  using Main = std::conditional_t<discrete, void, MainNet>;
-
+  MainNet main_net;
   BattleCaches<T> battle_cache;
 
   uint32_t pokemon_out_dim;
@@ -64,9 +64,7 @@ public:
       side_embedding_dim = (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
       battle_embedding.resize(2 * side_embedding_dim);
       battle_embedding_d.resize(2 * side_embedding_dim);
-      battle_cache = BattleCaches<float>{pokemon_out_dim, active_out_dim};
-      discrete_battle_cache =
-          BattleCaches<uint8_t>{pokemon_out_dim, active_out_dim};
+      battle_cache = BattleCaches<T>{pokemon_out_dim, active_out_dim};
       return true;
     }
   }
@@ -79,22 +77,18 @@ public:
 
   float value_inference(const pkmn_gen1_battle &b,
                         const pkmn_gen1_chance_durations &d) {
-    float value;
-    write_battle_embedding<float>(battle_embedding.data(), b, d);
-    value = sigmoid(main_net.propagate(battle_embedding.data()));
+    write_battle_embedding(b, d);
+    const auto value = sigmoid(main_net.propagate(battle_embedding.data()));
     assert(!std::isnan(value));
     return value;
   }
 
-  template <bool use_value = true>
-  auto inference(const pkmn_gen1_battle &b, const pkmn_gen1_chance_durations &d,
-                 const auto m, const auto n, const auto *p1_choice,
-                 const auto *p2_choice, float *p1, float *p2)
-      -> std::conditional_t<use_value, float, void> {
-
+  auto policy_inference(const pkmn_gen1_battle &b,
+                        const pkmn_gen1_chance_durations &d, const auto m,
+                        const auto n, const auto *p1_choice,
+                        const auto *p2_choice, float *p1, float *p2) {
     static thread_local uint16_t p1_choice_index[9];
     static thread_local uint16_t p2_choice_index[9];
-
     const auto &battle = PKMN::view(b);
     for (auto i = 0; i < m; ++i) {
       p1_choice_index[i] =
@@ -104,25 +98,32 @@ public:
       p2_choice_index[i] =
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
+    write_battle_embedding(b, d);
+    main_net.propagate<false>(battle_embedding.data(), m, n, p1_choice_index,
+                              p2_choice_index, p1, p2);
+  }
 
-    float value;
-    if constexpr (use_value) {
-      if (use_discrete) {
-        throw std::runtime_error(
-            "Value + Policy output with discrete nets not supported.");
-        return -1;
-      }
-      write_battle_embedding<float>(battle_embedding.data(), b, d);
-      value =
-          main_net.propagate<true>(battle_embedding.data(), m, n,
-                                   p1_choice_index, p2_choice_index, p1, p2);
-      return sigmoid(value);
-    } else {
-      write_battle_embedding<float>(battle_embedding.data(), b, d);
-      // won't use value layers or return anything
-      main_net.propagate<false>(battle_embedding.data(), m, n, p1_choice_index,
-                                p2_choice_index, p1, p2);
+  auto value_policy_inference(const pkmn_gen1_battle &b,
+                              const pkmn_gen1_chance_durations &d, const auto m,
+                              const auto n, const auto *p1_choice,
+                              const auto *p2_choice, float *p1, float *p2) {
+    static thread_local uint16_t p1_choice_index[9];
+    static thread_local uint16_t p2_choice_index[9];
+    const auto &battle = PKMN::view(b);
+    for (auto i = 0; i < m; ++i) {
+      p1_choice_index[i] =
+          Encode::Battle::Policy::get_index(battle.sides[0], p1_choice[i]);
     }
+    for (auto i = 0; i < n; ++i) {
+      p2_choice_index[i] =
+          Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
+    }
+    write_battle_embedding(b, d);
+    const auto value = sigmoid(
+        main_net.propagate<true>(battle_embedding.data(), m, n, p1_choice_index,
+                                 p2_choice_index, p1, p2));
+    assert(!std::isnan(value));
+    return value;
   }
 
 private:
@@ -131,9 +132,8 @@ private:
     return (1 + active_out_dim) + (i - 1) * (1 + pokemon_out_dim);
   }
 
-  template <typename T>
-  void write_battle_embedding(T *battle_embedding, const pkmn_gen1_battle &b,
-                              const pkmn_gen1_chance_durations &d) {
+  void write_battle_embedding(const pkmn_gen1_battle &b,
+                              const pkmn_gen1_chance_durations &d) noexcept {
     const auto &battle = PKMN::view(b);
     const auto &durations = PKMN::view(d);
     for (auto s = 0; s < 2; ++s) {
@@ -144,120 +144,99 @@ private:
       auto *side_embedding = battle_embedding + s * side_embedding_index(6);
 
       if (stored.hp == 0) {
-        std::fill(side_embedding, side_embedding + (active_out_dim + 1), 0);
+        std::fill_n(side_embedding, active_out_dim + 1, 0);
       } else {
-        if constexpr (std::is_integral_v<T>) {
-          const T *embedding =
-              discrete_battle_cache.active[s][side.order[0] - 1].get(
-                  active_net, side.active, stored, duration);
-          std::copy(embedding, embedding + active_out_dim, side_embedding + 1);
-          side_embedding[0] = (float)stored.hp / stored.stats.hp * 127;
-        } else {
-          const T *embedding = battle_cache.active[s][side.order[0] - 1].get(
-              active_net, side.active, stored, duration);
-          std::copy(embedding, embedding + active_out_dim, side_embedding + 1);
-          side_embedding[0] = (float)stored.hp / stored.stats.hp;
-        }
+        const auto percent = (float)stored.hp / stored.stats.hp;
+        side_embedding[0] = std::is_integral_v<T> ? percent * 127 : percent;
+        const T *embedding = battle_cache.active[s][side.order[0] - 1].get(
+            active_net, side.active, stored, duration);
+        std::copy_n(embedding, active_out_dim, side_embedding + 1);
       }
-
-      const auto &permute = random_permutation_5();
 
       for (auto slot = 2; slot <= 6; ++slot) {
         auto *slot_embedding = side_embedding + side_embedding_index(slot - 1);
         // const auto id = side.order[permute[slot - 2]];
         const auto id = side.order[slot - 1];
-
         if (id == 0) {
-          std::fill(slot_embedding, slot_embedding + (pokemon_out_dim + 1), 0);
+          std::fill_n(slot_embedding, pokemon_out_dim + 1, 0);
         } else {
           const auto &pokemon = side.pokemon[id - 1];
           if (pokemon.hp == 0) {
-            std::fill(slot_embedding, slot_embedding + (pokemon_out_dim + 1),
-                      0);
+            std::fill_n(slot_embedding, pokemon_out_dim + 1, 0);
           } else {
+            const auto percent = (float)pokemon.hp / pokemon.stats.hp;
+            slot_embedding[0] = std::is_integral_v<T> ? percent * 127 : percent;
             const auto sleep = duration.sleep(slot - 1);
-            if constexpr (std::is_integral_v<T>) {
-              const T *embedding =
-                  discrete_battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
-              std::copy(embedding, embedding + pokemon_out_dim,
-                        slot_embedding + 1);
-              slot_embedding[0] = (float)pokemon.hp / pokemon.stats.hp * 127;
-            } else {
-              const T *embedding =
-                  battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
-              std::copy(embedding, embedding + pokemon_out_dim,
-                        slot_embedding + 1);
-              slot_embedding[0] = (float)pokemon.hp / pokemon.stats.hp;
-            }
+            const T *embedding =
+                battle_cache.pokemon[s][id - 1].get(pokemon, sleep);
+            std::copy_n(embedding, pokemon_out_dim, slot_embedding + 1);
           }
         }
-      }
-    }
-  }
-
-  void print_battle_embedding(const float *input) const {
-    for (auto s = 0; s < 2; ++s) {
-      const auto *side_embedding = input + s * side_embedding_index(6);
-      std::cout << "Active " << (int)(100 * side_embedding[0]) << "%\n";
-      for (auto i = 0; i < active_out_dim; ++i) {
-        std::cout << side_embedding[1 + i] << ' ';
-      }
-      std::cout << std::endl;
-
-      for (auto p = 1; p < 6; ++p) {
-        const auto *p_input = side_embedding + side_embedding_index(p);
-        std::cout << "Pokemon " << (int)(100 * p_input[0]) << "%\n";
-        for (auto i = 0; i < pokemon_out_dim; ++i) {
-          std::cout << p_input[1 + i] << ' ';
-        }
-        std::cout << std::endl;
       }
     }
   }
 };
 
 namespace Impl {
-std::shared_ptr<Network> invalid(const std::string &msg) {
+std::unique_ptr<MainNet> invalid(const std::string &msg) {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
                            " (check code for valid sizes)."};
-  return std::shared_ptr<Network>{nullptr};
+  return std::unique_ptr<MainNet>{nullptr};
 }
-template <int In, int H1> std::shared_ptr<Network> make_network_2(int h2) {
-  if (H1 < h2) {
-    throw std::runtime_error{"Quantized net must have decreasing layer size."};
-    return std::shared_ptr<Network>{nullptr};
-  }
 
-  switch (h2) {
-  case 32:
-    return std::make_shared<MainNet<In, H1, 32>>();
+template <int In, int Hidden, int ValueHidden>
+std::unique_ptr<MainNet> make_network_3(int policy_hidden) {
+  // if (Hidden < policy_hidden) {
+  // return Impl::invalid("Policy hidden cannot be larget than hidden.");
+  // }
+  switch (policy_hidden) {
   case 64:
-    return std::make_shared<MainNet<In, H1, 64>>();
+    return std::make_unique<MainNet<In, Hidden, ValueHidden, 64>>(
+        policy_hidden);
   default:
-    return Impl::invalid("H2: " + std::to_string(h2));
+    return Impl::invalid("Policy hidden: " + std::to_string(policy_hidden));
   }
 }
-template <int In> std::shared_ptr<Network> make_network_1(int h1, int h2) {
-  switch (h1) {
+
+template <int In, int Hidden>
+std::unique_ptr<MainNet> make_network_2(int value_hidden, int policy_hidden) {
+  if (Hidden < value_hidden) {
+    return Impl::invalid("Value hidden cannot be larget than hidden.");
+  }
+  switch (value_hidden) {
   case 32:
-    return make_network_2<In, 32>(h2);
+    return make_network_3<In, Hidden, 32>(policy_hidden);
   case 64:
-    return make_network_2<In, 64>(h2);
-  case 128:
-    return make_network_2<In, 128>(h2);
+    return make_network_3<In, Hidden, 64>(policy_hidden);
   default:
-    return Impl::invalid("H1: " + std::to_string(h1));
+    return Impl::invalid("Value hidden: " + std::to_string(value_hidden));
+  }
+}
+template <int In>
+std::unique_ptr<MainNet> make_network_1(int hidden, int value_hidden,
+                                        int policy_hidden) {
+  switch (hidden) {
+  case 32:
+    return make_network_2<In, 32>(value_hidden);
+  case 64:
+    return make_network_2<In, 64>(value_hidden, policy_hidden);
+  // case 128:
+  // return make_network_2<In, 128>(value_hidden, policy_hidden);
+  default:
+    return Impl::invalid("Hidden: " + std::to_string(hidden));
   }
 }
 } // namespace Impl
 
-std::shared_ptr<Network> make_network(int in, int h1, int h2) {
+std::unique_ptr<MainNet> make_discrete_main(int in, int hidden, int value_hidden,
+                                      int policy_hidden) {
   switch (in) {
-  case 512:
-    return Impl::make_network_1<512>(h1, h2);
+  // case 512:
+  // return Impl::make_network_1<512>(hidden, value_hidden);
   case 768:
-    return Impl::make_network_1<768>(h1, h2);
-  case 1024:
+    return Impl::make_network_1<768>(hidden, value_hidden, policy_hidden);
+  // case 1024:
+  // return Impl::make_network_1<1024>(hidden, value_hidden);
   default:
     return Impl::invalid("Side dim: " + std::to_string(in));
   }
