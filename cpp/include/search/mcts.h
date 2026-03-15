@@ -133,8 +133,6 @@ struct Output {
     std::array<double, 9> empirical;
     std::array<double, 9> nash;
     std::array<double, 9> beta;
-    // std::array<>
-    // std::array<double, 9> ;
   };
 
   std::array<std::array<size_t, 9>, 9> visit_matrix;

@@ -13,26 +13,7 @@ namespace NN::Battle {
 
 inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
-struct NetworkBase {
-  virtual void init_caches(const pkmn_gen1_battle &b) = 0;
-  virtual bool read_parameters(const std::istream &stream) = 0;
-  virtual void write_parameters(std::ostream &stream) = 0;
-  virtual bool check_cache() const = 0;
-  virtual float value_inference(const pkmn_gen1_battle &b,
-                                const pkmn_gen1_chance_durations &d) = 0;
-  virtual void policy_inference(const pkmn_gen1_battle &b,
-                                const pkmn_gen1_chance_durations &d,
-                                const uint8_t m, const uint8_t n,
-                                const uint16_t *p1_choice,
-                                const uint16_t *p2_choice, float *p1,
-                                float *p2) = 0;
-  virtual float value_policy_inference(const pkmn_gen1_battle &b,
-                                       const pkmn_gen1_chance_durations &d,
-                                       const uint8_t m, const uint8_t n,
-                                       const uint16_t *p1_choice,
-                                       const uint16_t *p2_choice, float *p1,
-                                       float *p2) = 0;
-};
+struct NetworkBase {};
 
 template <typename Main> class Network : public NetworkBase {
   static constexpr auto activation = MainNet::activation;
@@ -41,7 +22,7 @@ template <typename Main> class Network : public NetworkBase {
   EmbeddingNet<activation> pokemon_net;
   EmbeddingNet<activation> active_net;
   Main main_net;
-  BattleCaches<T> battle_cache;
+  BattleCache<T> battle_cache;
 
   uint32_t pokemon_out_dim;
   uint32_t active_out_dim;
@@ -64,7 +45,7 @@ public:
       active_out_dim = active_net.fc1.out_dim;
       side_embedding_dim = (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
       battle_embedding.resize(2 * side_embedding_dim);
-      battle_cache = BattleCaches<T>{pokemon_out_dim, active_out_dim};
+      battle_cache = BattleCache<T>{pokemon_out_dim, active_out_dim};
       return true;
     }
   }
@@ -178,27 +159,6 @@ private:
   }
 };
 
-template <typename M>
-auto quantize_network(const Network<MainNet> &network)
-    -> std::unique_ptr<NetworkBase<M>> {
-  const auto &main = network.main_net;
-  auto unique_quantized =
-      make_discrete_network(main.fc0.in_dim, main.fc0.out_dim,
-                            main.value_fc2.out_dim, main.p1_policy_fc2.out_dim);
-  auto &q = *unique_quantized;
-  q.fc0.copy_parameters(main.fc0);
-
-  // fc1.copy_parameters(main.fc0);
-  // value_fc2.copy_parameters(main.fc0);
-  // value_fc3.copy_parameters(main.fc0);
-  // p.copy_parameters(main.fc0);
-  // fc0.copy_parameters(main.fc0);
-  // TODO
-
-  // q.battle_cache()
-  return std::dynamic_pointer_cast<Network<M> *>(unique_quantized);
-}
-
 namespace Impl {
 std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
@@ -206,61 +166,66 @@ std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
   return std::unique_ptr<NetworkBase>{nullptr};
 }
 
+template <int In, int Hidden, int ValueHidden, int PolicyHidden>
+std::unique_ptr<NetworkBase>
+visit_network_4(const auto F, std::unique_ptr<NetworkBase> network) {
+  using Net =
+      Network<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>>;
+  auto net = std::dynamic_pointer_cast<Net>(network);
+  F(*net);
+  return network;
+}
+
 template <int In, int Hidden, int ValueHidden>
-std::unique_ptr<NetworkBase> make_network_3(int policy_hidden) {
-  // if (Hidden < policy_hidden) {
-  // return Impl::invalid("Policy hidden cannot be larget than hidden.");
-  // }
+std::unique_ptr<NetworkBase>
+visit_network_3(int policy_hidden, const auto F,
+                std::unique_ptr<NetworkBase> network) {
   switch (policy_hidden) {
   case 64:
-    return std::make_unique<
-        Network<Quantized::MainNet<In, Hidden, ValueHidden, 64>>>(
-        policy_hidden);
+    return visit_network_4<In, Hidden, ValueHidden, 64>(F, network);
   default:
     return Impl::invalid("Policy hidden: " + std::to_string(policy_hidden));
   }
 }
 
 template <int In, int Hidden>
-std::unique_ptr<NetworkBase> make_network_2(int value_hidden,
-                                            int policy_hidden) {
+std::unique_ptr<NetworkBase>
+visit_network_2(int value_hidden, int policy_hidden, const auto F,
+                std::unique_ptr<NetworkBase> network) {
   if (Hidden < value_hidden) {
     return Impl::invalid("Value hidden cannot be larget than hidden.");
   }
   switch (value_hidden) {
   case 32:
-    return make_network_3<In, Hidden, 32>(policy_hidden);
+    return visit_network_3<In, Hidden, 32>(policy_hidden, F, network);
   case 64:
-    return make_network_3<In, Hidden, 64>(policy_hidden);
+    return visit_network_3<In, Hidden, 64>(policy_hidden, F, network);
   default:
     return Impl::invalid("Value hidden: " + std::to_string(value_hidden));
   }
 }
 template <int In>
-std::unique_ptr<NetworkBase> make_network_1(int hidden, int value_hidden,
-                                            int policy_hidden) {
+std::unique_ptr<NetworkBase>
+visit_network_1(int hidden, int value_hidden, int policy_hidden, const auto F,
+                std::unique_ptr<NetworkBase> network) {
   switch (hidden) {
   case 32:
-    return make_network_2<In, 32>(value_hidden, policy_hidden);
+    return visit_network_2<In, 32>(value_hidden, policy_hidden, F, network);
   case 64:
-    return make_network_2<In, 64>(value_hidden, policy_hidden);
-  // case 128:
-  // return make_network_2<In, 128>(value_hidden, policy_hidden);
+    return visit_network_2<In, 64>(value_hidden, policy_hidden, F, network);
   default:
     return Impl::invalid("Hidden: " + std::to_string(hidden));
   }
 }
 } // namespace Impl
 
-std::unique_ptr<NetworkBase> try_make_quantized_network(Network<MainNet> &net) {
-  const auto [in, hidden, value_hidden, policy_hidden] = net.shape();
+std::unique_ptr<NetworkBase>
+visit_network(int in, int hidden, int value_hidden, int policy_hidden,
+              const auto F, std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {
-  // case 512:
-  // return Impl::make_network_1<512>(hidden, value_hidden);
   case 768:
-    return Impl::make_network_1<768>(hidden, value_hidden, policy_hidden);
-  // case 1024:
-  // return Impl::make_network_1<1024>(hidden, value_hidden);
+    return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,
+                                      network);
   default:
     return Impl::invalid("Side dim: " + std::to_string(in));
   }

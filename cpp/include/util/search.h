@@ -169,18 +169,42 @@ struct Agent : AgentParams {
 auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
          MCTS::Output output = {}, bool *const flag = nullptr) {
 
-  const auto search = [&](auto dur, auto &model, auto &params,
-                          auto &node) -> MCTS::Output {
+  const auto parse_eval_and_search = [&](const auto dur, const auto &params,
+                                         auto &heap) {
     MCTS::Search s{};
-    const auto o = s.run(device, dur, params, node, model, input, output);
-    // std::cout << "depth: " << (float)s.total_depth / o.iterations
-    //           << " errors: " << s.errors << std::endl;
-    return o;
+    if (agent.is_monte_carlo()) {
+      MCTS::MonteCarlo model{};
+      return s.run(device, dur, model, params, heap, input, output);
+    } else if (agent.is_foul_play()) {
+      PokeEngine::Model model{};
+      return s.run(device, dur, model, params, heap, input, output);
+    } else {
+      if (!agent.network) {
+        agent.initialize_network(input.battle);
+      } else {
+        if (!agent.network->check_cache()) {
+          throw std::runtime_error{"Cache mismatch."};
+        }
+      }
+
+      return agent.network->run(device, dur, params, node, model, input,
+                                output);
+    }
   };
 
-  const auto parse_matrix_ucb_and_search = [&](auto dur, auto &model,
-                                               auto &bandit_params,
-                                               auto &node) -> MCTS::Output {
+  const auto parse_heap_and_search = [&](const auto dur, const auto &params,
+                                         auto &both) {
+    if (agent.use_table) {
+      auto &table = nodes.get(both.table);
+      table.hasher = {device};
+      return parse_eval_and_search(dur, params, table);
+    } else {
+      return parse_eval_and_search(dur, params, nodes.get(both.node));
+    }
+  };
+
+  const auto parse_matrix_ucb_and_search =
+      [&](auto dur, auto &bandit_params) -> MCTS::Output {
     const auto &matrix_ucb = agent.matrix_ucb;
     if (!matrix_ucb.empty()) {
       const auto matrix_ucb_split = Parse::split(agent.matrix_ucb, '-');
@@ -194,27 +218,14 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       matrix_ucb_params.interval = std::stoull(matrix_ucb_split[1]);
       matrix_ucb_params.minimum = std::stoull(matrix_ucb_split[2]);
       matrix_ucb_params.c = std::stof(matrix_ucb_split[3]);
-      return search(dur, model, matrix_ucb_params, node);
+      return parse_heap_and_search(dur, matrix_ucb_params, node);
     } else {
-      return search(dur, model, bandit_params, node);
+      return parse_heap_and_search(dur, bandit_params, node);
     }
   };
 
-  const auto parse_heap_and_search = [&](const auto dur, auto &model,
-                                         const auto &params, auto &both) {
-    if (agent.use_table) {
-      auto &table = nodes.get(both.table);
-      table.hasher = {device};
-      return parse_matrix_ucb_and_search(dur, model, params, table);
-    } else {
-      return parse_matrix_ucb_and_search(dur, model, params,
-                                         nodes.get(both.node));
-    }
-  };
-
-  const auto parse_bandit_and_search = [&](auto dur, auto &model) {
+  const auto parse_bandit_and_search = [&](auto dur) {
     const auto bandit_split = Parse::split(agent.bandit, '-');
-
     if (bandit_split.size() < 2) {
       throw std::runtime_error("Could not parse bandit string: " +
                                agent.bandit);
@@ -222,73 +233,52 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
 
     const auto &name = bandit_split[0];
     const float f1 = std::stof(bandit_split[1]);
-
     if (name == "ucb") {
       UCB::Bandit::Params params{.c = f1};
-      return parse_heap_and_search(dur, model, params, nodes.ucb);
+      return parse_matrix_ucb_and_search(dur, params);
     } else if (name == "ucb1") {
       UCB1::Bandit::Params params{.c = f1};
-      return parse_heap_and_search(dur, model, params, nodes.ucb1);
+      return parse_matrix_ucb_and_search(dur, params);
     } else if (name == "pucb") {
       PUCB::Bandit::Params params{.c = f1};
-      return parse_heap_and_search(dur, model, params, nodes.pucb);
+      return parse_matrix_ucb_and_search(dur, params);
     }
 
     float alpha = .05;
     if (bandit_split.size() >= 3) {
       alpha = std::stof(bandit_split[2]);
     }
-
     if (name == "exp3") {
       Exp3::Bandit::Params params{.gamma = f1,
                                   .one_minus_gamma = (1 - f1),
                                   .alpha = alpha,
                                   .one_minus_alpha = (1 - alpha)};
-      return parse_heap_and_search(dur, model, params, nodes.exp3);
+      return parse_matrix_ucb_and_search(dur, params);
     } else if (name == "pexp3") {
       PExp3::Bandit::Params params{.gamma = f1,
                                    .one_minus_gamma = (1 - f1),
                                    .alpha = alpha,
                                    .one_minus_alpha = (1 - alpha)};
-      return parse_heap_and_search(dur, model, params, nodes.pexp3);
+      return parse_matrix_ucb_and_search(dur, params);
     } else {
       throw std::runtime_error("Could not parse bandit string: " + name);
     }
   };
 
-  const auto parse_eval_and_search = [&](const auto dur) {
-    if (agent.is_monte_carlo()) {
-      MCTS::MonteCarlo model{};
-      return parse_bandit_and_search(dur, model);
-    } else if (agent.is_foul_play()) {
-      PokeEngine::Model model{};
-      return parse_bandit_and_search(dur, model);
-    } else {
-      if (!agent.network) {
-        agent.initialize_network(input.battle);
-      } else {
-        if (!agent.network->check_cache()) {
-          throw std::runtime_error{"Cache mismatch."};
-        }
-      }
-      return parse_bandit_and_search(dur, agent.network.value());
-    }
-  };
-
   const auto parse_budget_and_search = [&]() {
     if (flag != nullptr) {
-      return parse_eval_and_search(flag);
+      return parse_bandit_and_search(flag);
     }
     const auto pos = agent.search_budget.find_first_not_of("0123456789");
     size_t number = std::stoll(agent.search_budget.substr(0, pos));
     std::string unit =
         (pos == std::string::npos) ? "" : agent.search_budget.substr(pos);
     if (unit.empty()) {
-      return parse_eval_and_search(number);
+      return parse_bandit_and_search(number);
     } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
-      return parse_eval_and_search(std::chrono::milliseconds{number});
+      return parse_bandit_and_search(std::chrono::milliseconds{number});
     } else if (unit == "s" || unit == "sec" || unit == "seconds") {
-      return parse_eval_and_search(std::chrono::seconds{number});
+      return parse_bandit_and_search(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
                                agent.search_budget);

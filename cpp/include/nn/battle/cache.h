@@ -268,7 +268,7 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   }
 };
 
-template <typename T> struct BattleCaches {
+template <typename T> struct BattleCache {
 
   template <typename U> using SideSet = std::array<U, 6>;
   template <typename U> using BattleSet = std::array<std::array<U, 6>, 2>;
@@ -278,9 +278,9 @@ template <typename T> struct BattleCaches {
   using Team = std::array<PKMN::Set, 6>;
   std::array<Team, 2> teams;
 
-  BattleCaches() = default;
+  BattleCache() = default;
 
-  BattleCaches(uint32_t pod, uint32_t aod)
+  BattleCache(uint32_t pod, uint32_t aod)
       : pokemon{SideSet<PokemonCache<T>>{
                     PokemonCache<T>(pod), PokemonCache<T>(pod),
                     PokemonCache<T>(pod), PokemonCache<T>(pod),
