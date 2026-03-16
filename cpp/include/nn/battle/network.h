@@ -13,9 +13,12 @@ namespace NN::Battle {
 
 inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
-struct NetworkBase {};
+struct NetworkBase {
+  virtual std::tuple<int, int, int, int> shape() const noexcept = 0;
+};
 
 template <typename Main> class NetworkImpl : public NetworkBase {
+public:
   static constexpr NN::Activation activation = Main::activation;
   using T = typename Main::T;
 
@@ -30,6 +33,10 @@ template <typename Main> class NetworkImpl : public NetworkBase {
   std::vector<T> battle_embedding;
 
 public:
+  std::tuple<int, int, int, int> shape() const noexcept {
+    return main_net.shape();
+  }
+
   bool read_parameters(std::istream &stream) {
     const bool ok = pokemon_net.read_parameters(stream) &&
                     active_net.read_parameters(stream) &&

@@ -120,7 +120,7 @@ struct AgentParams {
   bool discrete;
   bool table;
 
-  constexpr bool operator==(const AgentParams&) const = default;
+  constexpr bool operator==(const AgentParams &) const = default;
 };
 
 struct Agent : AgentParams {
@@ -145,7 +145,7 @@ struct Agent : AgentParams {
     auto network = NN::Battle::Network{};
 
     // sometimes reads fail because python is writing to that file. just retry
-    const auto try_read_parameters = [&network, eval]() {
+    const auto try_read_parameters = [&network, this]() {
       constexpr auto tries = 3;
       bool read_success = false;
       for (auto i = 0; i < tries; ++i) {
@@ -163,12 +163,12 @@ struct Agent : AgentParams {
     };
     try_read_parameters();
 
-    network.init_caches(b);
+    // network.init_caches(b);
 
     if (discrete) {
-      const auto [id, hd, vd, pd] = network.shape();
-      auto q_network_ptr =
-          NN::Battle::visit_network(id, hd, vd, pd, [&network](auto &net) {
+      const auto [id, hd, vd, pd] = network.main_net.shape();
+      auto q_network_ptr = NN::Battle::visit_network_or_construct(
+          id, hd, vd, pd, [&network](auto &net) {
             // TODO call param, cache copy
             return;
           });
@@ -194,25 +194,24 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       PokeEngine::Model model{};
       return s.run(device, dur, model, params, heap, input, output);
     } else {
-      if (auto network = std::dynamic_pointer_cast<Network>(agent.network_ptr);
+      if (auto network =
+              dynamic_cast<NN::Battle::Network *>(agent.network_ptr.get());
           network) {
         return s.run(device, dur, *network, params, heap, input, output);
-        output
       } else {
-        const auto [id, hd, vd, pd] = network.shape();
-        auto q_network_ptr = NN::Battle::visit_network(
+        const auto [id, hd, vd, pd] = agent.network_ptr->shape();
+        auto q_network_ptr = NN::Battle::visit_network_or_construct(
             id, hd, vd, pd,
             [&](auto &net) {
-              output = s.run(device, dur, model, params, heap, input, output);
+              output = s.run(device, dur, net, params, heap, input, output);
             },
-            agent.network_ptr);
+            std::move(agent.network_ptr));
         return output;
       }
     };
 
-    const auto parse_heap_and_search = [&](const auto dur, const auto &params,
-                                           auto &both) {
-      if (agent.use_table) {
+    const auto parse_heap_and_search = [&](const auto dur, const auto &params, auto &both) {
+      if (agent.table) {
         auto &table = nodes.get(both.table);
         table.hasher = {device};
         return parse_eval_and_search(dur, params, table);
@@ -222,7 +221,7 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
     };
 
     const auto parse_matrix_ucb_and_search =
-        [&](auto dur, auto &bandit_params) -> MCTS::Output {
+        [&](auto dur, auto &bandit_params, auto& both) -> MCTS::Output {
       const auto &matrix_ucb = agent.matrix_ucb;
       if (!matrix_ucb.empty()) {
         const auto matrix_ucb_split = Parse::split(agent.matrix_ucb, '-');
@@ -236,9 +235,9 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
         matrix_ucb_params.interval = std::stoull(matrix_ucb_split[1]);
         matrix_ucb_params.minimum = std::stoull(matrix_ucb_split[2]);
         matrix_ucb_params.c = std::stof(matrix_ucb_split[3]);
-        return parse_heap_and_search(dur, matrix_ucb_params, node);
+        return parse_heap_and_search(dur, matrix_ucb_params, both);
       } else {
-        return parse_heap_and_search(dur, bandit_params, node);
+        return parse_heap_and_search(dur, bandit_params, both);
       }
     };
 

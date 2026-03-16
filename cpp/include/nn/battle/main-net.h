@@ -10,10 +10,10 @@
 
 namespace NN::Battle {
 
-template <Activation activation> struct MainNet {
+template <Activation act> struct MainNet {
 
   using T = float;
-  static constexpr Activation act{activation};
+  static constexpr Activation activation{act};
 
   Affine<activation> fc0;
   Affine<activation> fc1;
