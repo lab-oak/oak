@@ -16,7 +16,7 @@ namespace NN::Battle::Quantized {
 
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 struct MainNet {
-
+  static constexpr Activation activation{Activation::clamp};
   using T = uint8_t;
   static constexpr int PolicyOut = 320;
 

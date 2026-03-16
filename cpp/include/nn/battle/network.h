@@ -182,15 +182,14 @@ template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 std::unique_ptr<NetworkBase>
 visit_network_4(const auto F, std::unique_ptr<NetworkBase> network) {
   using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
-  auto net = std::dynamic_pointer_cast<Net>(network);
+  auto net = dynamic_cast<Net*>(network.get());
   if (net) {
     F(*net);
   } else {
     // TODO check
-    network.release();
-    network = std::make_shared<Net>();
+    network.reset(new Net);
   }
-  return network;
+  return std::move(network);
 }
 
 template <int In, int Hidden, int ValueHidden>
@@ -199,7 +198,7 @@ visit_network_3(int policy_hidden, const auto F,
                 std::unique_ptr<NetworkBase> network) {
   switch (policy_hidden) {
   case 64:
-    return visit_network_4<In, Hidden, ValueHidden, 64>(F, network);
+    return visit_network_4<In, Hidden, ValueHidden, 64>(F, std::move(network));
   default:
     return Impl::invalid("Policy hidden: " + std::to_string(policy_hidden));
   }
@@ -214,9 +213,11 @@ visit_network_2(int value_hidden, int policy_hidden, const auto F,
   }
   switch (value_hidden) {
   case 32:
-    return visit_network_3<In, Hidden, 32>(policy_hidden, F, network);
+    return visit_network_3<In, Hidden, 32>(policy_hidden, F,
+                                           std::move(network));
   case 64:
-    return visit_network_3<In, Hidden, 64>(policy_hidden, F, network);
+    return visit_network_3<In, Hidden, 64>(policy_hidden, F,
+                                           std::move(network));
   default:
     return Impl::invalid("Value hidden: " + std::to_string(value_hidden));
   }
@@ -227,9 +228,11 @@ visit_network_1(int hidden, int value_hidden, int policy_hidden, const auto F,
                 std::unique_ptr<NetworkBase> network) {
   switch (hidden) {
   case 32:
-    return visit_network_2<In, 32>(value_hidden, policy_hidden, F, network);
+    return visit_network_2<In, 32>(value_hidden, policy_hidden, F,
+                                   std::move(network));
   case 64:
-    return visit_network_2<In, 64>(value_hidden, policy_hidden, F, network);
+    return visit_network_2<In, 64>(value_hidden, policy_hidden, F,
+                                   std::move(network));
   default:
     return Impl::invalid("Hidden: " + std::to_string(hidden));
   }
@@ -247,7 +250,7 @@ visit_network_or_construct(int in, int hidden, int value_hidden,
   switch (in) {
   case 768:
     return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,
-                                      network);
+                                      std::move(network));
   default:
     return Impl::invalid("Side dim: " + std::to_string(in));
   }
