@@ -14,6 +14,10 @@ using EmbeddingT = std::conditional_t<(dim > 0), std::array<T, dim>, T *>;
 
 using PKMN::Data::Status;
 
+template <typename T, int dim = 0> struct CacheBase {
+  
+};
+
 template <typename T, int dim = 0> struct PokemonCache {
 
   // Encode does not have a dimension for no status
@@ -52,13 +56,18 @@ template <typename T, int dim = 0> struct PokemonCache {
     }
   }
 
-  PokemonCache(const PokemonCache &other) {
+  template <typename U> PokemonCache(const PokemonCache<U> &other) {
     if constexpr (is_dynamic) {
       embedding_size = other.embedding_size;
       for (auto i = 0; i < n_embeddings; ++i) {
         embeddings[i] = new T[embedding_size];
         const auto *source = other.embeddings[i];
-        std::copy(source, source + embedding_size, embeddings[i]);
+        // std::copy(source, source + embedding_size, embeddings[i]);
+        constexpr float scale =
+            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+                                                                 : 1.0f;
+        std::transform(source, source_embedding_size, embeddings[i],
+                       [scale](const auto *x) { return x * scale; });
       }
     } else {
       embeddings = other.embeddings;
@@ -66,13 +75,20 @@ template <typename T, int dim = 0> struct PokemonCache {
     embedding = other.embedding;
   }
 
+  template <typename U>
   PokemonCache &operator=(const PokemonCache &other) {
     if constexpr (is_dynamic) {
       embedding_size = other.embedding_size;
       for (auto i = 0; i < n_embeddings; ++i) {
         embeddings[i] = new T[embedding_size];
         const auto *source = other.embeddings[i];
-        std::copy(source, source + embedding_size, embeddings[i]);
+        // std::copy(source, source + embedding_size, embeddings[i]);
+        constexpr float scale =
+            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+                                                                 : 1.0f;
+        std::transform(source, source_embedding_size, embeddings[i],
+                       [scale](const auto *x) { return x * scale; });
+
       }
     } else {
       embeddings = other.embeddings;

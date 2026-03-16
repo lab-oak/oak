@@ -13,7 +13,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <optional>
+#include <memory>
 #include <thread>
 
 namespace RuntimeSearch {
@@ -125,10 +125,10 @@ struct AgentParams {
 
 struct Agent : AgentParams {
 
-  std::unique_ptr<NN::Battle::NetworkBase> network_ptr;
+  std::unique_ptr<NN::Battle::NetworkBase> network_ptr{};
 
   // using AgentParams::AgentParams;
-  Agent(const AgentParams& params) : AgentParams{params}, network_ptr{} {}
+  Agent(const AgentParams &params) : AgentParams{params}, network_ptr{} {}
   Agent() = default;
   Agent(const Agent &other) : AgentParams{static_cast<AgentParams>(other)} {}
 
@@ -144,15 +144,14 @@ struct Agent : AgentParams {
   bool is_network() const { return !is_monte_carlo() && !is_foul_play(); }
 
   void initialize_network(const pkmn_gen1_battle &b) {
-    auto network = NN::Battle::Network{};
-
+    auto network = std::make_unique<NN::Battle::Network>();
     // sometimes reads fail because python is writing to that file. just retry
     const auto try_read_parameters = [&network, this]() {
       constexpr auto tries = 3;
       bool read_success = false;
       for (auto i = 0; i < tries; ++i) {
         std::ifstream file{eval};
-        if (network.read_parameters(file)) {
+        if (network->read_parameters(file)) {
           read_success = true;
           break;
         }
@@ -168,7 +167,7 @@ struct Agent : AgentParams {
     // network.init_caches(b);
 
     if (discrete) {
-      const auto [id, hd, vd, pd] = network.main_net.shape();
+      const auto [id, hd, vd, pd] = network->main_net.shape();
       auto q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd, [&network](auto &net) {
             // TODO call param, cache copy
@@ -177,6 +176,8 @@ struct Agent : AgentParams {
       if (q_network_ptr) {
         network_ptr = std::move(q_network_ptr);
       }
+    } else {
+      network_ptr = std::move(network);
     }
 
     assert(network_ptr);
@@ -196,6 +197,9 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
       PokeEngine::Model model{};
       return s.run(device, dur, params, heap, model, input, output);
     } else {
+      if (!agent.network_ptr) {
+        agent.initialize_network(input.battle);
+      }
       if (auto network =
               dynamic_cast<NN::Battle::Network *>(agent.network_ptr.get());
           network) {
@@ -208,6 +212,9 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
               output = s.run(device, dur, params, heap, net, input, output);
             },
             std::move(agent.network_ptr));
+        if (q_network_ptr) {
+          agent.network_ptr = std::move(q_network_ptr);
+        }
         return output;
       }
     }

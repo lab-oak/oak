@@ -71,7 +71,7 @@ public:
     return value;
   }
 
-  auto policy_inference(const pkmn_gen1_battle &b,
+  void policy_inference(const pkmn_gen1_battle &b,
                         const pkmn_gen1_chance_durations &d, const auto m,
                         const auto n, const auto *p1_choice,
                         const auto *p2_choice, float *p1, float *p2) {
@@ -172,30 +172,30 @@ using QNetwork =
     NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>>;
 
 namespace Impl {
-std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
+auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
                            " (check code for valid sizes)."};
-  return std::unique_ptr<NetworkBase>{nullptr};
 }
 
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
-std::unique_ptr<NetworkBase>
-visit_network_4(const auto F, std::unique_ptr<NetworkBase> network) {
+auto visit_network_4(const auto &F, std::unique_ptr<NetworkBase> network) {
   using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
-  auto net = dynamic_cast<Net*>(network.get());
-  if (net) {
-    F(*net);
+  auto *net = dynamic_cast<Net *>(network.get());
+  if (!network) {
+    network = std::make_unique<Net>();
   } else {
-    // TODO check
-    network.reset(new Net);
+    if (net) {
+      F(*net);
+    } else {
+      throw std::runtime_error{"Invalid discrete cast."};
+    }
   }
-  return std::move(network);
+  return network;
 }
 
 template <int In, int Hidden, int ValueHidden>
-std::unique_ptr<NetworkBase>
-visit_network_3(int policy_hidden, const auto F,
-                std::unique_ptr<NetworkBase> network) {
+auto visit_network_3(int policy_hidden, const auto &F,
+                     std::unique_ptr<NetworkBase> network) {
   switch (policy_hidden) {
   case 64:
     return visit_network_4<In, Hidden, ValueHidden, 64>(F, std::move(network));
@@ -205,11 +205,10 @@ visit_network_3(int policy_hidden, const auto F,
 }
 
 template <int In, int Hidden>
-std::unique_ptr<NetworkBase>
-visit_network_2(int value_hidden, int policy_hidden, const auto F,
-                std::unique_ptr<NetworkBase> network) {
+auto visit_network_2(int value_hidden, int policy_hidden, const auto &F,
+                     std::unique_ptr<NetworkBase> network) {
   if (Hidden < value_hidden) {
-    return Impl::invalid("Value hidden cannot be larget than hidden.");
+    return Impl::invalid("Value hidden cannot be larger than hidden.");
   }
   switch (value_hidden) {
   case 32:
@@ -222,10 +221,10 @@ visit_network_2(int value_hidden, int policy_hidden, const auto F,
     return Impl::invalid("Value hidden: " + std::to_string(value_hidden));
   }
 }
+
 template <int In>
-std::unique_ptr<NetworkBase>
-visit_network_1(int hidden, int value_hidden, int policy_hidden, const auto F,
-                std::unique_ptr<NetworkBase> network) {
+auto visit_network_1(int hidden, int value_hidden, int policy_hidden,
+                     const auto &F, std::unique_ptr<NetworkBase> network) {
   switch (hidden) {
   case 32:
     return visit_network_2<In, 32>(value_hidden, policy_hidden, F,
@@ -239,14 +238,9 @@ visit_network_1(int hidden, int value_hidden, int policy_hidden, const auto F,
 }
 } // namespace Impl
 
-// Attempts to cast the network pointer to a quantized net with given size
-// If the dimensions are invalid, it throws an exception and returns nullptr
-// If it succeeds, it calls the lambda on the dereferenced network pointer
-// If it fails, it releases the pointer and constructs
-std::unique_ptr<NetworkBase>
-visit_network_or_construct(int in, int hidden, int value_hidden,
-                           int policy_hidden, const auto F,
-                           std::unique_ptr<NetworkBase> network = {}) {
+auto visit_network_or_construct(int in, int hidden, int value_hidden,
+                                int policy_hidden, const auto &F,
+                                std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {
   case 768:
     return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,
@@ -255,5 +249,4 @@ visit_network_or_construct(int in, int hidden, int value_hidden,
     return Impl::invalid("Side dim: " + std::to_string(in));
   }
 }
-
 } // namespace NN::Battle
