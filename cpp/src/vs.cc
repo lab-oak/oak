@@ -206,11 +206,11 @@ void thread_fn(const ProgramArgs *args_ptr) {
     const auto result = PKMN::update(battle, 0, 0, options);
     auto input = MCTS::Input{battle, PKMN::durations(options), result};
 
-    if (p1_agent.uses_network()) {
+    if (p1_agent.is_network()) {
       p1_agent.initialize_network(battle);
       p1_agent_after.network.emplace(p1_agent.network.value());
     }
-    if (p2_agent.uses_network()) {
+    if (p2_agent.is_network()) {
       p2_agent.initialize_network(battle);
       p2_agent_after.network.emplace(p2_agent.network.value());
     }

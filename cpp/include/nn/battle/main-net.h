@@ -30,6 +30,10 @@ template <Activation activation> struct MainNet {
   std::vector<float> p1_policy_buffer;
   std::vector<float> p2_policy_buffer;
 
+  std::tuple<int, int, int, int> shape() const noexcept {
+    return {fc0.in_dim, fc0.out_dim, value_fc2.out_dim, p1_policy_fc2.out_dim};
+  }
+
   bool read_parameters(std::istream &stream) {
     const bool ok = fc0.read_parameters(stream) &&
                     fc1.read_parameters(stream) &&

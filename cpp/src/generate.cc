@@ -277,7 +277,7 @@ void generate(const ProgramArgs *args_ptr) {
                                       .eval = args.eval,
                                       .discrete_network = args.use_discrete,
                                       .matrix_ucb = args.matrix_ucb};
-    if (agent.uses_network()) {
+    if (agent.is_network()) {
       agent.initialize_network(battle_data.battle);
     }
 
@@ -327,7 +327,7 @@ void generate(const ProgramArgs *args_ptr) {
         MCTS::Output output{};
 
         const bool policy_rollout_only =
-            agent.uses_network() && (agent.search_budget == "1");
+            agent.is_network() && (agent.search_budget == "1");
 
         if (policy_rollout_only) {
           std::array<float, 9> p1_logits{};

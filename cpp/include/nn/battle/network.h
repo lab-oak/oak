@@ -15,8 +15,8 @@ inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
 struct NetworkBase {};
 
-template <typename Main> class Network : public NetworkBase {
-  static constexpr auto activation = MainNet::activation;
+template <typename Main> class NetworkImpl : public NetworkBase {
+  static constexpr NN::Activation activation = Main::activation;
   using T = typename Main::T;
 
   EmbeddingNet<activation> pokemon_net;
@@ -159,6 +159,11 @@ private:
   }
 };
 
+using Network = NetworkImpl<MainNet<Activation::relu>>;
+template <int In, int Hidden, int ValueHidden, int PolicyHidden>
+using QNetwork =
+    NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>>;
+
 namespace Impl {
 std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
@@ -169,10 +174,15 @@ std::unique_ptr<NetworkBase> invalid(const std::string &msg) {
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 std::unique_ptr<NetworkBase>
 visit_network_4(const auto F, std::unique_ptr<NetworkBase> network) {
-  using Net =
-      Network<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>>;
+  using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
   auto net = std::dynamic_pointer_cast<Net>(network);
-  F(*net);
+  if (net) {
+    F(*net);
+  } else {
+    // TODO check
+    network.release();
+    network = std::make_shared<Net>();
+  }
   return network;
 }
 
@@ -219,9 +229,14 @@ visit_network_1(int hidden, int value_hidden, int policy_hidden, const auto F,
 }
 } // namespace Impl
 
+// Attempts to cast the network pointer to a quantized net with given size
+// If the dimensions are invalid, it throws an exception and returns nullptr
+// If it succeeds, it calls the lambda on the dereferenced network pointer
+// If it fails, it releases the pointer and constructs
 std::unique_ptr<NetworkBase>
-visit_network(int in, int hidden, int value_hidden, int policy_hidden,
-              const auto F, std::unique_ptr<NetworkBase> network = {}) {
+visit_network_or_construct(int in, int hidden, int value_hidden,
+                           int policy_hidden, const auto F,
+                           std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {
   case 768:
     return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,
