@@ -28,9 +28,9 @@ int benchmark(int argc, char **argv) {
   const auto result = PKMN::update(battle, 0, 0, options);
   const auto durations = PKMN::durations();
   const auto input = MCTS::Input{battle, durations, result};
-  auto nodes = RuntimeSearch::Nodes{};
+  auto heap = RuntimeSearch::Heap{};
 
-  const auto output = RuntimeSearch::run(device, input, nodes, agent);
+  const auto output = RuntimeSearch::run(device, input, heap, agent);
 
   std::cout << output.duration.count() << "µs." << std::endl;
   std::cout << output.iterations << " iterations." << std::endl;

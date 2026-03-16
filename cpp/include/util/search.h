@@ -15,100 +15,30 @@
 #include <fstream>
 #include <memory>
 #include <thread>
+#include <variant>
 
 namespace RuntimeSearch {
 
 template <typename T> using UniqueNode = std::unique_ptr<MCTS::Node<T>>;
 template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
 
-template <typename T> struct UniqueStats {
-  UniqueNode<T> node;
-  UniqueTable<T> table;
-  void reset() noexcept {
-    node.reset();
-    table.reset();
-  }
-  void reset_node_stats() noexcept {
-    if (node) {
-      node->stats = {};
-    }
-  }
+using BanditVariant =
+    std::variant<std::monostate, UniqueNode<Exp3::JointBandit>,
+                 UniqueTable<Exp3::JointBandit>, UniqueNode<PExp3::JointBandit>,
+                 UniqueTable<PExp3::JointBandit>, UniqueNode<UCB::JointBandit>,
+                 UniqueTable<UCB::JointBandit>, UniqueNode<PUCB::JointBandit>,
+                 UniqueTable<PUCB::JointBandit>, UniqueNode<UCB1::JointBandit>,
+                 UniqueTable<UCB1::JointBandit>>;
 
-  void reset_table_stats(const auto &state) {
-    if (table) {
-      table->entries[state.s1.last ^ state.s2.last] = {};
-    }
-  }
-};
-// TODO just let claude unfuck this
-struct Nodes {
-  UniqueStats<Exp3::JointBandit> exp3;
-  UniqueStats<PExp3::JointBandit> pexp3;
-  UniqueStats<UCB::JointBandit> ucb;
-  UniqueStats<UCB1::JointBandit> ucb1;
-  UniqueStats<PUCB::JointBandit> pucb;
-  bool set;
+struct Heap {
+  BanditVariant data;
 
-  Nodes() { reset(); }
+  bool empty() const { return std::holds_alternative<std::monostate>(data); }
 
-  auto &get(auto &unique_item) {
-    if (set && !unique_item.get()) {
-      throw std::runtime_error{"Nodes alread set elsewhere"};
-    }
-    unique_item =
-        std::make_unique<std::remove_cvref_t<decltype(*unique_item)>>();
-    set = true;
-    return *unique_item;
-  }
-
-  void reset() {
-    exp3.reset();
-    pexp3.reset();
-    ucb.reset();
-    ucb1.reset();
-    pucb.reset();
-    set = false;
-  }
-
-  // For UCB game generation, if a node is kept and its stats are not reset
-  // the empirical policies may have 0.0 at some actions.
-  // This is a clumsy fix though. TODO
-  void reset_node_stats() {
-    exp3.reset_node_stats();
-    pexp3.reset_node_stats();
-    ucb.reset_node_stats();
-    ucb1.reset_node_stats();
-    pucb.reset_node_stats();
-  }
-
-  void reset_table_stats(const auto &state) {
-    exp3.reset_table_stats(state);
-    pexp3.reset_table_stats(state);
-    ucb.reset_table_stats(state);
-    ucb1.reset_table_stats(state);
-    pucb.reset_table_stats(state);
-  }
-
-  bool update(auto i1, auto i2, const auto &obs) {
-    auto update_node = [&](auto &node) -> bool {
-      if (!node || !node->stats.is_init()) {
-        return false;
-      }
-      auto child = node->children.find({i1, i2, obs});
-      if (child == node->children.end()) {
-        node = std::make_unique<std::decay_t<decltype(*node)>>();
-        return false;
-      } else {
-        auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
-            std::move((*child).second));
-        node.swap(unique_child);
-        return true;
-      }
-    };
-    // No action is required to update a table
-    return update_node(exp3.node) || update_node(pexp3.node) ||
-           update_node(ucb.node) || update_node(ucb1.node) ||
-           update_node(pucb.node);
+  template <typename T> auto both() {
+    UniqueNode<T> *a = std::get_if<UniqueNode<T>>(&data);
+    UniqueTable<T> *b = std::get_if<UniqueTable<T>>(&data);
+    return std::pair<UniqueNode<T> *, UniqueTable<T> *>{a, b};
   }
 };
 
@@ -184,8 +114,8 @@ struct Agent : AgentParams {
   }
 };
 
-auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
-         MCTS::Output output = {}, bool *const flag = nullptr) {
+auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
+         Agent &agent, MCTS::Output output = {}, bool *const flag = nullptr) {
 
   const auto parse_eval_and_search = [&](const auto dur, const auto &params,
                                          auto &heap) {
@@ -221,18 +151,38 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
   };
 
   const auto parse_heap_and_search = [&](const auto dur, const auto &params,
-                                         auto &both) {
+                                         const auto &both) {
+    const auto [node_ptr, table_ptr] = both;
+    using Node = std::remove_cvref_t<decltype(**node_ptr)>;
+    using Table = std::remove_cvref_t<decltype(**table_ptr)>;
+    auto &heap = heap_variant.data;
     if (agent.table) {
-      auto &table = nodes.get(both.table);
-      table.hasher = {device};
-      return parse_eval_and_search(dur, params, table);
+      if (heap_variant.empty()) {
+        auto table = std::make_unique<Table>();
+        table->hasher = {device};
+        heap = std::move(table);
+        return parse_eval_and_search(dur, params,
+                                     *std::get<std::unique_ptr<Table>>(heap));
+      } else if (!table_ptr) {
+        throw std::runtime_error{"Bad variant access."};
+      }
+      return parse_eval_and_search(dur, params,
+                                   *std::get<std::unique_ptr<Table>>(heap));
     } else {
-      return parse_eval_and_search(dur, params, nodes.get(both.node));
+      if (heap_variant.empty()) {
+        heap = std::make_unique<Node>();
+        return parse_eval_and_search(dur, params,
+                                     *std::get<std::unique_ptr<Node>>(heap));
+      } else if (!node_ptr) {
+        throw std::runtime_error{"Bad variant access."};
+      }
+      return parse_eval_and_search(dur, params,
+                                   *std::get<std::unique_ptr<Node>>(heap));
     }
   };
 
   const auto parse_matrix_ucb_and_search = [&](auto dur, auto &bandit_params,
-                                               auto &both) -> MCTS::Output {
+                                               const auto &both) {
     const auto &matrix_ucb = agent.matrix_ucb;
     if (!matrix_ucb.empty()) {
       const auto matrix_ucb_split = Parse::split(agent.matrix_ucb, '-');
@@ -263,13 +213,16 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
     const float f1 = std::stof(bandit_split[1]);
     if (name == "ucb") {
       UCB::Bandit::Params params{.c = f1};
-      return parse_matrix_ucb_and_search(dur, params, nodes.ucb);
+      return parse_matrix_ucb_and_search(dur, params,
+                                         heap_variant.both<UCB::JointBandit>());
     } else if (name == "ucb1") {
       UCB1::Bandit::Params params{.c = f1};
-      return parse_matrix_ucb_and_search(dur, params, nodes.ucb1);
+      return parse_matrix_ucb_and_search(
+          dur, params, heap_variant.both<UCB1::JointBandit>());
     } else if (name == "pucb") {
       PUCB::Bandit::Params params{.c = f1};
-      return parse_matrix_ucb_and_search(dur, params, nodes.pucb);
+      return parse_matrix_ucb_and_search(
+          dur, params, heap_variant.both<PUCB::JointBandit>());
     }
 
     float alpha = .05;
@@ -281,13 +234,15 @@ auto run(auto &device, const MCTS::Input &input, Nodes &nodes, Agent &agent,
                                   .one_minus_gamma = (1 - f1),
                                   .alpha = alpha,
                                   .one_minus_alpha = (1 - alpha)};
-      return parse_matrix_ucb_and_search(dur, params, nodes.exp3);
+      return parse_matrix_ucb_and_search(
+          dur, params, heap_variant.both<Exp3::JointBandit>());
     } else if (name == "pexp3") {
       PExp3::Bandit::Params params{.gamma = f1,
                                    .one_minus_gamma = (1 - f1),
                                    .alpha = alpha,
                                    .one_minus_alpha = (1 - alpha)};
-      return parse_matrix_ucb_and_search(dur, params, nodes.pexp3);
+      return parse_matrix_ucb_and_search(
+          dur, params, heap_variant.both<PExp3::JointBandit>());
     } else {
       throw std::runtime_error("Could not parse bandit string: " + name);
     }

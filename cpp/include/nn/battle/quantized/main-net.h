@@ -85,7 +85,7 @@ struct MainNet {
   }
 
   template <bool use_value = true>
-  auto inference(const uint8_t *input_data, const int m, const int n,
+  auto propagate(const uint8_t *input_data, const int m, const int n,
                  const auto *p1_choice_index, const auto *p2_choice_index,
                  float *p1, float *p2)
       -> std::conditional_t<use_value, float, void> const {

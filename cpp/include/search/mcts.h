@@ -16,6 +16,8 @@
 #include <random>
 #include <unordered_map>
 
+#include <typeinfo>
+
 template <class RNG> double gamma_sample(double a, RNG &rng) {
   static std::normal_distribution<double> norm(0.0, 1.0);
   static std::uniform_real_distribution<double> uni(0.0, 1.0);
@@ -81,8 +83,8 @@ inline constexpr bool is_table =
 
 template <typename T>
 inline constexpr bool is_network = requires(std::remove_cvref_t<T> &network) {
-  network.inference(std::declval<const pkmn_gen1_battle &>(),
-                    std::declval<const pkmn_gen1_chance_durations &>());
+  network.value_inference(std::declval<const pkmn_gen1_battle &>(),
+                          std::declval<const pkmn_gen1_chance_durations &>());
 };
 
 template <typename T>
@@ -92,15 +94,15 @@ inline constexpr bool is_poke_engine =
     };
 
 template <typename T>
-inline constexpr bool is_policy_network =
-    requires(std::remove_cvref_t<T> &network) {
-      network.inference(std::declval<const pkmn_gen1_battle &>(),
-                        std::declval<const pkmn_gen1_chance_durations &>(),
-                        std::declval<uint8_t>(), std::declval<uint8_t>(),
-                        std::declval<const pkmn_choice *>(),
-                        std::declval<const pkmn_choice *>(),
-                        std::declval<float *>(), std::declval<float *>());
-    };
+inline constexpr bool is_policy_network = requires(
+    std::remove_cvref_t<T> &network) {
+  network.policy_inference(std::declval<const pkmn_gen1_battle &>(),
+                           std::declval<const pkmn_gen1_chance_durations &>(),
+                           std::declval<uint8_t>(), std::declval<uint8_t>(),
+                           std::declval<const pkmn_choice *>(),
+                           std::declval<const pkmn_choice *>(),
+                           std::declval<float *>(), std::declval<float *>());
+};
 
 template <typename T>
 inline constexpr bool is_contextual_bandit =
@@ -222,6 +224,7 @@ template <SearchOptions Options = default_search> struct Search {
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const Input &input, Output output = {}) {
 
+    std::cout << typeid(decltype(model)).name() << "\n";
     // reset data members
     *this = {};
 
@@ -266,10 +269,10 @@ template <SearchOptions Options = default_search> struct Search {
                     is_policy_network<decltype(model)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
-        const float value = model.inference(
-            input.battle, input.durations, output.p1.k, output.p2.k,
-            output.p1.choices.data(), output.p2.choices.data(),
-            p1_logits.data(), p2_logits.data());
+        model.policy_inference(input.battle, input.durations, output.p1.k,
+                               output.p2.k, output.p1.choices.data(),
+                               output.p2.choices.data(), p1_logits.data(),
+                               p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
       }
@@ -470,13 +473,13 @@ template <SearchOptions Options = default_search> struct Search {
           if constexpr (is_contextual_bandit<decltype(stats)>) {
             static thread_local std::array<float, 9> p1_logits;
             static thread_local std::array<float, 9> p2_logits;
-            value = model.inference(battle, durations(), m, n,
-                                    p1_choices.data(), p2_choices.data(),
-                                    p1_logits.data(), p2_logits.data());
+            value = model.value_policy_inference(
+                battle, durations(), m, n, p1_choices.data(), p2_choices.data(),
+                p1_logits.data(), p2_logits.data());
             stats.softmax_logits(bandit_params, p1_logits.data(),
                                  p2_logits.data());
           } else {
-            value = model.inference(battle, durations());
+            value = model.value_inference(battle, durations());
           }
         } else if constexpr (is_poke_engine<decltype(model)>) {
           const auto m = pkmn_gen1_battle_choices(

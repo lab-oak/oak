@@ -14,9 +14,7 @@ using EmbeddingT = std::conditional_t<(dim > 0), std::array<T, dim>, T *>;
 
 using PKMN::Data::Status;
 
-template <typename T, int dim = 0> struct CacheBase {
-  
-};
+template <typename T, int dim = 0> struct CacheBase {};
 
 template <typename T, int dim = 0> struct PokemonCache {
 
@@ -87,7 +85,6 @@ template <typename T, int dim = 0> struct PokemonCache {
         //                                                          : 1.0f;
         // std::transform(source, source_embedding_size, embeddings[i],
         //                [scale](const auto *x) { return x * scale; });
-
       }
     } else {
       embeddings = other.embeddings;

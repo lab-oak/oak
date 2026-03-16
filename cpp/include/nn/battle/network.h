@@ -130,7 +130,8 @@ private:
       const auto &duration = durations.get(s);
       const auto &stored = side.stored();
 
-      auto *side_embedding = battle_embedding + s * side_embedding_index(6);
+      auto *side_embedding =
+          battle_embedding.data() + s * side_embedding_index(6);
 
       if (stored.hp == 0) {
         std::fill_n(side_embedding, active_out_dim + 1, 0);
