@@ -62,12 +62,12 @@ template <typename T, int dim = 0> struct PokemonCache {
       for (auto i = 0; i < n_embeddings; ++i) {
         embeddings[i] = new T[embedding_size];
         const auto *source = other.embeddings[i];
-        // std::copy(source, source + embedding_size, embeddings[i]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        std::transform(source, source_embedding_size, embeddings[i],
-                       [scale](const auto *x) { return x * scale; });
+        std::copy(source, source + embedding_size, embeddings[i]);
+        // constexpr float scale =
+        //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+        //                                                          : 1.0f;
+        // std::transform(source, source_embedding_size, embeddings[i],
+        //                [scale](const auto *x) { return x * scale; });
       }
     } else {
       embeddings = other.embeddings;
@@ -75,19 +75,18 @@ template <typename T, int dim = 0> struct PokemonCache {
     embedding = other.embedding;
   }
 
-  template <typename U>
   PokemonCache &operator=(const PokemonCache &other) {
     if constexpr (is_dynamic) {
       embedding_size = other.embedding_size;
       for (auto i = 0; i < n_embeddings; ++i) {
         embeddings[i] = new T[embedding_size];
         const auto *source = other.embeddings[i];
-        // std::copy(source, source + embedding_size, embeddings[i]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        std::transform(source, source_embedding_size, embeddings[i],
-                       [scale](const auto *x) { return x * scale; });
+        std::copy(source, source + embedding_size, embeddings[i]);
+        // constexpr float scale =
+        //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+        //                                                          : 1.0f;
+        // std::transform(source, source_embedding_size, embeddings[i],
+        //                [scale](const auto *x) { return x * scale; });
 
       }
     } else {
