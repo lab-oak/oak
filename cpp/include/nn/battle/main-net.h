@@ -10,19 +10,18 @@
 
 namespace NN::Battle {
 
-template <Activation act> struct MainNet {
+struct MainNet {
 
   using T = float;
-  static constexpr Activation activation{act};
 
-  Affine<activation> fc0;
-  Affine<activation> fc1;
-  Affine<activation> value_fc2;
-  Affine<Activation::none> value_fc3;
-  Affine<activation> p1_policy_fc2;
-  Affine<Activation::none> p1_policy_fc3;
-  Affine<activation> p2_policy_fc2;
-  Affine<Activation::none> p2_policy_fc3;
+  Affine<> fc0;
+  Affine<> fc1;
+  Affine<> value_fc2;
+  Affine<> value_fc3;
+  Affine<> p1_policy_fc2;
+  Affine<> p1_policy_fc3;
+  Affine<> p2_policy_fc2;
+  Affine<> p2_policy_fc3;
 
   std::vector<float> buffer0;
   std::vector<float> buffer1;
@@ -65,29 +64,31 @@ template <Activation act> struct MainNet {
            p2_policy_fc3.write_parameters(stream);
   }
 
-  float propagate(const float *input_data) {
+  template <Activation activation> float propagate(const float *input_data) {
     float output;
-    fc0.propagate(input_data, buffer0.data());
-    fc1.propagate(buffer0.data(), buffer1.data());
-    value_fc2.propagate(buffer1.data(), value_buffer.data());
-    value_fc3.propagate(value_buffer.data(), &output);
+    fc0.propagate<activation>(input_data, buffer0.data());
+    fc1.propagate<activation>(buffer0.data(), buffer1.data());
+    value_fc2.propagate<activation>(buffer1.data(), value_buffer.data());
+    value_fc3.propagate<>(value_buffer.data(), &output);
     return output;
   }
 
-  template <bool use_value = true>
+  template <bool use_value, Activation activation>
   auto propagate(const float *input_data, const auto m, const auto n,
                  const auto *p1_choice_index, const auto *p2_choice_index,
                  float *p1, float *p2)
       -> std::conditional_t<use_value, float, void> {
     float output;
-    fc0.propagate(input_data, buffer0.data());
-    fc1.propagate(buffer0.data(), buffer1.data());
+    fc0.propagate<activation>(input_data, buffer0.data());
+    fc1.propagate<activation>(buffer0.data(), buffer1.data());
     if constexpr (use_value) {
-      value_fc2.propagate(buffer1.data(), value_buffer.data());
-      value_fc3.propagate(value_buffer.data(), &output);
+      value_fc2.propagate<activation>(buffer1.data(), value_buffer.data());
+      value_fc3.propagate<>(value_buffer.data(), &output);
     }
-    p1_policy_fc2.propagate(buffer1.data(), p1_policy_buffer.data());
-    p2_policy_fc2.propagate(buffer1.data(), p2_policy_buffer.data());
+    p1_policy_fc2.propagate<activation>(buffer1.data(),
+                                        p1_policy_buffer.data());
+    p2_policy_fc2.propagate<activation>(buffer1.data(),
+                                        p2_policy_buffer.data());
 
     for (auto i = 0; i < m; ++i) {
       const auto p1_c = p1_choice_index[i];

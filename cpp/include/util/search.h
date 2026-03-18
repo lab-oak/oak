@@ -74,23 +74,23 @@ struct Agent : AgentParams {
   bool is_network() const { return !is_monte_carlo() && !is_foul_play(); }
 
   void initialize_network(const pkmn_gen1_battle &b) {
+    std::cout << "start init: " << network_ptr.get() << std::endl;
+
     auto network = std::make_unique<NN::Battle::Network>();
+    std::cout << "temp float: " << network.get() << std::endl;
+
     // sometimes reads fail because python is writing to that file. just retry
     const auto try_read_parameters = [&network, this]() {
       constexpr auto tries = 3;
-      bool read_success = false;
       for (auto i = 0; i < tries; ++i) {
         std::ifstream file{eval};
         if (network->read_parameters(file)) {
-          read_success = true;
-          break;
+          return;
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
-      if (!read_success) {
-        throw std::runtime_error{
-            "Agent could not read network parameters at: " + eval};
-      }
+      throw std::runtime_error{"Agent could not read network parameters at: " +
+                               eval};
     };
     try_read_parameters();
 
@@ -98,17 +98,37 @@ struct Agent : AgentParams {
 
     if (discrete) {
       const auto [id, hd, vd, pd] = network->main_net.shape();
+      std::cout << "temp shape " << id << ' ' << hd << ' ' << vd << ' ' << pd
+                << std::endl;
       auto q_network_ptr = NN::Battle::visit_network_or_construct(
-          id, hd, vd, pd, [&network](auto &net) {
+          id, hd, vd, pd, [](auto &net) { return; });
+      q_network_ptr = NN::Battle::visit_network_or_construct(
+          id, hd, vd, pd,
+          [&network](auto &net) {
             // TODO call param, cache copy
+            std::cout << "visit lambda" << std::endl;
+            net.active_net = network->active_net;
+            net.pokemon_net = network->pokemon_net;
+            net.pokemon_out_dim = network->pokemon_out_dim;
+            net.active_out_dim = network->active_out_dim;
+            net.side_embedding_dim = network->side_embedding_dim;
+            net.battle_embedding.resize(network->battle_embedding.size());
+            net.battle_cache = network->battle_cache;
             return;
-          });
+          },
+          std::move(q_network_ptr));
+      std::cout << "discrete net " << q_network_ptr.get() << std::endl;
       if (q_network_ptr) {
+        std::cout << "before reset" << std::endl;
+        network.reset();
         network_ptr = std::move(q_network_ptr);
+        std::cout << "member after swap: " << network_ptr.get() << std::endl;
       }
     } else {
       network_ptr = std::move(network);
     }
+
+    std::cout << "end init: " << network_ptr.get() << std::endl;
 
     assert(network_ptr);
   }

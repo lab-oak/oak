@@ -70,7 +70,9 @@ struct MainNet {
     ValuePolicyBuffer() { std::memset(this, 0, sizeof(*this)); }
   };
 
+  template <Activation activation>
   float propagate(const uint8_t *input_data) const {
+    static_assert(activation == Activation::clamp);
     alignas(CacheLineSize) static thread_local ValueBuffer buffer;
     fc0.propagate(input_data, buffer.fc0_out);
     ac0.propagate(buffer.fc0_out, buffer.ac0_out);
@@ -84,11 +86,12 @@ struct MainNet {
     return value;
   }
 
-  template <bool use_value = true>
+  template <bool use_value, Activation activation>
   auto propagate(const uint8_t *input_data, const int m, const int n,
                  const auto *p1_choice_index, const auto *p2_choice_index,
                  float *p1, float *p2)
       -> std::conditional_t<use_value, float, void> const {
+    static_assert(activation == Activation::clamp);
     alignas(CacheLineSize) static thread_local ValuePolicyBuffer buffer;
     fc0.propagate(input_data, buffer.fc0_out);
     ac0.propagate(buffer.fc0_out, buffer.ac0_out);

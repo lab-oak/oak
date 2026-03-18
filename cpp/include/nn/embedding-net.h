@@ -7,9 +7,9 @@
 
 namespace NN {
 
-template <NN::Activation activation> struct EmbeddingNet {
-  Affine<activation, Eigen::ColMajor> fc0;
-  Affine<activation> fc1;
+struct EmbeddingNet {
+  Affine<Eigen::ColMajor> fc0;
+  Affine<> fc1;
   std::vector<float> buf;
 
   bool read_parameters(std::istream &stream) {
@@ -25,15 +25,17 @@ template <NN::Activation activation> struct EmbeddingNet {
     return fc0.write_parameters(stream) && fc1.write_parameters(stream);
   }
 
+  template <Activation activation>
   void propagate(const float *input_data, float *output_data) {
-    fc0.propagate(input_data, buf.data());
-    fc1.propagate(buf.data(), output_data);
+    fc0.propagate<activation>(input_data, buf.data());
+    fc1.propagate<activation>(buf.data(), output_data);
   }
 
+  template <Activation activation>
   void propagate(const float *input, const auto *index, float *output_data,
                  auto n) {
-    fc0.propagate(input, index, buf.data(), n);
-    fc1.propagate(buf.data(), output_data);
+    fc0.propagate<activation>(input, index, buf.data(), n);
+    fc1.propagate<activation>(buf.data(), output_data);
   }
 
   void initialize(auto &device) {

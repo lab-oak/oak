@@ -19,7 +19,7 @@ enum class Activation {
   clamp = 2,
 };
 
-template <Activation activation, int Order = Eigen::RowMajor> class Affine {
+template <int Order = Eigen::RowMajor> class Affine {
 public:
   using Vector = Eigen::VectorXf;
   using Matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Order>;
@@ -86,6 +86,7 @@ public:
     return !stream.fail();
   }
 
+  template <Activation activation = Activation::none>
   void propagate(const float *input_data, float *output_data) const {
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
@@ -102,6 +103,7 @@ public:
     }
   }
 
+  template <Activation activation = Activation::none>
   void propagate(const float *input_data, const auto *index_data,
                  float *output_data, uint32_t n) const {
     Eigen::Map<Vector> output(output_data, out_dim);

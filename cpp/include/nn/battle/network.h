@@ -17,13 +17,15 @@ struct NetworkBase {
   virtual std::tuple<int, int, int, int> shape() const noexcept = 0;
 };
 
-template <typename Main> class NetworkImpl : public NetworkBase {
+template <typename Main, Activation activation>
+class NetworkImpl : public NetworkBase {
 public:
-  static constexpr NN::Activation activation = Main::activation;
+  static_assert(activation == Activation::relu ||
+                activation == Activation::clamp);
   using T = typename Main::T;
 
-  EmbeddingNet<activation> pokemon_net;
-  EmbeddingNet<activation> active_net;
+  EmbeddingNet pokemon_net;
+  EmbeddingNet active_net;
   Main main_net;
   BattleCache<T> battle_cache;
 
@@ -66,7 +68,8 @@ public:
   float value_inference(const pkmn_gen1_battle &b,
                         const pkmn_gen1_chance_durations &d) {
     write_battle_embedding(b, d);
-    const auto value = sigmoid(main_net.propagate(battle_embedding.data()));
+    const auto value = sigmoid(
+        main_net.template propagate<activation>(battle_embedding.data()));
     assert(!std::isnan(value));
     return value;
   }
@@ -87,9 +90,9 @@ public:
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
     write_battle_embedding(b, d);
-    main_net.template propagate<false>(battle_embedding.data(), m, n,
-                                       p1_choice_index, p2_choice_index, p1,
-                                       p2);
+    main_net.template propagate<false, activation>(battle_embedding.data(), m,
+                                                   n, p1_choice_index,
+                                                   p2_choice_index, p1, p2);
   }
 
   auto value_policy_inference(const pkmn_gen1_battle &b,
@@ -108,7 +111,7 @@ public:
           Encode::Battle::Policy::get_index(battle.sides[1], p2_choice[i]);
     }
     write_battle_embedding(b, d);
-    const auto value = sigmoid(main_net.template propagate<true>(
+    const auto value = sigmoid(main_net.template propagate<true, activation>(
         battle_embedding.data(), m, n, p1_choice_index, p2_choice_index, p1,
         p2));
     assert(!std::isnan(value));
@@ -138,8 +141,9 @@ private:
       } else {
         const auto percent = (float)stored.hp / stored.stats.hp;
         side_embedding[0] = std::is_integral_v<T> ? percent * 127 : percent;
-        const T *embedding = battle_cache.active[s][side.order[0] - 1].get(
-            active_net, side.active, stored, duration);
+        const T *embedding =
+            battle_cache.active[s][side.order[0] - 1].template get<activation>(
+                active_net, side.active, stored, duration);
         std::copy_n(embedding, active_out_dim, side_embedding + 1);
       }
 
@@ -167,10 +171,11 @@ private:
   }
 };
 
-using Network = NetworkImpl<MainNet<Activation::relu>>;
+using Network = NetworkImpl<MainNet, Activation::relu>;
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 using QNetwork =
-    NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>>;
+    NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>,
+                Activation::clamp>;
 
 namespace Impl {
 auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
