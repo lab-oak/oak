@@ -714,22 +714,7 @@ template <SearchOptions Options = default_search> struct Search {
     // LRSNash convention: 2 extra entries needed for output denom, nash value
     std::array<float, 9 + 2> nash1{}, nash2{};
     LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
-    bool success = true;
-    try {
-      LRSNash::solve_fast(&solve_input, &solve_output);
-    } catch (std::exception &e) {
-      std::cerr << e.what() << std::endl;
-      success = false;
-      // print offending matrix in lossless form
-      std::cout << "value matrix" << std::endl;
-      for (auto i = 0; i < output.p1.k; ++i) {
-        for (auto j = 0; j < output.p2.k; ++j) {
-          std::cerr << "(" << output.value_matrix[i][j] << ", "
-                    << output.visit_matrix[i][j] << ") ";
-        }
-        std::cerr << std::endl;
-      }
-    }
+    LRSNash::solve_fast(&solve_input, &solve_output);
 
     for (int i = 0; i < output.p1.k; ++i) {
       output.p1.empirical[i] /= (float)output.iterations;
@@ -740,13 +725,6 @@ template <SearchOptions Options = default_search> struct Search {
       output.p2.nash[j] = nash2[j];
     }
     output.nash_value = solve_output.value;
-
-    // set nash data to emprical rather than leave as garbage/zeros/etc
-    if (!success) {
-      output.p1.nash = output.p1.empirical;
-      output.p2.nash = output.p2.empirical;
-      output.nash_value = output.empirical_value;
-    }
 
     output.p1.beta = {};
     output.p2.beta = {};
