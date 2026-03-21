@@ -1,5 +1,7 @@
 #pragma once
 
+#include <search/mcts.h>
+
 #include <chrono>
 #include <iomanip>
 #include <sstream>

@@ -35,13 +35,15 @@ int main(int argc, char **argv) {
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
-  auto agent = RuntimeSearch::Agent{
+  auto agent_params = RuntimeSearch::AgentParams{
       .search_budget = args.search_budget.value_or(std::to_string(1 << 12)),
       .bandit = args.bandit.value_or("ucb-1.0"),
       .eval = args.eval.value_or("mc"),
-      .discrete_network = args.use_discrete,
-      .matrix_ucb = args.matrix_ucb.value(),
-      .flag = args.use_search_budget ? nullptr : &search_flag};
+      .matrix_ucb = args.matrix_ucb.value_or(""),
+      .discrete = args.use_discrete,
+      .table = args.use_table};
+  auto agent = RuntimeSearch::Agent{agent_params};
+  bool *const flag = args.use_search_budget ? nullptr : &search_flag;
 
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());
@@ -53,14 +55,14 @@ int main(int argc, char **argv) {
                              .min = args.policy_min.value_or(0)};
 
   mt19937 device{args.seed.value()};
-  MCTS::Input battle_data;
+  MCTS::Input input;
 
   while (true) {
     std::string line;
     std::cout << "Input: battle-string" << std::endl;
     std::getline(std::cin, line);
     try {
-      battle_data = parse_input(line, args.seed.value());
+      input = parse_input(line, args.seed.value());
     } catch (const std::exception &e) {
       std::cerr << e.what() << std::endl;
       continue;
@@ -71,17 +73,16 @@ int main(int argc, char **argv) {
   // set the durations inside the options to start
   auto options = PKMN::options();
   pkmn_gen1_chance_options chance_options{};
-  chance_options.durations = battle_data.durations;
+  chance_options.durations = input.durations;
   pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
 
-  while (!pkmn_result_type(battle_data.result)) {
+  while (!pkmn_result_type(input.result)) {
     std::cout << "\nBattle:" << std::endl;
-    std::cout << PKMN::battle_data_to_string(battle_data.battle,
-                                             battle_data.durations);
+    std::cout << PKMN::battle_data_to_string(input.battle, input.durations);
     const auto [p1_choices, p2_choices] =
-        PKMN::choices(battle_data.battle, battle_data.result);
+        PKMN::choices(input.battle, input.result);
     const auto [p1_labels, p2_labels] =
-        PKMN::choice_labels(battle_data.battle, battle_data.result);
+        PKMN::choice_labels(input.battle, input.result);
 
     std::cout << "\nP1 choices:" << std::endl;
     for (auto i = 0; i < p1_choices.size(); ++i) {
@@ -96,7 +97,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Starting search. (Ctrl + C) to stop." << std::endl;
 
-    RuntimeSearch::Nodes nodes{};
+    RuntimeSearch::Heap heap{};
     MCTS::Output output{};
 
     int p1_index = -1;
@@ -104,9 +105,9 @@ int main(int argc, char **argv) {
 
     while (true) {
       search_flag = true;
-      output = RuntimeSearch::run(device, battle_data, nodes, agent, output);
-      std::cout << output_string(output, battle_data.battle, p1_labels,
-                                 p2_labels);
+      output =
+          RuntimeSearch::run(device, input, heap, agent, output, flag);
+      std::cout << output_string(output, input.battle, p1_labels, p2_labels);
       std::cout << "Input: P1 index (P2 index); Negative index = sample."
                 << std::endl;
       std::string line;
@@ -148,15 +149,13 @@ int main(int argc, char **argv) {
               << p2_labels[p2_index] << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    battle_data.result = PKMN::update(battle_data.battle, c1, c2, options);
-    battle_data.durations =
-        *pkmn_gen1_battle_options_chance_durations(&options);
+    input.result = PKMN::update(input.battle, c1, c2, options);
+    input.durations = *pkmn_gen1_battle_options_chance_durations(&options);
   }
 
   std::cout << "\nBattle:" << std::endl;
-  std::cout << PKMN::battle_data_to_string(battle_data.battle,
-                                           battle_data.durations);
-  std::cout << "Score: " << PKMN::score(battle_data.result) << std::endl;
+  std::cout << PKMN::battle_data_to_string(input.battle, input.durations);
+  std::cout << "Score: " << PKMN::score(input.result) << std::endl;
 
   return 0;
 }

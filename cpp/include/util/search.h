@@ -22,6 +22,7 @@ namespace RuntimeSearch {
 template <typename T> using UniqueNode = std::unique_ptr<MCTS::Node<T>>;
 template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
 
+// TODO templatize
 using BanditVariant =
     std::variant<std::monostate, UniqueNode<Exp3::JointBandit>,
                  UniqueTable<Exp3::JointBandit>, UniqueNode<PExp3::JointBandit>,
@@ -33,12 +34,39 @@ using BanditVariant =
 struct Heap {
   BanditVariant data;
 
-  bool empty() const { return std::holds_alternative<std::monostate>(data); }
+  bool empty() const noexcept {
+    return std::holds_alternative<std::monostate>(data);
+  }
 
   template <typename T> auto both() {
     UniqueNode<T> *a = std::get_if<UniqueNode<T>>(&data);
     UniqueTable<T> *b = std::get_if<UniqueTable<T>>(&data);
     return std::pair<UniqueNode<T> *, UniqueTable<T> *>{a, b};
+  }
+
+  // If the variant is a node, it swaps
+  bool update(uint8_t i, uint8_t j, MCTS::Obs &obs) {
+    const auto lambda = [&](auto &node) {
+      using T = std::remove_cvref_t<decltype(node)>;
+      if constexpr (TypeTraits::is_node<T>) {
+        if (!node || !node->stats.is_init()) {
+          return false;
+        }
+        auto child = node->children.find({i, j, obs});
+        if (child == node->children.end()) {
+          node = std::make_unique<std::decay_t<decltype(*node)>>();
+          return false;
+        } else {
+          auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
+              std::move((*child).second));
+          node.swap(unique_child);
+          return true;
+        }
+      }
+      return true;
+    };
+
+    return std::visit(lambda, data);
   }
 };
 
@@ -57,10 +85,9 @@ struct Agent : AgentParams {
 
   std::unique_ptr<NN::Battle::NetworkBase> network_ptr{};
 
-  // using AgentParams::AgentParams;
   Agent(const AgentParams &params) : AgentParams{params}, network_ptr{} {}
   Agent() = default;
-  Agent(const Agent &other) : AgentParams{static_cast<AgentParams>(other)} {}
+  // Agent(const Agent &other) : AgentParams{static_cast<AgentParams>(other)} {}
 
   constexpr bool operator==(const Agent &other) const {
     return static_cast<AgentParams>(*this) == static_cast<AgentParams>(other);
