@@ -34,7 +34,7 @@ template <typename T> struct PokemonCache {
   using Key = uint8_t;
 
   uint32_t dim;
-  std::array<Embedding, n_embeddings> embeddings;
+  std::array<Embedding, n_embeddings> embeddings;  // work
   std::vector<float> embedding;
 
   PokemonCache(uint32_t dim = 0) : dim{dim}, embedding{} {
@@ -79,7 +79,6 @@ template <typename T> struct PokemonCache {
     auto pokemon = base_pokemon;
     // iterate through all 16 has-pp combinations
     for (auto m = 0; m < n_pp; ++m) {
-
       // set move pp based on bits of m
       for (auto i = 0; i < 4; ++i) {
         pokemon.moves[i].pp = m & (1 << i);
@@ -95,7 +94,6 @@ template <typename T> struct PokemonCache {
         uint32_t n = std::distance(encoding_input.data(), input);
         auto *embedding_data =
             this->data(Encode::Battle::pokemon_key(pokemon, sleep));
-
         if constexpr (is_integral) {
           pokemon_net.propagate<activation, activation>(encoding_input.data(),
                                                         encoding_indices.data(),
@@ -117,7 +115,6 @@ template <typename T> struct PokemonCache {
         pokemon.status = status;
         get_entry(pokemon, 0);
       }
-
       // slept
       pokemon.status = Status::Sleep1;
       for (auto sleep = 1; sleep <= 7; ++sleep) {
@@ -248,35 +245,21 @@ template <typename T> struct BattleCache {
   }
 
   BattleCache(uint32_t pod, uint32_t aod)
-      : pokemon{SideSet<PokemonCache<T>>{
-                    PokemonCache<T>(pod), PokemonCache<T>(pod),
-                    PokemonCache<T>(pod), PokemonCache<T>(pod),
-                    PokemonCache<T>(pod), PokemonCache<T>(pod)},
-                SideSet<PokemonCache<T>>{
-                    PokemonCache<T>(pod), PokemonCache<T>(pod),
-                    PokemonCache<T>(pod), PokemonCache<T>(pod),
-                    PokemonCache<T>(pod), PokemonCache<T>(pod)}},
-        active{SideSet<ActivePokemonCache<T>>{
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)},
-               SideSet<ActivePokemonCache<T>>{
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod),
-                   ActivePokemonCache<T>(aod), ActivePokemonCache<T>(aod)}} {}
+      : pokemon{SideSet<PokemonCache<T>>{pod, pod, pod, pod, pod, pod},
+                {pod, pod, pod, pod, pod, pod}},
+        active{SideSet<ActivePokemonCache<T>>{aod, aod, aod, aod, aod, aod},
+               {aod, aod, aod, aod, aod, aod}} {}
 
-  void check(const pkmn_gen1_battle &battle) {
-    if (teams == std::array<Team, 2>{}) {
-      const auto &b = PKMN::view(battle);
-      for (auto s = 0; s < 2; ++s) {
-        for (auto p = 0; p < 6; ++p) {
-          const auto &poke = b.sides[s].pokemon[p];
-          teams[s][p] = PKMN::Set{poke.species, poke.moves};
-        }
+  template <Activation activation>
+  void fill(EmbeddingNet &pokemon_net, const PKMN::Battle &battle) {
+    for (auto s = 0; s < 2; ++s) {
+      for (auto p = 0; s < 6; ++s) {
+        const auto &poke = battle.sides[s].pokemon[p];
+        pokemon[s][p].template fill<activation>(pokemon_net, poke);
+        // teams[s][p] = PKMN::Set{poke.species, poke.moves};
+        // std::transform(teams[s][p])
       }
-    } else {
     }
-    // set team
   }
 };
 
