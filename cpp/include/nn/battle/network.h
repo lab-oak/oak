@@ -6,7 +6,7 @@
 #include <nn/battle/main-net.h>
 #include <nn/battle/quantized/main-net.h>
 #include <nn/default-hyperparameters.h>
-#include <nn/embedding-net.h>
+#include <nn/ffn.h>
 #include <util/random.h>
 
 namespace NN::Battle {

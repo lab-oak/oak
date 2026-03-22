@@ -3,7 +3,7 @@
 #include <encode/build/compressed-trajectory.h>
 #include <format/ou/data.h>
 #include <nn/default-hyperparameters.h>
-#include <nn/embedding-net.h>
+#include <nn/ffn.h>
 #include <train/build/trajectory.h>
 
 namespace NN {
