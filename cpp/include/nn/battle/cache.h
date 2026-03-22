@@ -7,6 +7,7 @@
 #include <nn/ffn.h>
 
 #include <map>
+#include <memory>
 
 namespace NN::Battle {
 
@@ -63,7 +64,10 @@ template <typename T> struct PokemonCache {
     for (auto i = 0; i < n_embeddings; ++i) {
       embeddings[i] = std::make_unique<T[]>(dim);
       const auto *source = other.embeddings[i].get();
-      // TODO
+      constexpr float scale =
+          std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f : 1.0f;
+      std::transform(source, source + dim, embeddings[i].get(),
+                     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     embedding = other.embedding;
     return *this;
