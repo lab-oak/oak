@@ -10,15 +10,11 @@
 
 namespace NN::Battle {
 
-// dynamically sized embeddings use new T[] rather than vector
-template <typename T, int dim>
-using EmbeddingT = std::conditional_t<(dim > 0), std::array<T, dim>, T *>;
+template <typename T> using EmbeddingT = std::unique_ptr<T[]>;
 
 using PKMN::Data::Status;
 
-template <typename T, int dim = 0> struct CacheBase {};
-
-template <typename T, int dim = 0> struct PokemonCache {
+template <typename T> struct PokemonCache {
 
   // Encode does not have a dimension for no status
   static constexpr auto n_status = Encode::Battle::Status::n_dim + 1;
@@ -33,24 +29,21 @@ template <typename T, int dim = 0> struct PokemonCache {
       Status::None,      Status::Poison, Status::Burn,  Status::Freeze,
       Status::Paralysis, Status::Rest1,  Status::Rest2, Status::Rest3};
 
-  static constexpr bool is_dynamic{dim <= 0};
   static constexpr bool is_integral{std::is_integral_v<T>};
-  using Embedding = EmbeddingT<T, dim>;
+  using Embedding = EmbeddingT<T>;
   using Key = uint8_t;
 
   uint32_t embedding_size;
   std::array<Embedding, n_embeddings> embeddings;
   std::vector<float> embedding;
 
-  PokemonCache(int d = 0) : embedding_size{dim}, embedding{} {
-    if constexpr (is_dynamic) {
-      embedding_size = d;
-      if (d > 0) {
-        for (auto &embedding : embeddings) {
-          embedding = new T[embedding_size];
-        }
+  PokemonCache(int d = 0) : embedding_size{d}, embedding{} {
+    if (d > 0) {
+      for (auto &embedding : embeddings) {
+        embedding = std::make_unique<T[]>(embedding_size);
       }
     }
+
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
     }
@@ -60,113 +53,81 @@ template <typename T, int dim = 0> struct PokemonCache {
   // PokemonCache &operator=(const PokemonCache &) = delete;
 
   PokemonCache(const PokemonCache &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (auto i = 0; i < n_embeddings; ++i) {
-        embeddings[i] = new T[embedding_size];
-        const auto *source = other.embeddings[i];
-        std::copy(source, source + embedding_size, embeddings[i]);
-        // constexpr float scale =
-        // std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-        //  : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[i],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (auto i = 0; i < n_embeddings; ++i) {
+      embeddings[i] = std::make_unique<T[]>(embedding_size);
+      const auto *source = other.embeddings[i].get();
+      std::copy(source, source + embedding_size, embeddings[i]);
+      // constexpr float scale =
+      // std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+      //  : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[i],
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     embedding = other.embedding;
   }
 
-  template <typename U> PokemonCache(const PokemonCache<U, 0> &other) {
+  template <typename U> PokemonCache(const PokemonCache<U> &other) {
     std::cout << "Pcache copy ctor" << std::endl;
     std::cout << typeid(T).name() << ' ' << typeid(U).name() << std::endl;
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (auto i = 0; i < n_embeddings; ++i) {
-        embeddings[i] = new T[embedding_size];
-        const auto *source = other.embeddings[i];
-        // std::copy(source, source + embedding_size, embeddings[i]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[i],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (auto i = 0; i < n_embeddings; ++i) {
+      embeddings[i] = std::make_unique<T[]>(embedding_size);
+      const auto *source = other.embeddings[i].get();
+      // std::copy(source, source + embedding_size, embeddings[i]);
+      constexpr float scale =
+          std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[i],
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     embedding = other.embedding;
   }
 
   PokemonCache &operator=(const PokemonCache &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (auto i = 0; i < n_embeddings; ++i) {
-        embeddings[i] = new T[embedding_size];
-        const auto *source = other.embeddings[i];
-        std::copy(source, source + embedding_size, embeddings[i]);
-        // constexpr float scale =
-        //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-        //                                                          : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[i],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (auto i = 0; i < n_embeddings; ++i) {
+      embeddings[i] = std::make_unique<T[]>(embedding_size);
+      const auto *source = other.embeddings[i].get();
+      std::copy(source, source + embedding_size, embeddings[i].get());
+      // constexpr float scale =
+      //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+      //                                                          : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[i],
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     embedding = other.embedding;
     return *this;
   }
 
   template <typename U>
-  PokemonCache &operator=(const PokemonCache<U, 0> &other) {
+  PokemonCache &operator=(const PokemonCache<U> &other) {
     std::cout << "Pcache assign ctor" << std::endl;
     std::cout << typeid(T).name() << ' ' << typeid(U).name() << std::endl;
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (auto i = 0; i < n_embeddings; ++i) {
-        embeddings[i] = new T[embedding_size];
-        const auto *source = other.embeddings[i];
-        // std::copy(source, source + embedding_size, embeddings[i]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[i],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (auto i = 0; i < n_embeddings; ++i) {
+      embeddings[i] = std::make_unique<T[]>(embedding_size);
+      const auto *source = other.embeddings[i].get();
+      // std::copy(source, source + embedding_size, embeddings[i]);
+      constexpr float scale =
+          std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[i],
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     embedding = other.embedding;
     return *this;
   }
 
-  ~PokemonCache() {
-    if constexpr (is_dynamic) {
-      for (auto &embedding : embeddings) {
-        delete[] embedding;
-      }
-    }
-  }
-
-  inline T *data(Key key) const {
-    if constexpr (is_dynamic) {
-      return embeddings[key];
-    } else {
-      return embeddings[key].data();
-    }
-  }
+  inline T *data(Key key) const { return embeddings[key].get(); }
 
   // iterate through all move pp/status combinations for a pokemon and store
   // embedding
   template <Activation activation>
-  void fill(auto &pokemon_net, const PKMN::Pokemon &base_pokemon) {
-    assert(embedding_size == pokemon_net.fc1.out_dim);
+  void fill(EmbeddingNet &pokemon_net, const PKMN::Pokemon &base_pokemon) {
+    assert(embedding_size == pokemon_net.layer<1>().out_dim);
 
     auto pokemon = base_pokemon;
     // iterate through all 16 has-pp combinations
@@ -189,7 +150,7 @@ template <typename T, int dim = 0> struct PokemonCache {
             this->data(Encode::Battle::pokemon_key(pokemon, sleep));
 
         if constexpr (is_integral) {
-          pokemon_net.propagate(encoding_input.data(), encoding_indices.data(),
+          pokemon_net.propagate<activation, activation>(encoding_input.data(), encoding_indices.data(),
                                 embedding.data(), n);
           std::transform(embedding.begin(), embedding.end(), embedding_data,
                          [](const auto f) {
@@ -197,7 +158,7 @@ template <typename T, int dim = 0> struct PokemonCache {
                                                  f);
                          });
         } else {
-          pokemon_net.propagate(encoding_input.data(), encoding_indices.data(),
+          pokemon_net.propagate<activation, activation>(encoding_input.data(), encoding_indices.data(),
                                 embedding_data, n);
         }
       };
@@ -222,11 +183,10 @@ template <typename T, int dim = 0> struct PokemonCache {
   }
 };
 
-template <typename T, int dim = 0> struct ActivePokemonCache {
+template <typename T> struct ActivePokemonCache {
 
-  static constexpr bool is_dynamic{dim <= 0};
   static constexpr bool is_integral{std::is_integral_v<T>};
-  using Embedding = EmbeddingT<T, dim>;
+  using Embedding = EmbeddingT<T>;
   using Key = std::pair<PKMN::ActivePokemon, uint8_t>;
 
   uint32_t embedding_size;
@@ -235,10 +195,7 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   std::array<uint16_t, Encode::Battle::ActivePokemon::n_dim> encoding_indices;
   std::vector<float> embedding;
 
-  ActivePokemonCache(int d = 0) : embedding_size{dim} {
-    if constexpr (is_dynamic) {
-      embedding_size = d;
-    }
+  ActivePokemonCache(int d = 0) : embedding_size{d} {
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
     }
@@ -248,21 +205,17 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   // ActivePokemonCache &operator=(const ActivePokemonCache &) = delete;
 
   ActivePokemonCache(const ActivePokemonCache &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (const auto &p : other.embeddings) {
-        embeddings[p.first] = new T[embedding_size];
-        const auto *source = p.second;
-        std::copy(source, source + embedding_size, embeddings[p.first]);
-        // constexpr float scale =
-        //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-        //                                                          : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[p.first],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (const auto &p : other.embeddings) {
+      embeddings[p.first] = std::make_unique<T[]>(embedding_size);
+      const auto *source = p.second;
+      std::copy(source, source + embedding_size, embeddings[p.first].get());
+      // constexpr float scale =
+      //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+      //                                                          : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[p.first].get(),
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
@@ -270,22 +223,16 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   }
 
   template <typename U>
-  ActivePokemonCache(const ActivePokemonCache<U, 0> &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (const auto &p : other.embeddings) {
-        embeddings[p.first] = new T[embedding_size];
-        const auto *source = p.second;
-        // std::copy(source, source + embedding_size, embeddings[p.first]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        std::transform(
-            source, source + embedding_size, embeddings[p.first],
-            [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+  ActivePokemonCache(const ActivePokemonCache<U> &other) {
+    embedding_size = other.embedding_size;
+    for (const auto &p : other.embeddings) {
+      embeddings[p.first] = std::make_unique<T[]>(embedding_size);
+      const auto *source = p.second;
+      // std::copy(source, source + embedding_size, embeddings[p.first].get());
+      constexpr float scale =
+          std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f : 1.0f;
+      std::transform(source, source + embedding_size, embeddings[p.first].get(),
+                     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
@@ -293,21 +240,17 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   }
 
   ActivePokemonCache &operator=(const ActivePokemonCache &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (const auto &p : other.embeddings) {
-        embeddings[p.first] = new T[embedding_size];
-        const auto *source = p.second;
-        std::copy(source, source + embedding_size, embeddings[p.first]);
-        // constexpr float scale =
-        //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-        //                                                          : 1.0f;
-        // std::transform(
-        //     source, source + embedding_size, embeddings[p.first],
-        //     [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+    embedding_size = other.embedding_size;
+    for (const auto &p : other.embeddings) {
+      embeddings[p.first] = std::make_unique<T[]>(embedding_size);
+      const auto *source = p.second.get();
+      std::copy(source, source + embedding_size, embeddings[p.first].get());
+      // constexpr float scale =
+      //     std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
+      //                                                          : 1.0f;
+      // std::transform(
+      //     source, source + embedding_size, embeddings[p.first].get(),
+      //     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
@@ -316,22 +259,15 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
   }
 
   template <typename U>
-  ActivePokemonCache &operator=(const ActivePokemonCache<U, 0> &other) {
-    if constexpr (is_dynamic) {
-      embedding_size = other.embedding_size;
-      for (const auto &p : other.embeddings) {
-        embeddings[p.first] = new T[embedding_size];
-        const auto *source = p.second;
-        // std::copy(source, source + embedding_size, embeddings[p.first]);
-        constexpr float scale =
-            std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f
-                                                                 : 1.0f;
-        std::transform(
-            source, source + embedding_size, embeddings[p.first],
-            [scale](const U x) { return static_cast<T>(x * scale); });
-      }
-    } else {
-      embeddings = other.embeddings;
+  ActivePokemonCache &operator=(const ActivePokemonCache<U> &other) {
+    embedding_size = other.embedding_size;
+    for (const auto &p : other.embeddings) {
+      embeddings[p.first] = std::make_unique<T[]>(embedding_size);
+      const auto *source = p.second.get();
+      constexpr float scale =
+          std::is_floating_point_v<U> && std::is_integral_v<T> ? 127.0f : 1.0f;
+      std::transform(source, source + embedding_size, embeddings[p.first].get(),
+                     [scale](const U x) { return static_cast<T>(x * scale); });
     }
     if constexpr (is_integral) {
       embedding.resize(embedding_size);
@@ -339,21 +275,7 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
     return *this;
   }
 
-  ~ActivePokemonCache() {
-    if constexpr (is_dynamic) {
-      for (auto p : embeddings) {
-        delete[] p.second;
-      }
-    }
-  }
-
-  auto *data(const auto key) {
-    if constexpr (is_dynamic) {
-      return embeddings[key];
-    } else {
-      return embeddings[key].data();
-    }
-  }
+  auto *data(const auto key) { return embeddings[key].get(); }
 
   template <Activation activation>
   const T *get(EmbeddingNet &active_net, const auto &active,
@@ -371,22 +293,20 @@ template <typename T, int dim = 0> struct ActivePokemonCache {
                                            indices);
       const auto n = std::distance(encoding_input.data(), input);
 
-      if constexpr (is_dynamic) {
-        embeddings[key] = new T[embedding_size];
-      }
+      embeddings[key] = std::make_unique<T[]>(embedding_size);
       auto *embedding_data = data(key);
 
       if constexpr (is_integral) {
-        active_net.propagate<activation>(encoding_input.data(),
-                                         encoding_indices.data(),
-                                         embedding.data(), n);
+        active_net.propagate<activation, activation>(encoding_input.data(),
+                                                     encoding_indices.data(),
+                                                     embedding.data(), n);
         std::transform(embedding.begin(), embedding.end(), embedding_data,
                        [](const auto f) {
                          return static_cast<T>(std::numeric_limits<T>::max() *
                                                f);
                        });
       } else {
-        active_net.propagate<activation>(
+        active_net.propagate<activation, activation>(
             encoding_input.data(), encoding_indices.data(), embedding_data, n);
       }
 
