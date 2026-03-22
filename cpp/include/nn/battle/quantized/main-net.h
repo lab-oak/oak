@@ -50,8 +50,13 @@ struct MainNet {
     auto p1_fc3 = m.p1_policy_fc3;
     auto p2_fc3 = m.p2_policy_fc3;
     const auto resize = [](auto &layer, auto dim) {
-      layer.weights.conservativeResize(layer.in_dim, dim);
+      auto old_dim = layer.out_dim;
+      layer.weights.conservativeResize(dim, layer.in_dim);
       layer.biases.conservativeResize(dim);
+      if (dim > old_dim) {
+        layer.weights.bottomRows(dim - old_dim).setZero();
+        layer.biases.tail(dim - old_dim).setZero();
+      }
       layer.out_dim = dim;
     };
     resize(p1_fc3, 320);
@@ -125,15 +130,17 @@ struct MainNet {
     }
     p1_policy_fc2.propagate(buffer.ac1_out, buffer.p1_policy_fc2_out);
     p1_policy_ac2.propagate(buffer.p1_policy_fc2_out, buffer.p1_policy_ac2_out);
-    p1_policy_fc3.propagate(buffer.p1_policy_ac2_out, buffer.p1_policy_fc3_out);
     p2_policy_fc2.propagate(buffer.ac1_out, buffer.p2_policy_fc2_out);
     p2_policy_ac2.propagate(buffer.p2_policy_fc2_out, buffer.p2_policy_ac2_out);
-    p2_policy_fc3.propagate(buffer.p2_policy_ac2_out, buffer.p2_policy_fc3_out);
     for (int i = 0; i < m; ++i) {
-      p1[i] = buffer.p1_policy_fc3_out[p1_choice_index[i]] / conversion;
+      p1[i] = p1_policy_fc3.propagate_single(buffer.p1_policy_ac2_out,
+                                             p1_choice_index[i]) /
+              conversion;
     }
     for (int i = 0; i < n; ++i) {
-      p2[i] = buffer.p2_policy_fc3_out[p2_choice_index[i]] / conversion;
+      p2[i] = p2_policy_fc3.propagate_single(buffer.p2_policy_ac2_out,
+                                             p2_choice_index[i]) /
+              conversion;
     }
     if constexpr (use_value) {
       const float value = buffer.value_fc3_out[0] / conversion;

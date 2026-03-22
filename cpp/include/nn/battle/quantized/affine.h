@@ -67,14 +67,17 @@ public:
     return (i / 4) % (PaddedInputDimensions / 4) * OutputDimensions * 4 +
            i / PaddedInputDimensions * 4 + i % 4;
   }
-
   static constexpr IndexType get_weight_index(IndexType i) {
     return get_weight_index_scrambled(i);
   }
 
   void try_copy_parameters(const auto &affine) {
-    const auto assert_ = [](const bool x, const auto &msg) {
+    const auto assert_ = [&affine](const bool x, const auto &msg) {
       if (!x) {
+        std::cout << "q: " << InputDimensions << ' ' << OutputDimensions
+                  << std::endl;
+        std::cout << "f: " << affine.in_dim << ' ' << affine.out_dim
+                  << std::endl;
         throw std::runtime_error(msg);
       }
     };
@@ -86,8 +89,12 @@ public:
     for (auto i = 0; i < OutputDimensions * InputDimensions; ++i) {
       weights[get_weight_index(i)] =
           static_cast<int8_t>(affine.weights.data()[i] * 64);
-      assert_(affine.weights.data()[i] < 2, "non clamped");
-      assert_(affine.weights.data()[i] > -2, "non clamped");
+      assert_(affine.weights.data()[i] < 2,
+              std::to_string(i) + "non clamped" +
+                  std::to_string(affine.weights.data()[i]));
+      assert_(affine.weights.data()[i] > -2,
+              std::to_string(i) + "non clamped" +
+                  std::to_string(affine.weights.data()[i]));
     }
   }
 
@@ -161,6 +168,20 @@ public:
 #undef vec_add_dpbusd_32
 #undef vec_hadd
     }
+  }
+
+  OutputType propagate_single(const InputType *input, IndexType out_idx) const {
+    int32_t acc = biases[out_idx];
+    // Each group of 4 inputs is a chunk; out_idx's weights are at chunk_base +
+    // out_idx*4
+    for (IndexType i = 0; i < PaddedInputDimensions / 4; ++i) {
+      const WeightType *w = &weights[i * OutputDimensions * 4 + out_idx * 4];
+      acc += (int32_t)input[i * 4 + 0] * w[0];
+      acc += (int32_t)input[i * 4 + 1] * w[1];
+      acc += (int32_t)input[i * 4 + 2] * w[2];
+      acc += (int32_t)input[i * 4 + 3] * w[3];
+    }
+    return acc;
   }
 };
 

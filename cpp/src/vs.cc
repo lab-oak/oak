@@ -151,18 +151,19 @@ void thread_fn(const ProgramArgs *args_ptr) {
     build_buffer.clear();
   };
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
-    auto p1_agent = RuntimeSearch::Agent{
+    auto p1_agent_params = RuntimeSearch::AgentParams{
         .search_budget =
             args.p1_search_budget.or_else([&] { return args.search_budget; })
                 .value(),
         .bandit = args.p1_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p1_eval.or_else([&] { return args.eval; }).value(),
-        .discrete_network = args.p1_use_discrete,
         .matrix_ucb =
             args.p1_matrix_ucb.or_else([&] { return args.matrix_ucb; })
                 .value_or(""),
-        .use_table = args.p1_use_table};
-    auto p1_agent_after = p1_agent;
+        .discrete = args.p1_use_discrete,
+        .table = args.p1_use_table};
+    auto p1_agent = RuntimeSearch::Agent{p1_agent_params};
+    auto p1_agent_after = RuntimeSearch::Agent{p1_agent_params};
     p1_agent_after.search_budget = args.p1_search_budget_after.value_or("0");
     p1_agent_after.matrix_ucb = args.p1_matrix_ucb_after.value_or("");
     const auto p1_policy_options = RuntimePolicy::Options{
@@ -173,18 +174,19 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .min = args.p1_policy_min.or_else([&] { return args.policy_min; })
                    .value_or(0)};
 
-    auto p2_agent = RuntimeSearch::Agent{
+    auto p2_agent_params = RuntimeSearch::AgentParams{
         .search_budget =
             args.p2_search_budget.or_else([&] { return args.search_budget; })
                 .value(),
         .bandit = args.p2_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p2_eval.or_else([&] { return args.eval; }).value(),
-        .discrete_network = args.p2_use_discrete,
         .matrix_ucb =
             args.p2_matrix_ucb.or_else([&] { return args.matrix_ucb; })
                 .value_or(""),
-        .use_table = args.p2_use_table};
-    auto p2_agent_after = p2_agent;
+        .discrete = args.p2_use_discrete,
+        .table = args.p2_use_table};
+    auto p2_agent = RuntimeSearch::Agent{p2_agent_params};
+    auto p2_agent_after = RuntimeSearch::Agent{p2_agent_params};
     p2_agent_after.search_budget = args.p2_search_budget_after.value_or("0");
     p2_agent_after.matrix_ucb = args.p2_matrix_ucb_after.value_or("");
     const auto p2_policy_options = RuntimePolicy::Options{
@@ -208,11 +210,11 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
     if (p1_agent.is_network()) {
       p1_agent.initialize_network(battle);
-      p1_agent_after.network.emplace(p1_agent.network.value());
+      p1_agent_after.network_ptr = std::move(p1_agent.network_ptr->clone());
     }
     if (p2_agent.is_network()) {
       p2_agent.initialize_network(battle);
-      p2_agent_after.network.emplace(p2_agent.network.value());
+      p2_agent_after.network_ptr = std::move(p2_agent.network_ptr->clone());
     }
 
     auto p1_battle_frames = Train::Battle::CompressedFrames{battle};
@@ -254,9 +256,9 @@ void thread_fn(const ProgramArgs *args_ptr) {
         p1_early_stop = 0;
         p2_early_stop = 0;
         if (p1_choices.size() > 1) {
-          RuntimeSearch::Nodes nodes{};
-          p1_output = RuntimeSearch::run(device, input, nodes, p1_agent);
-          p1_output = RuntimeSearch::run(device, input, nodes, p1_agent_after,
+          RuntimeSearch::Heap heap{};
+          p1_output = RuntimeSearch::run(device, input, heap, p1_agent);
+          p1_output = RuntimeSearch::run(device, input, heap, p1_agent_after,
                                          p1_output);
           p1_early_stop =
               inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
@@ -273,9 +275,9 @@ void thread_fn(const ProgramArgs *args_ptr) {
           if (same_search && p1_choices.size() > 1) {
             p2_output = p1_output;
           } else {
-            RuntimeSearch::Nodes nodes{};
-            p2_output = RuntimeSearch::run(device, input, nodes, p2_agent);
-            p2_output = RuntimeSearch::run(device, input, nodes, p2_agent_after,
+            RuntimeSearch::Heap heap{};
+            p2_output = RuntimeSearch::run(device, input, heap, p2_agent);
+            p2_output = RuntimeSearch::run(device, input, heap, p2_agent_after,
                                            p2_output);
             if (print_search_outputs) {
               print("P2:");

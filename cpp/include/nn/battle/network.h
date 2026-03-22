@@ -15,7 +15,7 @@ inline constexpr float sigmoid(const float x) { return 1 / (1 + std::exp(-x)); }
 
 struct NetworkBase {
   virtual std::tuple<int, int, int, int> shape() const noexcept = 0;
-  virtual NetworkBase *clone() const noexcept = 0;
+  virtual std::unique_ptr<NetworkBase> clone() const noexcept = 0;
 };
 
 template <typename Main, Activation activation>
@@ -40,7 +40,9 @@ public:
     return main_net.shape();
   }
 
-  NetworkBase *clone() const noexcept { return new NetworkImpl{*this}; }
+  std::unique_ptr<NetworkBase> clone() const noexcept {
+    return std::make_unique<NetworkImpl>(*this);
+  }
 
   void fill_cache(const pkmn_gen1_battle &battle) noexcept {
     battle_cache.template fill<activation>(pokemon_net, PKMN::view(battle));

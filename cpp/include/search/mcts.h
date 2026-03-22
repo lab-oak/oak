@@ -731,7 +731,7 @@ template <SearchOptions Options = default_search> struct Search {
 
     output.p1.beta = {};
     output.p2.beta = {};
-
+    return;
     std::mt19937 rd{std::random_device{}()};
 
     for (auto k = 0; k < beta_n; ++k) {
