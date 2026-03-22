@@ -329,16 +329,21 @@ size_t read_build_trajectories(Py::Build::Trajectories &trajectories,
 }
 
 Output cpp_inference(const Py::Battle::Frames &battle_frames,
-                     std::string network_path, bool discrete = false) {
+                     std::string network_path, bool discrete = false,
+                     std::string budget = "0") {
 
   RuntimeSearch::AgentParams agent_params{};
   agent_params.eval = network_path;
-  agent_params.bandit = "ucb-1.0";
+  agent_params.bandit = "pucb-1.0";
   agent_params.discrete = discrete;
-  agent_params.search_budget = "1";
+  // TODO fix 1
+  agent_params.search_budget = budget;
   RuntimeSearch::Agent agent{agent_params};
-  agent.initialize_network(
-      *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data()));
+  auto battle =
+      *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
+  auto options = PKMN::options();
+  auto result = PKMN::result();
+  agent.initialize_network(battle);
   mt19937 device{std::random_device{}()};
 
   Output buffer{battle_frames.size};
@@ -348,20 +353,22 @@ Output cpp_inference(const Py::Battle::Frames &battle_frames,
   auto battle_ptr = battle_frames.battle.data();
   auto durations_ptr = battle_frames.durations.data();
   auto k = battle_frames.k.data();
+  auto choice = battle_frames.choice.data();
   auto p1_choices = battle_frames.choices.data();
   auto p2_choices = battle_frames.choices.data() + 9;
 
   for (auto i = 0; i < battle_frames.size; ++i) {
     MCTS::Input input{
-        .battle = *reinterpret_cast<const pkmn_gen1_battle *>(battle_ptr),
-        .durations = *reinterpret_cast<const pkmn_gen1_chance_durations *>(
-            durations_ptr),
+        .battle = battle,
+        .durations = PKMN::durations(options),
+        .result = result,
     };
     RuntimeSearch::Heap heap{};
     const auto output = RuntimeSearch::run(device, input, heap, agent);
     *value = output.initial_value;
     std::copy_n(output.p1.prior.data(), output.p1.k, p1_policy);
     std::copy_n(output.p2.prior.data(), output.p2.k, p2_policy);
+    result = PKMN::update(battle, choice[0], choice[1], options);
     // out
     value += 1;
     p1_policy += 18; // TODO check strides
@@ -370,6 +377,7 @@ Output cpp_inference(const Py::Battle::Frames &battle_frames,
     battle_ptr += sizeof(pkmn_gen1_battle);
     durations_ptr += sizeof(pkmn_gen1_chance_durations);
     k += 2;
+    choice += 2;
     p1_choices += 18;
     p2_choices += 18;
   }
@@ -691,7 +699,7 @@ PYBIND11_MODULE(pyoak, m) {
       .def("clear", &Py::Build::Trajectories::clear);
 
   m.def("cpp_inference", &cpp_inference, py::arg("battle_frames"),
-        py::arg("network_path"), py::arg("discrete"));
+        py::arg("network_path"), py::arg("discrete"), py::arg("budget"));
   m.def("solve_matrix", &solve_matrix, py::arg("row_payoff"),
         py::arg("discretize_factor"));
 

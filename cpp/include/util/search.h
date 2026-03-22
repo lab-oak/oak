@@ -135,12 +135,9 @@ struct Agent : AgentParams {
             net.main_net.try_copy_parameters(network->main_net);
           },
           std::move(q_network_ptr));
-      std::cout << "discrete net " << q_network_ptr.get() << std::endl;
       if (q_network_ptr) {
-        std::cout << "before reset" << std::endl;
         network.reset();
         network_ptr = std::move(q_network_ptr);
-        std::cout << "member after swap: " << network_ptr.get() << std::endl;
       }
     } else {
       network->battle_cache.fill<NN::Activation::relu>(network->pokemon_net,

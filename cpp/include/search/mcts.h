@@ -226,7 +226,6 @@ template <SearchOptions Options = default_search> struct Search {
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
              auto &model, const Input &input, Output output = {}) {
 
-    std::cout << typeid(decltype(model)).name() << "\n";
     // reset data members
     *this = {};
 

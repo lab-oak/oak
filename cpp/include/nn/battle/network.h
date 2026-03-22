@@ -180,7 +180,7 @@ private:
 
 template <Activation activation>
 using FNetwork = NetworkImpl<MainNet, activation>;
-using Network = FNetwork<Activation::relu>;
+using Network = FNetwork<Activation::clamp>; // TODO support both!!!
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 using QNetwork =
     NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>,

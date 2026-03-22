@@ -112,6 +112,7 @@ struct MainNet {
                  float *p1, float *p2)
       -> std::conditional_t<use_value, float, void> const {
     static_assert(activation == Activation::clamp);
+    constexpr float conversion = 127 * (1 << 6);
     alignas(CacheLineSize) static thread_local ValuePolicyBuffer buffer;
     fc0.propagate(input_data, buffer.fc0_out);
     ac0.propagate(buffer.fc0_out, buffer.ac0_out);
@@ -129,13 +130,13 @@ struct MainNet {
     p2_policy_ac2.propagate(buffer.p2_policy_fc2_out, buffer.p2_policy_ac2_out);
     p2_policy_fc3.propagate(buffer.p2_policy_ac2_out, buffer.p2_policy_fc3_out);
     for (int i = 0; i < m; ++i) {
-      p1[i] = buffer.p1_policy_fc3_out[p1_choice_index[i]];
+      p1[i] = buffer.p1_policy_fc3_out[p1_choice_index[i]] / conversion;
     }
     for (int i = 0; i < n; ++i) {
-      p2[i] = buffer.p2_policy_fc3_out[p2_choice_index[i]];
+      p2[i] = buffer.p2_policy_fc3_out[p2_choice_index[i]] / conversion;
     }
     if constexpr (use_value) {
-      const float value = buffer.value_fc3_out[0] / float(127 * (1 << 6));
+      const float value = buffer.value_fc3_out[0] / conversion;
       assert(!std::isnan(value));
       return value;
     }

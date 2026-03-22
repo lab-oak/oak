@@ -138,10 +138,13 @@ struct CompressedFramesImpl {
       return true;
     }
 
-    void write_to_tensor(uint8_t *k, Iter *iter, float *empirical_policies,
-                         float *nash_policies, float *ev, float *nv) const {
+    void write_to_tensor(uint8_t *k, uint8_t *choice, Iter *iter,
+                         float *empirical_policies, float *nash_policies,
+                         float *ev, float *nv) const {
       k[0] = p1.k;
       k[1] = p2.k;
+      choice[0] = p1.choice;
+      choice[1] = p2.choice;
       iter[0] = iterations;
       std::fill_n(empirical_policies, 18, 0);
       std::fill_n(nash_policies, 18, 0);
