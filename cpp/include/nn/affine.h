@@ -8,12 +8,8 @@
 
 namespace NN {
 
-uint64_t combine_hash(uint64_t h1, uint64_t h2) {
-  return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) &
-         0xFFFFFFFFFFFFFFFF;
-}
-
 enum class Activation {
+  same = -1,
   none = 0,
   relu = 1,
   clamp = 2,
@@ -21,6 +17,7 @@ enum class Activation {
 
 template <int Order = Eigen::RowMajor> class Affine {
 public:
+  using enum Activation;
   using Vector = Eigen::VectorXf;
   using Matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Order>;
   using MatrixRowMajor =
@@ -30,6 +27,10 @@ public:
   uint32_t out_dim;
   Matrix weights;
   Vector biases;
+
+  bool operator==(const Affine &other) const noexcept {
+    return (biases == other.biases) && (weights == other.weights);
+  }
 
   bool read_parameters(std::istream &stream) {
     if (!stream.read(reinterpret_cast<char *>(&in_dim), sizeof(uint32_t))) {
@@ -50,13 +51,13 @@ public:
         return false;
       }
     } else {
-      MatrixRowMajor row_major_matrix;
-      row_major_matrix.resize(out_dim, in_dim);
-      if (!stream.read(reinterpret_cast<char *>(row_major_matrix.data()),
+      MatrixRowMajor row_major_weights;
+      row_major_weights.resize(out_dim, in_dim);
+      if (!stream.read(reinterpret_cast<char *>(row_major_weights.data()),
                        out_dim * in_dim * sizeof(float))) {
         return false;
       }
-      weights = row_major_matrix;
+      weights = row_major_weights;
     }
 
     for (auto i = 0; i < out_dim; ++i) {
@@ -77,54 +78,46 @@ public:
       stream.write(reinterpret_cast<const char *>(weights.data()),
                    out_dim * in_dim * sizeof(float));
     } else {
-      MatrixRowMajor row_major_matrix;
-      row_major_matrix.resize(out_dim, in_dim);
-      row_major_matrix = weights;
-      stream.write(reinterpret_cast<const char *>(weights.data()),
+      MatrixRowMajor row_major_weights;
+      row_major_weights.resize(out_dim, in_dim);
+      row_major_weights = weights;
+      stream.write(reinterpret_cast<const char *>(row_major_weights.data()),
                    out_dim * in_dim * sizeof(float));
     }
     return !stream.fail();
   }
 
-  template <Activation activation = Activation::none>
+  template <Activation act = none, Activation pre = none>
   void propagate(const float *input_data, float *output_data) const {
+    constexpr auto activation = (act == same) ? pre : act;
     const auto input = Eigen::Map<const Vector>(input_data, in_dim);
     Eigen::Map<Vector> output(output_data, out_dim);
     output.noalias() = weights * input + biases;
-    if constexpr (activation == Activation::none) {
+    if constexpr (activation == none) {
       return;
-    }
-    for (auto i = 0; i < out_dim; ++i) {
-      if constexpr (activation == Activation::relu) {
-        output(i) = std::max(output(i), 0.0f);
-      } else {
-        output(i) = std::clamp(output(i), 0.0f, 1.0f);
-      }
+    } else if constexpr (activation == relu) {
+      output = output.cwiseMax(0.0f);
+    } else {
+      output = output.cwiseMax(0.0f).cwiseMin(1.0f);
     }
   }
 
-  template <Activation activation = Activation::none>
+  template <Activation act = none, Activation pre = none>
   void propagate(const float *input_data, const auto *index_data,
                  float *output_data, uint32_t n) const {
+    constexpr auto activation = (act == same) ? pre : act;
     Eigen::Map<Vector> output(output_data, out_dim);
     output = biases;
     for (auto k = 0; k < n; ++k) {
       output.noalias() += weights.col(index_data[k]) * input_data[k];
     }
-    if constexpr (activation == Activation::none) {
+    if constexpr (activation == none) {
       return;
+    } else if constexpr (activation == relu) {
+      output = output.cwiseMax(0.0f);
+    } else {
+      output = output.cwiseMax(0.0f).cwiseMin(1.0f);
     }
-    for (auto i = 0; i < out_dim; ++i) {
-      if constexpr (activation == Activation::relu) {
-        output(i) = std::max(output(i), 0.0f);
-      } else {
-        output(i) = std::clamp(output(i), 0.0f, 1.0f);
-      }
-    }
-  }
-
-  bool operator==(const Affine &other) const {
-    return (biases == other.biases) && (weights == other.weights);
   }
 
   void initialize(auto &device) {
@@ -139,5 +132,10 @@ public:
     }
   }
 };
+
+uint64_t combine_hash(uint64_t h1, uint64_t h2) {
+  return (h1 ^ (h2 + 0x9E3779B97F4A7C15 + (h1 << 6) + (h1 >> 2))) &
+         0xFFFFFFFFFFFFFFFF;
+}
 
 } // namespace NN
