@@ -34,7 +34,8 @@ template <typename T> struct PokemonCache {
   using Key = uint8_t;
 
   uint32_t dim;
-  std::array<Embedding, n_embeddings> embeddings;  // work
+  std::array<Embedding, n_embeddings> embeddings;
+  // work
   std::vector<float> embedding;
 
   PokemonCache(uint32_t dim = 0) : dim{dim}, embedding{} {
@@ -253,7 +254,7 @@ template <typename T> struct BattleCache {
   template <Activation activation>
   void fill(EmbeddingNet &pokemon_net, const PKMN::Battle &battle) {
     for (auto s = 0; s < 2; ++s) {
-      for (auto p = 0; s < 6; ++s) {
+      for (auto p = 0; p < 6; ++p) {
         const auto &poke = battle.sides[s].pokemon[p];
         pokemon[s][p].template fill<activation>(pokemon_net, poke);
         // teams[s][p] = PKMN::Set{poke.species, poke.moves};
