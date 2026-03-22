@@ -99,11 +99,7 @@ struct Agent : AgentParams {
   bool is_network() const { return !is_monte_carlo() && !is_foul_play(); }
 
   void initialize_network(const pkmn_gen1_battle &b) {
-    std::cout << "start init: " << network_ptr.get() << std::endl;
-
     auto network = std::make_unique<NN::Battle::Network>();
-    std::cout << "temp float: " << network.get() << std::endl;
-
     // sometimes reads fail because python is writing to that file. just retry
     const auto try_read_parameters = [&network, this]() {
       constexpr auto tries = 3;
@@ -123,14 +119,12 @@ struct Agent : AgentParams {
       network->battle_cache.fill<NN::Activation::clamp>(network->pokemon_net,
                                                         PKMN::view(b));
       const auto [id, hd, vd, pd] = network->main_net.shape();
-      std::cout << "temp shape " << id << ' ' << hd << ' ' << vd << ' ' << pd
-                << std::endl;
       auto q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd, [](auto &net) { return; });
       q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd,
           [&network](auto &net) {
-            std::cout << "visit lambda" << std::endl;
+            // convert to quantized
             net.active_net = network->active_net;
             net.pokemon_net = network->pokemon_net;
             net.pokemon_out_dim = network->pokemon_out_dim;
@@ -153,9 +147,6 @@ struct Agent : AgentParams {
                                                        PKMN::view(b));
       network_ptr = std::move(network);
     }
-
-    std::cout << "end init: " << network_ptr.get() << std::endl;
-
     assert(network_ptr);
   }
 };

@@ -328,25 +328,23 @@ size_t read_build_trajectories(Py::Build::Trajectories &trajectories,
   return errors.load() ? 0 : std::min(count.load(), trajectories.size);
 }
 
-Output cpp_inference(std::string network_path,
-                     const Py::Battle::Frames &battle_frames) {
+Output cpp_inference(const Py::Battle::Frames &battle_frames,
+                     std::string network_path, bool discrete = false) {
+
+  RuntimeSearch::AgentParams agent_params{};
+  agent_params.eval = network_path;
+  agent_params.bandit = "ucb-1.0";
+  agent_params.discrete = discrete;
+  agent_params.search_budget = "1";
+  RuntimeSearch::Agent agent{agent_params};
+  agent.initialize_network(
+      *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data()));
+  mt19937 device{std::random_device{}()};
+
   Output buffer{battle_frames.size};
-  NN::Battle::FNetwork<NN::Activation::clamp> network;
-  std::ifstream file{network_path, std::ios::binary};
-  if (!file) {
-    throw std::runtime_error{"Can't open network"};
-  }
-  network.read_parameters(file);
-
-  const auto &initial_battle =
-      *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
-  network.battle_cache.fill<NN::Activation::clamp>(network.pokemon_net,
-                                                   PKMN::view(initial_battle));
-
   auto value = buffer.value.mutable_data();
   auto p1_policy = buffer.policy.mutable_data();
   auto p2_policy = buffer.policy.mutable_data() + 9;
-
   auto battle_ptr = battle_frames.battle.data();
   auto durations_ptr = battle_frames.durations.data();
   auto k = battle_frames.k.data();
@@ -354,14 +352,16 @@ Output cpp_inference(std::string network_path,
   auto p2_choices = battle_frames.choices.data() + 9;
 
   for (auto i = 0; i < battle_frames.size; ++i) {
-    const auto &battle =
-        *reinterpret_cast<const pkmn_gen1_battle *>(battle_ptr);
-    const auto &durations =
-        *reinterpret_cast<const pkmn_gen1_chance_durations *>(durations_ptr);
-
-    *value = network.value_policy_inference(battle, durations, k[0], k[1],
-                                            p1_choices, p2_choices, p1_policy,
-                                            p2_policy);
+    MCTS::Input input{
+        .battle = *reinterpret_cast<const pkmn_gen1_battle *>(battle_ptr),
+        .durations = *reinterpret_cast<const pkmn_gen1_chance_durations *>(
+            durations_ptr),
+    };
+    RuntimeSearch::Heap heap{};
+    const auto output = RuntimeSearch::run(device, input, heap, agent);
+    *value = output.initial_value;
+    std::copy_n(output.p1.prior.data(), output.p1.k, p1_policy);
+    std::copy_n(output.p2.prior.data(), output.p2.k, p2_policy);
     // out
     value += 1;
     p1_policy += 18; // TODO check strides
@@ -690,8 +690,8 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("end", &Py::Build::Trajectories::end)
       .def("clear", &Py::Build::Trajectories::clear);
 
-  m.def("cpp_inference", &cpp_inference, py::arg("network_path"),
-        py::arg("battle_frames"));
+  m.def("cpp_inference", &cpp_inference, py::arg("battle_frames"),
+        py::arg("network_path"), py::arg("discrete"));
   m.def("solve_matrix", &solve_matrix, py::arg("row_payoff"),
         py::arg("discretize_factor"));
 

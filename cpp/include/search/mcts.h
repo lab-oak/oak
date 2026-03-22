@@ -4,6 +4,7 @@
 #include <libpkmn/strings.h>
 #include <search/durations.h>
 #include <search/hash.h>
+#include <search/util/softmax.h>
 #include <util/random.h>
 
 #include <chrono>
@@ -143,6 +144,7 @@ struct Output {
   size_t iterations;
   std::chrono::microseconds duration;
 
+  double initial_value;
   double empirical_value;
   double nash_value;
   Side p1;
@@ -269,12 +271,14 @@ template <SearchOptions Options = default_search> struct Search {
                     is_policy_network<decltype(model)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
-        model.policy_inference(input.battle, input.durations, output.p1.k,
-                               output.p2.k, output.p1.choices.data(),
-                               output.p2.choices.data(), p1_logits.data(),
-                               p2_logits.data());
+        output.initial_value = model.value_policy_inference(
+            input.battle, input.durations, output.p1.k, output.p2.k,
+            output.p1.choices.data(), output.p2.choices.data(),
+            p1_logits.data(), p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
+        softmax(output.p1.prior.data(), p1_logits.data(), output.p1.k);
+        softmax(output.p2.prior.data(), p2_logits.data(), output.p2.k);
       }
     }
 

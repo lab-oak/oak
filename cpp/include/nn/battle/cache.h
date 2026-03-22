@@ -236,7 +236,20 @@ template <typename T> struct BattleCache {
   using Team = std::array<PKMN::Set, 6>;
   std::array<Team, 2> teams;
 
-  BattleCache() = default;
+  BattleCache(uint32_t pod = 0, uint32_t aod = 0)
+      : pokemon{SideSet<PokemonCache<T>>{pod, pod, pod, pod, pod, pod},
+                {pod, pod, pod, pod, pod, pod}},
+        active{SideSet<ActivePokemonCache<T>>{aod, aod, aod, aod, aod, aod},
+               {aod, aod, aod, aod, aod, aod}} {}
+
+  BattleCache(const BattleCache &other) {
+    for (auto s = 0; s < 2; ++s) {
+      for (auto p = 0; p < 6; ++p) {
+        pokemon[s][p] = other.pokemon[s][p];
+        active[s][p] = other.active[s][p];
+      }
+    }
+  }
 
   BattleCache &operator=(const BattleCache &other) = default;
   template <typename U> BattleCache &operator=(const BattleCache<U> &other) {
@@ -248,12 +261,6 @@ template <typename T> struct BattleCache {
     }
     return *this;
   }
-
-  BattleCache(uint32_t pod, uint32_t aod)
-      : pokemon{SideSet<PokemonCache<T>>{pod, pod, pod, pod, pod, pod},
-                {pod, pod, pod, pod, pod, pod}},
-        active{SideSet<ActivePokemonCache<T>>{aod, aod, aod, aod, aod, aod},
-               {aod, aod, aod, aod, aod, aod}} {}
 
   template <Activation activation>
   void fill(EmbeddingNet &pokemon_net, const PKMN::Battle &battle) {

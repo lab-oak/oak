@@ -46,7 +46,7 @@ def test_consistency():
         network.inference(encoded_frames_torch, output_torch)
 
         output_2 = oak.cpp_inference(
-            args.network, oak.BattleFrames.from_bytes(buffer, n_frames)
+            oak.BattleFrames.from_bytes(buffer, n_frames), args.network
         )
         output_torch_2 = oak.torch.OutputBuffer(output_2)
 
