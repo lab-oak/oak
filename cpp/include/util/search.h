@@ -22,14 +22,13 @@ namespace RuntimeSearch {
 template <typename T> using UniqueNode = std::unique_ptr<MCTS::Node<T>>;
 template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
 
-// TODO templatize
+template <typename... T>
+using BanditVariantT =
+    std::variant<std::monostate, UniqueNode<T>..., UniqueTable<T>...>;
+
 using BanditVariant =
-    std::variant<std::monostate, UniqueNode<Exp3::JointBandit>,
-                 UniqueTable<Exp3::JointBandit>, UniqueNode<PExp3::JointBandit>,
-                 UniqueTable<PExp3::JointBandit>, UniqueNode<UCB::JointBandit>,
-                 UniqueTable<UCB::JointBandit>, UniqueNode<PUCB::JointBandit>,
-                 UniqueTable<PUCB::JointBandit>, UniqueNode<UCB1::JointBandit>,
-                 UniqueTable<UCB1::JointBandit>>;
+    BanditVariantT<Exp3::JointBandit, PExp3::JointBandit, UCB::JointBandit,
+                   PUCB::JointBandit, UCB1::JointBandit>;
 
 struct Heap {
   BanditVariant data;
@@ -178,8 +177,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
         agent.initialize_network(input.battle);
       }
       if (auto network =
-              dynamic_cast<NN::Battle::Network *>(agent.network_ptr.get());
-          network) {
+              dynamic_cast<NN::Battle::Network *>(agent.network_ptr.get())) {
         return s.run(device, dur, params, heap, *network, input, output);
       } else {
         const auto [id, hd, vd, pd] = agent.network_ptr->shape();

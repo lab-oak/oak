@@ -171,7 +171,9 @@ private:
   }
 };
 
-using Network = NetworkImpl<MainNet, Activation::relu>;
+template <Activation activation>
+using FNetwork = NetworkImpl<MainNet, activation>;
+using Network = FNetwork<Activation::relu>;
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 using QNetwork =
     NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>,

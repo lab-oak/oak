@@ -52,6 +52,7 @@ struct MainNet {
     const auto resize = [](auto &layer, auto dim) {
       layer.weights.conservativeResize(layer.in_dim, dim);
       layer.biases.conservativeResize(dim);
+      layer.out_dim = dim;
     };
     resize(p1_fc3, 320);
     resize(p2_fc3, 320);

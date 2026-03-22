@@ -331,7 +331,7 @@ size_t read_build_trajectories(Py::Build::Trajectories &trajectories,
 Output cpp_inference(std::string network_path,
                      const Py::Battle::Frames &battle_frames) {
   Output buffer{battle_frames.size};
-  NN::Battle::Network network;
+  NN::Battle::FNetwork<NN::Activation::clamp> network;
   std::ifstream file{network_path, std::ios::binary};
   if (!file) {
     throw std::runtime_error{"Can't open network"};
@@ -340,7 +340,8 @@ Output cpp_inference(std::string network_path,
 
   const auto &initial_battle =
       *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
-  network.fill_pokemon_caches(initial_battle);
+  network.battle_cache.fill<NN::Activation::clamp>(network.pokemon_net,
+                                                   PKMN::view(initial_battle));
 
   auto value = buffer.value.mutable_data();
   auto p1_policy = buffer.policy.mutable_data();
@@ -358,8 +359,9 @@ Output cpp_inference(std::string network_path,
     const auto &durations =
         *reinterpret_cast<const pkmn_gen1_chance_durations *>(durations_ptr);
 
-    *value = network.inference(battle, durations, k[0], k[1], p1_choices,
-                               p2_choices, p1_policy, p2_policy);
+    *value = network.value_policy_inference(battle, durations, k[0], k[1],
+                                            p1_choices, p2_choices, p1_policy,
+                                            p2_policy);
     // out
     value += 1;
     p1_policy += 18; // TODO check strides
@@ -422,9 +424,9 @@ PYBIND11_MODULE(pyoak, m) {
       py::arg("encoded_frames"), py::arg("indexer"), py::arg("threads"),
       py::arg("max_battle_length"), py::arg("min_iterations"));
 
-  py::class_<RuntimeSearch::Nodes>(m, "Nodes")
+  py::class_<RuntimeSearch::Heap>(m, "Heap")
       .def(py::init<>())
-      .def("reset", &RuntimeSearch::Nodes::reset);
+      .def("empty", &RuntimeSearch::Heap::empty);
 
   py::class_<RuntimeSearch::Agent>(m, "Agent")
       .def(py::init<>())
@@ -432,7 +434,7 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readwrite("bandit", &RuntimeSearch::Agent::bandit)
       .def_readwrite("eval", &RuntimeSearch::Agent::eval)
       .def_readwrite("matrix_ucb", &RuntimeSearch::Agent::matrix_ucb)
-      .def_readwrite("use_table", &RuntimeSearch::Agent::use_table);
+      .def_readwrite("table", &RuntimeSearch::Agent::table);
   py::class_<MCTS::Input>(m, "Input").def(py::init<>());
 
   m.def(
@@ -556,12 +558,12 @@ PYBIND11_MODULE(pyoak, m) {
       });
   m.def(
       "search",
-      [](const MCTS::Input &input, RuntimeSearch::Nodes &nodes,
+      [](const MCTS::Input &input, RuntimeSearch::Heap &heap,
          RuntimeSearch::Agent &agent, MCTS::Output output = {}) {
         mt19937 device{std::random_device{}()};
-        return RuntimeSearch::run(device, input, nodes, agent, output);
+        return RuntimeSearch::run(device, input, heap, agent, output);
       },
-      py::arg("input"), py::arg("nodes"), py::arg("agent"),
+      py::arg("input"), py::arg("heap"), py::arg("agent"),
       py::arg("output") = MCTS::Output{});
 
   // Battle net hyperparams
