@@ -12,10 +12,10 @@ namespace Build {
 
 struct Network {
 
-  using T = Encode::Build::Tensorizer<Format::OU>;
+  // using T = Encode::Build::Tensorizer<Format::OU>;
 
-  EmbeddingNet<true, false> policy_net;
-  EmbeddingNet<true, false> value_net;
+  TeamBuildingNet policy_net;
+  TeamBuildingNet value_net;
 
   void initialize(auto &device) {
     policy_net.initialize(device);
@@ -32,8 +32,9 @@ struct Network {
            value_net.write_parameters(stream);
   }
 
-  void propagate(const float *input_data, float *output_data) {
-    policy_net.propagate(input_data, output_data);
+  void inference(const float *input, float *output) {
+    policy_net.propagate<Activation::relu, Activation::relu, Activation::none>(
+        input, output);
   }
 };
 

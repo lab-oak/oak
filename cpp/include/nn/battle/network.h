@@ -50,8 +50,8 @@ public:
     if (stream.read(&dummy, 1)) {
       return false;
     } else {
-      pokemon_out_dim = pokemon_net.fc1.out_dim;
-      active_out_dim = active_net.fc1.out_dim;
+      pokemon_out_dim = pokemon_net.layer<1>().out_dim;
+      active_out_dim = active_net.layer<1>().out_dim;
       side_embedding_dim = (1 + active_out_dim) + 5 * (1 + pokemon_out_dim);
       battle_embedding.resize(2 * side_embedding_dim);
       battle_cache = BattleCache<T>{pokemon_out_dim, active_out_dim};

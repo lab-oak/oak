@@ -53,7 +53,7 @@ auto softmax(auto &x) {
                      return Encode::Build::Tensorizer<>::action_index(action);
                    });
 
-    network.propagate(input.data(), logits.data());
+    network.inference(input.data(), logits.data());
 
     // get legal logits, softmax, sample action, apply
     std::vector<float> legal_logits;

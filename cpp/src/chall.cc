@@ -105,8 +105,7 @@ int main(int argc, char **argv) {
 
     while (true) {
       search_flag = true;
-      output =
-          RuntimeSearch::run(device, input, heap, agent, output, flag);
+      output = RuntimeSearch::run(device, input, heap, agent, output, flag);
       std::cout << output_string(output, input.battle, p1_labels, p2_labels);
       std::cout << "Input: P1 index (P2 index); Negative index = sample."
                 << std::endl;
