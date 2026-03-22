@@ -72,7 +72,7 @@ public:
     return get_weight_index_scrambled(i);
   }
 
-  void copy_parameters(const auto &affine) {
+  void try_copy_parameters(const auto &affine) {
     const auto assert_ = [](const bool x, const auto &msg) {
       if (!x) {
         throw std::runtime_error(msg);

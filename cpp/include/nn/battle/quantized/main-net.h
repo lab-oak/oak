@@ -40,6 +40,25 @@ struct MainNet {
     return {In, Hidden, ValueHidden, PolicyHidden};
   }
 
+  void try_copy_parameters(const auto &m) {
+    fc0.try_copy_parameters(m.fc0);
+    fc1.try_copy_parameters(m.fc1);
+    value_fc2.try_copy_parameters(m.value_fc2);
+    value_fc3.try_copy_parameters(m.value_fc3);
+    p1_policy_fc2.try_copy_parameters(m.p1_policy_fc2);
+    p2_policy_fc2.try_copy_parameters(m.p2_policy_fc2);
+    auto p1_fc3 = m.p1_policy_fc3;
+    auto p2_fc3 = m.p2_policy_fc3;
+    const auto resize = [](auto &layer, auto dim) {
+      layer.weights.conservativeResize(layer.in_dim, dim);
+      layer.biases.conservativeResize(dim);
+    };
+    resize(p1_fc3, 320);
+    resize(p2_fc3, 320);
+    p1_policy_fc3.try_copy_parameters(p1_fc3);
+    p2_policy_fc3.try_copy_parameters(p2_fc3);
+  }
+
   struct alignas(CacheLineSize) ValueBuffer {
     alignas(CacheLineSize) typename decltype(fc0)::OutputBuffer fc0_out;
     alignas(CacheLineSize) typename decltype(ac0)::OutputBuffer ac0_out;

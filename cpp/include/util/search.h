@@ -87,7 +87,6 @@ struct Agent : AgentParams {
 
   Agent(const AgentParams &params) : AgentParams{params}, network_ptr{} {}
   Agent() = default;
-  // Agent(const Agent &other) : AgentParams{static_cast<AgentParams>(other)} {}
 
   constexpr bool operator==(const Agent &other) const {
     return static_cast<AgentParams>(*this) == static_cast<AgentParams>(other);
@@ -121,9 +120,9 @@ struct Agent : AgentParams {
     };
     try_read_parameters();
 
-    // network.init_caches(b);
-
     if (discrete) {
+      network->battle_cache.fill<NN::Activation::clamp>(network->pokemon_net,
+                                                        PKMN::view(b));
       const auto [id, hd, vd, pd] = network->main_net.shape();
       std::cout << "temp shape " << id << ' ' << hd << ' ' << vd << ' ' << pd
                 << std::endl;
@@ -132,7 +131,6 @@ struct Agent : AgentParams {
       q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd,
           [&network](auto &net) {
-            // TODO call param, cache copy
             std::cout << "visit lambda" << std::endl;
             net.active_net = network->active_net;
             net.pokemon_net = network->pokemon_net;
@@ -141,7 +139,7 @@ struct Agent : AgentParams {
             net.side_embedding_dim = network->side_embedding_dim;
             net.battle_embedding.resize(network->battle_embedding.size());
             net.battle_cache = network->battle_cache;
-            return;
+            net.main_net.try_copy_parameters(network->main_net);
           },
           std::move(q_network_ptr));
       std::cout << "discrete net " << q_network_ptr.get() << std::endl;
@@ -152,6 +150,8 @@ struct Agent : AgentParams {
         std::cout << "member after swap: " << network_ptr.get() << std::endl;
       }
     } else {
+      network->battle_cache.fill<NN::Activation::relu>(network->pokemon_net,
+                                                       PKMN::view(b));
       network_ptr = std::move(network);
     }
 

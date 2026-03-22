@@ -26,8 +26,8 @@ public:
 
   EmbeddingNet pokemon_net;
   EmbeddingNet active_net;
-  Main main_net;
   BattleCache<T> battle_cache;
+  Main main_net;
 
   uint32_t pokemon_out_dim;
   uint32_t active_out_dim;
