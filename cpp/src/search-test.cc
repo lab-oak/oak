@@ -22,14 +22,15 @@ struct Test {
     pkmn_gen1_chance_options chance_options{};
     chance_options.durations = battle_data.durations;
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
-    RuntimeSearch::Nodes nodes{};
-    auto agent = RuntimeSearch::Agent{
+    RuntimeSearch::Heap heap{};
+    auto agent_params = RuntimeSearch::AgentParams{
         .search_budget = args.search_budget.value_or(std::to_string(1 << 20)),
         .bandit = args.bandit.value_or("exp3-1.0-0.1"),
         .eval = args.eval.value_or("mc"),
-        .discrete_network = args.use_discrete,
-        .matrix_ucb = args.matrix_ucb.value_or("")};
-    auto output = RuntimeSearch::run(device, battle_data, nodes, agent);
+        .matrix_ucb = args.matrix_ucb.value_or(""),
+        .discrete = args.use_discrete};
+    auto agent = RuntimeSearch::Agent{agent_params};
+    auto output = RuntimeSearch::run(device, battle_data, heap, agent);
     bool success = std::abs(output.empirical_value - expected) <= error;
     if (!success) {
       std::cerr << position << std::endl;

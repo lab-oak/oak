@@ -272,16 +272,20 @@ void generate(const ProgramArgs *args_ptr) {
 
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
-    auto agent = RuntimeSearch::Agent{.search_budget = args.search_budget,
-                                      .bandit = args.bandit,
-                                      .eval = args.eval,
-                                      .discrete_network = args.use_discrete,
-                                      .matrix_ucb = args.matrix_ucb};
+    auto agent_params = RuntimeSearch::AgentParams{
+        .search_budget = args.search_budget,
+        .bandit = args.bandit,
+        .eval = args.eval,
+        .matrix_ucb = args.matrix_ucb,
+        .discrete = args.use_discrete,
+        .table = args.use_table,
+    };
+    auto agent = RuntimeSearch::Agent{agent_params};
     if (agent.is_network()) {
       agent.initialize_network(battle_data.battle);
     }
 
-    auto nodes = RuntimeSearch::Nodes{};
+    auto heap = RuntimeSearch::Heap{};
 
     auto policy_options =
         RuntimePolicy::Options{.mode = args.policy_mode,
@@ -330,43 +334,44 @@ void generate(const ProgramArgs *args_ptr) {
             agent.is_network() && (agent.search_budget == "1");
 
         if (policy_rollout_only) {
-          std::array<float, 9> p1_logits{};
-          std::array<float, 9> p2_logits{};
-          output.p1.k = pkmn_gen1_battle_choices(
-              &battle_data.battle, PKMN_PLAYER_P1,
-              pkmn_result_p1(battle_data.result), output.p1.choices.data(),
-              PKMN_GEN1_MAX_CHOICES);
-          output.p2.k = pkmn_gen1_battle_choices(
-              &battle_data.battle, PKMN_PLAYER_P2,
-              pkmn_result_p2(battle_data.result), output.p2.choices.data(),
-              PKMN_GEN1_MAX_CHOICES);
-          agent.network.value().inference<false>(
-              battle_data.battle,
-              *pkmn_gen1_battle_options_chance_durations(&options), output.p1.k,
-              output.p2.k, output.p1.choices.data(), output.p2.choices.data(),
-              p1_logits.data(), p2_logits.data());
-          softmax(output.p1.empirical.data(), p1_logits.data(), output.p1.k);
-          softmax(output.p2.empirical.data(), p2_logits.data(), output.p2.k);
+          // TODO TODO TODO
+          // std::array<float, 9> p1_logits{};
+          // std::array<float, 9> p2_logits{};
+          // output.p1.k = pkmn_gen1_battle_choices(
+          //     &battle_data.battle, PKMN_PLAYER_P1,
+          //     pkmn_result_p1(battle_data.result), output.p1.choices.data(),
+          //     PKMN_GEN1_MAX_CHOICES);
+          // output.p2.k = pkmn_gen1_battle_choices(
+          //     &battle_data.battle, PKMN_PLAYER_P2,
+          //     pkmn_result_p2(battle_data.result), output.p2.choices.data(),
+          //     PKMN_GEN1_MAX_CHOICES);
+          // agent.network.value().inference<false>(
+          //     battle_data.battle,
+          //     *pkmn_gen1_battle_options_chance_durations(&options),
+          //     output.p1.k, output.p2.k, output.p1.choices.data(),
+          //     output.p2.choices.data(), p1_logits.data(), p2_logits.data());
+          // softmax(output.p1.empirical.data(), p1_logits.data(), output.p1.k);
+          // softmax(output.p2.empirical.data(), p2_logits.data(), output.p2.k);
 
-          if constexpr (debug) {
-            const auto [p1_labels, p2_labels] =
-                PKMN::choice_labels(battle_data.battle, battle_data.result);
+          // if constexpr (debug) {
+          //   const auto [p1_labels, p2_labels] =
+          //       PKMN::choice_labels(battle_data.battle, battle_data.result);
 
-            std::cout << "\nP1 policy:" << std::endl;
-            for (auto i = 0; i < output.p1.k; ++i) {
-              std::cout << p1_labels[i] << ": " << output.p1.empirical[i]
-                        << ' ';
-            }
-            std::cout << std::endl;
-            std::cout << "P2 policy:" << std::endl;
-            for (auto i = 0; i < output.p2.k; ++i) {
-              std::cout << p2_labels[i] << ": " << output.p2.empirical[i]
-                        << ' ';
-            }
-            std::cout << std::endl;
-          }
+          //   std::cout << "\nP1 policy:" << std::endl;
+          //   for (auto i = 0; i < output.p1.k; ++i) {
+          //     std::cout << p1_labels[i] << ": " << output.p1.empirical[i]
+          //               << ' ';
+          //   }
+          //   std::cout << std::endl;
+          //   std::cout << "P2 policy:" << std::endl;
+          //   for (auto i = 0; i < output.p2.k; ++i) {
+          //     std::cout << p2_labels[i] << ": " << output.p2.empirical[i]
+          //               << ' ';
+          //   }
+          //   std::cout << std::endl;
+          // }
         } else {
-          output = RuntimeSearch::run(device, battle_data, nodes, agent);
+          output = RuntimeSearch::run(device, battle_data, heap, agent);
           if (use_after) {
             agent.search_budget =
                 args.after_search_budget.value_or(agent.search_budget);
@@ -376,7 +381,7 @@ void generate(const ProgramArgs *args_ptr) {
             // agent.use_discrete = args.after_use_discrete;
             // use-table must be the same...
             auto after_output =
-                RuntimeSearch::run(device, battle_data, nodes, agent, output);
+                RuntimeSearch::run(device, battle_data, heap, agent, output);
             const auto [min, u, max] =
                 expl(after_output, output, policy_options);
             const auto p1_expl = u - min;
@@ -419,17 +424,18 @@ void generate(const ProgramArgs *args_ptr) {
             PKMN::update(battle_data.battle, p1_choice, p2_choice, options);
         battle_data.durations = PKMN::durations(options);
 
-        // set nodes
+        // set heap
         const auto &obs = *reinterpret_cast<const MCTS::Obs *>(
             pkmn_gen1_battle_options_chance_actions(&options));
         if (args.keep_node) {
-          const bool node_kept = nodes.update(p1_index, p2_index, obs);
+          const bool node_kept = heap.update(p1_index, p2_index, obs);
           RuntimeData::update_with_node_counter.fetch_add(node_kept);
           // TODO
-          nodes.reset_node_stats();
-          // nodes.reset_table_stats(); TODO
+          // heap.reset_node_stats();
+          // heap.reset_table_stats(); TODO
         } else {
-          nodes.reset();
+          heap = RuntimeSearch::Heap{};
+          // heap.reset();
         }
         RuntimeData::update_counter.fetch_add(1);
 

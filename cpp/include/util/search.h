@@ -44,7 +44,7 @@ struct Heap {
   }
 
   // If the variant is a node, it swaps
-  bool update(uint8_t i, uint8_t j, MCTS::Obs &obs) {
+  bool update(uint8_t i, uint8_t j, const MCTS::Obs &obs) {
     const auto lambda = [&](auto &node) {
       using T = std::remove_cvref_t<decltype(node)>;
       if constexpr (TypeTraits::is_node<T>) {
