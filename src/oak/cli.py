@@ -22,7 +22,7 @@ def _run_binary(binary_name, prefix=f"_bin/{directory}"):
     sys.exit(return_code)
 
 
-def test_oak():
+def oak_search_test():
     _run_binary("search-test")
 
 
