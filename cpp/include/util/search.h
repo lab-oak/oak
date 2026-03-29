@@ -38,7 +38,7 @@ struct Heap {
   }
 
   template <typename T>
-  auto both() -> std::pair<MCTS::Node<T>, MCTS::Table<T>> {
+  auto both() -> std::pair<MCTS::Node<T> *, MCTS::Table<T> *> {
     return {std::get_if<MCTS::Node<T>>(&data),
             std::get_if<MCTS::Table<T>>(&data)};
   }
@@ -59,12 +59,13 @@ struct Heap {
             node = {};
             return false;
           } else {
-            std::swap(node, child.second);
+            std::swap(node, child->second);
             return true;
           }
+        } else {
+          static_assert(TypeTraits::is_table<T>);
+          return true;
         }
-        static_assert(TypeTraits::is_table<T>);
-        return true;
       }
     };
 
@@ -119,7 +120,7 @@ struct Agent : AgentParams {
     try_read_parameters();
 
     if (discrete) {
-      network->fill<NN::Activation::clamp>(PKMN::view(b));
+      network->fill_cache(b);
       const auto [id, hd, vd, pd] = network->main_net.shape();
       auto q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd, [](auto &net) { return; });
@@ -194,23 +195,19 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
     if (agent.table) {
       if (heap_variant.empty()) {
         heap = Table{};
-        return parse_eval_and_search(dur, params,
-                                     *std::get<Table>(heap));
+        return parse_eval_and_search(dur, params, std::get<Table>(heap));
       } else if (!table_ptr) {
         throw std::runtime_error{"Bad variant access."};
       }
-      return parse_eval_and_search(dur, params,
-                                   *std::get<Table>(heap));
+      return parse_eval_and_search(dur, params, std::get<Table>(heap));
     } else {
       if (heap_variant.empty()) {
         heap = Node{};
-        return parse_eval_and_search(dur, params,
-                                     *std::get<Node>(heap));
+        return parse_eval_and_search(dur, params, std::get<Node>(heap));
       } else if (!node_ptr) {
         throw std::runtime_error{"Bad variant access."};
       }
-      return parse_eval_and_search(dur, params,
-                                   *std::get<Node>(heap));
+      return parse_eval_and_search(dur, params, std::get<Node>(heap));
     }
   };
 
