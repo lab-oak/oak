@@ -144,7 +144,7 @@ struct Output {
   size_t iterations;
   std::chrono::microseconds duration;
 
-  double initial_value;
+  double initial_value; // jank, only used for cpp/python comp.
   double empirical_value;
   double nash_value;
   Side p1;
@@ -224,7 +224,7 @@ template <SearchOptions Options = default_search> struct Search {
   size_t errors;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
-             auto &model, const Input &input, Output output = {}) {
+             auto &model, const Input &input, Output output = {}) noexcept {
 
     // reset data members
     *this = {};
@@ -318,7 +318,8 @@ template <SearchOptions Options = default_search> struct Search {
   }
 
   float run_root_iteration(auto &device, const auto &params, auto &heap,
-                           const auto &input, auto &model, Output &output) {
+                           const auto &input, auto &model,
+                           Output &output) noexcept {
 
     auto copy = input;
     auto *rng = reinterpret_cast<uint64_t *>(
@@ -373,7 +374,8 @@ template <SearchOptions Options = default_search> struct Search {
   // - value at each heap
   std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
                                         auto &heap, auto &input, auto &model,
-                                        Output &output, size_t depth = 0) {
+                                        Output &output,
+                                        size_t depth = 0) noexcept {
     static constexpr size_t max_depth = 100;
 
     bool error = false;
@@ -518,7 +520,8 @@ template <SearchOptions Options = default_search> struct Search {
   }
 
   float init_stats_and_rollout(auto &stats, auto &device,
-                               pkmn_gen1_battle &battle, pkmn_result result) {
+                               pkmn_gen1_battle &battle,
+                               pkmn_result result) noexcept {
 
     auto seed = device.uniform_64();
     auto m = pkmn_gen1_battle_choices(&battle, PKMN_PLAYER_P1,
@@ -662,7 +665,7 @@ template <SearchOptions Options = default_search> struct Search {
 
   // use battle seed to quickly compute a clamped damage roll
   template <size_t n_rolls>
-  inline static constexpr uint8_t roll_byte(const uint8_t seed) {
+  inline static constexpr uint8_t roll_byte(const uint8_t seed) noexcept {
     constexpr uint8_t lowest_roll{217};
     constexpr uint8_t middle_roll{236};
     if constexpr (n_rolls == 1) {
@@ -674,7 +677,7 @@ template <SearchOptions Options = default_search> struct Search {
     }
   }
 
-  void set_turn_limit(auto &battle) const {
+  void set_turn_limit(auto &battle) const noexcept {
     reinterpret_cast<uint16_t *>(battle.bytes +
                                  PKMN::Layout::Offsets::Battle::turn)[0] = 1000;
   }
@@ -688,7 +691,7 @@ template <SearchOptions Options = default_search> struct Search {
     return *pkmn_gen1_battle_options_chance_durations(&options);
   }
 
-  void process_output(Output &output, size_t beta_n = 0) {
+  void process_output(Output &output, size_t beta_n = 0) noexcept {
     // prepare output, solve empirical root matrix if enabled
     // output.empirical_value = output.total_value / output.iterations;
     double total_value = 0;
@@ -731,7 +734,9 @@ template <SearchOptions Options = default_search> struct Search {
 
     output.p1.beta = {};
     output.p2.beta = {};
-    return;
+
+    return; // TODO
+
     std::mt19937 rd{std::random_device{}()};
 
     for (auto k = 0; k < beta_n; ++k) {

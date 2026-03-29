@@ -12,9 +12,8 @@ namespace Build {
 
 struct Network {
 
-  // using T = Encode::Build::Tensorizer<Format::OU>;
-
   TeamBuildingNet policy_net;
+  // unused
   TeamBuildingNet value_net;
 
   void initialize(auto &device) {
