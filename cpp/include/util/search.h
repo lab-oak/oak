@@ -24,7 +24,7 @@ template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
 
 template <typename... T>
 using BanditVariantT =
-    std::variant<std::monostate, UniqueNode<T>..., UniqueTable<T>...>;
+    std::variant<std::monostate, MCTS::Node<T>..., MCTS::Table<T>...>;
 
 using BanditVariant =
     BanditVariantT<Exp3::JointBandit, PExp3::JointBandit, UCB::JointBandit,
@@ -37,32 +37,35 @@ struct Heap {
     return std::holds_alternative<std::monostate>(data);
   }
 
-  template <typename T> auto both() {
-    UniqueNode<T> *a = std::get_if<UniqueNode<T>>(&data);
-    UniqueTable<T> *b = std::get_if<UniqueTable<T>>(&data);
-    return std::pair<UniqueNode<T> *, UniqueTable<T> *>{a, b};
+  template <typename T>
+  auto both() -> std::pair<MCTS::Node<T>, MCTS::Table<T>> {
+    return {std::get_if<MCTS::Node<T>>(&data),
+            std::get_if<MCTS::Table<T>>(&data)};
   }
 
   // If the variant is a node, it swaps
   bool update(uint8_t i, uint8_t j, const MCTS::Obs &obs) {
     const auto lambda = [&](auto &node) {
       using T = std::remove_cvref_t<decltype(node)>;
-      if constexpr (TypeTraits::is_node<T>) {
-        if (!node || !node->stats.is_init()) {
-          return false;
+      if constexpr (std::is_same_v<T, std::monostate>) {
+        return false;
+      } else {
+        if constexpr (TypeTraits::is_node<T>) {
+          if (!node.stats.is_init()) {
+            return false;
+          }
+          auto child = node.children.find({i, j, obs});
+          if (child == node.children.end()) {
+            node = {};
+            return false;
+          } else {
+            std::swap(node, child.second);
+            return true;
+          }
         }
-        auto child = node->children.find({i, j, obs});
-        if (child == node->children.end()) {
-          node = std::make_unique<std::decay_t<decltype(*node)>>();
-          return false;
-        } else {
-          auto unique_child = std::make_unique<std::decay_t<decltype(*node)>>(
-              std::move((*child).second));
-          node.swap(unique_child);
-          return true;
-        }
+        static_assert(TypeTraits::is_table<T>);
+        return true;
       }
-      return true;
     };
 
     return std::visit(lambda, data);
@@ -116,8 +119,7 @@ struct Agent : AgentParams {
     try_read_parameters();
 
     if (discrete) {
-      network->battle_cache.fill<NN::Activation::clamp>(network->pokemon_net,
-                                                        PKMN::view(b));
+      network->fill<NN::Activation::clamp>(PKMN::view(b));
       const auto [id, hd, vd, pd] = network->main_net.shape();
       auto q_network_ptr = NN::Battle::visit_network_or_construct(
           id, hd, vd, pd, [](auto &net) { return; });
@@ -186,31 +188,29 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
   const auto parse_heap_and_search = [&](const auto dur, const auto &params,
                                          const auto &both) {
     const auto [node_ptr, table_ptr] = both;
-    using Node = std::remove_cvref_t<decltype(**node_ptr)>;
-    using Table = std::remove_cvref_t<decltype(**table_ptr)>;
+    using Node = std::remove_cvref_t<decltype(*node_ptr)>;
+    using Table = std::remove_cvref_t<decltype(*table_ptr)>;
     auto &heap = heap_variant.data;
     if (agent.table) {
       if (heap_variant.empty()) {
-        auto table = std::make_unique<Table>();
-        table->hasher = {device};
-        heap = std::move(table);
+        heap = Table{};
         return parse_eval_and_search(dur, params,
-                                     *std::get<std::unique_ptr<Table>>(heap));
+                                     *std::get<Table>(heap));
       } else if (!table_ptr) {
         throw std::runtime_error{"Bad variant access."};
       }
       return parse_eval_and_search(dur, params,
-                                   *std::get<std::unique_ptr<Table>>(heap));
+                                   *std::get<Table>(heap));
     } else {
       if (heap_variant.empty()) {
-        heap = std::make_unique<Node>();
+        heap = Node{};
         return parse_eval_and_search(dur, params,
-                                     *std::get<std::unique_ptr<Node>>(heap));
+                                     *std::get<Node>(heap));
       } else if (!node_ptr) {
         throw std::runtime_error{"Bad variant access."};
       }
       return parse_eval_and_search(dur, params,
-                                   *std::get<std::unique_ptr<Node>>(heap));
+                                   *std::get<Node>(heap));
     }
   };
 
