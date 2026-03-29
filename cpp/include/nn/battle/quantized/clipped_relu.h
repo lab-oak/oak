@@ -50,12 +50,6 @@ public:
     return hashValue;
   }
 
-  // Read network parameters
-  bool read_parameters(std::istream &) { return true; }
-
-  // Write network parameters
-  bool write_parameters(std::ostream &) const { return true; }
-
   // Forward propagation
   void propagate(const InputType *input, OutputType *output) const {
 

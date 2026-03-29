@@ -36,14 +36,6 @@ template <typename... Layers> struct FeedForwardNetwork {
     return true;
   }
 
-  bool write_parameters(std::ostream &stream) const {
-    bool ok = true;
-    std::apply(
-        [&](const auto &...l) { ((ok &= l.write_parameters(stream)), ...); },
-        layers);
-    return ok;
-  }
-
   template <Activation First, Activation... Rest>
   void propagate(const float *input, float *output) {
     static_assert((sizeof...(Rest) + 1) == NumLayers);

@@ -68,12 +68,6 @@ public:
     }
   }
 
-  bool write_parameters(std::ostream &stream) const {
-    return pokemon_net.write_parameters(stream) &&
-           active_net.write_parameters(stream) &&
-           main_net.write_parameters(stream);
-  }
-
   float value_inference(const pkmn_gen1_battle &b,
                         const pkmn_gen1_chance_durations &d) {
     write_battle_embedding(b, d);
@@ -182,7 +176,8 @@ private:
 
 template <Activation activation>
 using FNetwork = NetworkImpl<MainNet, activation>;
-using Network = FNetwork<Activation::clamp>; // TODO support both!!!
+using Network = FNetwork<Activation::relu>;         // TODO support both!!!
+using NetworkClamped = FNetwork<Activation::clamp>; // TODO support both!!!
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 using QNetwork =
     NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>,
@@ -197,15 +192,13 @@ auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 auto visit_network_4(const auto &F, std::unique_ptr<NetworkBase> network) {
   using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
-  auto *net = dynamic_cast<Net *>(network.get());
   if (!network) {
     network = std::make_unique<Net>();
+  }
+  if (auto *net = dynamic_cast<Net *>(network.get())) {
+    F(*net);
   } else {
-    if (net) {
-      F(*net);
-    } else {
-      throw std::runtime_error{"Invalid discrete cast."};
-    }
+    throw std::runtime_error{"Invalid discrete cast."};
   }
   return network;
 }
@@ -255,7 +248,7 @@ auto visit_network_1(int hidden, int value_hidden, int policy_hidden,
 }
 } // namespace Impl
 
-auto visit_network_or_construct(int in, int hidden, int value_hidden,
+auto visit_quantized_network(int in, int hidden, int value_hidden,
                                 int policy_hidden, const auto &F,
                                 std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {

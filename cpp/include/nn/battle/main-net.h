@@ -54,16 +54,6 @@ struct MainNet {
     return true;
   }
 
-  bool write_parameters(std::ostream &stream) const {
-    return fc0.write_parameters(stream) && fc1.write_parameters(stream) &&
-           value_fc2.write_parameters(stream) &&
-           value_fc3.write_parameters(stream) &&
-           p1_policy_fc2.write_parameters(stream) &&
-           p1_policy_fc3.write_parameters(stream) &&
-           p2_policy_fc2.write_parameters(stream) &&
-           p2_policy_fc3.write_parameters(stream);
-  }
-
   template <Activation activation> float propagate(const float *input_data) {
     float output;
     fc0.propagate<activation>(input_data, buffer0.data());

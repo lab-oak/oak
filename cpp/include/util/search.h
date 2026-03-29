@@ -19,9 +19,6 @@
 
 namespace RuntimeSearch {
 
-template <typename T> using UniqueNode = std::unique_ptr<MCTS::Node<T>>;
-template <typename T> using UniqueTable = std::unique_ptr<MCTS::Table<T>>;
-
 template <typename... T>
 using BanditVariantT =
     std::variant<std::monostate, MCTS::Node<T>..., MCTS::Table<T>...>;
@@ -111,50 +108,69 @@ struct Agent : AgentParams {
   bool is_network() const { return !is_monte_carlo() && !is_foul_play(); }
 
   void initialize_network(const pkmn_gen1_battle &b) {
-    auto network = std::make_unique<NN::Battle::Network>();
-    // sometimes reads fail because python is writing to that file. just retry
-    const auto try_read_parameters = [&network, this]() {
+
+    const auto try_open_file = [this]() {
       constexpr auto tries = 3;
       for (auto i = 0; i < tries; ++i) {
-        std::ifstream file{eval};
-        if (network->read_parameters(file)) {
-          return;
+        std::fstream file{eval};
+        if (file) {
+          return file;
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
-      throw std::runtime_error{"Agent could not read network parameters at: " +
-                               eval};
+      throw std::runtime_error{"Agent: could not open file at: " + eval};
     };
-    try_read_parameters();
+    auto file = try_open_file();
 
-    if (discrete) {
-      network->fill_cache(b);
-      const auto [id, hd, vd, pd] = network->main_net.shape();
-      auto q_network_ptr = NN::Battle::visit_network_or_construct(
-          id, hd, vd, pd, [](auto &net) { return; });
-      q_network_ptr = NN::Battle::visit_network_or_construct(
-          id, hd, vd, pd,
-          [&network](auto &net) {
-            // convert to quantized
-            net.active_net = network->active_net;
-            net.pokemon_net = network->pokemon_net;
-            net.pokemon_out_dim = network->pokemon_out_dim;
-            net.active_out_dim = network->active_out_dim;
-            net.side_embedding_dim = network->side_embedding_dim;
-            net.battle_embedding.resize(network->battle_embedding.size());
-            net.battle_cache = network->battle_cache;
-            net.main_net.try_copy_parameters(network->main_net);
-          },
-          std::move(q_network_ptr));
-      if (q_network_ptr) {
-        network.reset();
-        network_ptr = std::move(q_network_ptr);
+    struct Header {
+      uint8_t bytes[8];
+    };
+
+    const auto read_parameters_and_maybe_quantize = [&](auto &network) {
+      if (!network->read_parameters(file)) {
+        throw std::runtime_error{"Agent: could not read parameters at: " +
+                                 eval};
       }
-    } else {
-      network->battle_cache.fill<NN::Activation::relu>(network->pokemon_net,
-                                                       PKMN::view(b));
-      network_ptr = std::move(network);
+      network->fill_cache(b);
+      if (discrete) {
+        const auto [id, hd, vd, pd] = network->main_net.shape();
+        auto q_network_ptr = NN::Battle::visit_quantized_network(
+            id, hd, vd, pd, [&network](auto &net) {
+              // convert to quantized
+              net.active_net = network->active_net;
+              net.pokemon_net = network->pokemon_net;
+              net.pokemon_out_dim = network->pokemon_out_dim;
+              net.active_out_dim = network->active_out_dim;
+              net.side_embedding_dim = network->side_embedding_dim;
+              net.battle_embedding.resize(network->battle_embedding.size());
+              net.battle_cache = network->battle_cache;
+              net.main_net.try_copy_parameters(network->main_net);
+            });
+        network_ptr = std::move(q_network_ptr);
+      } else {
+        network_ptr = std::move(network);
+      }
+    };
+
+    Header header;
+    file.read(reinterpret_cast<char *>(&header), 8);
+    using NN::Activation;
+    const auto activation = static_cast<Activation>(header.bytes[0] + 1);
+    if (activation == Activation::clamp) {
+      auto network = std::make_unique<NN::Battle::Network>();
+      read_parameters_and_maybe_quantize(network);
     }
+    if (discrete) {
+      throw std::runtime_error{"Agent: .discrete was specified but the parsed "
+                               "header does not encode clamped activations."};
+    }
+    if (activation == Activation::relu) {
+      auto network = std::make_unique<NN::Battle::Network>();
+      read_parameters_and_maybe_quantize(network);
+    } else {
+      throw std::runtime_error{"Agent: could not parse header at: " + eval};
+    }
+
     assert(network_ptr);
   }
 };
@@ -180,7 +196,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
         return s.run(device, dur, params, heap, *network, input, output);
       } else {
         const auto [id, hd, vd, pd] = agent.network_ptr->shape();
-        auto q_network_ptr = NN::Battle::visit_network_or_construct(
+        auto q_network_ptr = NN::Battle::visit_quantized_network(
             id, hd, vd, pd,
             [&](auto &net) {
               output = s.run(device, dur, params, heap, net, input, output);

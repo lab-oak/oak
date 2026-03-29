@@ -69,24 +69,6 @@ public:
     return true;
   }
 
-  bool write_parameters(std::ostream &stream) const {
-    stream.write(reinterpret_cast<const char *>(&in_dim), sizeof(uint32_t));
-    stream.write(reinterpret_cast<const char *>(&out_dim), sizeof(uint32_t));
-    stream.write(reinterpret_cast<const char *>(biases.data()),
-                 out_dim * sizeof(float));
-    if constexpr (Order == Eigen::RowMajor) {
-      stream.write(reinterpret_cast<const char *>(weights.data()),
-                   out_dim * in_dim * sizeof(float));
-    } else {
-      MatrixRowMajor row_major_weights;
-      row_major_weights.resize(out_dim, in_dim);
-      row_major_weights = weights;
-      stream.write(reinterpret_cast<const char *>(row_major_weights.data()),
-                   out_dim * in_dim * sizeof(float));
-    }
-    return !stream.fail();
-  }
-
   template <Activation act = none, Activation pre = none>
   void propagate(const float *input_data, float *output_data) const {
     constexpr auto activation = (act == same) ? pre : act;

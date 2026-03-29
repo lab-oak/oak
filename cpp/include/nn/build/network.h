@@ -26,11 +26,6 @@ struct Network {
            value_net.read_parameters(stream);
   }
 
-  bool write_parameters(std::ostream &stream) const {
-    return policy_net.write_parameters(stream) &&
-           value_net.write_parameters(stream);
-  }
-
   void inference(const float *input, float *output) {
     policy_net.propagate<Activation::relu, Activation::relu, Activation::none>(
         input, output);
