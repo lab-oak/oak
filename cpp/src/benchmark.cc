@@ -32,7 +32,12 @@ int benchmark(int argc, char **argv) {
 
   const auto output = RuntimeSearch::run(device, input, heap, agent);
 
-  std::cout << output.duration.count() << "µs." << std::endl;
+  const auto us = output.duration.count();
+  if (us >= 10000) {
+    std::cout << (us / 1000) << "ms." << std::endl;
+  } else {
+    std::cout << us << "µs." << std::endl;
+  }
   std::cout << output.iterations << " iterations." << std::endl;
 
   return 0;

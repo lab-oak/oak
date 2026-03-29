@@ -249,8 +249,8 @@ auto visit_network_1(int hidden, int value_hidden, int policy_hidden,
 } // namespace Impl
 
 auto visit_quantized_network(int in, int hidden, int value_hidden,
-                                int policy_hidden, const auto &F,
-                                std::unique_ptr<NetworkBase> network = {}) {
+                             int policy_hidden, const auto &F,
+                             std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {
   case 768:
     return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,
