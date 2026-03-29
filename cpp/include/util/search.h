@@ -68,9 +68,17 @@ struct Heap {
         }
       }
     };
-
     return std::visit(lambda, data);
   }
+
+  // void reset_stats() {
+  //   std::visit([](auto &heap){
+  //     using T = std::remove_cvref_t<decltype(heap)>;
+  //     if constexpr (!std::is_same_v<T, std::monostate>) {
+  //       heap.stats = {};
+  //     }
+  //   }, data);
+  // }
 };
 
 struct AgentParams {
@@ -197,7 +205,8 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
         heap = Table{};
         return parse_eval_and_search(dur, params, std::get<Table>(heap));
       } else if (!table_ptr) {
-        throw std::runtime_error{"Bad variant access."};
+        throw std::runtime_error{"RuntimeSearch: Bad Heap access. Expecting " +
+                                 std::string{typeid(Table).name()}};
       }
       return parse_eval_and_search(dur, params, std::get<Table>(heap));
     } else {
@@ -205,7 +214,8 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
         heap = Node{};
         return parse_eval_and_search(dur, params, std::get<Node>(heap));
       } else if (!node_ptr) {
-        throw std::runtime_error{"Bad variant access."};
+        throw std::runtime_error{"RuntimeSearch: Bad Heap access. Expecting " +
+                                 std::string{typeid(Node).name()}};
       }
       return parse_eval_and_search(dur, params, std::get<Node>(heap));
     }

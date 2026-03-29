@@ -127,7 +127,6 @@ struct Input {
   pkmn_result result;
 };
 
-// strategies, value estimate, etc. All info the search produces
 struct Output {
   struct Side {
     uint8_t k;
@@ -144,7 +143,7 @@ struct Output {
   size_t iterations;
   std::chrono::microseconds duration;
 
-  double initial_value; // jank, only used for cpp/python comp.
+  double initial_value;
   double empirical_value;
   double nash_value;
   Side p1;

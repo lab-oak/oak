@@ -47,10 +47,10 @@ struct ProgramArgs : public GenerateArgs {
   size_t &threads =
       kwarg("threads", "Number of parallel self-play games to run")
           .set_default(std::max(1u, std::thread::hardware_concurrency() - 1));
-  size_t &max_samples =
-      kwarg("max-samples",
-            "Number of samples to generate before program termination")
-          .set_default(1 << 30);
+  size_t &max_battles =
+      kwarg("max-battles",
+            "Number of valid self-play games before program termination")
+          .set_default(1 << 25);
   size_t &buffer_size =
       kwarg("buffer-size", "Size of battle buffer (Mb) before write")
           .set_default(8);
@@ -135,6 +135,7 @@ std::string start_datetime = get_current_datetime();
 std::atomic<size_t> battle_buffer_counter{};
 std::atomic<size_t> build_buffer_counter{};
 // global sums
+std::atomic<size_t> battle_counter{};
 std::atomic<size_t> frame_counter{};
 std::atomic<size_t> traj_counter{};
 std::atomic<size_t> update_counter{};
@@ -352,9 +353,6 @@ void generate(const ProgramArgs *args_ptr) {
         if (args.keep_node) {
           const bool node_kept = heap.update(p1_index, p2_index, obs);
           RuntimeData::update_with_node_counter.fetch_add(node_kept);
-          // TODO
-          // heap.reset_node_stats();
-          // heap.reset_table_stats(); TODO
         } else {
           heap = RuntimeSearch::Heap{};
           // heap.reset();
@@ -377,8 +375,8 @@ void generate(const ProgramArgs *args_ptr) {
       training_frames.write(buffer + frame_buffer_write_index);
       frame_buffer_write_index += n_bytes_frames;
       // data
-      if (RuntimeData::frame_counter.fetch_add(training_frames.updates.size()) >
-          args.max_samples) {
+      RuntimeData::frame_counter.fetch_add(training_frames.updates.size());
+      if ((1 + RuntimeData::battle_counter.fetch_add(1)) >= args.max_battles) {
         RuntimeData::terminated = true;
       }
       if (frame_buffer_write_index >= training_frames_target_size) {
@@ -439,7 +437,7 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
           (double)RuntimeData::update_counter.load();
       std::cout << "keep node ratio: " << keep_node_ratio << std::endl;
     }
-    const auto progress = (double)frames_more / args.max_samples * 100;
+    const auto progress = (double)frames_more / args.max_battles * 100;
     std::cout << "progress: " << progress << "%" << std::endl;
 
     frames_done = frames_more;
