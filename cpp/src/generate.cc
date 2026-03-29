@@ -72,10 +72,6 @@ struct ProgramArgs : public GenerateArgs {
       kwarg("fast-search-prob",
             "Probability a search with only fast-search-budget is used")
           .set_default(0);
-  double &after_search_prob =
-      kwarg("after-search-prob",
-            "Probability a search with only fast-search-budget is used")
-          .set_default(0);
   int &max_battle_length =
       kwarg("max-battle-length",
             "Battles exceeding this many updates are dropped")
@@ -319,8 +315,6 @@ void generate(const ProgramArgs *args_ptr) {
                                                 battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
-        const bool use_after =
-            !use_fast && (device.uniform() < args.after_search_prob);
         agent.search_budget = ((battle_length == 0) && skip_battle)
                                   ? args.t1_search_budget.value()
                                   : (use_fast ? args.fast_search_budget.value()
@@ -330,91 +324,19 @@ void generate(const ProgramArgs *args_ptr) {
                      : args.policy_mode;
         MCTS::Output output{};
 
-        const bool policy_rollout_only =
-            agent.is_network() && (agent.search_budget == "1");
-
-        if (policy_rollout_only) {
-          // TODO TODO TODO
-          // std::array<float, 9> p1_logits{};
-          // std::array<float, 9> p2_logits{};
-          // output.p1.k = pkmn_gen1_battle_choices(
-          //     &battle_data.battle, PKMN_PLAYER_P1,
-          //     pkmn_result_p1(battle_data.result), output.p1.choices.data(),
-          //     PKMN_GEN1_MAX_CHOICES);
-          // output.p2.k = pkmn_gen1_battle_choices(
-          //     &battle_data.battle, PKMN_PLAYER_P2,
-          //     pkmn_result_p2(battle_data.result), output.p2.choices.data(),
-          //     PKMN_GEN1_MAX_CHOICES);
-          // agent.network.value().inference<false>(
-          //     battle_data.battle,
-          //     *pkmn_gen1_battle_options_chance_durations(&options),
-          //     output.p1.k, output.p2.k, output.p1.choices.data(),
-          //     output.p2.choices.data(), p1_logits.data(), p2_logits.data());
-          // softmax(output.p1.empirical.data(), p1_logits.data(), output.p1.k);
-          // softmax(output.p2.empirical.data(), p2_logits.data(), output.p2.k);
-
-          // if constexpr (debug) {
-          //   const auto [p1_labels, p2_labels] =
-          //       PKMN::choice_labels(battle_data.battle, battle_data.result);
-
-          //   std::cout << "\nP1 policy:" << std::endl;
-          //   for (auto i = 0; i < output.p1.k; ++i) {
-          //     std::cout << p1_labels[i] << ": " << output.p1.empirical[i]
-          //               << ' ';
-          //   }
-          //   std::cout << std::endl;
-          //   std::cout << "P2 policy:" << std::endl;
-          //   for (auto i = 0; i < output.p2.k; ++i) {
-          //     std::cout << p2_labels[i] << ": " << output.p2.empirical[i]
-          //               << ' ';
-          //   }
-          //   std::cout << std::endl;
-          // }
-        } else {
-          output = RuntimeSearch::run(device, battle_data, heap, agent);
-          if (use_after) {
-            agent.search_budget =
-                args.after_search_budget.value_or(agent.search_budget);
-            agent.bandit = args.after_bandit.value_or(agent.bandit);
-            agent.matrix_ucb = args.after_matrix_ucb.value_or(agent.matrix_ucb);
-            agent.eval = args.after_eval.value_or(agent.eval);
-            // agent.use_discrete = args.after_use_discrete;
-            // use-table must be the same...
-            auto after_output =
-                RuntimeSearch::run(device, battle_data, heap, agent, output);
-            const auto [min, u, max] =
-                expl(after_output, output, policy_options);
-            const auto p1_expl = u - min;
-            const auto p2_expl = max - u;
-            // std::cout << "expl: " << p2_expl << ' ' << p1_expl << std::endl;
-            if ((std::max(p1_expl, p2_expl) > 0.20) ||
-                ((p1_expl + p2_expl) > 0.35)) {
-              const auto [p1_labels, p2_labels] =
-                  PKMN::choice_labels(battle_data.battle, battle_data.result);
-              std::cout << PKMN::battle_data_to_string(battle_data.battle,
-                                                       battle_data.durations)
-                        << std::endl;
-              std::cout << MCTS::output_string(output, battle_data.battle,
-                                               p1_labels, p2_labels);
-              std::cout << MCTS::output_string(after_output, battle_data.battle,
-                                               p1_labels, p2_labels);
-            }
-          }
-          if (battle_length == 0) {
-            p1_matchup = output.empirical_value;
-            p2_matchup = 1 - output.empirical_value;
-            if (skip_battle) {
-              break;
-            }
+        output = RuntimeSearch::run(device, battle_data, heap, agent);
+        if (battle_length == 0) {
+          p1_matchup = output.empirical_value;
+          p2_matchup = 1 - output.empirical_value;
+          if (skip_battle) {
+            break;
           }
         }
 
         const auto p1_index = RuntimePolicy::process_and_sample(
-            device, output.p1,
-            policy_rollout_only ? rollout_policy_options : policy_options);
+            device, output.p1, policy_options);
         const auto p2_index = RuntimePolicy::process_and_sample(
-            device, output.p2,
-            policy_rollout_only ? rollout_policy_options : policy_options);
+            device, output.p2, policy_options);
         const auto p1_choice = output.p1.choices[p1_index];
         const auto p2_choice = output.p2.choices[p2_index];
         training_frames.updates.emplace_back(output, p1_choice, p2_choice);
