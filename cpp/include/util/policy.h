@@ -12,6 +12,7 @@ struct Options {
 };
 
 enum class Mode : char {
+  prior = 'p',
   empirical = 'e',
   nash = 'n',
   argmax = 'x',
@@ -19,6 +20,7 @@ enum class Mode : char {
 };
 
 std::array<double, 9> get_policy(const auto &side, const auto &options) {
+  const auto &prior = side.prior;
   const auto &empirical = side.empirical;
   const auto &nash = side.nash;
   const auto &beta = side.beta;
@@ -32,6 +34,10 @@ std::array<double, 9> get_policy(const auto &side, const auto &options) {
         (word.size() > 1) ? std::stod(std::string(word.substr(1))) : 1.0;
 
     switch (static_cast<Mode>(word[0])) {
+    case Mode::prior: {
+      std::transform(prior.begin(), prior.end(), policy.begin(), policy.begin(),
+                     [w](double q, double p) { return p + w * q; });
+    }
     case Mode::empirical: {
       std::transform(empirical.begin(), empirical.end(), policy.begin(),
                      policy.begin(),
@@ -50,6 +56,7 @@ std::array<double, 9> get_policy(const auto &side, const auto &options) {
       break;
     }
     case Mode::beta: {
+      throw std::runtime_error{"RuntimePolicy: (b)eta mode disabled for now."};
       std::transform(beta.begin(), beta.end(), policy.begin(), policy.begin(),
                      [w](double b, double p) { return p + w * b; });
       break;
