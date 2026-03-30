@@ -176,8 +176,8 @@ private:
 
 template <Activation activation>
 using FNetwork = NetworkImpl<MainNet, activation>;
-using Network = FNetwork<Activation::relu>;         // TODO support both!!!
-using NetworkClamped = FNetwork<Activation::clamp>; // TODO support both!!!
+using Network = FNetwork<Activation::relu>;
+using NetworkClamped = FNetwork<Activation::clamp>;
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 using QNetwork =
     NetworkImpl<Quantized::MainNet<In, Hidden, ValueHidden, PolicyHidden>,

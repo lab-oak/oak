@@ -100,6 +100,7 @@ class BuildTrajectories:
 
 
 class Activation:
+    same: int = -1
     none: int = 0
     relu: int = 1
     clamp: int = 2
@@ -332,6 +333,7 @@ class BattleNetwork(torch.nn.Module):
         self.hidden_dim = hd
         self.value_hidden_dim = vhd
         self.policy_hidden_dim = pohd
+        self.activation = activation
 
         self.pokemon_net = EmbeddingNet(
             self.pokemon_in_dim,
@@ -357,11 +359,14 @@ class BattleNetwork(torch.nn.Module):
         )
 
     def read_parameters(self, f):
+        self.activation = f.read(8) + 1
+        # TODO this does nothing
         self.pokemon_net.read_parameters(f)
         self.active_net.read_parameters(f)
         self.main_net.read_parameters(f)
 
     def write_parameters(self, f):
+        f.write(struct.pack("<Q", self.activation - 1))
         self.pokemon_net.write_parameters(f)
         self.active_net.write_parameters(f)
         self.main_net.write_parameters(f)

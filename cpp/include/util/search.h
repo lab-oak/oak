@@ -150,6 +150,7 @@ struct Agent : AgentParams {
       } else {
         network_ptr = std::move(network);
       }
+      assert(network_ptr);
     };
 
     Header header;
@@ -159,6 +160,7 @@ struct Agent : AgentParams {
     if (activation == Activation::clamp) {
       auto network = std::make_unique<NN::Battle::Network>();
       read_parameters_and_maybe_quantize(network);
+      return;
     }
     if (discrete) {
       throw std::runtime_error{"Agent: .discrete was specified but the parsed "
@@ -167,11 +169,10 @@ struct Agent : AgentParams {
     if (activation == Activation::relu) {
       auto network = std::make_unique<NN::Battle::Network>();
       read_parameters_and_maybe_quantize(network);
+      return;
     } else {
       throw std::runtime_error{"Agent: could not parse header at: " + eval};
     }
-
-    assert(network_ptr);
   }
 };
 
@@ -194,7 +195,11 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
       if (auto network =
               dynamic_cast<NN::Battle::Network *>(agent.network_ptr.get())) {
         return s.run(device, dur, params, heap, *network, input, output);
-      } else {
+      } else if (auto network = dynamic_cast<NN::Battle::NetworkClamped *>(
+                     agent.network_ptr.get())) {
+        return s.run(device, dur, params, heap, *network, input, output);
+      }
+      {
         const auto [id, hd, vd, pd] = agent.network_ptr->shape();
         auto q_network_ptr = NN::Battle::visit_quantized_network(
             id, hd, vd, pd,

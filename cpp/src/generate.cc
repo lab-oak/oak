@@ -66,7 +66,7 @@ struct ProgramArgs : public GenerateArgs {
           .set_default(true);
   bool &keep_node = kwarg("keep-node", "Use the applicable child node for the "
                                        "next search instead of a new node.")
-                        .set_default(true);
+                        .set_default(false);
 
   double &fast_search_prob =
       kwarg("fast-search-prob",
