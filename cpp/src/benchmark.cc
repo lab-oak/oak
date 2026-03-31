@@ -10,7 +10,7 @@ int benchmark(int argc, char **argv) {
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
   auto agent_params = RuntimeSearch::AgentParams{
-      .search_budget = args.search_budget.value_or(std::to_string(1 << 20)),
+      .budget = args.budget.value_or(std::to_string(1 << 20)),
       .bandit = args.bandit.value_or("ucb-1.0"),
       .eval = args.eval.value_or("mc"),
       .matrix_ucb = args.matrix_ucb.value_or(""),

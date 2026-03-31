@@ -70,7 +70,7 @@ struct ProgramArgs : public GenerateArgs {
 
   double &fast_search_prob =
       kwarg("fast-search-prob",
-            "Probability a search with only fast-search-budget is used")
+            "Probability a search with only fast-budget is used")
           .set_default(0);
   int &max_battle_length =
       kwarg("max-battle-length",
@@ -270,7 +270,7 @@ void generate(const ProgramArgs *args_ptr) {
     Train::Battle::CompressedFrames training_frames{battle_data.battle};
 
     auto agent_params = RuntimeSearch::AgentParams{
-        .search_budget = args.search_budget,
+        .budget = args.budget,
         .bandit = args.bandit,
         .eval = args.eval,
         .matrix_ucb = args.matrix_ucb,
@@ -316,10 +316,10 @@ void generate(const ProgramArgs *args_ptr) {
                                                 battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
-        agent.search_budget = ((battle_length == 0) && skip_battle)
-                                  ? args.t1_search_budget.value()
-                                  : (use_fast ? args.fast_search_budget.value()
-                                              : args.search_budget);
+        agent.budget = ((battle_length == 0) && skip_battle)
+                                  ? args.t1_budget.value()
+                                  : (use_fast ? args.fast_budget.value()
+                                              : args.budget);
         policy_options.mode =
             use_fast ? args.fast_policy_mode.value_or(args.policy_mode)
                      : args.policy_mode;
@@ -459,11 +459,11 @@ void setup(const auto &args) {
   if (!args.working_dir.has_value()) {
     args.working_dir.emplace(RuntimeData::start_datetime);
   }
-  if (!args.t1_search_budget.has_value()) {
-    args.t1_search_budget.emplace(args.search_budget);
+  if (!args.t1_budget.has_value()) {
+    args.t1_budget.emplace(args.budget);
   }
-  if (!args.fast_search_budget.has_value()) {
-    args.fast_search_budget.emplace(args.search_budget);
+  if (!args.fast_budget.has_value()) {
+    args.fast_budget.emplace(args.budget);
   }
 
   // create working dir

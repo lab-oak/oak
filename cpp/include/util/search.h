@@ -79,7 +79,7 @@ struct Heap {
 };
 
 struct AgentParams {
-  std::string search_budget;
+  std::string budget;
   std::string bandit;
   std::string eval;
   std::string matrix_ucb;
@@ -313,10 +313,10 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
     if (flag != nullptr) {
       return parse_bandit_and_search(flag);
     }
-    const auto pos = agent.search_budget.find_first_not_of("0123456789");
-    size_t number = std::stoll(agent.search_budget.substr(0, pos));
+    const auto pos = agent.budget.find_first_not_of("0123456789");
+    size_t number = std::stoll(agent.budget.substr(0, pos));
     std::string unit =
-        (pos == std::string::npos) ? "" : agent.search_budget.substr(pos);
+        (pos == std::string::npos) ? "" : agent.budget.substr(pos);
     if (unit.empty()) {
       return parse_bandit_and_search(number);
     } else if (unit == "ms" || unit == "millisec" || unit == "milliseconds") {
@@ -325,7 +325,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
       return parse_bandit_and_search(std::chrono::seconds{number});
     } else {
       throw std::runtime_error("Invalid search duration specification: " +
-                               agent.search_budget);
+                               agent.budget);
     }
   };
 

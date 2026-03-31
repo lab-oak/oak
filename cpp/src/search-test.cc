@@ -24,7 +24,7 @@ struct Test {
     pkmn_gen1_battle_options_set(&options, nullptr, &chance_options, nullptr);
     RuntimeSearch::Heap heap{};
     auto agent_params = RuntimeSearch::AgentParams{
-        .search_budget = args.search_budget.value_or(std::to_string(1 << 20)),
+        .budget = args.budget.value_or(std::to_string(1 << 20)),
         .bandit = args.bandit.value_or("exp3-1.0-0.1"),
         .eval = args.eval.value_or("mc"),
         .matrix_ucb = args.matrix_ucb.value_or(""),

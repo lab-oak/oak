@@ -11,9 +11,9 @@
 
 struct ProgramArgs : public ChallArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
-  bool &use_search_budget =
-      flag("--use-search-budget",
-           "Use --search-budget value instead of ctrl+z to end search");
+  bool &use_budget =
+      flag("--use-budget",
+           "Use --budget value instead of ctrl+z to end search");
 };
 
 bool search_flag = true;
@@ -36,14 +36,14 @@ int main(int argc, char **argv) {
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
   auto agent_params = RuntimeSearch::AgentParams{
-      .search_budget = args.search_budget.value_or(std::to_string(1 << 12)),
+      .budget = args.budget.value_or(std::to_string(1 << 12)),
       .bandit = args.bandit.value_or("ucb-1.0"),
       .eval = args.eval.value_or("mc"),
       .matrix_ucb = args.matrix_ucb.value_or(""),
       .discrete = args.use_discrete,
       .table = args.use_table};
   auto agent = RuntimeSearch::Agent{agent_params};
-  bool *const flag = args.use_search_budget ? nullptr : &search_flag;
+  bool *const flag = args.use_budget ? nullptr : &search_flag;
 
   if (!args.seed.has_value()) {
     args.seed.emplace(std::random_device{}());

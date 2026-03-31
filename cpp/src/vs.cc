@@ -55,10 +55,10 @@ struct ProgramArgs : public VsArgs {
 
   std::optional<std::string> &p1_bandit_after = kwarg("p1-bandit-after", "");
   std::optional<std::string> &p2_bandit_after = kwarg("p2-bandit-after", "");
-  std::optional<std::string> &p1_search_budget_after =
-      kwarg("p1-search-budget-after", "");
-  std::optional<std::string> &p2_search_budget_after =
-      kwarg("p2-search-budget-after", "");
+  std::optional<std::string> &p1_budget_after =
+      kwarg("p1-budget-after", "");
+  std::optional<std::string> &p2_budget_after =
+      kwarg("p2-budget-after", "");
   std::optional<std::string> &p1_matrix_ucb_after =
       kwarg("p1-matrix-ucb-after", "");
   std::optional<std::string> &p2_matrix_ucb_after =
@@ -152,8 +152,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
   };
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
     auto p1_agent_params = RuntimeSearch::AgentParams{
-        .search_budget =
-            args.p1_search_budget.or_else([&] { return args.search_budget; })
+        .budget =
+            args.p1_budget.or_else([&] { return args.budget; })
                 .value(),
         .bandit = args.p1_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p1_eval.or_else([&] { return args.eval; }).value(),
@@ -164,7 +164,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .table = args.p1_use_table};
     auto p1_agent = RuntimeSearch::Agent{p1_agent_params};
     auto p1_agent_after = RuntimeSearch::Agent{p1_agent_params};
-    p1_agent_after.search_budget = args.p1_search_budget_after.value_or("0");
+    p1_agent_after.budget = args.p1_budget_after.value_or("0");
     p1_agent_after.matrix_ucb = args.p1_matrix_ucb_after.value_or("");
     const auto p1_policy_options = RuntimePolicy::Options{
         .mode = args.p1_policy_mode.or_else([&] { return args.policy_mode; })
@@ -175,8 +175,8 @@ void thread_fn(const ProgramArgs *args_ptr) {
                    .value_or(0)};
 
     auto p2_agent_params = RuntimeSearch::AgentParams{
-        .search_budget =
-            args.p2_search_budget.or_else([&] { return args.search_budget; })
+        .budget =
+            args.p2_budget.or_else([&] { return args.budget; })
                 .value(),
         .bandit = args.p2_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p2_eval.or_else([&] { return args.eval; }).value(),
@@ -187,7 +187,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .table = args.p2_use_table};
     auto p2_agent = RuntimeSearch::Agent{p2_agent_params};
     auto p2_agent_after = RuntimeSearch::Agent{p2_agent_params};
-    p2_agent_after.search_budget = args.p2_search_budget_after.value_or("0");
+    p2_agent_after.budget = args.p2_budget_after.value_or("0");
     p2_agent_after.matrix_ucb = args.p2_matrix_ucb_after.value_or("");
     const auto p2_policy_options = RuntimePolicy::Options{
         .mode = args.p2_policy_mode.or_else([&] { return args.policy_mode; })
@@ -475,8 +475,8 @@ void setup(auto &args) {
     }
   };
 
-  check_args(args.search_budget, args.p1_search_budget, args.p2_search_budget,
-             "search-budget");
+  check_args(args.budget, args.p1_budget, args.p2_budget,
+             "budget");
   check_args(args.eval, args.p1_eval, args.p2_eval, "eval");
   check_args(args.bandit, args.p1_bandit, args.p2_bandit, "bandit");
   check_args(args.policy_mode, args.p1_policy_mode, args.p2_policy_mode,

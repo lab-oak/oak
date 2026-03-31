@@ -337,7 +337,7 @@ Output cpp_inference(const Py::Battle::Frames &battle_frames,
   agent_params.bandit = "pucb-1.0";
   agent_params.discrete = discrete;
   // TODO fix 1
-  agent_params.search_budget = budget;
+  agent_params.budget = budget;
   RuntimeSearch::Agent agent{agent_params};
   auto battle =
       *reinterpret_cast<const pkmn_gen1_battle *>(battle_frames.battle.data());
@@ -438,7 +438,7 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<RuntimeSearch::Agent>(m, "Agent")
       .def(py::init<>())
-      .def_readwrite("search_budget", &RuntimeSearch::Agent::search_budget)
+      .def_readwrite("budget", &RuntimeSearch::Agent::budget)
       .def_readwrite("bandit", &RuntimeSearch::Agent::bandit)
       .def_readwrite("eval", &RuntimeSearch::Agent::eval)
       .def_readwrite("matrix_ucb", &RuntimeSearch::Agent::matrix_ucb)

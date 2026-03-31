@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description="Parameter testing for battle agent
 parser.add_argument("--working-dir", default=None, type=str)
 parser.add_argument("--net-path", default=".", type=str)
 parser.add_argument("--vs-path", default="./release/vs", type=str)
-parser.add_argument("--search-budget", default=2**12, type=int)
+parser.add_argument("--budget", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
@@ -151,7 +151,7 @@ class Global:
         selection_modes = ["n", "e", "x"]
         selection_mode = random.choice(selection_modes)
 
-        return ID(net_hash, bandit, selection_mode, args.search_budget)
+        return ID(net_hash, bandit, selection_mode, args.budget)
 
     def remove_id(self, target_id: ID):
         return NotImplemented
@@ -361,8 +361,8 @@ def run_once() -> [ID, ID, [int, int, int]]:
         f"--teams={args.teams}",
         f"--p1-eval={glob.directory[lesserID.net_hash]}",
         f"--p2-eval={glob.directory[greaterID.net_hash]}",
-        f"--p1-search-budget={lesserID.iterations}",
-        f"--p2-search-budget={greaterID.iterations}",
+        f"--p1-budget={lesserID.iterations}",
+        f"--p2-budget={greaterID.iterations}",
         f"--p1-bandit={lesserID.bandit}",
         f"--p2-bandit={greaterID.bandit}",
         f"--p1-policy-mode={lesserID.policy_mode}",

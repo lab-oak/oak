@@ -58,10 +58,10 @@ The general plan:
 First let's use the benchmark tool to get an idea of how fast data generation is 
 
 ```bash
-(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --search-budget=1024
+(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --budget=1024
 3936 ms.
 1024 iterations.
-(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --search-budget=4096
+(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --budget=4096
 16779 ms.
 4096 iterations.
 (.venv) user@laptop:~$ python
@@ -87,7 +87,7 @@ The point of this calculation is to estimate how long it will take to generate 1
 
 Let's pick some arguments for the `generate` call  with experience in mind
 
-* `--search-budget=4096`
+* `--budget=4096`
 
 2^12 is a reasonable iteration count for a few reasons. AlphaZero used 1000 iterations, and the branching factor for a simultaneous move game is the product of the number of actions for either player. Its totally possible RBY has a higher average branching factor and that's not even considering RNG. Therefore we probably at least as many iterations as altenative move cofigs.
 
@@ -99,7 +99,7 @@ Unfortunately I can't share this
 
 This is an innovation of Efficient MuZero. It reduces cost of data gen while balancing value and policy learning.
 
-* `--fast-search-budget=`
+* `--fast-budget=`
 
 * `--bandit=`
 
@@ -116,7 +116,7 @@ The max for my system. By default it does max - 1.
 The name of the dir where all work will be saved. By default this is a datetime string. It is advised to use short code names.
 
 ```bash
-(.venv) user@laptop:~/oak$ generate --search-budget=1024 --bandit=ucb-1.0 --policy-mode=x --eval=fp --dir=fp-data
+(.venv) user@laptop:~/oak$ generate --budget=1024 --bandit=ucb-1.0 --policy-mode=x --eval=fp --dir=fp-data
 Created directory fp-data
 279.767 battle frames/sec.
 keep node ratio: 0
@@ -140,7 +140,7 @@ All the Oak programs save their arguments to disk
    --move-delete-prob : 0
  --build-network-path : 
         --max-pokemon : 6
-      --search-budget : 1024
+      --budget : 1024
              --bandit : ucb-1.0
          --matrix-ucb : 
                --eval : fp
@@ -255,12 +255,12 @@ We allow the training to go for 1000 steps. In this training regime (non-Network
 
 The `vs` program requires the following information for both players:
 
-* `search-budget`
+* `budget`
 * `eval`
 * `bandit`
 * `policy-mode`
 
-These information can be entered with no prefix so that it applies to both players (e.g. `--search-budget=8s`)
+These information can be entered with no prefix so that it applies to both players (e.g. `--budget=8s`)
 or with the prefix `p1-`/`p2-` (e.g. `--p1-eval=fp`.)
 A prefixed argument will override a non-prefixed argument.
 
@@ -268,7 +268,7 @@ Lets first compare the trained network with the PokeEngine eval using a think ti
 This first test does not use the networks policy inference since is using the same bandit as PokeEngine (for initial comparison's sake.)
 
 ```bash
-(.venv) user@laptop:~$ vs --search-budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
+(.venv) user@laptop:~$ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
 score: -nan over 0 games; Elo diff: -nan
 0 0 0
 info: 
@@ -323,10 +323,10 @@ info:
 Indeed, the `benchmark` tool shows that the network is abount 3x slower:
 
 ```bash
-(.venv) user@laptop:~$ benchmark --eval=fp --search-budget=1000ms
+(.venv) user@laptop:~$ benchmark --eval=fp --budget=1000ms
 1000001 ms.
 253551 iterations.
-(.venv) user@laptop:~$ benchmark --eval=apple/500.battle.net --search-budget=1000ms
+(.venv) user@laptop:~$ benchmark --eval=apple/500.battle.net --budget=1000ms
 1000008 ms.
 85005 iterations.
 ```
@@ -334,7 +334,7 @@ Indeed, the `benchmark` tool shows that the network is abount 3x slower:
 The speed penalty could be greatly mitigated if it was allowed to use policy inference. Let's try that:
 
 ```bash
-(.venv) user@laptop:~$ vs --search-budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --p1-bandit=pucb-1.0 --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
+(.venv) user@laptop:~$ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --p1-bandit=pucb-1.0 --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
 # ...
 score: 0.639344 over 61 games; Elo diff: 99.4568
 39 0 22

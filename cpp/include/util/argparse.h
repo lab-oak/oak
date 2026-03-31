@@ -23,8 +23,8 @@ struct TeamBuildingArgs : public argparse::Args {
 
 #define MAKE_AGENT_ARGS(NAME, BASE, WRAPPER, A, B)                             \
   struct NAME : public BASE {                                                  \
-    WRAPPER<std::string> &A##search_budget =                                   \
-        kwarg(B "search-budget", "Search budget, e.g. 1024/100ms/8s");         \
+    WRAPPER<std::string> &A##budget =                                   \
+        kwarg(B "budget", "Search budget, e.g. 1024/100ms/8s");         \
                                                                                \
     WRAPPER<std::string> &A##bandit =                                          \
         kwarg(B "bandit", "Bandit algorithm and parameters");                  \

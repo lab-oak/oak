@@ -39,19 +39,19 @@ generate_parser.add_argument(
     help="Initial build network ('' = random initial)",
 )
 generate_parser.add_argument(
-    "--search-budget",
+    "--budget",
     type=int,
     help="Number of iterations for training frames",
     required=True,
 )
 generate_parser.add_argument(
-    "--fast-search-budget",
+    "--fast-budget",
     type=int,
     help="Number of iterations for non-training frames",
     required=True,
 )
 generate_parser.add_argument(
-    "--t1-search-budget",
+    "--t1-budget",
     type=int,
     default=None,
     help="Number of iterations for turn 1 search, used when skipping battles for build data generation",
@@ -59,7 +59,7 @@ generate_parser.add_argument(
 generate_parser.add_argument(
     "--fast-search-prob",
     type=float,
-    help="Probability that fast-search-budget is used instead of search-budget",
+    help="Probability that fast-budget is used instead of budget",
     required=True,
 )
 generate_parser.add_argument(
@@ -171,8 +171,8 @@ def main():
     # arg set
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
-    if args.t1_search_budget is None:
-        args.t1_search_budget = args.search_budget
+    if args.t1_budget is None:
+        args.t1_budget = args.budget
 
     # paths set
     now = datetime.datetime.now()
@@ -216,9 +216,9 @@ def main():
 
     generate_cmd = [
         "generate",
-        f"--search-budget={args.search_budget}",
-        f"--fast-search-budget={args.fast_search_budget}",
-        f"--t1-search-budget={args.t1_search_budget}",
+        f"--budget={args.budget}",
+        f"--fast-budget={args.fast_budget}",
+        f"--t1-budget={args.t1_budget}",
         f"--bandit={args.bandit}",
         f"--eval={network_path if use_battle else "mc"}",
         f"--policy-mode={args.policy_mode}",
@@ -275,7 +275,7 @@ def main():
         + get_common_cmd(args, "")
         + [
             f"--max-battle-length={args.max_battle_length}",
-            f"--min-iterations={args.fast_search_budget + 1}",
+            f"--min-iterations={args.fast_budget + 1}",
             f"--value-nash-weight={args.value_nash_weight}",
             f"--value-empirical-weight={args.value_empirical_weight}",
             f"--value-score-weight={args.value_score_weight}",
