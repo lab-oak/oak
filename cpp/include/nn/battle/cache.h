@@ -104,10 +104,7 @@ template <typename T> struct PokemonCache {
                                                         encoding_indices.data(),
                                                         embedding.data(), n);
           std::transform(embedding.begin(), embedding.end(), embedding_data,
-                         [](const auto f) {
-                           return static_cast<T>(std::numeric_limits<T>::max() *
-                                                 f);
-                         });
+                         [](const auto f) { return static_cast<T>(127 * f); });
         } else {
           pokemon_net.propagate<activation, activation>(encoding_input.data(),
                                                         encoding_indices.data(),
@@ -209,10 +206,7 @@ template <typename T> struct ActivePokemonCache {
                                                      encoding_indices.data(),
                                                      embedding.data(), n);
         std::transform(embedding.begin(), embedding.end(), embedding_data,
-                       [](const auto f) {
-                         return static_cast<T>(std::numeric_limits<T>::max() *
-                                               f);
-                       });
+                       [](const auto f) { return static_cast<T>(127 * f); });
       } else {
         active_net.propagate<activation, activation>(
             encoding_input.data(), encoding_indices.data(), embedding_data, n);
