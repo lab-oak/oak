@@ -294,6 +294,7 @@ class OutputBuffer:
         self.active_pokemon = torch.from_numpy(buffers.active_pokemon)
         self.sides = torch.from_numpy(buffers.sides)
         self.value = torch.from_numpy(buffers.value)
+        self.logit = torch.from_numpy(buffers.logit)
         self.policy_logit = torch.from_numpy(buffers.policy_logit)
         self.policy = torch.from_numpy(buffers.policy)
 
@@ -302,6 +303,7 @@ class OutputBuffer:
         self.active_pokemon = self.active_pokemon.to(device)
         self.sides = self.sides.to(device)
         self.value = self.value.to(device)
+        self.logit = self.logit.to(device)
         self.policy_logit = self.policy_logit.to(device)
         self.policy = self.policy.to(device)
         return self
@@ -359,7 +361,9 @@ class BattleNetwork(torch.nn.Module):
         )
 
     def read_parameters(self, f):
-        self.activation = f.read(8) + 1
+        header = f.read(8)
+        self.activation = struct.unpack("<Q", header)[0]
+        self.activation = self.activation + 1
         # TODO this does nothing
         self.pokemon_net.read_parameters(f)
         self.active_net.read_parameters(f)
@@ -403,18 +407,20 @@ class BattleNetwork(torch.nn.Module):
         if use_policy:
             (
                 output.value[:size],
-                output.policy_logit[:size, 0, :-1],
-                output.policy_logit[:size, 1, :-1],
+                output.logit[:size, 0, :-1],
+                output.logit[:size, 1, :-1],
             ) = self.main_net.forward(battle)
         else:
             output.value = self.main_net.forward_value_only(battle)
 
-        output.policy[:size, 0] = torch.gather(
-            output.policy_logit[:size, 0], 1, input.choice_indices[:size, 0]
+        output.policy_logit[:size, 0] = torch.gather(
+            output.logit[:size, 0], 1, input.choice_indices[:size, 0]
         )
-        output.policy[:size, 1] = torch.gather(
-            output.policy_logit[:size, 1], 1, input.choice_indices[:size, 1]
+        output.policy_logit[:size, 1] = torch.gather(
+            output.logit[:size, 1], 1, input.choice_indices[:size, 1]
         )
+
+        # print(output.sides)
 
     def hash(self) -> int:
         h = self.pokemon_net.hash()

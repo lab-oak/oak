@@ -316,10 +316,10 @@ void generate(const ProgramArgs *args_ptr) {
                                                 battle_data.durations));
 
         const bool use_fast = device.uniform() < args.fast_search_prob;
-        agent.budget = ((battle_length == 0) && skip_battle)
-                                  ? args.t1_budget.value()
-                                  : (use_fast ? args.fast_budget.value()
-                                              : args.budget);
+        agent.budget =
+            ((battle_length == 0) && skip_battle)
+                ? args.t1_budget.value()
+                : (use_fast ? args.fast_budget.value() : args.budget);
         policy_options.mode =
             use_fast ? args.fast_policy_mode.value_or(args.policy_mode)
                      : args.policy_mode;

@@ -21,6 +21,8 @@ parser.add_argument(
 def test_consistency():
     fn_parser = parser.add_argument_group("")
     fn_parser.add_argument("--games", default=None, type=int)
+    fn_parser.add_argument("--discrete", default=False, type=bool)
+    fn_parser.add_argument("--eps", default=0.0, type=float)
     args = parser.parse_args()
     assert args.data_path, "Provide path to data file to inspect"
     assert args.network, "Provide path to network to test"
@@ -29,7 +31,10 @@ def test_consistency():
     import oak
     import oak.torch
 
-    network = oak.torch.BattleNetwork()
+    activation = (
+        oak.torch.Activation.clamp if args.discrete else oak.torch.Activation.relu
+    )
+    network = oak.torch.BattleNetwork(activation=activation)
 
     with open(args.network, "rb") as f:
         network.read_parameters(f)
@@ -41,17 +46,36 @@ def test_consistency():
     for buffer, n_frames in buffer_list[:max_games]:
         encoded_frames = oak.EncodedBattleFrames.from_bytes(buffer, n_frames)
         encoded_frames_torch = oak.torch.EncodedBattleFrames(encoded_frames)
-        output = oak.OutputBuffer(encoded_frames.size)
-        output_torch = oak.torch.OutputBuffer(output)
-        network.inference(encoded_frames_torch, output_torch)
+        o1 = oak.OutputBuffer(encoded_frames.size)
+        python_output = oak.torch.OutputBuffer(o1)
+        network.inference(encoded_frames_torch, python_output)
+        python_output.policy_logit[torch.isneginf(python_output.policy_logit)] = 0.0
 
-        output_2 = oak.cpp_inference(
-            oak.BattleFrames.from_bytes(buffer, n_frames), args.network
+        o2 = oak.cpp_inference(
+            oak.BattleFrames.from_bytes(buffer, n_frames),
+            args.network,
+            args.discrete,
+            "0",
         )
-        output_torch_2 = oak.torch.OutputBuffer(output_2)
+        cpp_output = oak.torch.OutputBuffer(o2)
 
-        assert torch.all(output_2.value == output_torch_2.value)
-        assert torch.all(output_2.policy == output_torch_2.policy)
+        value_diff = torch.abs(python_output.value - cpp_output.value)
+        logit_diff = torch.abs(python_output.policy_logit - cpp_output.policy_logit)
+
+        print("VALUE")
+        for _ in value_diff:
+            print(_)
+
+        print(python_output.policy_logit)
+        print(cpp_output.policy_logit)
+
+        print(f"Max value diff: {torch.max(value_diff).item()}")
+        print(f"Max logit diff: {torch.max(logit_diff).item()}")
+        print(f"Avg value diff: {torch.mean(value_diff).item()}")
+        print(f"Avg logit diff: {(torch.sum(logit_diff) / torch.sum(logit_diff != 0))}")
+
+        assert torch.all(value_diff < args.eps)
+        assert torch.all(logit_diff < args.eps)
 
     print(
         f"CPP and Python agree on value/policy inference for the first {max_games} games of the data file."

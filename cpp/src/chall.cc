@@ -11,9 +11,8 @@
 
 struct ProgramArgs : public ChallArgs {
   std::optional<uint64_t> &seed = kwarg("seed", "Global program seed");
-  bool &use_budget =
-      flag("--use-budget",
-           "Use --budget value instead of ctrl+z to end search");
+  bool &use_budget = flag("--use-budget",
+                          "Use --budget value instead of ctrl+z to end search");
 };
 
 bool search_flag = true;

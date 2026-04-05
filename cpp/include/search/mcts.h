@@ -131,6 +131,7 @@ struct Output {
   struct Side {
     uint8_t k;
     std::array<pkmn_choice, 9> choices;
+    std::array<double, 9> logit;
     std::array<double, 9> prior;
     std::array<double, 9> empirical;
     std::array<double, 9> nash;
@@ -275,6 +276,8 @@ template <SearchOptions Options = default_search> struct Search {
             p1_logits.data(), p2_logits.data());
         stats.softmax_logits(bandit_params(params), p1_logits.data(),
                              p2_logits.data());
+        std::copy_n(p1_logits.data(), output.p1.k, output.p1.logit.data());
+        std::copy_n(p2_logits.data(), output.p2.k, output.p2.logit.data());
         softmax(output.p1.prior.data(), p1_logits.data(), output.p1.k);
         softmax(output.p2.prior.data(), p2_logits.data(), output.p2.k);
       }

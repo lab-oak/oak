@@ -237,10 +237,10 @@ def main():
 
         if not args.no_policy_loss:
             p1_policy_loss = masked_cross_entropy(
-                output.policy[:size, 0], p1_policy_target
+                output.policy_logit[:size, 0], p1_policy_target
             )
             p2_policy_loss = masked_cross_entropy(
-                output.policy[:size, 1], p2_policy_target
+                output.policy_logit[:size, 1], p2_policy_target
             )
             loss = loss + args.policy_loss_weight * (p1_policy_loss + p2_policy_loss)
 
@@ -260,13 +260,6 @@ def main():
             )
             if not args.no_policy_loss:
                 print("P1 policy inference/target")
-                # TODO
-                # x = torch.nn.functional.softmax(output.p1_policy[:window], 1).view(
-                #     window, 1, 9
-                # )
-                # y = p1_policy_target[:window].view(window, 1, 9)
-                # print(torch.cat([x, y], dim=1))
-                # print(f"loss: p1:{p1_policy_loss}, p2:{p2_policy_loss}")
             if not args.no_value_loss:
                 print(f"loss: v:{value_loss.mean()}")
 

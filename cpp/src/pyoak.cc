@@ -348,6 +348,8 @@ Output cpp_inference(const Py::Battle::Frames &battle_frames,
 
   Output buffer{battle_frames.size};
   auto value = buffer.value.mutable_data();
+  auto p1_logit = buffer.policy_logit.mutable_data();
+  auto p2_logit = buffer.policy_logit.mutable_data() + 9;
   auto p1_policy = buffer.policy.mutable_data();
   auto p2_policy = buffer.policy.mutable_data() + 9;
   auto battle_ptr = battle_frames.battle.data();
@@ -366,12 +368,16 @@ Output cpp_inference(const Py::Battle::Frames &battle_frames,
     RuntimeSearch::Heap heap{};
     const auto output = RuntimeSearch::run(device, input, heap, agent);
     *value = output.initial_value;
+    std::copy_n(output.p1.logit.data(), output.p1.k, p1_logit);
+    std::copy_n(output.p2.logit.data(), output.p2.k, p2_logit);
     std::copy_n(output.p1.prior.data(), output.p1.k, p1_policy);
     std::copy_n(output.p2.prior.data(), output.p2.k, p2_policy);
     result = PKMN::update(battle, choice[0], choice[1], options);
     // out
     value += 1;
-    p1_policy += 18; // TODO check strides
+    p1_logit += 18;
+    p2_logit += 18;
+    p1_policy += 18;
     p2_policy += 18;
     // in
     battle_ptr += sizeof(pkmn_gen1_battle);
@@ -676,6 +682,7 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readonly("active_pokemon", &Output::active_pokemon)
       .def_readonly("sides", &Output::sides)
       .def_readonly("value", &Output::value)
+      .def_readonly("logit", &Output::logit)
       .def_readonly("policy_logit", &Output::policy_logit)
       .def_readonly("policy", &Output::policy)
       .def("clear", &Output::clear);

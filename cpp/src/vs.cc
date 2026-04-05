@@ -55,10 +55,8 @@ struct ProgramArgs : public VsArgs {
 
   std::optional<std::string> &p1_bandit_after = kwarg("p1-bandit-after", "");
   std::optional<std::string> &p2_bandit_after = kwarg("p2-bandit-after", "");
-  std::optional<std::string> &p1_budget_after =
-      kwarg("p1-budget-after", "");
-  std::optional<std::string> &p2_budget_after =
-      kwarg("p2-budget-after", "");
+  std::optional<std::string> &p1_budget_after = kwarg("p1-budget-after", "");
+  std::optional<std::string> &p2_budget_after = kwarg("p2-budget-after", "");
   std::optional<std::string> &p1_matrix_ucb_after =
       kwarg("p1-matrix-ucb-after", "");
   std::optional<std::string> &p2_matrix_ucb_after =
@@ -152,9 +150,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
   };
   const auto play = [&](auto &p1_build_traj, auto &p2_build_traj) -> int {
     auto p1_agent_params = RuntimeSearch::AgentParams{
-        .budget =
-            args.p1_budget.or_else([&] { return args.budget; })
-                .value(),
+        .budget = args.p1_budget.or_else([&] { return args.budget; }).value(),
         .bandit = args.p1_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p1_eval.or_else([&] { return args.eval; }).value(),
         .matrix_ucb =
@@ -175,9 +171,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
                    .value_or(0)};
 
     auto p2_agent_params = RuntimeSearch::AgentParams{
-        .budget =
-            args.p2_budget.or_else([&] { return args.budget; })
-                .value(),
+        .budget = args.p2_budget.or_else([&] { return args.budget; }).value(),
         .bandit = args.p2_bandit.or_else([&] { return args.bandit; }).value(),
         .eval = args.p2_eval.or_else([&] { return args.eval; }).value(),
         .matrix_ucb =
@@ -475,8 +469,7 @@ void setup(auto &args) {
     }
   };
 
-  check_args(args.budget, args.p1_budget, args.p2_budget,
-             "budget");
+  check_args(args.budget, args.p1_budget, args.p2_budget, "budget");
   check_args(args.eval, args.p1_eval, args.p2_eval, "eval");
   check_args(args.bandit, args.p1_bandit, args.p2_bandit, "bandit");
   check_args(args.policy_mode, args.p1_policy_mode, args.p2_policy_mode,

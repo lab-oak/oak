@@ -19,8 +19,9 @@ struct Output {
   py::array_t<float> active_pokemon;
   py::array_t<float> sides;
   py::array_t<float> value;
-  py::array_t<float> policy_logit;
-  py::array_t<float> policy;
+  py::array_t<float> logit;        // raw
+  py::array_t<float> policy_logit; // selected
+  py::array_t<float> policy;       // softmax
 
   // last dim is neg inf, invalid actions map to it
   static constexpr size_t policy_out_dim = Encode::Battle::Policy::n_dim + 1;
@@ -35,8 +36,8 @@ struct Output {
         py::array_t<float>(std::vector<size_t>{size, 2, 1, active_out_dim});
     sides = py::array_t<float>(std::vector<size_t>{size, 2, 1, side_out_dim});
     value = py::array_t<float>(std::vector<size_t>{size, 1});
-    policy_logit =
-        py::array_t<float>(std::vector<size_t>{size, 2, policy_out_dim});
+    logit = py::array_t<float>(std::vector<size_t>{size, 2, policy_out_dim});
+    policy_logit = py::array_t<float>(std::vector<size_t>{size, 2, 9});
     policy = py::array_t<float>(std::vector<size_t>{size, 2, 9});
     clear();
   }
@@ -46,13 +47,13 @@ struct Output {
     std::fill_n(active_pokemon.mutable_data(), active_pokemon.size(), 0.0f);
     std::fill_n(sides.mutable_data(), sides.size(), 0.0f);
     std::fill_n(value.mutable_data(), value.size(), 0.0f);
+    std::fill_n(logit.mutable_data(), logit.size(), 0.0f);
     std::fill_n(policy_logit.mutable_data(), policy_logit.size(), 0.0f);
     std::fill_n(policy.mutable_data(), policy.size(), 0.0f);
-    auto logit = policy_logit.mutable_unchecked<3>();
+    auto l = logit.mutable_unchecked<3>();
     for (auto s = 0; s < 2; ++s) {
-      for (size_t i = 0; i < logit.shape(0); ++i) {
-        logit(i, s, logit.shape(2) - 1) =
-            -std::numeric_limits<float>::infinity();
+      for (size_t i = 0; i < l.shape(0); ++i) {
+        l(i, s, l.shape(2) - 1) = -std::numeric_limits<float>::infinity();
       }
     }
   }
