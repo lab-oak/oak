@@ -206,7 +206,12 @@ auto visit_network_4(const auto &F, std::unique_ptr<NetworkBase> network) {
 template <int In, int Hidden, int ValueHidden>
 auto visit_network_3(int policy_hidden, const auto &F,
                      std::unique_ptr<NetworkBase> network) {
+  if (Hidden < policy_hidden) {
+    return Impl::invalid("Policy hidden cannot be larger than hidden.");
+  }
   switch (policy_hidden) {
+  case 32:
+    return visit_network_4<In, Hidden, ValueHidden, 32>(F, std::move(network));
   case 64:
     return visit_network_4<In, Hidden, ValueHidden, 64>(F, std::move(network));
   default:
