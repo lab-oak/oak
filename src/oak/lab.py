@@ -62,10 +62,6 @@ def test_consistency():
         value_diff = torch.abs(python_output.value - cpp_output.value)
         logit_diff = torch.abs(python_output.policy_logit - cpp_output.policy_logit)
 
-        print("VALUE")
-        for _ in value_diff:
-            print(_)
-
         print(python_output.policy_logit)
         print(cpp_output.policy_logit)
 
