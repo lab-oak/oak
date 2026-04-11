@@ -19,59 +19,9 @@
 
 #include <typeinfo>
 
-template <class RNG> double gamma_sample(double a, RNG &rng) {
-  static std::normal_distribution<double> norm(0.0, 1.0);
-  static std::uniform_real_distribution<double> uni(0.0, 1.0);
-
-  if (a < 1.0) {
-    // boost trick
-    double u = uni(rng);
-    return gamma_sample(a + 1.0, rng) * std::pow(u, 1.0 / a);
-  }
-
-  double d = a - 1.0 / 3.0;
-  double c = 1.0 / std::sqrt(9.0 * d);
-
-  while (true) {
-    double x = norm(rng);
-    double v = 1.0 + c * x;
-    if (v <= 0)
-      continue;
-    v = v * v * v;
-
-    double u = uni(rng);
-
-    if (u < 1 - 0.0331 * x * x * x * x)
-      return d * v;
-
-    if (std::log(u) < 0.5 * x * x + d * (1 - v + std::log(v)))
-      return d * v;
-  }
-}
-
-template <class RNG> double beta_sample(double alpha, size_t N, RNG &rng) {
-  double beta = double(N) - alpha;
-  double x = gamma_sample<RNG>(alpha, rng);
-  double y = gamma_sample<RNG>(beta, rng);
-  return x / (x + y);
-}
-
-template <class RNG> double fast_beta(double alpha, size_t N, RNG &rng) {
-  double beta = N - alpha;
-  std::uniform_real_distribution<double> uni(0.0, 1.0);
-
-  // Johnk's method
-  while (true) {
-    double u = uni(rng);
-    double v = uni(rng);
-
-    double x = std::pow(u, 1.0 / alpha);
-    double y = std::pow(v, 1.0 / beta);
-
-    if (x + y <= 1.0)
-      return x / (x + y);
-  }
-}
+namespace MCTS {
+struct MonteCarlo {};
+} // namespace MCTS
 
 namespace TypeTraits {
 template <typename T>
@@ -83,27 +33,16 @@ inline constexpr bool is_table =
     requires(std::remove_cvref_t<T> &heap) { heap.entries; };
 
 template <typename T>
-inline constexpr bool is_network = requires(std::remove_cvref_t<T> &network) {
-  network.value_inference(std::declval<const pkmn_gen1_battle &>(),
-                          std::declval<const pkmn_gen1_chance_durations &>());
-};
+inline constexpr bool is_network =
+    std::is_base_of_v<NN::Battle::NetworkBase, std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool is_poke_engine =
-    requires(std::remove_cvref_t<T> &poke_engine) {
-      poke_engine.evaluate(std::declval<const pkmn_gen1_battle &>());
-    };
+    std::is_same_v<PokeEngine::Model, std::remove_cvref_t<T>>;
 
 template <typename T>
-inline constexpr bool is_policy_network = requires(
-    std::remove_cvref_t<T> &network) {
-  network.policy_inference(std::declval<const pkmn_gen1_battle &>(),
-                           std::declval<const pkmn_gen1_chance_durations &>(),
-                           std::declval<uint8_t>(), std::declval<uint8_t>(),
-                           std::declval<const pkmn_choice *>(),
-                           std::declval<const pkmn_choice *>(),
-                           std::declval<float *>(), std::declval<float *>());
-};
+inline constexpr bool is_monte_carlo =
+    std::is_same_v<MCTS::Model, std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool is_contextual_bandit =
@@ -173,8 +112,6 @@ size_t count(const auto &heap) {
   }
   return c;
 }
-
-struct MonteCarlo {};
 
 // wrapper to use for enabling matrix ucb at root heap
 template <typename BanditParams> struct MatrixUCBParams {
@@ -267,7 +204,7 @@ template <SearchOptions Options = default_search> struct Search {
       };
 
       if constexpr (is_contextual_bandit<decltype(stats)> &&
-                    is_policy_network<decltype(model)>) {
+                    is_network<decltype(model)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
         output.initial_value = model.value_policy_inference(
@@ -342,7 +279,6 @@ template <SearchOptions Options = default_search> struct Search {
                              output)
             .first;
       } else {
-        // const auto start = std::chrono::high_resolution_clock::now();
         const auto [p1_index, p2_index] =
             solve_root_matrix_and_sample(device, params, copy, output);
         const auto c1 = output.p1.choices[p1_index];
@@ -466,45 +402,42 @@ template <SearchOptions Options = default_search> struct Search {
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:
       [[likely]] {
+        using T = decltype(model);
         float value;
-        if constexpr (is_network<decltype(model)>) {
-          const auto m = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
-              p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          const auto n = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
-              p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          if (!stats.is_init()) {
-            stats.init(m, n);
-          }
-          if constexpr (is_contextual_bandit<decltype(stats)>) {
-            static thread_local std::array<float, 9> p1_logits;
-            static thread_local std::array<float, 9> p2_logits;
-            value = model.value_policy_inference(
-                battle, durations(), m, n, p1_choices.data(), p2_choices.data(),
-                p1_logits.data(), p2_logits.data());
-            stats.softmax_logits(bandit_params, p1_logits.data(),
-                                 p2_logits.data());
-          } else {
-            value = model.value_inference(battle, durations());
-          }
-        } else if constexpr (is_poke_engine<decltype(model)>) {
-          const auto m = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
-              p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          const auto n = pkmn_gen1_battle_choices(
-              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
-              p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
-          if (!stats.is_init()) {
-            stats.init(m, n);
-          }
-          value = model.evaluate(battle);
-        } else {
-          // model is monte-carlo
+        if constexpr (is_monte_carlo<T>) {
           value = init_stats_and_rollout(stats, device, battle, result);
+        } else {
+          const auto m = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P1, pkmn_result_p1(result),
+              p1_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          const auto n = pkmn_gen1_battle_choices(
+              &battle, PKMN_PLAYER_P2, pkmn_result_p2(result),
+              p2_choices.data(), PKMN_GEN1_MAX_CHOICES);
+          if (!stats.is_init()) {
+            stats.init(m, n);
+          }
+
+          if constexpr (is_network<T>) {
+            if constexpr (is_contextual_bandit<decltype(stats)>) {
+              static thread_local std::array<float, 9> p1_logits;
+              static thread_local std::array<float, 9> p2_logits;
+              value = model.value_policy_inference(
+                  battle, durations(), m, n, p1_choices.data(),
+                  p2_choices.data(), p1_logits.data(), p2_logits.data());
+              stats.softmax_logits(bandit_params, p1_logits.data(),
+                                   p2_logits.data());
+            } else {
+              value = model.value_inference(battle, durations());
+            }
+          } else if constexpr (is_poke_engine<T>) {
+            value = model.evaluate(battle);
+          } else {
+            static_assert(!std::is_same_v<T, T>);
+          }
         }
-        return {value, 1 - value};
       }
+      return {value, 1 - value};
+
     case PKMN_RESULT_WIN: {
       return {1, 0};
     }
@@ -737,36 +670,33 @@ template <SearchOptions Options = default_search> struct Search {
     output.p1.beta = {};
     output.p2.beta = {};
 
-    return; // TODO
-
-    std::mt19937 rd{std::random_device{}()};
-
-    for (auto k = 0; k < beta_n; ++k) {
-      for (int i = 0; i < output.p1.k; ++i) {
-        for (int j = 0; j < output.p2.k; ++j) {
-          auto n = output.visit_matrix[i][j];
-          double v = output.value_matrix[i][j];
-          if (n == 0) {
-            n = 1;
-            v = .5;
-          }
-          auto w = beta_sample(v, n, rd);
-          solve_matrix[output.p2.k * i + j] = w * discretize_factor;
-        }
-      }
-      LRSNash::FastInput solve_input{static_cast<int>(output.p1.k),
-                                     static_cast<int>(output.p2.k),
-                                     solve_matrix.data(), discretize_factor};
-      std::array<float, 9 + 2> nash1{}, nash2{};
-      LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
-      LRSNash::solve_fast(&solve_input, &solve_output);
-      for (auto i = 0; i < output.p1.k; ++i) {
-        output.p1.beta[i] += nash1[i] / beta_n;
-      }
-      for (auto i = 0; i < output.p2.k; ++i) {
-        output.p2.beta[i] += nash2[i] / beta_n;
-      }
-    }
+    // std::mt19937 rd{std::random_device{}()};
+    // for (auto k = 0; k < beta_n; ++k) {
+    //   for (int i = 0; i < output.p1.k; ++i) {
+    //     for (int j = 0; j < output.p2.k; ++j) {
+    //       auto n = output.visit_matrix[i][j];
+    //       double v = output.value_matrix[i][j];
+    //       if (n == 0) {
+    //         n = 1;
+    //         v = .5;
+    //       }
+    //       auto w = beta_sample(v, n, rd);
+    //       solve_matrix[output.p2.k * i + j] = w * discretize_factor;
+    //     }
+    //   }
+    //   LRSNash::FastInput solve_input{static_cast<int>(output.p1.k),
+    //                                  static_cast<int>(output.p2.k),
+    //                                  solve_matrix.data(), discretize_factor};
+    //   std::array<float, 9 + 2> nash1{}, nash2{};
+    //   LRSNash::FloatOneSumOutput solve_output{nash1.data(), nash2.data(), 0};
+    //   LRSNash::solve_fast(&solve_input, &solve_output);
+    //   for (auto i = 0; i < output.p1.k; ++i) {
+    //     output.p1.beta[i] += nash1[i] / beta_n;
+    //   }
+    //   for (auto i = 0; i < output.p2.k; ++i) {
+    //     output.p2.beta[i] += nash2[i] / beta_n;
+    //   }
+    // }
   }
 };
 
