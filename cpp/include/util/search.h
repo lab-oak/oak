@@ -185,7 +185,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
       MCTS::MonteCarlo model{};
       return s.run(device, dur, params, heap, model, input, output);
     } else if (agent.is_foul_play()) {
-      PokeEngine::Model model{};
+      PokeEngine::Eval model{};
       return s.run(device, dur, params, heap, model, input, output);
     } else {
       if (!agent.network_ptr) {

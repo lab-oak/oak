@@ -40,7 +40,7 @@ inline constexpr bool is_network =
 
 template <typename T>
 inline constexpr bool is_poke_engine =
-    std::is_same_v<PokeEngine::Model, std::remove_cvref_t<T>>;
+    std::is_same_v<PokeEngine::Eval, std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool is_monte_carlo =
@@ -163,7 +163,7 @@ template <SearchOptions Options = default_search> struct Search {
   size_t errors;
 
   Output run(auto &device, const auto budget, const auto &params, auto &heap,
-             auto &model, const Input &input, Output output = {}) noexcept {
+             auto &eval, const Input &input, Output output = {}) noexcept {
 
     // reset data members
     *this = {};
@@ -179,8 +179,8 @@ template <SearchOptions Options = default_search> struct Search {
       ucb_weight = std::log(2 * output.p1.k * output.p2.k);
     }
 
-    if constexpr (is_poke_engine<decltype(model)>) {
-      model.get_root_score(input.battle);
+    if constexpr (is_poke_engine<decltype(eval)>) {
+      eval.get_root_score(input.battle);
     }
 
     auto &stats = [&]() -> auto & {
@@ -206,10 +206,10 @@ template <SearchOptions Options = default_search> struct Search {
       };
 
       if constexpr (is_contextual_bandit<decltype(stats)> &&
-                    is_network<decltype(model)>) {
+                    is_network<decltype(eval)>) {
         static thread_local std::array<float, 9> p1_logits;
         static thread_local std::array<float, 9> p2_logits;
-        output.initial_value = model.value_policy_inference(
+        output.initial_value = eval.value_policy_inference(
             input.battle, input.durations, output.p1.k, output.p2.k,
             output.p1.choices.data(), output.p2.choices.data(),
             p1_logits.data(), p2_logits.data());
@@ -232,7 +232,7 @@ template <SearchOptions Options = default_search> struct Search {
           std::chrono::duration_cast<std::chrono::microseconds>(budget);
       std::chrono::microseconds elapsed{};
       while (elapsed < duration) {
-        run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, eval, output);
         ++output.iterations;
         elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::high_resolution_clock::now() - start);
@@ -240,13 +240,13 @@ template <SearchOptions Options = default_search> struct Search {
       // run while boolean flag is set
     } else if constexpr (requires { *budget; }) {
       while (*budget) {
-        run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, eval, output);
         ++output.iterations;
       }
       // number of iterations
     } else {
       for (auto i = 0; i < budget; ++i) {
-        run_root_iteration(device, params, heap, input, model, output);
+        run_root_iteration(device, params, heap, input, eval, output);
         ++output.iterations;
       }
     }
@@ -259,7 +259,7 @@ template <SearchOptions Options = default_search> struct Search {
   }
 
   float run_root_iteration(auto &device, const auto &params, auto &heap,
-                           const auto &input, auto &model,
+                           const auto &input, auto &eval,
                            Output &output) noexcept {
 
     auto copy = input;
@@ -274,10 +274,10 @@ template <SearchOptions Options = default_search> struct Search {
     }
 
     if constexpr (!is_matrix_ucb<decltype(params)>) {
-      return run_iteration(device, params, heap, copy, model, output).first;
+      return run_iteration(device, params, heap, copy, eval, output).first;
     } else {
       if ((output.iterations < params.delay)) {
-        return run_iteration(device, params.bandit_params, heap, copy, model,
+        return run_iteration(device, params.bandit_params, heap, copy, eval,
                              output)
             .first;
       } else {
@@ -294,10 +294,10 @@ template <SearchOptions Options = default_search> struct Search {
                 pkmn_gen1_battle_options_chance_actions(&options));
             auto &child = heap.children[{p1_index, p2_index, obs}];
             return run_iteration(device, params.bandit_params, child, copy,
-                                 model, output, 1);
+                                 eval, output, 1);
           } else {
             return run_iteration(device, params.bandit_params, heap, copy,
-                                 model, output, 1);
+                                 eval, output, 1);
           }
         }();
 
@@ -313,7 +313,7 @@ template <SearchOptions Options = default_search> struct Search {
   // we return value for each player because it's slightly faster than calcing 1
   // - value at each heap
   std::pair<float, float> run_iteration(auto &device, const auto &bandit_params,
-                                        auto &heap, auto &input, auto &model,
+                                        auto &heap, auto &input, auto &eval,
                                         Output &output,
                                         size_t depth = 0) noexcept {
     static constexpr size_t max_depth = 100;
@@ -370,10 +370,10 @@ template <SearchOptions Options = default_search> struct Search {
               pkmn_gen1_battle_options_chance_actions(&options));
           auto &child =
               heap.children[{outcome.p1.index, outcome.p2.index, obs}];
-          return run_iteration(device, bandit_params, child, input, model,
+          return run_iteration(device, bandit_params, child, input, eval,
                                output, depth + 1);
         } else {
-          return run_iteration(device, bandit_params, heap, input, model,
+          return run_iteration(device, bandit_params, heap, input, eval,
                                output, depth + 1);
         }
       }();
@@ -404,7 +404,7 @@ template <SearchOptions Options = default_search> struct Search {
     switch (pkmn_result_type(result)) {
     case PKMN_RESULT_NONE:
       [[likely]] {
-        using T = decltype(model);
+        using T = decltype(eval);
         float value;
         if constexpr (is_monte_carlo<T>) {
           value = init_stats_and_rollout(stats, device, battle, result);
@@ -423,16 +423,16 @@ template <SearchOptions Options = default_search> struct Search {
             if constexpr (is_contextual_bandit<decltype(stats)>) {
               static thread_local std::array<float, 9> p1_logits;
               static thread_local std::array<float, 9> p2_logits;
-              value = model.value_policy_inference(
+              value = eval.value_policy_inference(
                   battle, durations(), m, n, p1_choices.data(),
                   p2_choices.data(), p1_logits.data(), p2_logits.data());
               stats.softmax_logits(bandit_params, p1_logits.data(),
                                    p2_logits.data());
             } else {
-              value = model.value_inference(battle, durations());
+              value = eval.value_inference(battle, durations());
             }
           } else if constexpr (is_poke_engine<T>) {
-            value = model.evaluate(battle);
+            value = eval.evaluate(battle);
           } else {
             static_assert(!std::is_same_v<T, T>);
           }

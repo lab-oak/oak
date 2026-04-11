@@ -186,7 +186,7 @@ float evaluate_battle(const PKMN::Battle &battle) noexcept {
   return score;
 }
 
-struct Model {
+struct Eval {
   float root_score;
 
   void get_root_score(const pkmn_gen1_battle &b) noexcept {
