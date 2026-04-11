@@ -156,7 +156,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .matrix_ucb =
             args.p1_matrix_ucb.or_else([&] { return args.matrix_ucb; })
                 .value_or(""),
-        .discrete = args.p1_use_discrete,
+        .discrete = args.use_discrete || args.p1_use_discrete,
         .table = args.p1_use_table};
     auto p1_agent = RuntimeSearch::Agent{p1_agent_params};
     auto p1_agent_after = RuntimeSearch::Agent{p1_agent_params};
@@ -177,7 +177,7 @@ void thread_fn(const ProgramArgs *args_ptr) {
         .matrix_ucb =
             args.p2_matrix_ucb.or_else([&] { return args.matrix_ucb; })
                 .value_or(""),
-        .discrete = args.p2_use_discrete,
+        .discrete = args.use_discrete || args.p2_use_discrete,
         .table = args.p2_use_table};
     auto p2_agent = RuntimeSearch::Agent{p2_agent_params};
     auto p2_agent_after = RuntimeSearch::Agent{p2_agent_params};
