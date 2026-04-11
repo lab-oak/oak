@@ -44,7 +44,7 @@ inline constexpr bool is_poke_engine =
 
 template <typename T>
 inline constexpr bool is_monte_carlo =
-    std::is_same_v<MCTS::Model, std::remove_cvref_t<T>>;
+    std::is_same_v<MCTS::MonteCarlo, std::remove_cvref_t<T>>;
 
 template <typename T>
 inline constexpr bool is_contextual_bandit =
@@ -431,14 +431,14 @@ template <SearchOptions Options = default_search> struct Search {
             } else {
               value = model.value_inference(battle, durations());
             }
-          } else if constexpr (true) {
+          } else if constexpr (is_poke_engine<T>) {
             value = model.evaluate(battle);
           } else {
             static_assert(!std::is_same_v<T, T>);
           }
         }
+        return {value, 1 - value};
       }
-      return {value, 1 - value};
 
     case PKMN_RESULT_WIN: {
       return {1, 0};
