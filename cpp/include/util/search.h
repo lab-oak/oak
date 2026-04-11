@@ -7,7 +7,6 @@
 #include <search/bandit/ucb.h>
 #include <search/bandit/ucb1.h>
 #include <search/mcts.h>
-#include <search/poke-engine-evalulate.h>
 #include <util/strings.h>
 
 #include <chrono>

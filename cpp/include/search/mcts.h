@@ -2,8 +2,10 @@
 
 #include <libpkmn/layout.h>
 #include <libpkmn/strings.h>
+#include <nn/battle/network.h>
 #include <search/durations.h>
 #include <search/hash.h>
+#include <search/poke-engine-evaluate.h>
 #include <search/util/softmax.h>
 #include <util/random.h>
 
@@ -429,7 +431,7 @@ template <SearchOptions Options = default_search> struct Search {
             } else {
               value = model.value_inference(battle, durations());
             }
-          } else if constexpr (is_poke_engine<T>) {
+          } else if constexpr (true) {
             value = model.evaluate(battle);
           } else {
             static_assert(!std::is_same_v<T, T>);
