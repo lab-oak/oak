@@ -41,5 +41,6 @@ def benchmark():
 def chall():
     _run_binary("chall")
 
+
 def evo():
     _run_binary("evo")

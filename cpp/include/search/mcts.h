@@ -296,8 +296,8 @@ template <SearchOptions Options = default_search> struct Search {
             return run_iteration(device, params.bandit_params, child, copy,
                                  eval, output, 1);
           } else {
-            return run_iteration(device, params.bandit_params, heap, copy,
-                                 eval, output, 1);
+            return run_iteration(device, params.bandit_params, heap, copy, eval,
+                                 output, 1);
           }
         }();
 
@@ -373,8 +373,8 @@ template <SearchOptions Options = default_search> struct Search {
           return run_iteration(device, bandit_params, child, input, eval,
                                output, depth + 1);
         } else {
-          return run_iteration(device, bandit_params, heap, input, eval,
-                               output, depth + 1);
+          return run_iteration(device, bandit_params, heap, input, eval, output,
+                               depth + 1);
         }
       }();
       outcome.p1.value = value.first;
