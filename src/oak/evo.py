@@ -1,7 +1,6 @@
 import sys
 import os
 import struct
-import torch
 import argparse
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -9,6 +8,7 @@ from typing import Dict, List
 import subprocess
 import math
 import threading
+import copy
 
 import oak
 import oak.torch
@@ -22,7 +22,7 @@ parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
 parser.add_argument("--games-per-save", default=2**10, type=int)
-parser.add_argument("--saves-per-update", default=1, type=int)
+parser.add_argument("--saves-per-refresh", default=1, type=int)
 parser.add_argument("--teams", default="", type=str)
 parser.add_argument("--exp3-gamma-min", default=0.001, type=float)
 parser.add_argument("--exp3-gamma-max", default=5.0, type=float)
@@ -45,13 +45,14 @@ args = parser.parse_args()
 
 
 class ID:
-    def __init__(self, net_hash, bandit, policy_mode, ms):
+    def __init__(self, net_hash, bandit, policy_mode, ms, discrete=True):
         self.net_hash = net_hash
         assert len(bandit) < 15, f"Error: bandit too long: {bandit}"
         self.bandit = bandit
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
         self.ms = ms
+        self.discrete = discrete
 
     def __eq__(self, other):
         if not isinstance(other, ID):
@@ -78,6 +79,11 @@ class ID:
         print(self.net_hash, self.bandit, self.policy_mode, self.ms)
 
 
+def permute_id(before: ID) -> ID:
+    after = copy.deepcopy(before)
+    return after
+
+
 def less_than(id1: ID, id2: ID):
     return (id1.net_hash, id1.bandit, id1.policy_mode, id1.ms) < (
         id2.net_hash,
@@ -96,6 +102,11 @@ def read_id(f):
     mode = data[23:24].decode("ascii")
     ms = struct.unpack("<I", data[24:28])[0]
     return ID(net_hash, bandit, mode, ms)
+
+
+class WDL:
+    def __init__(self, w=0, d=0, l=0):
+        self.win, self.draw, self.loss = (w, d, l)
 
 
 class Elo:
@@ -179,15 +190,12 @@ class Results:
 
 class Options:
     network_table: Dict[int, str] = {}
-    bandits = set(
-    )
+    bandits = set()
 
     @staticmethod
     def fill_network_table(path):
         net_files = oak.util.find_data_files(path, ext=".battle.net")
         for file in net_files:
-            print(file)
-
             # TODO remove
             step = int(file.split("/")[-1].split(".")[0])
             if (step % 500) or (step == 0):
@@ -250,24 +258,24 @@ in_flight: Dict[int, tuple] = {}
 def new_agent():
     net_hash, network_path = random.choice(list(Options.network_table.items()))
 
-    base_bandits = ["exp3-", "ucb-"]
-    base_bandits.append("pexp3-")
-    base_bandits.append("p2exp3-")
-    base_bandits.append("pucb-")
+    base_bandits = ["exp3", "ucb"]
+    base_bandits.append("pexp3")
+    base_bandits.append("pucb")
     bandit = random.choice(base_bandits)
 
     param = None
-    if (
-        bandit.startswith("pexp3")
-        or bandit.startswith("p2exp3")
-        or bandit.startswith("exp3")
-    ):
+    if bandit.startswith("pexp3") or bandit.startswith("exp3"):
         param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
-    elif bandit.startswith("pucb") or bandit.startswith("ucb"):
+    elif (
+        bandit.startswith("pucb")
+        or bandit.startswith("ucb")
+        or bandit.startswith("ucb1")
+    ):
         param = random.uniform(args.ucb_c_min, args.ucb_c_max)
     else:
         assert False, "bad bandit name"
-    bandit = bandit + str(param)[:5]
+    PRECISION = 5
+    bandit = bandit + "-" + str(param)[:PRECISION]
 
     selection_modes = ["n", "e", "x"]
     selection_mode = random.choice(selection_modes)
@@ -285,63 +293,59 @@ def fill_agents(n=args.max_agents):
 def select():
     N = sum(map(lambda kv: kv[1][1], ProgramData.ucb.table.items()))
 
-    ids_sorted = sorted(
+    ucb_sorted = sorted(
         ProgramData.ucb.table.items(),
         key=lambda kv: (kv[1][0]) + (args.c * math.sqrt(N) / (kv[1][1] + 1)),
         reverse=True,
     )
-    if len(ids_sorted) < 2:
+    if len(ucb_sorted) < 2:
         raise RuntimeError("Need at least 2 IDs")
 
-    first, second = ids_sorted[:2]
+    first, second = ucb_sorted[:2]
 
-    first[1][1] = first[1][1] + 1
-    second[1][1] = second[1][1] + 1
+    # virtual
+    for id_, ucb_entry in ucb_sorted[:2]:
+        ucb_entry[1] += 1
 
-    id1 = first[0]
-    id2 = second[0]
+    id1 = ucb_sorted[0][0]
+    id2 = ucb_sorted[1][0]
     if less_than(id2, id1):
         id1, id2 = id2, id1
     return id1, id2
 
 
-def update(lesserID, greaterID, data):
-    score = (data[0] + 0.5 * data[1]) / 2
+def update(lesserID, greaterID, wdl):
+    score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / 2
 
-    wdl = ProgramData.results.table.get((lesserID, greaterID), [0, 0, 0])
-    wdl[0] += data[0]
-    wdl[1] += data[1]
-    wdl[2] += data[2]
-    ProgramData.results.table[(lesserID, greaterID)] = wdl
+    # Results
+    data = ProgramData.results.table.get((lesserID, greaterID), [0, 0, 0])
+    data[0] += wdl.win
+    data[1] += wdl.draw
+    data[2] += wdl.loss
+    ProgramData.results.table[(lesserID, greaterID)] = data
 
+    # Elo
     R_lesser = ProgramData.elo.table[lesserID]
     R_greater = ProgramData.elo.table[greaterID]
-
     E_lesser = 1 / (1 + 10 ** ((R_greater - R_lesser) / 400))
     E_greater = 1 - E_lesser
-
     ProgramData.elo.table[lesserID] += args.K * (score - E_lesser)
     ProgramData.elo.table[greaterID] += args.K * ((1 - score) - E_greater)
 
-    v, n = ProgramData.ucb.table[lesserID]
-    total_v = v * (n - 1)
-    assert n > 0, "Bad UCB update"
-    ProgramData.ucb.table[lesserID] = [(total_v + score) / n, n]
-    v, n = ProgramData.ucb.table[greaterID]
-    assert n > 0, "Bad UCB update"
-    total_v = v * (n - 1)
-    ProgramData.ucb.table[greaterID] = [(total_v + (1 - score)) / n, n]
+    # UCB
+    for i, id_ in enumerate([lesserID, greaterID]):
+        v, virtual_n = ProgramData.ucb.table[id_]
+        n = virtual_n - 1
+        total_v = v * n
+        update = score if i == 0 else (1 - score)
+        v_ = (total_v + update) / (n + 1)
+        ProgramData.ucb.table[id_] = [v_, virtual_n]
 
 
 def remove_lowest(n):
     sorted_ratings = sorted(ProgramData.ucb.table.items(), key=lambda kv: kv[1])
     for kv in sorted_ratings[:n]:
         del ProgramData.ucb.table[kv[0]]
-
-
-def reset_visits():
-    for key, value in ProgramData.ucb.table.items():
-        value[1] = 0
 
 
 def setup():
@@ -361,7 +365,7 @@ def setup():
         ProgramData.read(args.dir)
 
 
-def run_once() -> [ID, ID, [int, int, int]]:
+def run_vs() -> [ID, ID, WDL]:
     if shutdown.is_set():
         return None
 
@@ -372,10 +376,7 @@ def run_once() -> [ID, ID, [int, int, int]]:
         in_flight[future_id] = (lesserID, greaterID)
 
     cmd = [
-        sys.executable,
-        "-u",
-        "-m",
-        "oak.vs",
+        "vs",
         "--threads=1",
         "--max-games=1",
         "--skip-save",
@@ -390,14 +391,19 @@ def run_once() -> [ID, ID, [int, int, int]]:
         f"--p2-policy-mode={greaterID.policy_mode}",
     ]
 
+    if lesserID.discrete:
+        cmd += ["--p1-use-discrete"]
+    if greaterID.discrete:
+        cmd += ["--p2-use-discrete"]
+
     result = subprocess.run(cmd, text=True, capture_output=True)
 
     with in_flight_lock:
         in_flight.pop(future_id, None)
-
     last_line = result.stdout.strip().splitlines()[-1]
     data = list(map(int, last_line.split()))
-    return lesserID, greaterID, data
+    wdl = WDL(*data)
+    return lesserID, greaterID, wdl
 
 
 def undo_in_flight():
@@ -419,17 +425,22 @@ def run_batch(pool, n):
     for _ in range(n):
         if shutdown.is_set():
             break
-        f = pool.submit(run_once)
+        f = pool.submit(run_vs)
         futures[f] = True
 
     for fut in as_completed(futures):
         result = fut.result()
         if result is None:
             continue
-        lesserID, greaterID, data = result
-        update(lesserID, greaterID, data)
+        lesserID, greaterID, wdl = result
+        update(lesserID, greaterID, wdl)
 
     return not shutdown.is_set()
+
+
+def refresh_agent_pool():
+    remove_lowest(args.n_delete)
+    fill_agents(args.n_delete)
 
 
 def main():
@@ -437,10 +448,7 @@ def main():
 
     try:
         while True:
-            for _ in range(args.start, args.saves_per_update):
-                print("step", _)
-                args.start = 0
-
+            for _ in range(args.saves_per_refresh):
                 sorted_ratings = sorted(
                     ProgramData.elo.table.items(), key=lambda kv: kv[1]
                 )
@@ -456,6 +464,7 @@ def main():
                         )
                 print("")
 
+                print("Run batch")
                 with ThreadPoolExecutor(max_workers=args.threads) as pool:
                     completed = run_batch(pool, args.games_per_save)
 
@@ -470,10 +479,8 @@ def main():
             print(
                 f"Removing lowest {args.n_delete} agents and replacing with random agents."
             )
-            remove_lowest(args.n_delete)
-            Options.fill_network_table(args.network_dir)
-            fill_agents(args.n_delete)
-            reset_visits()
+
+            refresh_agent_pool()
 
     except KeyboardInterrupt:
         shutdown.set()
