@@ -15,8 +15,8 @@ import oak.torch
 
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
 
-parser.add_argument("--working-dir", default=None, type=str)
-parser.add_argument("--net-path", default=".", type=str)
+parser.add_argument("--dir", default=None, type=str)
+parser.add_argument("--network-path", default=".", type=str)
 parser.add_argument("--budget", default=2**12, type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
@@ -24,25 +24,27 @@ parser.add_argument("--n-delete", default=8, type=int)
 parser.add_argument("--games-per-save", default=2**10, type=int)
 parser.add_argument("--saves-per-update", default=1, type=int)
 parser.add_argument("--teams", default="", type=str)
-parser.add_argument("--exp3-param-min", default=0.001, type=float)
-parser.add_argument("--exp3-param-max", default=5.0, type=float)
-parser.add_argument("--ucb-param-min", default=0.001, type=float)
-parser.add_argument("--ucb-param-max", default=5.0, type=float)
-parser.add_argument("--allow-policy", default=False, type=bool)
+parser.add_argument("--exp3-gamma-min", default=0.001, type=float)
+parser.add_argument("--exp3-gamma-max", default=5.0, type=float)
+parser.add_argument("--exp3-alpha-min", default=0.001, type=float)
+parser.add_argument("--exp3-alpha-max", default=0.5, type=float)
+parser.add_argument("--ucb-c-min", default=0.001, type=float)
+parser.add_argument("--ucb-c-max", default=5.0, type=float)
 parser.add_argument("--start", default=0, type=int)
 parser.add_argument("--c", default=1.414, type=float)
 parser.add_argument("--K", default=8, type=float)
 
 args = parser.parse_args()
 
+
 class ID:
-    def __init__(self, net_hash, bandit, policy_mode, iterations):
+    def __init__(self, net_hash, bandit, policy_mode, ms):
         self.net_hash = net_hash
         assert len(bandit) < 15, f"Error: bandit too long: {bandit}"
         self.bandit = bandit
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
-        self.iterations = iterations
+        self.ms = ms
 
     def __eq__(self, other):
         if not isinstance(other, ID):
@@ -51,11 +53,11 @@ class ID:
             self.net_hash == other.net_hash
             and self.bandit == other.bandit
             and self.policy_mode == other.policy_mode
-            and self.iterations == other.iterations
+            and self.ms == other.ms
         )
 
     def __hash__(self):
-        return hash((self.net_hash, self.bandit, self.policy_mode, self.iterations))
+        return hash((self.net_hash, self.bandit, self.policy_mode, self.ms))
 
     def write(self, f):
         f.write(struct.pack("<Q", self.net_hash))
@@ -63,18 +65,18 @@ class ID:
         bn = bn.ljust(15, b"\0")
         f.write(bn)
         f.write(self.policy_mode.encode("utf8"))
-        f.write(struct.pack("<I", self.iterations))
+        f.write(struct.pack("<I", self.ms))
 
     def print(self):
-        print(self.net_hash, self.bandit, self.policy_mode, self.iterations)
+        print(self.net_hash, self.bandit, self.policy_mode, self.ms)
 
 
 def less_than(id1: ID, id2: ID):
-    return (id1.net_hash, id1.bandit, id1.policy_mode, id1.iterations) < (
+    return (id1.net_hash, id1.bandit, id1.policy_mode, id1.ms) < (
         id2.net_hash,
         id2.bandit,
         id2.policy_mode,
-        id2.iterations,
+        id2.ms,
     )
 
 
@@ -85,8 +87,8 @@ def read_id(f):
     net_hash = struct.unpack("<Q", data[:8])[0]
     bandit = data[8:23].rstrip(b"\0").decode("ascii")
     mode = data[23:24].decode("ascii")
-    iterations = struct.unpack("<I", data[24:28])[0]
-    return ID(net_hash, bandit, mode, iterations)
+    ms = struct.unpack("<I", data[24:28])[0]
+    return ID(net_hash, bandit, mode, ms)
 
 
 class Elo:
@@ -230,13 +232,12 @@ in_flight: Dict[int, tuple] = {}
 
 
 def new_agent():
-    net_hash, net_path = random.choice(list(net_dir.table.items()))
+    net_hash, network_path = random.choice(list(net_dir.table.items()))
 
     base_bandits = ["exp3-", "ucb-"]
-    if args.allow_policy:
-        base_bandits.append("pexp3-")
-        base_bandits.append("p2exp3-")
-        base_bandits.append("pucb-")
+    base_bandits.append("pexp3-")
+    base_bandits.append("p2exp3-")
+    base_bandits.append("pucb-")
     bandit = random.choice(base_bandits)
 
     param = None
@@ -245,9 +246,9 @@ def new_agent():
         or bandit.startswith("p2exp3")
         or bandit.startswith("exp3")
     ):
-        param = random.uniform(args.exp3_param_min, args.exp3_param_max)
+        param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
     elif bandit.startswith("pucb") or bandit.startswith("ucb"):
-        param = random.uniform(args.ucb_param_min, args.ucb_param_max)
+        param = random.uniform(args.ucb_c_min, args.ucb_c_max)
     else:
         assert False, "bad bandit name"
     bandit = bandit + str(param)[:5]
@@ -328,20 +329,20 @@ def reset_visits():
 
 
 def setup():
-    if args.working_dir is None:
+    if args.dir is None:
         import datetime
 
         now = datetime.datetime.now()
-        working_dir = now.strftime("elo-%Y-%m-%d-%H:%M:%S")
-        os.makedirs(working_dir, exist_ok=False)
-        args.working_dir = working_dir
+        dir = now.strftime("elo-%Y-%m-%d-%H:%M:%S")
+        os.makedirs(dir, exist_ok=False)
+        args.dir = dir
 
-        net_dir.fill_from_path(args.net_path)
+        net_dir.fill_from_path(args.network_path)
         fill_agents()
     else:
         print("Reading files")
-        net_dir.read(os.path.join(args.working_dir, "directory"))
-        program_data.read(args.working_dir)
+        net_dir.read(os.path.join(args.dir, "directory"))
+        program_data.read(args.dir)
 
 
 def run_once() -> [ID, ID, [int, int, int]]:
@@ -365,8 +366,8 @@ def run_once() -> [ID, ID, [int, int, int]]:
         f"--teams={args.teams}",
         f"--p1-eval={net_dir.table[lesserID.net_hash]}",
         f"--p2-eval={net_dir.table[greaterID.net_hash]}",
-        f"--p1-budget={lesserID.iterations}",
-        f"--p2-budget={greaterID.iterations}",
+        f"--p1-budget={lesserID.ms}ms",
+        f"--p2-budget={greaterID.ms}ms",
         f"--p1-bandit={lesserID.bandit}",
         f"--p2-bandit={greaterID.bandit}",
         f"--p1-policy-mode={lesserID.policy_mode}",
@@ -433,7 +434,7 @@ def main():
                             net_dir.table[key.net_hash],
                             key.bandit,
                             key.policy_mode,
-                            key.iterations,
+                            key.ms,
                             value,
                             program_data.ucb.table[key],
                         )
@@ -445,7 +446,7 @@ def main():
                 if shutdown.is_set():
                     break
 
-                program_data.write(args.working_dir)
+                program_data.write(args.dir)
 
             if shutdown.is_set():
                 break
@@ -454,7 +455,7 @@ def main():
                 f"Removing lowest {args.n_delete} agents and replacing with random agents."
             )
             remove_lowest(args.n_delete)
-            net_dir.fill_from_path(args.net_path)
+            net_dir.fill_from_path(args.network_path)
             fill_agents(args.n_delete)
             reset_visits()
 
@@ -463,7 +464,7 @@ def main():
 
     print("\nShutting down, waiting for in-flight games to finish...")
     undo_in_flight()
-    program_data.write(args.working_dir)
+    program_data.write(args.dir)
     print("Saved.")
 
 
