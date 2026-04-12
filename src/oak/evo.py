@@ -16,8 +16,8 @@ import oak.torch
 parser = argparse.ArgumentParser(description="Parameter testing for battle agents.")
 
 parser.add_argument("--dir", default=None, type=str)
-parser.add_argument("--network-path", default=".", type=str)
-parser.add_argument("--budget", default=2**12, type=int)
+parser.add_argument("--network-dir", default=".", type=str)
+parser.add_argument("--budget-ms", default=f"{2**5}", type=int)
 parser.add_argument("--threads", default=1, type=int)
 parser.add_argument("--max-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
@@ -31,8 +31,15 @@ parser.add_argument("--exp3-alpha-max", default=0.5, type=float)
 parser.add_argument("--ucb-c-min", default=0.001, type=float)
 parser.add_argument("--ucb-c-max", default=5.0, type=float)
 parser.add_argument("--start", default=0, type=int)
+# Agent selection UCB params
 parser.add_argument("--c", default=1.414, type=float)
 parser.add_argument("--K", default=8, type=float)
+
+parser.add_argument("--no-exp3", action="store_true")
+parser.add_argument("--no-pexp3", action="store_true")
+parser.add_argument("--no-ucb", action="store_true")
+parser.add_argument("--no-pucb", action="store_true")
+parser.add_argument("--no-ucb1", action="store_true")
 
 args = parser.parse_args()
 
@@ -170,20 +177,30 @@ class Results:
                 f.write(struct.pack("<III", w, l, d))
 
 
-class NetworkDirectory:
-    def __init__(self):
-        self.table: Dict[int, str] = {}
+class Options:
+    network_table: Dict[int, str] = {}
+    bandits = set(
+    )
 
-    def fill_from_path(self, path):
+    @staticmethod
+    def fill_network_table(path):
         net_files = oak.util.find_data_files(path, ext=".battle.net")
         for file in net_files:
+            print(file)
+
+            # TODO remove
+            step = int(file.split("/")[-1].split(".")[0])
+            if (step % 500) or (step == 0):
+                continue
+
             network = oak.torch.BattleNetwork()
             with open(file, "rb") as f:
                 network.read_parameters(f)
-            self.table[network.hash()] = file
-        self.table[0] = "mc"
+            Options.network_table[network.hash()] = file
+        # Options.network_table[0] = "mc"
 
-    def read(self, path):
+    @staticmethod
+    def read(path):
         with open(path, "rb") as f:
             while True:
                 h_bytes = f.read(8)
@@ -196,35 +213,34 @@ class NetworkDirectory:
                     if not c or c == b"\0":
                         break
                     path_bytes.append(c)
-                self.table[net_hash] = b"".join(path_bytes).decode("utf-8")
+                Options.network_table[net_hash] = b"".join(path_bytes).decode("utf-8")
 
-    def write(self, path):
+    @staticmethod
+    def write(path):
         with open(path, "wb") as f:
-            for nh, path_str in self.table.items():
+            for nh, path_str in Options.network_table.items():
                 f.write(struct.pack("<Q", nh))
                 f.write(path_str.encode("utf-8"))
                 f.write(b"\0")
 
 
 class ProgramData:
-    def __init__(self):
-        self.elo = Elo()
-        self.ucb = UCB()
-        self.results = Results()
+    elo = Elo()
+    ucb = UCB()
+    results = Results()
 
-    def read(self, base):
-        self.elo.read(os.path.join(base, "ratings"))
-        self.ucb.read(os.path.join(base, "ucb"))
-        self.results.read(os.path.join(base, "results"))
+    @staticmethod
+    def read(base):
+        ProgramData.elo.read(os.path.join(base, "ratings"))
+        ProgramData.ucb.read(os.path.join(base, "ucb"))
+        ProgramData.results.read(os.path.join(base, "results"))
 
-    def write(self, base):
-        self.elo.write(os.path.join(base, "ratings"))
-        self.ucb.write(os.path.join(base, "ucb"))
-        self.results.write(os.path.join(base, "results"))
+    @staticmethod
+    def write(base):
+        ProgramData.elo.write(os.path.join(base, "ratings"))
+        ProgramData.ucb.write(os.path.join(base, "ucb"))
+        ProgramData.results.write(os.path.join(base, "results"))
 
-
-net_dir = NetworkDirectory()
-program_data = ProgramData()
 
 shutdown = threading.Event()
 in_flight_lock = threading.Lock()
@@ -232,7 +248,7 @@ in_flight: Dict[int, tuple] = {}
 
 
 def new_agent():
-    net_hash, network_path = random.choice(list(net_dir.table.items()))
+    net_hash, network_path = random.choice(list(Options.network_table.items()))
 
     base_bandits = ["exp3-", "ucb-"]
     base_bandits.append("pexp3-")
@@ -256,21 +272,21 @@ def new_agent():
     selection_modes = ["n", "e", "x"]
     selection_mode = random.choice(selection_modes)
 
-    return ID(net_hash, bandit, selection_mode, args.budget)
+    return ID(net_hash, bandit, selection_mode, args.budget_ms)
 
 
 def fill_agents(n=args.max_agents):
     for _ in range(n):
         agent = new_agent()
-        program_data.elo.table[agent] = Elo.default_rating
-        program_data.ucb.table[agent] = [0, 0]
+        ProgramData.elo.table[agent] = Elo.default_rating
+        ProgramData.ucb.table[agent] = [0, 0]
 
 
 def select():
-    N = sum(map(lambda kv: kv[1][1], program_data.ucb.table.items()))
+    N = sum(map(lambda kv: kv[1][1], ProgramData.ucb.table.items()))
 
     ids_sorted = sorted(
-        program_data.ucb.table.items(),
+        ProgramData.ucb.table.items(),
         key=lambda kv: (kv[1][0]) + (args.c * math.sqrt(N) / (kv[1][1] + 1)),
         reverse=True,
     )
@@ -292,39 +308,39 @@ def select():
 def update(lesserID, greaterID, data):
     score = (data[0] + 0.5 * data[1]) / 2
 
-    wdl = program_data.results.table.get((lesserID, greaterID), [0, 0, 0])
+    wdl = ProgramData.results.table.get((lesserID, greaterID), [0, 0, 0])
     wdl[0] += data[0]
     wdl[1] += data[1]
     wdl[2] += data[2]
-    program_data.results.table[(lesserID, greaterID)] = wdl
+    ProgramData.results.table[(lesserID, greaterID)] = wdl
 
-    R_lesser = program_data.elo.table[lesserID]
-    R_greater = program_data.elo.table[greaterID]
+    R_lesser = ProgramData.elo.table[lesserID]
+    R_greater = ProgramData.elo.table[greaterID]
 
     E_lesser = 1 / (1 + 10 ** ((R_greater - R_lesser) / 400))
     E_greater = 1 - E_lesser
 
-    program_data.elo.table[lesserID] += args.K * (score - E_lesser)
-    program_data.elo.table[greaterID] += args.K * ((1 - score) - E_greater)
+    ProgramData.elo.table[lesserID] += args.K * (score - E_lesser)
+    ProgramData.elo.table[greaterID] += args.K * ((1 - score) - E_greater)
 
-    v, n = program_data.ucb.table[lesserID]
+    v, n = ProgramData.ucb.table[lesserID]
     total_v = v * (n - 1)
     assert n > 0, "Bad UCB update"
-    program_data.ucb.table[lesserID] = [(total_v + score) / n, n]
-    v, n = program_data.ucb.table[greaterID]
+    ProgramData.ucb.table[lesserID] = [(total_v + score) / n, n]
+    v, n = ProgramData.ucb.table[greaterID]
     assert n > 0, "Bad UCB update"
     total_v = v * (n - 1)
-    program_data.ucb.table[greaterID] = [(total_v + (1 - score)) / n, n]
+    ProgramData.ucb.table[greaterID] = [(total_v + (1 - score)) / n, n]
 
 
 def remove_lowest(n):
-    sorted_ratings = sorted(program_data.ucb.table.items(), key=lambda kv: kv[1])
+    sorted_ratings = sorted(ProgramData.ucb.table.items(), key=lambda kv: kv[1])
     for kv in sorted_ratings[:n]:
-        del program_data.ucb.table[kv[0]]
+        del ProgramData.ucb.table[kv[0]]
 
 
 def reset_visits():
-    for key, value in program_data.ucb.table.items():
+    for key, value in ProgramData.ucb.table.items():
         value[1] = 0
 
 
@@ -337,12 +353,12 @@ def setup():
         os.makedirs(dir, exist_ok=False)
         args.dir = dir
 
-        net_dir.fill_from_path(args.network_path)
+        Options.fill_network_table(args.network_dir)
         fill_agents()
     else:
         print("Reading files")
-        net_dir.read(os.path.join(args.dir, "directory"))
-        program_data.read(args.dir)
+        Options.read(os.path.join(args.dir, "directory"))
+        ProgramData.read(args.dir)
 
 
 def run_once() -> [ID, ID, [int, int, int]]:
@@ -364,8 +380,8 @@ def run_once() -> [ID, ID, [int, int, int]]:
         "--max-games=1",
         "--skip-save",
         f"--teams={args.teams}",
-        f"--p1-eval={net_dir.table[lesserID.net_hash]}",
-        f"--p2-eval={net_dir.table[greaterID.net_hash]}",
+        f"--p1-eval={Options.network_table[lesserID.net_hash]}",
+        f"--p2-eval={Options.network_table[greaterID.net_hash]}",
         f"--p1-budget={lesserID.ms}ms",
         f"--p2-budget={greaterID.ms}ms",
         f"--p1-bandit={lesserID.bandit}",
@@ -387,13 +403,13 @@ def run_once() -> [ID, ID, [int, int, int]]:
 def undo_in_flight():
     with in_flight_lock:
         for lesserID, greaterID in in_flight.values():
-            if lesserID in program_data.ucb.table:
-                program_data.ucb.table[lesserID][1] = max(
-                    0, program_data.ucb.table[lesserID][1] - 1
+            if lesserID in ProgramData.ucb.table:
+                ProgramData.ucb.table[lesserID][1] = max(
+                    0, ProgramData.ucb.table[lesserID][1] - 1
                 )
-            if greaterID in program_data.ucb.table:
-                program_data.ucb.table[greaterID][1] = max(
-                    0, program_data.ucb.table[greaterID][1] - 1
+            if greaterID in ProgramData.ucb.table:
+                ProgramData.ucb.table[greaterID][1] = max(
+                    0, ProgramData.ucb.table[greaterID][1] - 1
                 )
         in_flight.clear()
 
@@ -426,17 +442,17 @@ def main():
                 args.start = 0
 
                 sorted_ratings = sorted(
-                    program_data.elo.table.items(), key=lambda kv: kv[1]
+                    ProgramData.elo.table.items(), key=lambda kv: kv[1]
                 )
                 for key, value in sorted_ratings:
-                    if key in program_data.ucb.table:
+                    if key in ProgramData.ucb.table:
                         print(
-                            net_dir.table[key.net_hash],
+                            Options.network_table[key.net_hash],
                             key.bandit,
                             key.policy_mode,
                             key.ms,
                             value,
-                            program_data.ucb.table[key],
+                            ProgramData.ucb.table[key],
                         )
                 print("")
 
@@ -446,7 +462,7 @@ def main():
                 if shutdown.is_set():
                     break
 
-                program_data.write(args.dir)
+                ProgramData.write(args.dir)
 
             if shutdown.is_set():
                 break
@@ -455,7 +471,7 @@ def main():
                 f"Removing lowest {args.n_delete} agents and replacing with random agents."
             )
             remove_lowest(args.n_delete)
-            net_dir.fill_from_path(args.network_path)
+            Options.fill_network_table(args.network_dir)
             fill_agents(args.n_delete)
             reset_visits()
 
@@ -464,7 +480,7 @@ def main():
 
     print("\nShutting down, waiting for in-flight games to finish...")
     undo_in_flight()
-    program_data.write(args.dir)
+    ProgramData.write(args.dir)
     print("Saved.")
 
 
