@@ -81,6 +81,43 @@ class ID:
 
 def permute_id(before: ID) -> ID:
     after = copy.deepcopy(before)
+
+    choice = random.randint(0, 4)
+
+    if choice == 0:
+        bandit_type = after.bandit.split("-")[0]
+        if bandit_type in ("exp3", "pexp3"):
+            param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+        else:
+            param = random.uniform(args.ucb_c_min, args.ucb_c_max)
+        PRECISION = 5
+        after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+
+    elif choice == 1:
+        # New bandit type AND re-sample params
+        base_bandits = ["exp3", "pexp3", "ucb", "pucb"]
+        bandit_type = random.choice(base_bandits)
+        if bandit_type in ("exp3", "pexp3"):
+            param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+        else:
+            param = random.uniform(args.ucb_c_min, args.ucb_c_max)
+        PRECISION = 5
+        after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+
+    elif choice == 2:
+        net_hash, _ = random.choice(list(Options.network_table.items()))
+        after.net_hash = net_hash
+
+    elif choice == 3:
+        modes = ["x", "n", "e"]
+        modes.remove(after.policy_mode)
+        after.policy_mode = random.choice(modes)
+    elif choice == 4:
+        # 50/50 flip discrete
+        after.discrete = random.choice([True, False])
+    else:
+        assert False, "what"
+
     return after
 
 
@@ -283,13 +320,6 @@ def new_agent():
     return ID(net_hash, bandit, selection_mode, args.budget_ms)
 
 
-def fill_agents(n=args.max_agents):
-    for _ in range(n):
-        agent = new_agent()
-        ProgramData.elo.table[agent] = Elo.default_rating
-        ProgramData.ucb.table[agent] = [0, 0]
-
-
 def select():
     N = sum(map(lambda kv: kv[1][1], ProgramData.ucb.table.items()))
 
@@ -315,7 +345,9 @@ def select():
 
 
 def update(lesserID, greaterID, wdl):
-    score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / 2
+    score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / (
+        wdl.win + wdl.draw + wdl.loss
+    )
 
     # Results
     data = ProgramData.results.table.get((lesserID, greaterID), [0, 0, 0])
@@ -342,12 +374,6 @@ def update(lesserID, greaterID, wdl):
         ProgramData.ucb.table[id_] = [v_, virtual_n]
 
 
-def remove_lowest(n):
-    sorted_ratings = sorted(ProgramData.ucb.table.items(), key=lambda kv: kv[1])
-    for kv in sorted_ratings[:n]:
-        del ProgramData.ucb.table[kv[0]]
-
-
 def setup():
     if args.dir is None:
         import datetime
@@ -358,7 +384,10 @@ def setup():
         args.dir = dir
 
         Options.fill_network_table(args.network_dir)
-        fill_agents()
+        for _ in range(args.max_agents):
+            agent = new_agent()
+            ProgramData.elo.table[agent] = Elo.default_rating
+            ProgramData.ucb.table[agent] = [0, 0]
     else:
         print("Reading files")
         Options.read(os.path.join(args.dir, "directory"))
@@ -379,7 +408,7 @@ def run_vs() -> [ID, ID, WDL]:
         "vs",
         "--threads=1",
         "--max-games=1",
-        "--skip-save",
+        "--mirror-match",
         f"--teams={args.teams}",
         f"--p1-eval={Options.network_table[lesserID.net_hash]}",
         f"--p2-eval={Options.network_table[greaterID.net_hash]}",
@@ -439,8 +468,25 @@ def run_batch(pool, n):
 
 
 def refresh_agent_pool():
-    remove_lowest(args.n_delete)
-    fill_agents(args.n_delete)
+    top_agents = sorted(
+        ProgramData.ucb.table.items(), key=lambda kv: kv[1][1], reverse=True
+    )
+    top_agents = [id_ for id_, _ in top_agents]
+
+    for i in range(args.n_delete):
+        parent = top_agents[i]
+        child = copy.deepcopy(parent)
+        while child in ProgramData.ucb.table:
+            child = permute_id(parent)
+        ProgramData.ucb.table[child] = [0, 0]
+        ProgramData.elo.table[child] = Elo.default_rating
+
+    for i in range(args.n_delete):
+        id_ = top_agents[-(i + 1)]
+        del ProgramData.ucb.table[id_]
+        del ProgramData.elo.table[id_]
+
+    print(f"Refresh: {len(ProgramData.ucb.table)} {len(ProgramData.elo.table)}")
 
 
 def main():
@@ -475,10 +521,6 @@ def main():
 
             if shutdown.is_set():
                 break
-
-            print(
-                f"Removing lowest {args.n_delete} agents and replacing with random agents."
-            )
 
             refresh_agent_pool()
 
