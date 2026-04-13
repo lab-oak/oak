@@ -19,7 +19,7 @@ parser.add_argument("--dir", default=None, type=str)
 parser.add_argument("--network-dir", default=".", type=str)
 parser.add_argument("--budget-ms", default=f"{2**5}", type=int)
 parser.add_argument("--threads", default=1, type=int)
-parser.add_argument("--max-agents", default=32, type=int)
+parser.add_argument("--min-agents", default=32, type=int)
 parser.add_argument("--n-delete", default=8, type=int)
 parser.add_argument("--games-per-save", default=2**10, type=int)
 parser.add_argument("--saves-per-refresh", default=1, type=int)
@@ -47,7 +47,7 @@ args = parser.parse_args()
 class ID:
     def __init__(self, net_hash, bandit, policy_mode, ms, discrete=True):
         self.net_hash = net_hash
-        assert len(bandit) < 15, f"Error: bandit too long: {bandit}"
+        assert len(bandit) < 31, f"Error: bandit too long: {bandit}"
         self.bandit = bandit
         assert len(policy_mode) == 1, f"Error: policy mode must be char: {policy_mode}"
         self.policy_mode = policy_mode
@@ -65,18 +65,21 @@ class ID:
         )
 
     def __hash__(self):
-        return hash((self.net_hash, self.bandit, self.policy_mode, self.ms))
+        return hash(
+            (self.net_hash, self.bandit, self.policy_mode, self.ms, self.discrete)
+        )
 
     def write(self, f):
         f.write(struct.pack("<Q", self.net_hash))
         bn = self.bandit.encode("utf8")
-        bn = bn.ljust(15, b"\0")
+        bn = bn.ljust(31, b"\0")
         f.write(bn)
         f.write(self.policy_mode.encode("utf8"))
         f.write(struct.pack("<I", self.ms))
+        f.write(struct.pack("<I", int(self.discrete)))
 
     def print(self):
-        print(self.net_hash, self.bandit, self.policy_mode, self.ms)
+        print(self.net_hash, self.bandit, self.policy_mode, self.ms, self.discrete)
 
 
 def permute_id(before: ID) -> ID:
@@ -122,23 +125,24 @@ def permute_id(before: ID) -> ID:
 
 
 def less_than(id1: ID, id2: ID):
-    return (id1.net_hash, id1.bandit, id1.policy_mode, id1.ms) < (
+    return (id1.net_hash, id1.bandit, id1.policy_mode, id1.ms, id1.discrete) < (
         id2.net_hash,
         id2.bandit,
         id2.policy_mode,
         id2.ms,
+        id2.discrete,
     )
 
 
 def read_id(f):
-    data = f.read(8 + 15 + 1 + 4)
-    if len(data) < 8 + 15 + 1 + 4:
+    data = f.read(8 + 31 + 1 + 4 + 4)
+    if len(data) < 8 + 31 + 1 + 4 + 4:
         return None
     net_hash = struct.unpack("<Q", data[:8])[0]
-    bandit = data[8:23].rstrip(b"\0").decode("ascii")
-    mode = data[23:24].decode("ascii")
-    ms = struct.unpack("<I", data[24:28])[0]
-    return ID(net_hash, bandit, mode, ms)
+    bandit = data[8:39].rstrip(b"\0").decode("ascii")
+    mode = data[39:40].decode("ascii")
+    ms, discrete = struct.unpack("<II", data[40:48])
+    return ID(net_hash, bandit, mode, ms, bool(discrete))
 
 
 class WDL:
@@ -175,7 +179,7 @@ class UCB:
     def __init__(self):
         self.table: Dict[ID, tuple[float, int]] = {}
 
-    def read(self, path, n=args.max_agents):
+    def read(self, path, n=args.min_agents):
         temp = {}
         with open(path, "rb") as f:
             while True:
@@ -384,7 +388,7 @@ def setup():
         args.dir = dir
 
         Options.fill_network_table(args.network_dir)
-        for _ in range(args.max_agents):
+        for _ in range(args.min_agents):
             agent = new_agent()
             ProgramData.elo.table[agent] = Elo.default_rating
             ProgramData.ucb.table[agent] = [0, 0]
@@ -468,12 +472,19 @@ def run_batch(pool, n):
 
 
 def refresh_agent_pool():
-    top_agents = sorted(
-        ProgramData.ucb.table.items(), key=lambda kv: kv[1][1], reverse=True
-    )
-    top_agents = [id_ for id_, _ in top_agents]
+    top_agents = [
+        id_
+        for id_, _ in sorted(
+            ProgramData.ucb.table.items(), key=lambda kv: kv[1][1], reverse=True
+        )
+    ]
 
     for i in range(args.n_delete):
+        id_ = top_agents[-(i + 1)]
+        del ProgramData.ucb.table[id_]
+        del ProgramData.elo.table[id_]
+
+    while len(ProgramData.ucb.table) < args.min_agents:
         parent = top_agents[i]
         child = copy.deepcopy(parent)
         while child in ProgramData.ucb.table:
@@ -481,12 +492,21 @@ def refresh_agent_pool():
         ProgramData.ucb.table[child] = [0, 0]
         ProgramData.elo.table[child] = Elo.default_rating
 
-    for i in range(args.n_delete):
-        id_ = top_agents[-(i + 1)]
-        del ProgramData.ucb.table[id_]
-        del ProgramData.elo.table[id_]
 
-    print(f"Refresh: {len(ProgramData.ucb.table)} {len(ProgramData.elo.table)}")
+def print_ids():
+    sorted_ratings = sorted(ProgramData.elo.table.items(), key=lambda kv: kv[1])
+    for key, value in sorted_ratings:
+        if key in ProgramData.ucb.table:
+            print(
+                Options.network_table[key.net_hash],
+                key.bandit,
+                key.policy_mode,
+                key.ms,
+                key.discrete,
+                value,
+                ProgramData.ucb.table[key],
+            )
+    print("")
 
 
 def main():
@@ -495,24 +515,11 @@ def main():
     try:
         while True:
             for _ in range(args.saves_per_refresh):
-                sorted_ratings = sorted(
-                    ProgramData.elo.table.items(), key=lambda kv: kv[1]
-                )
-                for key, value in sorted_ratings:
-                    if key in ProgramData.ucb.table:
-                        print(
-                            Options.network_table[key.net_hash],
-                            key.bandit,
-                            key.policy_mode,
-                            key.ms,
-                            value,
-                            ProgramData.ucb.table[key],
-                        )
-                print("")
-
                 print("Run batch")
                 with ThreadPoolExecutor(max_workers=args.threads) as pool:
                     completed = run_batch(pool, args.games_per_save)
+
+                print_ids()
 
                 if shutdown.is_set():
                     break
@@ -525,9 +532,9 @@ def main():
             refresh_agent_pool()
 
     except KeyboardInterrupt:
+        print("Wait for save. Or Interupt again to skip.")
         shutdown.set()
 
-    print("\nShutting down, waiting for in-flight games to finish...")
     undo_in_flight()
     ProgramData.write(args.dir)
     print("Saved.")
