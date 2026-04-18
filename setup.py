@@ -22,7 +22,7 @@ def get_paths(directory):
 
 
 setup(
-    name="oaks-lab",
+    name="oak-lab",
     version="1.1.0",
     packages=find_packages("src"),
     package_dir={"": "src"},

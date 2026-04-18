@@ -82,6 +82,6 @@ jobs:
       - name: Upload built wheel
         uses: actions/upload-artifact@v4
         with:
-          name: oaks-lab-wheel-ubuntu22-py${{ matrix.python-version }}
+          name: oak-lab-wheel-ubuntu22-py${{ matrix.python-version }}
           path: dist/repaired/*.whl
           if-no-files-found: error

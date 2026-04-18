@@ -237,16 +237,10 @@ class Options:
     def fill_network_table(path):
         net_files = oak.util.find_data_files(path, ext=".battle.net")
         for file in net_files:
-            # TODO remove
-            step = int(file.split("/")[-1].split(".")[0])
-            if (step % 500) or (step == 0):
-                continue
-
             network = oak.torch.BattleNetwork()
             with open(file, "rb") as f:
                 network.read_parameters(f)
             Options.network_table[network.hash()] = file
-        # Options.network_table[0] = "mc"
 
     @staticmethod
     def read(path):
@@ -332,6 +326,11 @@ def select():
         key=lambda kv: (kv[1][0]) + (args.c * math.sqrt(N) / (kv[1][1] + 1)),
         reverse=True,
     )
+    elo_sorted = sorted(
+        ProgramData.elo.table.items(),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
     if len(ucb_sorted) < 2:
         raise RuntimeError("Need at least 2 IDs")
 
@@ -394,7 +393,9 @@ def setup():
             ProgramData.ucb.table[agent] = [0, 0]
     else:
         print("Reading files")
-        Options.read(os.path.join(args.dir, "directory"))
+        # TODO
+        # Options.read(os.path.join(args.dir, "directory"))
+        Options.fill_network_table(args.network_dir)
         ProgramData.read(args.dir)
 
 
@@ -509,8 +510,15 @@ def print_ids():
     print("")
 
 
+def reset_visits():
+    for kv in ProgramData.ucb.table.items():
+        ProgramData.ucb.table[kv[0]] = [0, 0]
+
+
 def main():
     setup()
+
+    reset_visits() # TODO remove
 
     try:
         while True:
@@ -530,6 +538,7 @@ def main():
                 break
 
             refresh_agent_pool()
+            reset_visits()
 
     except KeyboardInterrupt:
         print("Wait for save. Or Interupt again to skip.")
