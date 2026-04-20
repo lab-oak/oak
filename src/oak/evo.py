@@ -26,8 +26,8 @@ parser.add_argument("--saves-per-refresh", default=1, type=int)
 parser.add_argument("--teams", default="", type=str)
 parser.add_argument("--exp3-gamma-min", default=0.001, type=float)
 parser.add_argument("--exp3-gamma-max", default=5.0, type=float)
-parser.add_argument("--exp3-alpha-min", default=0.001, type=float)
-parser.add_argument("--exp3-alpha-max", default=0.5, type=float)
+parser.add_argument("--exp3-alpha-min", default=0.0001, type=float)
+parser.add_argument("--exp3-alpha-max", default=1.0, type=float)
 parser.add_argument("--ucb-c-min", default=0.001, type=float)
 parser.add_argument("--ucb-c-max", default=5.0, type=float)
 parser.add_argument("--start", default=0, type=int)
@@ -87,35 +87,36 @@ def perturb_id(before: ID, choice: int) -> ID:
     PRECISION = 5
 
     if choice == 0:
-        bandit_type = after.bandit.split("-")[0]
+        bandit_split = after.bandit.split("-")
+        bandit_type = bandit_split[0]
         if bandit_type in ("exp3", "pexp3"):
             if random.randint(0, 1):
-                param = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
+                alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
                 after.bandit = (
-                    bandit_type + "-" + bandit_type[1] + str(param)[:PRECISION]
+                    f"{bandit_type}-{bandit_split[1]}-{str(alpha)[:PRECISION]}"
                 )
             else:
-                param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+                gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
                 after.bandit = (
-                    bandit_type + "-" + str(param)[:PRECISION] + bandit_type[2]
+                    f"{bandit_type}-{str(alpha)[:PRECISION]}-{bandit_split[2]}"
                 )
         else:
-            param = random.uniform(args.ucb_c_min, args.ucb_c_max)
-            after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+            c = random.uniform(args.ucb_c_min, args.ucb_c_max)
+            after.bandit = f"{bandit_type}-{str(c)[:PRECISION]}"
 
     elif choice == 1:
         # New bandit type AND re-sample params
         base_bandits = ["exp3", "pexp3", "ucb", "pucb", "ucb1"]
         bandit_type = random.choice(base_bandits)
         if bandit_type in ("exp3", "pexp3"):
-            param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+            gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
             alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
             after.bandit = (
-                bandit_type + "-" + str(param)[:PRECISION] + str(alpha)[:PRECISION]
+                f"{bandit_type}-{str(gamma)[:PRECISION]}-{str(alpha)[:PRECISION]}"
             )
         else:
-            param = random.uniform(args.ucb_c_min, args.ucb_c_max)
-            after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+            c = random.uniform(args.ucb_c_min, args.ucb_c_max)
+            after.bandit = f"{bandit_type}-{str(c)[:PRECISION]}"
 
     elif choice == 2:
         net_hash, _ = random.choice(list(Options.network_table.items()))
@@ -302,26 +303,26 @@ in_flight: Dict[int, tuple] = {}
 
 
 def new_agent():
+    PRECISION = 5
     net_hash, network_path = random.choice(list(Options.network_table.items()))
 
     base_bandits = ["exp3", "ucb"]
     base_bandits.append("pexp3")
     base_bandits.append("pucb")
     bandit = random.choice(base_bandits)
-
-    param = None
     if bandit.startswith("pexp3") or bandit.startswith("exp3"):
-        param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+        gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+        alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
+        bandit = bandit + "-" + str(gamma)[:PRECISION] + "-" + str(alpha)[:PRECISION]
     elif (
         bandit.startswith("pucb")
         or bandit.startswith("ucb")
         or bandit.startswith("ucb1")
     ):
-        param = random.uniform(args.ucb_c_min, args.ucb_c_max)
+        c = random.uniform(args.ucb_c_min, args.ucb_c_max)
+        bandit = bandit + "-" + str(c)[:PRECISION]
     else:
         assert False, "bad bandit name"
-    PRECISION = 5
-    bandit = bandit + "-" + str(param)[:PRECISION]
 
     selection_modes = ["n", "e", "x"]
     selection_mode = random.choice(selection_modes)
@@ -360,9 +361,6 @@ def select():
 
 def update(lesserID, greaterID, wdl):
     total = wdl.win + wdl.draw + wdl.loss
-    if not total:
-        lesserID.print()
-        greaterID.print()
     score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / total
 
     # Results
@@ -450,6 +448,11 @@ def run_vs() -> [ID, ID, WDL]:
     last_line = result.stdout.strip().splitlines()[-1]
     data = list(map(int, last_line.split()))
     wdl = WDL(*data)
+    # if not (wdl.win or wdl.draw or wdl.loss):
+    #     print("BAD")
+    #     print(cmd)
+    #     print(result.stdout)
+    #     print(result.stderr)
     return lesserID, greaterID, wdl
 
 
