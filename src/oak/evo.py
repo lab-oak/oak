@@ -82,28 +82,40 @@ class ID:
         print(self.net_hash, self.bandit, self.policy_mode, self.ms, self.discrete)
 
 
-def permute_id(before: ID, choice : int) -> ID:
+def perturb_id(before: ID, choice: int) -> ID:
     after = copy.deepcopy(before)
+    PRECISION = 5
 
     if choice == 0:
         bandit_type = after.bandit.split("-")[0]
         if bandit_type in ("exp3", "pexp3"):
-            param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+            if random.randint(0, 1):
+                param = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
+                after.bandit = (
+                    bandit_type + "-" + bandit_type[1] + str(param)[:PRECISION]
+                )
+            else:
+                param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+                after.bandit = (
+                    bandit_type + "-" + str(param)[:PRECISION] + bandit_type[2]
+                )
         else:
             param = random.uniform(args.ucb_c_min, args.ucb_c_max)
-        PRECISION = 5
-        after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+            after.bandit = bandit_type + "-" + str(param)[:PRECISION]
 
     elif choice == 1:
         # New bandit type AND re-sample params
-        base_bandits = ["exp3", "pexp3", "ucb", "pucb"]
+        base_bandits = ["exp3", "pexp3", "ucb", "pucb", "ucb1"]
         bandit_type = random.choice(base_bandits)
         if bandit_type in ("exp3", "pexp3"):
             param = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+            alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
+            after.bandit = (
+                bandit_type + "-" + str(param)[:PRECISION] + str(alpha)[:PRECISION]
+            )
         else:
             param = random.uniform(args.ucb_c_min, args.ucb_c_max)
-        PRECISION = 5
-        after.bandit = bandit_type + "-" + str(param)[:PRECISION]
+            after.bandit = bandit_type + "-" + str(param)[:PRECISION]
 
     elif choice == 2:
         net_hash, _ = random.choice(list(Options.network_table.items()))
@@ -113,9 +125,9 @@ def permute_id(before: ID, choice : int) -> ID:
         modes = ["x", "n", "e"]
         modes.remove(after.policy_mode)
         after.policy_mode = random.choice(modes)
+
     elif choice == 4:
-        # 50/50 flip discrete
-        after.discrete = random.choice([True, False])
+        after.discrete = not after.discrete
     else:
         assert False, "what"
 
@@ -347,9 +359,11 @@ def select():
 
 
 def update(lesserID, greaterID, wdl):
-    score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / (
-        wdl.win + wdl.draw + wdl.loss
-    )
+    total = wdl.win + wdl.draw + wdl.loss
+    if not total:
+        lesserID.print()
+        greaterID.print()
+    score = (1.0 * wdl.win + 0.5 * wdl.draw + 0.0 * wdl.loss) / total
 
     # Results
     data = ProgramData.results.table.get((lesserID, greaterID), [0, 0, 0])
@@ -485,11 +499,12 @@ def refresh_agent_pool():
         del ProgramData.elo.table[id_]
 
     while len(ProgramData.ucb.table) < args.min_agents:
+        i = args.min_agents - len(ProgramData.ucb.table) - 1
         parent = top_agents[i]
         child = copy.deepcopy(parent)
         choice = random.randint(0, 4)
         while child in ProgramData.ucb.table:
-            child = permute_id(parent, choice)
+            child = perturb_id(parent, choice)
         ProgramData.ucb.table[child] = [0, 0]
         ProgramData.elo.table[child] = Elo.default_rating
 
@@ -518,7 +533,7 @@ def reset_visits():
 def main():
     setup()
 
-    reset_visits() # TODO remove
+    reset_visits()  # TODO remove
 
     try:
         while True:
