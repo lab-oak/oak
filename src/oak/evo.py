@@ -9,6 +9,8 @@ import subprocess
 import math
 import threading
 import copy
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
+import asyncio
 
 import oak
 import oak.torch
@@ -98,7 +100,7 @@ def perturb_id(before: ID, choice: int) -> ID:
             else:
                 gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
                 after.bandit = (
-                    f"{bandit_type}-{str(alpha)[:PRECISION]}-{bandit_split[2]}"
+                    f"{bandit_type}-{str(gamma)[:PRECISION]}-{bandit_split[2]}"
                 )
         else:
             c = random.uniform(args.ucb_c_min, args.ucb_c_max)
@@ -381,11 +383,11 @@ def update(lesserID, greaterID, wdl):
     # UCB
     for i, id_ in enumerate([lesserID, greaterID]):
         v, virtual_n = ProgramData.ucb.table[id_]
-        n = virtual_n - 1
+        n = max(0, virtual_n - 1)
         total_v = v * n
         update = score if i == 0 else (1 - score)
         v_ = (total_v + update) / (n + 1)
-        ProgramData.ucb.table[id_] = [v_, virtual_n]
+        ProgramData.ucb.table[id_] = [v_, max(1, virtual_n)]
 
 
 def setup():
@@ -448,11 +450,11 @@ def run_vs() -> [ID, ID, WDL]:
     last_line = result.stdout.strip().splitlines()[-1]
     data = list(map(int, last_line.split()))
     wdl = WDL(*data)
-    # if not (wdl.win or wdl.draw or wdl.loss):
-    #     print("BAD")
-    #     print(cmd)
-    #     print(result.stdout)
-    #     print(result.stderr)
+    if not (wdl.win or wdl.draw or wdl.loss):
+        print("BAD")
+        print(cmd)
+        print(result.stdout)
+        print(result.stderr)
     return lesserID, greaterID, wdl
 
 
@@ -470,22 +472,49 @@ def undo_in_flight():
         in_flight.clear()
 
 
-def run_batch(pool, n):
-    futures = {}
-    for _ in range(n):
-        if shutdown.is_set():
-            break
-        f = pool.submit(run_vs)
-        futures[f] = True
+def run_forever():
+    games_since_save = 0
+    saves_since_refresh = 0
+    lock = threading.Lock()
 
-    for fut in as_completed(futures):
-        result = fut.result()
-        if result is None:
-            continue
-        lesserID, greaterID, wdl = result
-        update(lesserID, greaterID, wdl)
+    with ThreadPoolExecutor(max_workers=args.threads) as pool:
+        futures = {pool.submit(run_vs) for _ in range(args.threads)}
 
-    return not shutdown.is_set()
+        while not shutdown.is_set():
+            done, _ = wait(futures, return_when=FIRST_COMPLETED)
+
+            # print(f"futures in flight: {len(futures)}, done batch size: {len(done)}")
+
+            for fut in done:
+                futures.discard(fut)
+                # immediately resubmit before processing
+                if not shutdown.is_set():
+                    futures.add(pool.submit(run_vs))
+
+                result = fut.result()
+                if result is None:
+                    continue
+
+                lesserID, greaterID, wdl = result
+                if (
+                    lesserID not in ProgramData.ucb.table
+                    or greaterID not in ProgramData.ucb.table
+                ):
+                    continue
+
+                update(lesserID, greaterID, wdl)
+                games_since_save += 1
+
+                if games_since_save >= args.games_per_save:
+                    games_since_save = 0
+                    saves_since_refresh += 1
+                    print_ids()
+                    ProgramData.write(args.dir)
+
+                    if saves_since_refresh >= args.saves_per_refresh:
+                        saves_since_refresh = 0
+                        refresh_agent_pool()
+                        reset_visits()
 
 
 def refresh_agent_pool():
@@ -505,8 +534,8 @@ def refresh_agent_pool():
         i = args.min_agents - len(ProgramData.ucb.table) - 1
         parent = top_agents[i]
         child = copy.deepcopy(parent)
-        choice = random.randint(0, 4)
         while child in ProgramData.ucb.table:
+            choice = random.randint(0, 4)
             child = perturb_id(parent, choice)
         ProgramData.ucb.table[child] = [0, 0]
         ProgramData.elo.table[child] = Elo.default_rating
@@ -533,38 +562,22 @@ def reset_visits():
         ProgramData.ucb.table[kv[0]] = [0, 0]
 
 
-def main():
-    setup()
-
-    reset_visits()  # TODO remove
-
+async def _main():
     try:
-        while True:
-            for _ in range(args.saves_per_refresh):
-                print("Run batch")
-                with ThreadPoolExecutor(max_workers=args.threads) as pool:
-                    completed = run_batch(pool, args.games_per_save)
-
-                print_ids()
-
-                if shutdown.is_set():
-                    break
-
-                ProgramData.write(args.dir)
-
-            if shutdown.is_set():
-                break
-
-            refresh_agent_pool()
-            reset_visits()
-
+        await run_forever()
     except KeyboardInterrupt:
-        print("Wait for save. Or Interupt again to skip.")
+        print("Wait for save. Or interrupt again to skip.")
         shutdown.set()
 
     undo_in_flight()
     ProgramData.write(args.dir)
     print("Saved.")
+
+
+def main():
+    setup()
+    reset_visits()
+    asyncio.run(_main())
 
 
 if __name__ == "__main__":
