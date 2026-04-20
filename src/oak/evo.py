@@ -82,10 +82,8 @@ class ID:
         print(self.net_hash, self.bandit, self.policy_mode, self.ms, self.discrete)
 
 
-def permute_id(before: ID) -> ID:
+def permute_id(before: ID, choice : int) -> ID:
     after = copy.deepcopy(before)
-
-    choice = random.randint(0, 4)
 
     if choice == 0:
         bandit_type = after.bandit.split("-")[0]
@@ -236,6 +234,7 @@ class Options:
     @staticmethod
     def fill_network_table(path):
         net_files = oak.util.find_data_files(path, ext=".battle.net")
+        Options.network_table[0] = "fp"
         for file in net_files:
             network = oak.torch.BattleNetwork()
             with open(file, "rb") as f:
@@ -488,8 +487,9 @@ def refresh_agent_pool():
     while len(ProgramData.ucb.table) < args.min_agents:
         parent = top_agents[i]
         child = copy.deepcopy(parent)
+        choice = random.randint(0, 4)
         while child in ProgramData.ucb.table:
-            child = permute_id(parent)
+            child = permute_id(parent, choice)
         ProgramData.ucb.table[child] = [0, 0]
         ProgramData.elo.table[child] = Elo.default_rating
 
