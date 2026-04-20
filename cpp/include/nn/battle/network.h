@@ -192,29 +192,34 @@ auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
 
 template <int In, int Hidden, int ValueHidden, int PolicyHidden>
 auto visit_network_4(const auto &F, std::unique_ptr<NetworkBase> network) {
-  using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
-  if (!network) {
-    network = std::make_unique<Net>();
-  }
-  if (auto *net = dynamic_cast<Net *>(network.get())) {
-    F(*net);
+  if constexpr (Hidden < ValueHidden) {
+    return Impl::invalid("Value hidden cannot be larger than hidden.");
+  } else if constexpr (Hidden < PolicyHidden) {
+    return Impl::invalid("Policy hidden cannot be larger than hidden.");
   } else {
-    throw std::runtime_error{"Invalid discrete cast."};
+    using Net = QNetwork<In, Hidden, ValueHidden, PolicyHidden>;
+    if (!network) {
+      network = std::make_unique<Net>();
+    }
+    if (auto *net = dynamic_cast<Net *>(network.get())) {
+      F(*net);
+    } else {
+      throw std::runtime_error{"Invalid discrete cast."};
+    }
+    return network;
   }
-  return network;
 }
 
 template <int In, int Hidden, int ValueHidden>
 auto visit_network_3(int policy_hidden, const auto &F,
                      std::unique_ptr<NetworkBase> network) {
-  if (Hidden < policy_hidden) {
-    return Impl::invalid("Policy hidden cannot be larger than hidden.");
-  }
   switch (policy_hidden) {
   case 32:
     return visit_network_4<In, Hidden, ValueHidden, 32>(F, std::move(network));
   case 64:
     return visit_network_4<In, Hidden, ValueHidden, 64>(F, std::move(network));
+  case 128:
+    return visit_network_4<In, Hidden, ValueHidden, 128>(F, std::move(network));
   default:
     return Impl::invalid("Policy hidden: " + std::to_string(policy_hidden));
   }
@@ -223,9 +228,6 @@ auto visit_network_3(int policy_hidden, const auto &F,
 template <int In, int Hidden>
 auto visit_network_2(int value_hidden, int policy_hidden, const auto &F,
                      std::unique_ptr<NetworkBase> network) {
-  if (Hidden < value_hidden) {
-    return Impl::invalid("Value hidden cannot be larger than hidden.");
-  }
   switch (value_hidden) {
   case 32:
     return visit_network_3<In, Hidden, 32>(policy_hidden, F,
@@ -233,6 +235,9 @@ auto visit_network_2(int value_hidden, int policy_hidden, const auto &F,
   case 64:
     return visit_network_3<In, Hidden, 64>(policy_hidden, F,
                                            std::move(network));
+  case 128:
+    return visit_network_3<In, Hidden, 128>(policy_hidden, F,
+                                            std::move(network));
   default:
     return Impl::invalid("Value hidden: " + std::to_string(value_hidden));
   }
@@ -248,6 +253,9 @@ auto visit_network_1(int hidden, int value_hidden, int policy_hidden,
   case 64:
     return visit_network_2<In, 64>(value_hidden, policy_hidden, F,
                                    std::move(network));
+  case 128:
+    return visit_network_2<In, 128>(value_hidden, policy_hidden, F,
+                                    std::move(network));
   default:
     return Impl::invalid("Hidden: " + std::to_string(hidden));
   }
