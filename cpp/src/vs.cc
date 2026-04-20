@@ -218,113 +218,105 @@ void thread_fn(const ProgramArgs *args_ptr) {
 
     bool early_stop = false;
     size_t updates = 0;
-    try {
-      // playout game
-      while (!pkmn_result_type(input.result)) {
 
-        RuntimeData::battle_lengths[id] = updates;
+    // playout game
+    while (!pkmn_result_type(input.result)) {
 
-        while (RuntimeData::suspended) {
-          std::this_thread::sleep_for(std::chrono::seconds(1));
+      RuntimeData::battle_lengths[id] = updates;
+
+      while (RuntimeData::suspended) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+
+      if (RuntimeData::terminated) {
+        using Ignored = int;
+        return Ignored{};
+      }
+
+      const auto [p1_choices, p2_choices] =
+          PKMN::choices(input.battle, input.result);
+
+      const auto print_search_outputs = (device.uniform() < args.print_prob);
+      const auto [p1_labels, p2_labels] = [&input, print_search_outputs]() {
+        if (print_search_outputs) {
+          return PKMN::choice_labels(input.battle, input.result);
         }
+        return std::pair<std::vector<std::string>, std::vector<std::string>>{};
+      }();
 
-        if (RuntimeData::terminated) {
-          using Ignored = int;
-          return Ignored{};
+      MCTS::Output p1_output{}, p2_output{};
+      int p1_index{}, p2_index{};
+      p1_early_stop = 0;
+      p2_early_stop = 0;
+      if (p1_choices.size() > 1) {
+        RuntimeSearch::Heap heap{};
+        p1_output = RuntimeSearch::run(device, input, heap, p1_agent);
+        p1_output =
+            RuntimeSearch::run(device, input, heap, p1_agent_after, p1_output);
+        p1_early_stop =
+            inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
+        p1_index = process_and_sample(device, p1_output.p1, p1_policy_options);
+        if (print_search_outputs) {
+          print("P1:");
+          std::cout << MCTS::output_string(p1_output, input.battle, p1_labels,
+                                           p2_labels);
         }
+      }
 
-        const auto [p1_choices, p2_choices] =
-            PKMN::choices(input.battle, input.result);
-
-        const auto print_search_outputs = (device.uniform() < args.print_prob);
-        const auto [p1_labels, p2_labels] = [&input, print_search_outputs]() {
-          if (print_search_outputs) {
-            return PKMN::choice_labels(input.battle, input.result);
-          }
-          return std::pair<std::vector<std::string>,
-                           std::vector<std::string>>{};
-        }();
-
-        MCTS::Output p1_output{}, p2_output{};
-        int p1_index{}, p2_index{};
-        p1_early_stop = 0;
-        p2_early_stop = 0;
-        if (p1_choices.size() > 1) {
+      if (p2_choices.size() > 1) {
+        if (same_search && p1_choices.size() > 1) {
+          p2_output = p1_output;
+        } else {
           RuntimeSearch::Heap heap{};
-          p1_output = RuntimeSearch::run(device, input, heap, p1_agent);
-          p1_output = RuntimeSearch::run(device, input, heap, p1_agent_after,
-                                         p1_output);
-          p1_early_stop =
-              inverse_sigmoid(p1_output.empirical_value) / args.early_stop;
-          p1_index =
-              process_and_sample(device, p1_output.p1, p1_policy_options);
+          p2_output = RuntimeSearch::run(device, input, heap, p2_agent);
+          p2_output = RuntimeSearch::run(device, input, heap, p2_agent_after,
+                                         p2_output);
           if (print_search_outputs) {
-            print("P1:");
-            std::cout << MCTS::output_string(p1_output, input.battle, p1_labels,
+            print("P2:");
+            std::cout << MCTS::output_string(p2_output, input.battle, p1_labels,
                                              p2_labels);
           }
         }
-
-        if (p2_choices.size() > 1) {
-          if (same_search && p1_choices.size() > 1) {
-            p2_output = p1_output;
-          } else {
-            RuntimeSearch::Heap heap{};
-            p2_output = RuntimeSearch::run(device, input, heap, p2_agent);
-            p2_output = RuntimeSearch::run(device, input, heap, p2_agent_after,
-                                           p2_output);
-            if (print_search_outputs) {
-              print("P2:");
-              std::cout << MCTS::output_string(p2_output, input.battle,
-                                               p1_labels, p2_labels);
-            }
-          }
-          p2_early_stop =
-              inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
-          p2_index =
-              process_and_sample(device, p2_output.p2, p2_policy_options);
-        }
-
-        RuntimeData::battle_outputs[id] = {p1_output, p2_output};
-
-        if (updates == 0) {
-          p1_build_traj.value = p1_output.empirical_value;
-          p2_build_traj.value = 1 - p2_output.empirical_value;
-        }
-
-        // only if they have same sign and are both non zero
-        if ((p1_early_stop * p2_early_stop) > 0) {
-          early_stop = true;
-          break;
-        }
-
-        const auto p1_choice = p1_choices[p1_index];
-        const auto p2_choice = p2_choices[p2_index];
-
-        p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
-        p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
-
-        if (print_search_outputs) {
-          print("GAME: " + std::to_string(RuntimeData::n.load()), false);
-          print(" UPDATE: " + std::to_string(updates));
-          print(PKMN::battle_data_to_string(input.battle, input.durations));
-        }
-        input.result =
-            PKMN::update(input.battle, p1_choice, p2_choice, options);
-        input.durations = PKMN::durations(options);
-        ++updates;
+        p2_early_stop =
+            inverse_sigmoid(p2_output.empirical_value) / args.early_stop;
+        p2_index = process_and_sample(device, p2_output.p2, p2_policy_options);
       }
 
-      if (early_stop) {
-        if (p1_early_stop > 0) {
-          input.result = PKMN::result(PKMN::Result::Win);
-        } else {
-          input.result = PKMN::result(PKMN::Result::Lose);
-        }
+      RuntimeData::battle_outputs[id] = {p1_output, p2_output};
+
+      if (updates == 0) {
+        p1_build_traj.value = p1_output.empirical_value;
+        p2_build_traj.value = 1 - p2_output.empirical_value;
       }
 
-    } catch (const std::exception &e) {
-      std::cerr << e.what() << std::endl;
+      // only if they have same sign and are both non zero
+      if ((p1_early_stop * p2_early_stop) > 0) {
+        early_stop = true;
+        break;
+      }
+
+      const auto p1_choice = p1_choices[p1_index];
+      const auto p2_choice = p2_choices[p2_index];
+
+      p1_battle_frames.updates.emplace_back(p1_output, p1_choice, p2_choice);
+      p2_battle_frames.updates.emplace_back(p2_output, p1_choice, p2_choice);
+
+      if (print_search_outputs) {
+        print("GAME: " + std::to_string(RuntimeData::n.load()), false);
+        print(" UPDATE: " + std::to_string(updates));
+        print(PKMN::battle_data_to_string(input.battle, input.durations));
+      }
+      input.result = PKMN::update(input.battle, p1_choice, p2_choice, options);
+      input.durations = PKMN::durations(options);
+      ++updates;
+    }
+
+    if (early_stop) {
+      if (p1_early_stop > 0) {
+        input.result = PKMN::result(PKMN::Result::Win);
+      } else {
+        input.result = PKMN::result(PKMN::Result::Lose);
+      }
     }
 
     p1_battle_frames.result = input.result;
