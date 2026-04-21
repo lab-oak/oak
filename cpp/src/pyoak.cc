@@ -633,7 +633,6 @@ PYBIND11_MODULE(pyoak, m) {
     m.attr("policy_dim_labels") = v;
   }
 
-  // TODO make Target a class to reduce boilerplate
   py::class_<Py::Battle::Frames>(m, "BattleFrames")
       .def(py::init<size_t>())
       .def_static("from_bytes", &Py::Battle::Frames::from_bytes)

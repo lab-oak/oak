@@ -9,8 +9,8 @@ import subprocess
 import math
 import threading
 import copy
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 
 import oak
 import oak.torch
@@ -37,6 +37,8 @@ parser.add_argument("--start", default=0, type=int)
 parser.add_argument("--c", default=1.414, type=float)
 parser.add_argument("--K", default=8, type=float)
 
+
+# TODO unused
 parser.add_argument("--no-exp3", action="store_true")
 parser.add_argument("--no-pexp3", action="store_true")
 parser.add_argument("--no-ucb", action="store_true")
@@ -450,11 +452,6 @@ def run_vs() -> [ID, ID, WDL]:
     last_line = result.stdout.strip().splitlines()[-1]
     data = list(map(int, last_line.split()))
     wdl = WDL(*data)
-    if not (wdl.win or wdl.draw or wdl.loss):
-        print("BAD")
-        print(cmd)
-        print(result.stdout)
-        print(result.stderr)
     return lesserID, greaterID, wdl
 
 

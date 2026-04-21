@@ -205,7 +205,6 @@ constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *t) {
   t = Types::write(pokemon.types, t);
 }
 
-// TODO is this a valid reference???
 constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *&t,
                      uint16_t *&index, uint16_t offset = 0) {
   Stats::write(pokemon.stats, t, index, offset);
