@@ -321,16 +321,22 @@ def main():
 
     assert args.main
 
-    if args.main == "test-consistency":
-        test_consistency()
-    elif args.main == "battle-frame-stats":
-        battle_frame_stats()
-    elif args.main == "build-trajectory-stats":
-        build_trajectory_stats()
-    elif args.main == "create-team":
-        create_team()
-    else:
-        assert False, "Bad positional arg"
+    program_data = [
+        ("test_consistency", test_consistency),
+        ("battle_frame_stats", battle_frame_stats),
+        ("create_team", create_team),
+    ]
+
+    args.main = args.main.replace("-", "_")
+
+    for key, func in program_data:
+        if args.main == key:
+            func()
+            exit()
+
+    print(
+        f"Bad 'main' value, expected one of: {", ".join([key for key, func in program_data])}"
+    )
 
 
 if __name__ == "__main__":
