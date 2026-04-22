@@ -1,16 +1,29 @@
-# Optional first argument: directory to prepend to PATH
+# Optional zig PATH prepend
 if [ -n "$1" ]; then
     export PATH="$1:$PATH"
     echo "Prepended $1 to PATH"
 fi
-rm -rf cpp/libpkmn;
-cd cpp/extern/engine;
-zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/Debug/client;
-ls ../../libpkmn/Debug/client;
-zig build -Dshowdown -Dpic -Doptimize=Debug -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/Debug/chance;
-ls ../../libpkmn/Debug/chance;
-zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dlog -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/ReleaseFast/client;
-ls ../../libpkmn/ReleaseFast/client;
-zig build -Dshowdown -Dpic -Doptimize=ReleaseFast -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-lib-dir ../../../libpkmn/ReleaseFast/chance;
-ls ../../libpkmn/ReleaseFast/chance;
+
+set -e
+
+BASE_FLAGS="-Dshowdown -Dpic -Doption=ebc=false -Doption=miss=false -Doption=advance=false -Doption=key=true -Dchance -Dcalc --prefix-include-dir ../../../include"
+
+cd cpp/extern/engine
+
+for opt in Debug ReleaseFast; do
+  for mode in client chance; do
+    OUT="../../../libpkmn/$opt/$mode"
+
+    EXTRA=""
+    if [ "$mode" = "client" ]; then
+      EXTRA="-Dlog"
+    fi
+
+    zig build $BASE_FLAGS $EXTRA -Doptimize=$opt \
+      --prefix-lib-dir "$OUT"
+
+    ls "../../libpkmn/$opt/$mode"
+  done
+done
+
 cd ../../..
