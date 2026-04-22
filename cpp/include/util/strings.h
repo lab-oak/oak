@@ -153,7 +153,7 @@ std::string output_string(const MCTS::Output &output,
 
   const auto [p1_labels, p2_labels] =
       PKMN::choice_labels(input.battle, input.result);
-  return output_string(output, input.battle, p1_labels, p2_labels)
+  return output_string(output, input.battle, p1_labels, p2_labels);
 }
 
 } // namespace MCTS
