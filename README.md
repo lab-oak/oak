@@ -9,7 +9,7 @@ Oak is a Python package for perfect-info search in Pokemon RBY OU with two facet
 # Installation
 
 ```bash
-pip install lab-oak
+pip install oak-lab
 ```
 
 Detailed instructions and caveats are first in the [tutorial](TUTORIAL.md).
