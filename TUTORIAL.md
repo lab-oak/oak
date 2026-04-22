@@ -1,99 +1,158 @@
 # Installation and Activation
 
-This tutorial will assume that the user has installed the package in a virtual enviroment.
+Oak is available on the python package index under [oak-lab](https://pypi.org/project/oak-lab/).
 
-When the venv is active, several python scripts will be visible to terminal
+It is recommended that you install Oak in a virtual environment:
+
+```
+$ python3 -m venv .venv
+$ source .venv/bin/activate
+(.venv) $ pip install oak-lab
+```
+
+If the installation fails, it is likely that you are using either an unsupported Python version/OS/CPU architecture. Currently, **Oak is only available for Python versions 3.10 - 3.14 on the Linux operating system with x86-64 architecture.** Windows users can use [WSL](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux).
+
+The installation can quickly be checked with the `benchmark` program, which will run ~1M iterations of pure MCTS on turn 1 of a 6v6 game
 
 ```bash
-user@laptop:~$ battle
-Command 'battle' not found, did you mean:
-  command 'bottle' from snap bottle (0.0.4)
-See 'snap info <snapname>' for additional versions.
-user@laptop:~$ source .venv/bin/activate
-(.venv) user@laptop:~$ battle
-usage: battle [-h] [--network-path NETWORK_PATH] [--dir DIR] [--data-dir DATA_DIR] [--in-place]
-              [--steps STEPS] [--device DEVICE] [--threads THREADS] --batch-size BATCH_SIZE --lr LR
-              [--lr-decay LR_DECAY] [--lr-decay-start LR_DECAY_START]
-              [--lr-decay-interval LR_DECAY_INTERVAL] [--data-window DATA_WINDOW] [--min-files MIN_FILES]
-              [--sleep SLEEP] [--checkpoint CHECKPOINT] [--delete-window DELETE_WINDOW] [--seed SEED]
-              [--max-battle-length MAX_BATTLE_LENGTH] [--min-iterations MIN_ITERATIONS]
-              [--clamp-parameters] [--value-nash-weight VALUE_NASH_WEIGHT]
-              [--value-empirical-weight VALUE_EMPIRICAL_WEIGHT] [--value-score-weight VALUE_SCORE_WEIGHT]
-              [--p-nash-weight P_NASH_WEIGHT] [--no-value-loss] [--no-policy-loss]
-              [--policy-loss-weight POLICY_LOSS_WEIGHT] [--no-apply-symmetries]
-              [--pokemon-hidden-dim POKEMON_HIDDEN_DIM] [--active-hidden-dim ACTIVE_HIDDEN_DIM]
-              [--pokemon-out-dim POKEMON_OUT_DIM] [--active-out-dim ACTIVE_OUT_DIM]
-              [--hidden-dim HIDDEN_DIM] [--value-hidden-dim VALUE_HIDDEN_DIM]
-              [--policy-hidden-dim POLICY_HIDDEN_DIM] [--print-window PRINT_WINDOW]
-battle: error: the following arguments are required: --batch-size, --lr
-(.venv) user@laptop:~$ 
+(.venv) $ benchmark
+12811ms.
+1048576 iterations.
 ```
 
-The package is available on PyPI here and can be installed with
+While a Oak-installed virtual environment is active, the following binaries will be available from command line:
+
+* `benchmark`
+* `oak-search-test`
+* `generate`
+* `chall`
+* `vs`
+
+ and the following Python scripts:
+
+* `lab`
+* `battle`
+* `build`
+* `evo`
+
+The usage of all these programs will be covered in this tutorial.
+
+Oak is also a traditional Python library:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install lab-oak
-```
+(.venv) $ python
+Python 3.13.3 (main, Jan  8 2026, 12:03:54) [GCC 14.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import oak
+>>> input = oak.parse_battle("snorlax bodyslam rest | starmie psychic thunderwave recover")
+>>> agent = oak.Agent()
+>>> agent.budget = "8s"
+>>> agent.bandit = "ucb-1.0"
+>>> heap = oak.Heap()
+>>> output = oak.search(input, heap, agent)
+>>> print(oak.format(input, output))
+Iterations: 847615, Time: 8000.02 sec
+Value: 0.448
 
-Alternatively, the wheel can also be downloaded from the Github releases.
+P1
+BodySlam  Rest      
+0.989     0.011     
+1.000     0.000     
+P2
+Psychic   ThunderWave  Recover   
+0.028     0.970     0.001     
+0.000     1.000     0.000     
 
-```
-```
+Matrix:
+         Psychic  Thunder  Recover  
+BodySla  0.602    0.443    0.767    
+Rest     0.395    0.398    0.485    
 
+Visits:
+         Psychic  Thunder  Recover  
+BodySla  23811    813826   943      
+Rest     329      8673     33       
+```
 
 # Training a Battle Network
 
-One of the successes of this project is the ease and consistency with which a user can train a network that is stronger than FoulPlay's hand crafted eval. In this section, we will duplicate this result on a low-end consumer laptop.
+The example above was chosen to illustrate that Oak is capable of replacing the search used in IS-MCTS projects like [Foul Play](https://github.com/pmariglia/foul-play). But the evaluation used in the example is Monte Carlo, not a (much stronger) trained Oak battle network. Let's begin with data generation and network training.
 
 The general plan:
 
-* Fast self-play using `generate --eval=fp`
+* Fast self-play using `generate`
 
-* Train value and policy network using `battle`
+* Train value/policy network using `battle`
 
 * Compare strength (relative to FoulPlay and Monte-Carlo) using `vs`
 
-First let's use the benchmark tool to get an idea of how fast data generation is 
-
-```bash
-(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --budget=1024
-3936 ms.
-1024 iterations.
-(.venv) user@laptop:~$ benchmark --eval=fp --bandit=ucb-1.0 --budget=4096
-16779 ms.
-4096 iterations.
-(.venv) user@laptop:~$ python
-Python 3.13.3 (main, Jan  8 2026, 12:03:54) [GCC 14.2.0] on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>> fast = 2653 # microseconds for fast search
->>> slow = 6739 # full search and valid sample
->>> expected = (7/8) * fast + (1/8) * slow
->>> spus = 1 / expected # step per microsec
->>> s = spus * 10**6
->>> b = s / 80 # average battle length is 80, so battles per second
->>> x = 8 * b # times number of threads
->>> y = 10**6 / x # seconds to 1M battles
->>> z = y / 3600 # hours
->>> print(z)
-8.788194444444445
->>> 
-```
-
-The point of this calculation is to estimate how long it will take to generate 1M battles aka samples for the network' value output. I have succeeded with only a 250K for reference. This is likely around the lower bound for network superiority in test time regimes, and performance improves with more battles.
-
 ## Data generation
 
-Let's pick some arguments for the `generate` call  with experience in mind
+The `generate` program accepts many keyword arguments but only a few are required. Those that are reflect basic considerations that we will discuss now:
+
+* `--eval`
+
+This is value estimator that the search will use in self-play games. To start with, we only have PokeEngine evaluation ("fp") and Monte-Carlo ("mc", default).
+
+Despite being a simple hand crafted score function, "fp" is much stronger and faster than Monte-Carlo.
+
+```
+(.venv) $ vs --budget=4096 --bandit=ucb-1.0 --policy-mode=x --p1-eval=fp --p2-eval=mc
+...
+W D L:
+186 1 31
+```
+
+Above we've used the `vs` command with sensible arguments to compare the strength of these two evals, and we can see "fp" scored 186 wins to "mc"s 31.
+
+Therefore we will use the "fp" eval function our first self-play data generation run.
 
 * `--budget=4096`
 
-2^12 is a reasonable iteration count for a few reasons. AlphaZero used 1000 iterations, and the branching factor for a simultaneous move game is the product of the number of actions for either player. Its totally possible RBY has a higher average branching factor and that's not even considering RNG. Therefore we probably at least as many iterations as altenative move cofigs.
+2^12 is a reasonable iteration count for a few reasons. AlphaZero used 1000 ~ 2^10 iterations, and the branching factor for a simultaneous move game is the product of the number of actions for either player. Its totally possible RBY has a higher average branching factor after including RNG. Therefore we probably should use at least as many iterations as altenative move cofigs.
+
+```bash
+(.venv) $ benchmark --eval=fp --budget=4096
+3548µs.
+4096 iterations.
+```
+
+On my machine this gives us 3.5 milliseconds per step.
+
+* `--bandit=`
+
+There are 5 bandit algorithms available:
+
+* `ucb`
+* `pucb`
+* `ucb1`
+* `exp3`
+* `pexp3`
+
+Each of these has a float parameter that comes afterwards separated by a '-', e.g. `ucb-1.0`. For the 'ucb` variants this is the exploration weight "c" and for 'exp3' variants it is the update weight "gamma". The exp3 variants have a second optional parameter which is the weight of the uniform policy noise in the forecast.
+
+Currently all evidence points to ucb being the strongest variant, despiate exp3's [theoretical guarantees](TODO link paper?). It is probably also better suited towards low iteration searches.
+
+* `--policy-mode=x`
+
+The search will produce multiple strategies or policies for either player. These are:
+
+* `e` emprical
+* `x` argmax
+* `n` nash
+* `p` prior
+* `u` uniform
+
+All of these characters are valid arguments. Additionally, weighted combinations may be passed e.g. `x0.9e0.1`.
 
 * `--teams=teams`
 
-Unfortunately I can't share this 
+Any time teams are required Oak will default to the 17 or so Smogon sample teams. More teams is certainly beneficial however. The programs expect a simple plaintext format that can be explained hopefully with just an example (2 lines/teams):
+
+```
+jynx blizzard lovelykiss psychic rest; chansey counter icebeam softboiled thunderbolt; jolteon doublekick rest thunderbolt thunderwave; snorlax bodyslam icebeam reflect rest; starmie blizzard psychic recover thunderwave; tauros blizzard bodyslam earthquake hyperbeam
+gengar confuseray explosion hypnosis thunderbolt; chansey icebeam softboiled thunderbolt thunderwave; cloyster blizzard clamp explosion rest; exeggutor explosion psychic rest sleeppowder; golem earthquake explosion rest rockslide; slowbro amnesia rest surf thunderwave
+```
 
 * `--fast-search-prob=`
 
@@ -101,11 +160,6 @@ This is an innovation of Efficient MuZero. It reduces cost of data gen while bal
 
 * `--fast-budget=`
 
-* `--bandit=`
-
-At the time of this writing the strongest
-
-UCB is very aggresive which suits the low iteration count. This is also true for argmax move selection as well. It should be noted that Nash move selection is very sensitive to variance in any of the matrix entries - all move pairs must be decently explored for it to be competitive with argmax
 
 * `--threads=8`
 

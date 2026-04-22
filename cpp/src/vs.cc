@@ -95,6 +95,13 @@ std::vector<std::pair<MCTS::Output, MCTS::Output>> battle_outputs{};
 std::atomic<size_t> thread_id{};
 
 TeamBuilding::Provider provider;
+
+void print_wdl() {
+  std::cout << "W D L:\n";
+  std::cout << win.load() << ' ' << draw.load() << ' ' << loss.load()
+            << std::endl;
+}
+
 } // namespace RuntimeData
 
 void thread_fn(const ProgramArgs *args_ptr) {
@@ -421,8 +428,7 @@ void progress_thread_fn(const ProgramArgs *args_ptr) {
 
     std::cout << "score: " << average_score << " over " << RuntimeData::n.load()
               << " games; Elo diff: " << elo_difference << std::endl;
-    std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load()
-              << ' ' << RuntimeData::loss.load() << std::endl;
+    RuntimeData::print_wdl();
 
     std::cout << "info: " << std::endl;
     for (auto i = 0; i < args.threads; ++i) {
@@ -538,6 +544,5 @@ int main(int argc, char **argv) {
   std::cout << "score: "
             << (RuntimeData::score.load() / 2.0 / RuntimeData::n.load())
             << " over " << RuntimeData::n.load() << " games." << std::endl;
-  std::cout << RuntimeData::win.load() << ' ' << RuntimeData::draw.load() << ' '
-            << RuntimeData::loss.load() << std::endl;
+  RuntimeData::print_wdl();
 }

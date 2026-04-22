@@ -65,10 +65,10 @@ void print_side(const Output::Side &side) {
 auto output_string(const Output &output, const pkmn_gen1_battle &battle,
                    const auto &p1_labels, const auto &p2_labels) {
   constexpr auto label_width = 8;
-
   std::stringstream ss{};
 
-  auto print_arr = [&ss](const auto &arr, size_t k) {
+  auto print_arr = [&ss](const auto &prefix, const auto &arr, size_t k) {
+    ss << prefix;
     for (size_t i = 0; i < k; ++i) {
       ss << std::left << std::fixed << std::setw(label_width)
          << std::setprecision(3) << arr[i] << "  ";
@@ -84,22 +84,22 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
   };
 
   ss << "Iterations: " << output.iterations
-     << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
+     << ", Time: " << output.duration.count() / 1000.0 << " ms\n";
   ss << "Value: " << std::fixed << std::setprecision(3)
      << output.empirical_value << "\n";
-
-  ss << "\nP1" << std::endl;
-  print_arr(p1_labels, output.p1.k);
-  print_arr(output.p1.empirical, output.p1.k);
-  print_arr(output.p1.nash, output.p1.k);
-  print_arr(output.p1.beta, output.p1.k);
-  ss << "P2" << std::endl;
-  print_arr(p2_labels, output.p2.k);
-  print_arr(output.p2.empirical, output.p2.k);
-  print_arr(output.p2.nash, output.p2.k);
-  print_arr(output.p2.beta, output.p2.k);
-
-  ss << "\nMatrix:\n";
+  ss << '\n';
+  ss << "Player 1:" << '\n';
+  print_arr("   ", p1_labels, output.p1.k);
+  print_arr("e: ", output.p1.empirical, output.p1.k);
+  print_arr("n: ", output.p1.nash, output.p1.k);
+  print_arr("p: ", output.p1.prior, output.p1.k);
+  ss << "Player 2:" << '\n';
+  print_arr("   ", p2_labels, output.p2.k);
+  print_arr("e: ", output.p2.empirical, output.p2.k);
+  print_arr("n: ", output.p2.nash, output.p2.k);
+  print_arr("p: ", output.p2.prior, output.p2.k);
+  ss << '\n';
+  ss << "EV Matrix:\n";
   std::array<char, label_width + 1> col_offset{};
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   ss << fix_label(std::string{col_offset.data()}) << ' ';
@@ -122,7 +122,8 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
     ss << '\n';
   }
 
-  ss << "\nVisits:\n";
+  ss << "\nVisits:";
+  ss << '\n';
   std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
   ss << fix_label(std::string{col_offset.data()}) << ' ';
 
@@ -150,86 +151,9 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
 std::string output_string(const MCTS::Output &output,
                           const MCTS::Input &input) {
 
-  std::stringstream ss{};
-
-  constexpr auto label_width = 8;
-  const auto &battle = input.battle;
-  const auto [p1_labels, p2_labels] = PKMN::choice_labels(battle, input.result);
-
-  auto print_arr = [&ss](const auto &arr, size_t k) {
-    for (size_t i = 0; i < k; ++i) {
-      ss << std::left << std::fixed << std::setw(label_width)
-         << std::setprecision(3) << arr[i] << "  ";
-    }
-    ss << '\n';
-  };
-
-  const auto fix_label = [label_width](auto label) {
-    std::stringstream ss{};
-    ss << std::left << std::setw(label_width)
-       << label.substr(0, label_width - 1);
-    return ss.str();
-  };
-
-  ss << "Iterations: " << output.iterations
-     << ", Time: " << output.duration.count() / 1000.0 << " sec\n";
-  ss << "Value: " << std::fixed << std::setprecision(3)
-     << output.empirical_value << "\n";
-
-  ss << "\nP1" << std::endl;
-  print_arr(p1_labels, output.p1.k);
-  print_arr(output.p1.empirical, output.p1.k);
-  print_arr(output.p1.nash, output.p1.k);
-  ss << "P2" << std::endl;
-  print_arr(p2_labels, output.p2.k);
-  print_arr(output.p2.empirical, output.p2.k);
-  print_arr(output.p2.nash, output.p2.k);
-
-  ss << "\nMatrix:\n";
-  std::array<char, label_width + 1> col_offset{};
-  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  ss << fix_label(std::string{col_offset.data()}) << ' ';
-
-  for (size_t j = 0; j < output.p2.k; ++j)
-    ss << fix_label(p2_labels[j]) << " ";
-  ss << "\n";
-
-  for (size_t i = 0; i < output.p1.k; ++i) {
-    ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.p2.k; ++j) {
-      if (output.visit_matrix[i][j] == 0) {
-        ss << " ----    ";
-      } else {
-        double avg = output.value_matrix[i][j] / output.visit_matrix[i][j];
-        ss << std::left << std::fixed << std::setw(label_width)
-           << std::setprecision(3) << avg << " ";
-      }
-    }
-    ss << '\n';
-  }
-
-  ss << "\nVisits:\n";
-  std::fill(col_offset.data(), col_offset.data() + label_width, ' ');
-  ss << fix_label(std::string{col_offset.data()}) << ' ';
-
-  for (size_t j = 0; j < output.p2.k; ++j)
-    ss << fix_label(p2_labels[j]) << " ";
-  ss << "\n";
-
-  for (size_t i = 0; i < output.p1.k; ++i) {
-    ss << fix_label(p1_labels[i]) << " ";
-    for (size_t j = 0; j < output.p2.k; ++j) {
-      if (output.visit_matrix[i][j] == 0) {
-        ss << " ----    ";
-      } else {
-        auto avg = output.visit_matrix[i][j];
-        ss << std::left << std::fixed << std::setw(label_width)
-           << std::setprecision(3) << avg << " ";
-      }
-    }
-    ss << '\n';
-  }
-  return ss.str();
+  const auto [p1_labels, p2_labels] =
+      PKMN::choice_labels(input.battle, input.result);
+  return output_string(output, input.battle, p1_labels, p2_labels)
 }
 
 } // namespace MCTS
