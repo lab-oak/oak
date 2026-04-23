@@ -397,7 +397,7 @@ def setup():
         import datetime
 
         now = datetime.datetime.now()
-        dir = now.strftime("elo-%Y-%m-%d-%H:%M:%S")
+        dir = now.strftime("evo-%Y-%m-%d-%H:%M:%S")
         os.makedirs(dir, exist_ok=False)
         args.dir = dir
 
@@ -479,8 +479,6 @@ def run_forever():
 
         while not shutdown.is_set():
             done, _ = wait(futures, return_when=FIRST_COMPLETED)
-
-            # print(f"futures in flight: {len(futures)}, done batch size: {len(done)}")
 
             for fut in done:
                 futures.discard(fut)

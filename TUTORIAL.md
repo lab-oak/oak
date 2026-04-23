@@ -109,7 +109,7 @@ Therefore we will use the "fp" eval function our first self-play data generation
 
 * `--budget=4096`
 
-2^12 is a reasonable iteration count for a few reasons. AlphaZero used 1000 ~ 2^10 iterations, and the branching factor for a simultaneous move game is the product of the number of actions for either player. Its totally possible RBY has a higher average branching factor after including RNG. Therefore we probably should use at least as many iterations as altenative move cofigs.
+2^12 is a reasonable iteration count for a few reasons. AlphaZero used 1000 ~ 2^10 iterations, and the branching factor for a simultaneous move game is the product of the number of actions for either player. Its totally possible RBY has a higher average branching factor after including RNG. Therefore we probably should use at least as many iterations as alternating-move configs.
 
 ```bash
 (.venv) $ benchmark --eval=fp --budget=4096
@@ -131,7 +131,7 @@ There are 5 bandit algorithms available:
 
 Each of these has a float parameter that comes afterwards separated by a '-', e.g. `ucb-1.0`. For the 'ucb` variants this is the exploration weight "c" and for 'exp3' variants it is the update weight "gamma". The exp3 variants have a second optional parameter which is the weight of the uniform policy noise in the forecast.
 
-Currently all evidence points to ucb being the strongest variant, despiate exp3's [theoretical guarantees](TODO link paper?). It is probably also better suited towards low iteration searches.
+Currently all evidence points to ucb being the strongest variant, despite exp3's [theoretical guarantees](https://arxiv.org/abs/1804.09045). It is probably also better suited towards low iteration searches.
 
 * `--policy-mode=`
 
@@ -229,23 +229,23 @@ The battle script will look for `.battle.data` files *recursively* in the provid
 Pokemon scores have higher variance because of the stochastic nature of the game. Large batches should mitigate this.
 
 * `--lr=.001`
-A proven constant and the default for Adam (the optimizatier we use)
+A proven constant and the default for Adam (the optimizer we use)
 
 * `--threads=`
 Unlike `generate`, this script uses only one thread by default. This kwarg limits the max number of threads that Torch/CUDA can use and the number of data reading threads.
 
-The following arguements are default and were not explicitly entered, but deserve mention anyway.
+The following arguments are default and were not explicitly entered, but deserve mention anyway.
 
 * `--value_nash_weight=0.0`
 * `--value_empirical_weight=0.0`
 * `--value_score_weight=1.0`
 The final value target is a weighted sum of 3 different value estimates.
-The empirical value is just the average leaf value that is back progpogated to the root. The nash value is more complicated, but it is the value corresponding to a Nash equilibrium on the root node's "empirical matrix".
+The empirical value is just the average leaf value that is back propagated to the root. The nash value is more complicated, but it is the value corresponding to a Nash equilibrium on the root node's "empirical matrix".
 
 Most RL setups use only the score as we have. Additionally, using the PokeEngine eval we used for self play is not intended to be a value estimator. This means that the empirical and Nash values are less meaningful than if we used Monte-Carlo or a Network.
 
 * `--p_nash_weight=0.0`
-Nash solving isnt good when UCB is used.
+Nash solving isn't good when UCB is used.
 
 * `--pokemon_hidden_dim=128`
 * `--active_hidden_dim=128`
@@ -260,7 +260,7 @@ There are the default hyperparameters. The emphasis is on speed and minimizing t
 ### Run
 
 ```bash
-(.venv) $ battle -dir=first-net --data-dir=fp-data --batch-size=4096 --lr=.001 --threads=8
+(.venv) $ battle --dir=first-net --data-dir=fp-data --batch-size=4096 --lr=.001 --threads=8
 Using device: cpu
 Saved initial network in output directory.
 Initial network hash: 12608495754081121817
@@ -304,7 +304,7 @@ The program prints compare targets/predictions and display loss values. They are
 We allow the training to go for 1000 steps. In this training regime (non-Network eval, low iteration, small data set) the networks seems to plateau after a few hundred steps with `lr=.001`.
 
 
-## Evalutaion
+## Evaluation
 
 The `vs` program requires the following information for both players:
 
@@ -345,7 +345,7 @@ The data display is of the format
 
 ### Args
 
-The Pokemon-Showdown timer affords a 10 second increment, so that is probably the best search budget to use. This however makes getting (low variance) results agnonizingly slow, so we start with 1 second think time. Skill disparties seem to widen with more time.
+The Pokemon-Showdown timer affords a 10 second increment, so that is probably the best search budget to use. This however makes getting (low variance) results agonizingly slow, so we start with 1 second think time. Skill disparities seem to grow with more time.
 
 The `ucb1` bandit is clone of FoulPlay's. It does not use policy priors since the hand crafted eval does not provide them.
 
@@ -367,13 +367,13 @@ info:
 2 0 8
 ```
 
-10 games is a *very* sample sample size but the picture is still clear: our network is outmatched with these settings. However this can easily be explained and fixed.
+10 games is a *very* small sample size but the picture is still clear: our network is outmatched with these settings. However this can easily be explained and fixed.
 
 1. Using the exact same bandit means the network cannot use its trained policy inference
 
 2. The network is slower than the simpler eval
 
-Indeed, the `benchmark` tool shows that the network is abount 3x slower:
+Indeed, the `benchmark` tool shows that the network is about 3x slower:
 
 ```bash
 (.venv) $ benchmark --eval=fp --budget=1000ms
@@ -407,7 +407,14 @@ With this change, the network is now 2:1 vs 'fp'.
 
 # Python Scripting
 
+TODO
+
 # Training a Team-Building Network
+
+TODO
 
 # RL
 
+The `rl` program is very simple. It runs `generate` and the training scripts `battle`/`build` at the same time but with the `--in-place` flag for the learners.
+
+This means that, in addition to saving the updated network parameters in the usual way (i.e. "working-dir/step.battle.net"), it will save the latest parameters the path that `generate` reads from. Each self-play worker reads the parameters again at the start of each battle
