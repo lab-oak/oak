@@ -525,7 +525,7 @@ void thread_fn_wrapper(ProgramArgs *args) {
 int main(int argc, char **argv) {
 
   std::signal(SIGINT, handle_terminate);
-  // std::signal(SIGTSTP, handle_suspend);
+  std::signal(SIGTSTP, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 

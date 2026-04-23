@@ -431,7 +431,7 @@ void setup(const auto &args) {
     args.seed.emplace(std::random_device{}());
   }
   if (!args.working_dir.has_value()) {
-    args.working_dir.emplace(RuntimeData::start_datetime);
+    args.working_dir.emplace("generate-" + RuntimeData::start_datetime);
   }
   if (!args.t1_budget.has_value()) {
     args.t1_budget.emplace(args.budget);
@@ -509,7 +509,7 @@ void handle_terminate(int signal) {
 
 int main(int argc, char **argv) {
   std::signal(SIGINT, handle_terminate);
-  // std::signal(SIGTSTP, handle_suspend);
+  std::signal(SIGTSTP, handle_suspend);
 
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
