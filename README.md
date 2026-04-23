@@ -6,7 +6,7 @@ Oak is a Python package for perfect-info search in Pokemon RBY OU with two facet
 
 * Library that is powerful enough to reproduce the above as Python scripts and replace the evaluation function in existing Battle AI
 
-# Installation
+# Install
 
 ```bash
 pip install oak-lab
@@ -14,7 +14,7 @@ pip install oak-lab
 
 Detailed instructions and caveats are first in the [tutorial](TUTORIAL.md).
 
-# Building
+# Build
 
 **Note**: Libpkmn currently only builds with the Zig `master` release. See the [libpkmn README](https://github.com/pkmn/engine/blob/main/README.md) for more information
 
