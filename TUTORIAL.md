@@ -90,7 +90,7 @@ The general plan:
 
 The `generate` program accepts many keyword arguments but only a few are required. Those that are reflect basic considerations that we will discuss now:
 
-* `--eval`
+* `--eval=fp`
 
 This is value estimator that the search will use in self-play games. To start with, we only have PokeEngine evaluation ("fp") and Monte-Carlo ("mc", default).
 
@@ -119,7 +119,7 @@ Therefore we will use the "fp" eval function our first self-play data generation
 
 On my machine this gives us 3.5 milliseconds per step.
 
-* `--bandit=`
+* `--bandit=ucb-1.0`
 
 There are 5 bandit algorithms available:
 
@@ -133,21 +133,23 @@ Each of these has a float parameter that comes afterwards separated by a '-', e.
 
 Currently all evidence points to ucb being the strongest variant, despiate exp3's [theoretical guarantees](TODO link paper?). It is probably also better suited towards low iteration searches.
 
-* `--policy-mode=x`
+* `--policy-mode=`
 
 The search will produce multiple strategies or policies for either player. These are:
 
-* `e` emprical
-* `x` argmax
-* `n` nash
-* `p` prior
-* `u` uniform
+* `e` Empirical
+* `x` Argmax
+* `n` Nash equilibrium of empirical value matrix
+* `p` Network prior
+* `u` Uniform noise
 
 All of these characters are valid arguments. Additionally, weighted combinations may be passed e.g. `x0.9e0.1`.
 
-* `--teams=teams`
+The following arguments are optional but important:
 
-Any time teams are required Oak will default to the 17 or so Smogon sample teams. More teams is certainly beneficial however. The programs expect a simple plaintext format that can be explained hopefully with just an example (2 lines/teams):
+* `--teams=`
+
+Any time teams are required Oak will default to the 16 Smogon sample teams. More teams is certainly beneficial however. The programs expect a simple plaintext format that can be explained hopefully with just an example (2 lines/teams):
 
 ```
 jynx blizzard lovelykiss psychic rest; chansey counter icebeam softboiled thunderbolt; jolteon doublekick rest thunderbolt thunderwave; snorlax bodyslam icebeam reflect rest; starmie blizzard psychic recover thunderwave; tauros blizzard bodyslam earthquake hyperbeam
@@ -155,22 +157,20 @@ gengar confuseray explosion hypnosis thunderbolt; chansey icebeam softboiled thu
 ```
 
 * `--fast-search-prob=`
-
-This is an innovation of Efficient MuZero. It reduces cost of data gen while balancing value and policy learning.
-
 * `--fast-budget=`
 
+With this, the full search budget is only used for some of the steps, otherwise we use a reduced budget. This is an innovation of [EfficientZero](https://arxiv.org/abs/2111.00210); It reduces cost of data gen while balancing value and policy learning.
 
-* `--threads=8`
+* `--threads=`
 
-The max for my system. By default it does max - 1.
+By default this program will use the max number of threads minus one.
 
 * `--dir=fp-data`
 
-The name of the dir where all work will be saved. By default this is a datetime string. It is advised to use short code names.
+The name of the directory where all work will be saved. If this is not provided, the programs will all use a data-time string with the program name as the prefix. It is advised to use short code names.
 
 ```bash
-(.venv) user@laptop:~/oak$ generate --budget=1024 --bandit=ucb-1.0 --policy-mode=x --eval=fp --dir=fp-data
+(.venv) $ generate --budget=1024 --bandit=ucb-1.0 --policy-mode=x --eval=fp --dir=fp-data
 Created directory fp-data
 279.767 battle frames/sec.
 keep node ratio: 0
@@ -180,15 +180,13 @@ Game Lengths: 27 33 32 20 2 2 1
 
 You should see something like this. A line confirming the work directory was created and some periodic 
 
-After some time has passed we enter `Ctrl + C` to send a SIGINT signal. This triggers a save
-
-All the Oak programs save their arguments to disk
+After some time has passed we enter `Ctrl + C` to send a SIGINT signal. This terminates the program and triggers a save; all the Oak programs save their arguments to disk:
 
 ```bash
-(.venv) user@laptop:~/oak$ ls fp-data
+(.venv) $ ls fp-data
 0.battle.data  2.battle.data  4.battle.data  6.battle.data  matchup-matrix
 1.battle.data  3.battle.data  5.battle.data  args
-(.venv) user@laptop:~/oak$ head -10 fp-data/args
+(.venv) $ head -10 fp-data/args
    --team-modify-prob : 0
 --pokemon-delete-prob : 0
    --move-delete-prob : 0
@@ -200,16 +198,17 @@ All the Oak programs save their arguments to disk
                --eval : fp
 ```
 
-
 ## Training
 
-Let's start training by running a quick check.
+Let's start training by running a quick check with `lab`. This script is intended to be a multi-utility for RL. It is also written entirely with torch and the `oak` Python library so it serves as a good example for adding new functionality.
+
+The `battle-frame-stats` argument will recursively scan the provided `dir` for all files with the '.battle.data` extension. It then parses them to print statistics.
 
 ```bash
-(.venv) user@laptop:~$ tutorial battle-frame-stats fp-data
+(.venv) $ lab battle-frame-stats --dir=fp-data
 Total battle frames: 19373207
 Average battle length: 80.1695282078021
-(.venv) user@laptop:~$ python
+(.venv) $ python
 Python 3.13.3 (main, Jan  8 2026, 12:03:54) [GCC 14.2.0] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> 19373207 / 80 # number of games
@@ -227,12 +226,12 @@ battle --help
 The battle script will look for `.battle.data` files *recursively* in the provided dir (default=".")
 
 * `--batch-size=4096`
-Pokemon scores have higher variance because of the stochastic nature of the game.
+Pokemon scores have higher variance because of the stochastic nature of the game. Large batches should mitigate this.
 
 * `--lr=.001`
-A proven constant and the default for Adam (the optimization we use)
+A proven constant and the default for Adam (the optimizatier we use)
 
-* `--threads=8`
+* `--threads=`
 Unlike `generate`, this script uses only one thread by default. This kwarg limits the max number of threads that Torch/CUDA can use and the number of data reading threads.
 
 The following arguements are default and were not explicitly entered, but deserve mention anyway.
@@ -261,7 +260,7 @@ There are the default hyperparameters. The emphasis is on speed and minimizing t
 ### Run
 
 ```bash
-(.venv) user@laptop:~$ battle -dir=first-net --data-dir=fp-data --batch-size=4096 --lr=.001 --threads=8
+(.venv) $ battle -dir=first-net --data-dir=fp-data --batch-size=4096 --lr=.001 --threads=8
 Using device: cpu
 Saved initial network in output directory.
 Initial network hash: 12608495754081121817
@@ -300,9 +299,9 @@ loss: p1:0.25835880637168884, p2:0.26018473505973816
 loss: v:0.2493373304605484
 ```
 
-The program print outs compare targets/predictions and display loss values. They are subject to change and won't be discussed.
+The program prints compare targets/predictions and display loss values. They are likely to change and won't be discussed further.
 
-We allow the training to go for 1000 steps. In this training regime (non-Network eval, low iteration, small data set) the networks seems to plateau after a few hundred steps at `lr=.001`.
+We allow the training to go for 1000 steps. In this training regime (non-Network eval, low iteration, small data set) the networks seems to plateau after a few hundred steps with `lr=.001`.
 
 
 ## Evalutaion
@@ -322,7 +321,7 @@ Lets first compare the trained network with the PokeEngine eval using a think ti
 This first test does not use the networks policy inference since is using the same bandit as PokeEngine (for initial comparison's sake.)
 
 ```bash
-(.venv) user@laptop:~$ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
+(.venv) $ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
 score: -nan over 0 games; Elo diff: -nan
 0 0 0
 info: 
@@ -377,10 +376,10 @@ info:
 Indeed, the `benchmark` tool shows that the network is abount 3x slower:
 
 ```bash
-(.venv) user@laptop:~$ benchmark --eval=fp --budget=1000ms
+(.venv) $ benchmark --eval=fp --budget=1000ms
 1000001 ms.
 253551 iterations.
-(.venv) user@laptop:~$ benchmark --eval=apple/500.battle.net --budget=1000ms
+(.venv) $ benchmark --eval=apple/500.battle.net --budget=1000ms
 1000008 ms.
 85005 iterations.
 ```
@@ -388,7 +387,7 @@ Indeed, the `benchmark` tool shows that the network is abount 3x slower:
 The speed penalty could be greatly mitigated if it was allowed to use policy inference. Let's try that:
 
 ```bash
-(.venv) user@laptop:~$ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --p1-bandit=pucb-1.0 --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
+(.venv) $ vs --budget=1000ms --p1-eval=apple/500.battle.net --p2-eval=fp --p1-bandit=pucb-1.0 --bandit=ucb1-2.0 --policy-mode=x --threads=8 --mirror-match
 # ...
 score: 0.639344 over 61 games; Elo diff: 99.4568
 39 0 22
@@ -405,10 +404,6 @@ info:
 ```
 
 With this change, the network is now 2:1 vs 'fp'.
-
-### Conjectures
-
-
 
 # Python Scripting
 
