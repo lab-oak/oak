@@ -30,8 +30,6 @@ MCTS::Input parse_input(const std::string &line, uint64_t seed) {
 
 int main(int argc, char **argv) {
 
-  std::signal(SIGINT, handle_suspend);
-
   auto args = argparse::parse<ProgramArgs>(argc, argv);
 
   auto agent_params = RuntimeSearch::AgentParams{
@@ -69,6 +67,8 @@ int main(int argc, char **argv) {
     break;
   }
 
+  std::signal(SIGTSTP, handle_suspend);
+
   // set the durations inside the options to start
   auto options = PKMN::options();
   pkmn_gen1_chance_options chance_options{};
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     }
     std::cout << std::endl;
 
-    std::cout << "Starting search. (Ctrl + C) to stop." << std::endl;
+    std::cout << "Starting search. (Ctrl + Z) to pause." << std::endl;
 
     RuntimeSearch::Heap heap{};
     MCTS::Output output{};
