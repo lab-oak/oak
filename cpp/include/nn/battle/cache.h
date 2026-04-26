@@ -24,7 +24,8 @@ template <typename T> struct PokemonCache {
   // For a stored pokemon, the move pp and status features are the only ones
   // that can change over the course of the game (hp is not a part of the input
   // to the pokemon embedding)
-  static constexpr uint8_t n_embeddings = n_status * n_pp;
+  using Key = uint8_t;
+  static constexpr Key n_embeddings = n_status * n_pp;
   // All status consditions that dont use sleep duration
   static constexpr std::array<Status, 8> status_array{
       Status::None,      Status::Poison, Status::Burn,  Status::Freeze,
@@ -32,7 +33,6 @@ template <typename T> struct PokemonCache {
 
   static constexpr bool is_integral{std::is_integral_v<T>};
   using Embedding = EmbeddingT<T>;
-  using Key = uint8_t;
 
   uint32_t dim;
   std::array<Embedding, n_embeddings> embeddings;
@@ -135,7 +135,8 @@ template <typename T> struct ActivePokemonCache {
 
   static constexpr bool is_integral{std::is_integral_v<T>};
   using Embedding = EmbeddingT<T>;
-  using Key = std::pair<PKMN::ActivePokemon, uint8_t>;
+  using PokemonKey = PokemonCache<T>::Key;
+  using Key = std::pair<PKMN::ActivePokemon, PokemonKey>;
 
   uint32_t dim;
   std::map<Key, Embedding> embeddings;
@@ -185,8 +186,8 @@ template <typename T> struct ActivePokemonCache {
   template <Activation activation>
   const T *get(EmbeddingNet &active_net, const auto &active,
                const auto &pokemon, const auto &duration) {
-    const auto key = std::pair<PKMN::ActivePokemon, uint8_t>{
-        active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
+    const auto key =
+        Key{active, Encode::Battle::pokemon_key(pokemon, duration.sleep(0))};
     if (embeddings.find(key) != embeddings.end()) {
       const auto embedding_data = data(key);
       assert(embedding_data != nullptr);
