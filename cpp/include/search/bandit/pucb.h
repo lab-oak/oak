@@ -53,17 +53,15 @@ struct Bandit {
     if (k == 1) {
       outcome.index = 0;
     } else {
-      std::array<float, 9> q{};
-      uint64_t N{};
-      for (auto i = k - 1; i >= 0; --i) {
-        q[i] = (float)scores[i] / visits[i];
+      uint64_t N = 0;
+      for (auto i = 0; i < k; ++i) {
         N += visits[i];
       }
       float sqrtN = std::sqrt(N);
       float max = 0;
       for (auto i = 0; i < k; ++i) {
-        float e = params.c * priors[i] * sqrtN / visits[i];
-        float a = e + q[i];
+        float e = params.c * priors[i] * sqrtN;
+        float a = (e + scores[i]) / visits[i];
         if (a > max) {
           max = a;
           outcome.index = i;
