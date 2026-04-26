@@ -3,7 +3,9 @@
 #include <util/random.h>
 #include <util/search.h>
 
-struct ProgramArgs : public BenchmarkArgs {};
+struct ProgramArgs : public BenchmarkArgs {
+  bool &cleanup = flag("cleanup", "Include heap cleanup in time");
+};
 
 int benchmark(int argc, char **argv) {
 
@@ -30,9 +32,15 @@ int benchmark(int argc, char **argv) {
   const auto input = MCTS::Input{battle, durations, result};
   auto heap = RuntimeSearch::Heap{};
 
+  const auto start = std::chrono::high_resolution_clock::now();
   const auto output = RuntimeSearch::run(device, input, heap, agent);
+  auto us = output.duration.count();
+  if (args.cleanup) {
+    const auto end = std::chrono::high_resolution_clock::now();
+    us = std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+             .count();
+  }
 
-  const auto us = output.duration.count();
   if (us >= 10000) {
     std::cout << (us / 1000) << "ms." << std::endl;
   } else {
