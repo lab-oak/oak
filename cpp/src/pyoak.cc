@@ -448,6 +448,7 @@ PYBIND11_MODULE(pyoak, m) {
       .def_readwrite("bandit", &RuntimeSearch::Agent::bandit)
       .def_readwrite("eval", &RuntimeSearch::Agent::eval)
       .def_readwrite("matrix_ucb", &RuntimeSearch::Agent::matrix_ucb)
+      .def_readwrite("discrete", &RuntimeSearch::Agent::discrete)
       .def_readwrite("table", &RuntimeSearch::Agent::table);
   py::class_<MCTS::Input>(m, "Input").def(py::init<>());
 
