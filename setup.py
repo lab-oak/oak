@@ -28,7 +28,7 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={
-        "oak": get_paths("Release"),
+        "oak": get_paths("Release") + get_paths("Debug"),
     },
     distclass=BinaryDistribution,
 )
