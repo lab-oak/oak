@@ -66,15 +66,6 @@ struct Heap {
     };
     return std::visit(lambda, data);
   }
-
-  // void reset_stats() {
-  //   std::visit([](auto &heap){
-  //     using T = std::remove_cvref_t<decltype(heap)>;
-  //     if constexpr (!std::is_same_v<T, std::monostate>) {
-  //       heap.stats = {};
-  //     }
-  //   }, data);
-  // }
 };
 
 struct AgentParams {
@@ -269,6 +260,13 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
                                agent.bandit);
     }
 
+    const auto check_for_priors = [&agent]() {
+      if (agent.is_monte_carlo() || agent.is_foul_play()) {
+        throw std::runtime_error{"Contextual bandit specified with eval that "
+                                 "does not produce policy priors."};
+      }
+    };
+
     const auto &name = bandit_split[0];
     const float f1 = std::stof(bandit_split[1]);
     if (name == "ucb") {
@@ -280,6 +278,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
       return parse_matrix_ucb_and_search(
           dur, params, heap_variant.both<UCB1::JointBandit>());
     } else if (name == "pucb") {
+      check_for_priors();
       PUCB::Bandit::Params params{.c = f1};
       return parse_matrix_ucb_and_search(
           dur, params, heap_variant.both<PUCB::JointBandit>());
@@ -297,6 +296,7 @@ auto run(auto &device, const MCTS::Input &input, Heap &heap_variant,
       return parse_matrix_ucb_and_search(
           dur, params, heap_variant.both<Exp3::JointBandit>());
     } else if (name == "pexp3") {
+      check_for_priors();
       PExp3::Bandit::Params params{.gamma = f1,
                                    .one_minus_gamma = (1 - f1),
                                    .alpha = alpha,

@@ -28,10 +28,16 @@ parser.add_argument("--saves-per-refresh", default=1, type=int)
 parser.add_argument("--teams", default="", type=str)
 parser.add_argument("--exp3-gamma-min", default=0.001, type=float)
 parser.add_argument("--exp3-gamma-max", default=5.0, type=float)
+parser.add_argument("--exp3-gamma-delta", default=1.0, type=float)
+
 parser.add_argument("--exp3-alpha-min", default=0.0001, type=float)
-parser.add_argument("--exp3-alpha-max", default=1.0, type=float)
+parser.add_argument("--exp3-alpha-max", default=0.5, type=float)
+parser.add_argument("--exp3-alpha-delta", default=0.1, type=float)
+
 parser.add_argument("--ucb-c-min", default=0.001, type=float)
 parser.add_argument("--ucb-c-max", default=5.0, type=float)
+parser.add_argument("--ucb-c-delta", default=1.0, type=float)
+
 parser.add_argument("--start", default=0, type=int)
 # Agent selection UCB params
 parser.add_argument("--c", default=1.414, type=float)
@@ -46,6 +52,62 @@ parser.add_argument("--no-pucb", action="store_true")
 parser.add_argument("--no-ucb1", action="store_true")
 
 args = parser.parse_args()
+
+
+class Options:
+    network_table: Dict[int, str] = {}
+    bandits = [
+        name
+        for name, disabled in [
+            ("exp3", args.no_exp3),
+            ("ucb", args.no_ucb),
+            ("ucb1", args.no_ucb1),
+        ]
+        if not disabled
+    ]
+    contextual_bandits = [
+        name
+        for name, disabled in [
+            ("pexp3", args.no_pexp3),
+            ("pucb", args.no_pucb),
+        ]
+        if not disabled
+    ]
+    legal_bandits = bandits + contextual_bandits
+
+    @staticmethod
+    def fill_network_table(path):
+        net_files = oak.util.find_data_files(path, ext=".battle.net")
+        Options.network_table[0] = "fp"
+        for file in net_files:
+            network = oak.torch.BattleNetwork()
+            with open(file, "rb") as f:
+                network.read_parameters(f)
+            Options.network_table[network.hash()] = file
+
+    @staticmethod
+    def read(path):
+        with open(path, "rb") as f:
+            while True:
+                h_bytes = f.read(8)
+                if len(h_bytes) < 8:
+                    break
+                net_hash = struct.unpack("<Q", h_bytes)[0]
+                path_bytes = []
+                while True:
+                    c = f.read(1)
+                    if not c or c == b"\0":
+                        break
+                    path_bytes.append(c)
+                Options.network_table[net_hash] = b"".join(path_bytes).decode("utf-8")
+
+    @staticmethod
+    def write(path):
+        with open(path, "wb") as f:
+            for nh, path_str in Options.network_table.items():
+                f.write(struct.pack("<Q", nh))
+                f.write(path_str.encode("utf-8"))
+                f.write(b"\0")
 
 
 class ID:
@@ -87,31 +149,48 @@ class ID:
 
 
 def perturb_id(before: ID, choice: int) -> ID:
-    after = copy.deepcopy(before)
     PRECISION = 5
+    after = copy.deepcopy(before)
 
-    if choice == 0:
+    class Choice:
+        params = 0
+        bandit = 1
+        eval_ = 2
+        policy_mode = 3
+        discrete = 4
+
+    if choice == Choice.params:
         bandit_split = after.bandit.split("-")
         bandit_type = bandit_split[0]
+
         if bandit_type in ("exp3", "pexp3"):
             if random.randint(0, 1):
-                alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
+                current_alpha = float(bandit_split[2])
+                eps = random.uniform(-args.exp3_alpha_delta, args.exp3_alpha_delta)
+                alpha = max(
+                    args.exp3_alpha_min, min(args.exp3_alpha_max, current_alpha + eps)
+                )
                 after.bandit = (
                     f"{bandit_type}-{bandit_split[1]}-{str(alpha)[:PRECISION]}"
                 )
             else:
-                gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
+                current_gamma = float(bandit_split[1])
+                eps = random.uniform(-args.exp3_gamma_delta, args.exp3_gamma_delta)
+                gamma = max(
+                    args.exp3_gamma_min, min(args.exp3_gamma_max, current_gamma + eps)
+                )
                 after.bandit = (
                     f"{bandit_type}-{str(gamma)[:PRECISION]}-{bandit_split[2]}"
                 )
         else:
-            c = random.uniform(args.ucb_c_min, args.ucb_c_max)
+            current_c = float(bandit_split[1])
+            eps = random.uniform(-args.ucb_c_delta, args.ucb_c_delta)
+            c = max(args.ucb_c_min, min(args.ucb_c_max, current_c + eps))
             after.bandit = f"{bandit_type}-{str(c)[:PRECISION]}"
 
-    elif choice == 1:
+    elif choice == Choice.bandit:
         # New bandit type AND re-sample params
-        base_bandits = ["exp3", "pexp3", "ucb", "pucb", "ucb1"]
-        bandit_type = random.choice(base_bandits)
+        bandit_type = random.choice(Options.legal_bandits)
         if bandit_type in ("exp3", "pexp3"):
             gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
             alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
@@ -121,18 +200,25 @@ def perturb_id(before: ID, choice: int) -> ID:
         else:
             c = random.uniform(args.ucb_c_min, args.ucb_c_max)
             after.bandit = f"{bandit_type}-{str(c)[:PRECISION]}"
+        if before.net_hash == 0 and bandit_type in Options.contextual_bandits:
+            after.bandit = before.bandit
 
-    elif choice == 2:
+    elif choice == Choice.eval_:
+        bandit_split = after.bandit.split("-")
+        bandit_type = bandit_split[0]
         net_hash, _ = random.choice(list(Options.network_table.items()))
-        after.net_hash = net_hash
+        # prevents setting eval to fp when using a contextual bandit
+        if net_hash != 0 or bandit_type not in ("exp3", "pexp3"):
+            after.net_hash = net_hash
 
-    elif choice == 3:
+    elif choice == Choice.policy_mode:
         modes = ["x", "n", "e"]
         modes.remove(after.policy_mode)
         after.policy_mode = random.choice(modes)
 
-    elif choice == 4:
-        after.discrete = not after.discrete
+    elif choice == Choice.discrete:
+        if after.net_hash != 0:
+            after.discrete = not after.discrete
     else:
         assert False, "what"
 
@@ -163,6 +249,9 @@ def read_id(f):
 class WDL:
     def __init__(self, w=0, d=0, l=0):
         self.win, self.draw, self.loss = (w, d, l)
+
+    def valid(self):
+        return bool(self.win or self.draw or self.loss)
 
 
 class Elo:
@@ -244,45 +333,6 @@ class Results:
                 f.write(struct.pack("<III", w, l, d))
 
 
-class Options:
-    network_table: Dict[int, str] = {}
-    bandits = set()
-
-    @staticmethod
-    def fill_network_table(path):
-        net_files = oak.util.find_data_files(path, ext=".battle.net")
-        Options.network_table[0] = "fp"
-        for file in net_files:
-            network = oak.torch.BattleNetwork()
-            with open(file, "rb") as f:
-                network.read_parameters(f)
-            Options.network_table[network.hash()] = file
-
-    @staticmethod
-    def read(path):
-        with open(path, "rb") as f:
-            while True:
-                h_bytes = f.read(8)
-                if len(h_bytes) < 8:
-                    break
-                net_hash = struct.unpack("<Q", h_bytes)[0]
-                path_bytes = []
-                while True:
-                    c = f.read(1)
-                    if not c or c == b"\0":
-                        break
-                    path_bytes.append(c)
-                Options.network_table[net_hash] = b"".join(path_bytes).decode("utf-8")
-
-    @staticmethod
-    def write(path):
-        with open(path, "wb") as f:
-            for nh, path_str in Options.network_table.items():
-                f.write(struct.pack("<Q", nh))
-                f.write(path_str.encode("utf-8"))
-                f.write(b"\0")
-
-
 class ProgramData:
     elo = Elo()
     ucb = UCB()
@@ -310,19 +360,12 @@ def new_agent():
     PRECISION = 5
     net_hash, network_path = random.choice(list(Options.network_table.items()))
 
-    base_bandits = ["exp3", "ucb"]
-    base_bandits.append("pexp3")
-    base_bandits.append("pucb")
-    bandit = random.choice(base_bandits)
-    if bandit.startswith("pexp3") or bandit.startswith("exp3"):
+    bandit = random.choice(Options.legal_bandits)
+    if bandit in ["exp3", "pexp3"]:
         gamma = random.uniform(args.exp3_gamma_min, args.exp3_gamma_max)
         alpha = random.uniform(args.exp3_alpha_min, args.exp3_alpha_max)
         bandit = bandit + "-" + str(gamma)[:PRECISION] + "-" + str(alpha)[:PRECISION]
-    elif (
-        bandit.startswith("pucb")
-        or bandit.startswith("ucb")
-        or bandit.startswith("ucb1")
-    ):
+    elif bandit in ["ucb", "pucb", "ucb1"]:
         c = random.uniform(args.ucb_c_min, args.ucb_c_max)
         bandit = bandit + "-" + str(c)[:PRECISION]
     else:
@@ -330,6 +373,9 @@ def new_agent():
 
     selection_modes = ["n", "e", "x"]
     selection_mode = random.choice(selection_modes)
+
+    if net_hash == 0 and bandit in ("exp3", "pexp3"):
+        bandit = bandit[1:]
 
     return ID(net_hash, bandit, selection_mode, args.budget_ms)
 
@@ -452,6 +498,8 @@ def run_vs() -> [ID, ID, WDL]:
     last_line = result.stdout.strip().splitlines()[-1]
     data = list(map(int, last_line.split()))
     wdl = WDL(*data)
+    if not wdl.valid():
+        print(result.stdout)
     return lesserID, greaterID, wdl
 
 
