@@ -66,6 +66,12 @@ struct Heap {
     };
     return std::visit(lambda, data);
   }
+
+  std::string type() const {
+    return std::visit(
+        [](const auto &value) { return std::string(typeid(value).name()); },
+        data);
+  }
 };
 
 struct AgentParams {

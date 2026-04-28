@@ -440,7 +440,8 @@ PYBIND11_MODULE(pyoak, m) {
 
   py::class_<RuntimeSearch::Heap>(m, "Heap")
       .def(py::init<>())
-      .def("empty", &RuntimeSearch::Heap::empty);
+      .def("empty", &RuntimeSearch::Heap::empty)
+      .def("type", &RuntimeSearch::Heap::type);
 
   py::class_<RuntimeSearch::Agent>(m, "Agent")
       .def(py::init<>())
