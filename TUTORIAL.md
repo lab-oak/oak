@@ -129,7 +129,7 @@ There are 5 bandit algorithms available:
 * `exp3`
 * `pexp3`
 
-Each of these has a float parameter that comes afterwards separated by a '-', e.g. `ucb-1.0`. For the 'ucb` variants this is the exploration weight "c" and for 'exp3' variants it is the update weight "gamma". The exp3 variants have a second optional parameter which is the weight of the uniform policy noise in the forecast.
+Each of these has a float parameter that comes afterwards separated by a '-', e.g. `ucb-1.0`. For the 'ucb' variants this is the exploration weight "c" and for 'exp3' variants it is the update weight "gamma". The exp3 variants have a second optional parameter which is the weight of the uniform policy noise in the forecast e.g. `pexp3-1.0-0.1`.
 
 Currently all evidence points to ucb being the strongest variant, despite exp3's [theoretical guarantees](https://arxiv.org/abs/1804.09045). It is probably also better suited towards low iteration searches.
 
@@ -216,20 +216,60 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> 
 ```
 
-The keyword args for the battle script are lean enough that we can discuss each of them below. All Oak scripts will list their kwargs if the help flag is provided, e.g.
+### Architecture
+
+We should first discuss the Oak network design, from battle encoding to value and policy outputs.
+
+
+The information of a generation 1 battle can be split into two sides (no field conditions exist yet), and each side can be partitioned (save for `last_damage` and `last_selected`, which we ignore) into five `Pokemon` and `ActivePokemon`. The latter is the combination of the underlying `Pokemon` data for that slot and the active pokemon information (volatiles, stats, etc.)
+
+We use two distict 2-layer MLPs to encode each sides `Pokemon` and `ActivePokemon`. The data of these two is encoded in a mostly one-hot format, with continuous fields (e.g. `Stats`, HP percentage) normalized to [0, 1].
+
+The outputs of these networks, called 'embeddings', is concatenated into two side embeddings and these are concatenated into the battle embedding. This final embedding is what serves as the input into an AlphaZero style value/policy trunk. Using the default sizes for clarity, these are a shared trunk:
+
+> 768 x 64 -> 64 x 64
+
+The output of the trunk is the shared input for the value head:
+
+> 64 x 32 - > 32 x 1
+
+and the two policy heads, one for each player:
+
+> 64 x 64 -> 64 x (SPECIES + MOVES)
+
+In the policy output, we mask for legal moves. The 151 SPECIES logits correspond to switching to that pokemon, and the 165 MOVE logits correspond to using that move. Recharge/Struggle do not have logits, which is fine because they are only selectable when there is only 1 legal action for that player.
+
+### Quantization
+
+Any program that uses a network has the option to `i8` quantized version of that network's value/policy trunk. This process introduce some error to the output, but the increase in speed is typically enough to result in a stronger search.
+
+*Warning*: Not all networks are quantizable. Floating point versions of networks (Python and C++) have total liberty with regards to hyper-parameters. However, the quantized trunks are only available when:
+
+1. `BATTLE_EMBEDDING_DIM` = 10 * `POKEMON_EMBEDDING_DIM` + 2 * `ACTIVE_POKEMON_EMBEDDING_DIM` = 768
+
+2. `HIDDEN`, `VALUE_HIDDEN`, `POLICY_HIDDEN` are in {32, 64, 128}
+
+3. `VALUE_HIDDEN`, `POLICY_HIDDEN` <= `HIDDEN`
+
+### Args
+
+
+All Oak scripts will list their arguments if the `--help` flag is provided:
 
 ```bash
 battle --help
 ```
 
+Some of these listed are self explanitory, so we will focus on a few
+
 * `--data-dir=fp-data`
-The battle script will look for `.battle.data` files *recursively* in the provided dir (default=".")
+The battle script will look for `.battle.data` files *recursively* in the provided dir (default=".").
 
 * `--batch-size=4096`
 Pokemon scores have higher variance because of the stochastic nature of the game. Large batches should mitigate this.
 
 * `--lr=.001`
-A proven constant and the default for Adam (the optimizer we use)
+The default for the Pytorch Adam implementation.
 
 * `--threads=`
 Unlike `generate`, this script uses only one thread by default. This kwarg limits the max number of threads that Torch/CUDA can use and the number of data reading threads.
@@ -240,12 +280,13 @@ The following arguments are default and were not explicitly entered, but deserve
 * `--value_empirical_weight=0.0`
 * `--value_score_weight=1.0`
 The final value target is a weighted sum of 3 different value estimates.
-The empirical value is just the average leaf value that is back propagated to the root. The nash value is more complicated, but it is the value corresponding to a Nash equilibrium on the root node's "empirical matrix".
+The empirical value is just the average leaf value that is back propagated to the root. The Nash value is the (unique) value corresponding to Nash equilibria on the root empirical value matrix (it is normally very close the the empirical value.)
 
 Most RL setups use only the score as we have. Additionally, using the PokeEngine eval we used for self play is not intended to be a value estimator. This means that the empirical and Nash values are less meaningful than if we used Monte-Carlo or a Network.
 
+* `--p_empirical_weight=1.0`
 * `--p_nash_weight=0.0`
-Nash solving isn't good when UCB is used.
+There are two targets for the policy learning, the empirical and Nash strategies. The Nash stratagies produced by UCB bandit varaints tend to be low quality since these algorithms tend to leave some move pairs very unexplored. This results in a high-variance estimate of in that entry of the empirical value matrix.
 
 * `--pokemon_hidden_dim=128`
 * `--active_hidden_dim=128`
@@ -253,9 +294,11 @@ Nash solving isn't good when UCB is used.
 * `--active_out_dim=83`
 * `--hidden_dim=64`
 * `--value_hidden_dim=32`
-* `--policy_hidden_dim=64`
+* `--policy_hidden_dim=64` 
 
 There are the default hyperparameters. The emphasis is on speed and minimizing the number of FLOPs per inference.
+
+It 
 
 ### Run
 
@@ -342,7 +385,6 @@ The data display is of the format
   {thread}: {update}, ({p1_output.empirical_value}/{p1_output.nash_value}), ({p1_output.empirical_value}/{p1_output.nash_value})
 ```
 
-
 ### Args
 
 The Pokemon-Showdown timer affords a 10 second increment, so that is probably the best search budget to use. This however makes getting (low variance) results agonizingly slow, so we start with 1 second think time. Skill disparities seem to grow with more time.
@@ -407,14 +449,78 @@ With this change, the network is now 2:1 vs 'fp'.
 
 # Python Scripting
 
-TODO
+The primary goal of this program is to train a strong network for IS-MCTS like Foul-Play. We claimed that the Oak Python API is sufficient to reproduce all of the C++ binaries.
+
+This section will focus on reproducing the core functionality of `chall`, since this is closest to the task of integrating Oak with Foul-Play.
+
+### chall
+
+Let's first go over the program. We will cover the 
+
+### Search Objects
+
+All the now-familiar search parameters are contained in the oak.Agent class:
+
+```bash
+(.venv) user@laptop:~$ python
+Python 3.13.3 (main, Jan  8 2026, 12:03:54) [GCC 14.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import oak
+>>> agent = oak.Agent()
+>>> for field in [agent.budget, agent.bandit, agent.eval, agent.matrix_ucb, agent.table]:
+...     if type(field) == str:
+...         print(f"'{field}', length:{len(field)}")
+...     else:
+...         print(field)
+...         
+'', length:0
+'', length:0
+'', length:0
+'', length:0
+False
+False
+>>> 
+```
+
+The above shows that all fields are strings, except for `discrete` and `table`.
+
+An empty `eval` string will default to Monte-Carlo, but `bandit` and `budget` must be provided. The `table` flag has not previously been discussed, but it is alternative (and WIP) data structure for the search: a transposition table instead of a tree. 
+
+The tree/table is exposed as the Heap class
+
+```bash
+>>> heap = oak.Heap()
+```
+
+The Heap class is almost totally opaque. It is meant to be created, passed into the search function, and destored.
+
+The last piece is the Input class, which encodedes the information of a determinized or perfect-information battle. The underlying data of this is the `pkmn_gen1_battle` and `pkmn_gen1_chance_durations`. However, we do not expose the fields of these structs, and the Input class is opaque save for print functions
+
+A search Input is defined via a battle string, in the same format as the `chall` program inputs
+
+The only way to input
+
+
+### Ancillary Data
 
 # Training a Team-Building Network
 
-TODO
+The team building network architechture and infrastructure is much simpler than that for battling.
+
+
 
 # RL
 
 The `rl` program is very simple. It runs `generate` and the training scripts `battle`/`build` at the same time but with the `--in-place` flag for the learners.
 
 This means that, in addition to saving the updated network parameters in the usual way (i.e. "working-dir/step.battle.net"), it will save the latest parameters the path that `generate` reads from. Each self-play worker reads the parameters again at the start of each battle
+
+
+### Args
+
+The arguments for `rl` contain the arguments for both `battle` and `build`, where the latter's arguments are prefixed with "build-" for disambiguation. For example
+
+* `--lr` sets the learning rate build `battle`
+
+* `--build-lr` sets the learning rate for `build`
+
