@@ -173,6 +173,10 @@ class EmbeddingNet(nn.Module):
         self.fc0 = Affine(in_dim, hidden_dim, activation=activation0)
         self.fc1 = Affine(hidden_dim, out_dim, activation=activation1)
 
+    def set_activation(self, act):
+        self.fc0.activation = act
+        self.fc1.activation = act
+
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
         self.fc1.read_parameters(f)
@@ -213,6 +217,16 @@ class MainNet(nn.Module):
         self.policy1_fc2 = Affine(policy_hidden_dim, policy_out_dim, Activation.none)
         self.policy2_fc1 = Affine(hidden_dim, policy_hidden_dim, activation)
         self.policy2_fc2 = Affine(policy_hidden_dim, policy_out_dim, Activation.none)
+
+    def set_activation(self, act):
+        self.fc0.activation = act
+        self.fc1.activation = act
+        self.value_fc1.activation = act
+        self.value_fc2.activation = act
+        self.policy1_fc1.activation = act
+        self.policy1_fc2.activation = act
+        self.policy2_fc1.activation = act
+        self.policy2_fc2.activation = act
 
     def read_parameters(self, f):
         self.fc0.read_parameters(f)
@@ -360,11 +374,16 @@ class BattleNetwork(torch.nn.Module):
             activation=activation,
         )
 
+    def set_activation(self, act):
+        self.activation = act
+        self.pokemon_net.set_activation(act)
+        self.active_net.set_activation(act)
+        self.main_net.set_activation(act)
+
     def read_parameters(self, f):
         header = f.read(8)
-        self.activation = struct.unpack("<Q", header)[0]
-        self.activation = self.activation + 1
-        # TODO this does nothing
+        act = struct.unpack("<BBBBBBBB", header)[0]
+        self.set_activation(act + 1)
         self.pokemon_net.read_parameters(f)
         self.active_net.read_parameters(f)
         self.main_net.read_parameters(f)

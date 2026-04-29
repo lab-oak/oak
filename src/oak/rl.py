@@ -196,6 +196,11 @@ def main():
                 args.hidden_dim,
                 args.value_hidden_dim,
                 args.policy_hidden_dim,
+                activation=(
+                    oak.torch.Activation.clamp
+                    if args.discrete
+                    else oak.torch.Activation.relu
+                ),
             )
             if args.network_path != "":
                 print(f"Reading initial network from {args.network_path}")
@@ -238,10 +243,6 @@ def main():
         f"--battle-skip-prob={args.battle_skip_prob}",
         f"--build-network-path={build_network_path}",
     ]
-    if args.no_apply_symmetries:
-        generate_cmd.append("--no-apply-symmetries")
-    if args.clamp_parameters:
-        generate_cmd.append("--clamp-parameters")
 
     def get_common_cmd(args, prefix):
         p = prefix or ""
@@ -305,6 +306,10 @@ def main():
             f"--clip-eps={args.build_clip_eps}",
         ]
     )
+
+    if args.discrete:
+        generate_cmd.append("--use-discrete")
+        battle_cmd.append("--discrete")
 
     generate_proc = subprocess.Popen(
         generate_cmd,

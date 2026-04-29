@@ -16,6 +16,10 @@
 #include <thread>
 #include <variant>
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 namespace RuntimeSearch {
 
 template <typename... T>
@@ -137,6 +141,9 @@ struct Agent : AgentParams {
     };
 
     auto [file, fd] = try_open_file();
+    struct Header {
+      uint8_t bytes[8];
+    };
     FdGuard guard{fd};
 
     const auto read_parameters_and_maybe_quantize = [&](auto &network) {
@@ -166,7 +173,8 @@ struct Agent : AgentParams {
       assert(network_ptr);
     };
 
-    Header header;
+    Header header{};
+    static_assert(sizeof(header) == 8);
     file.read(reinterpret_cast<char *>(&header), 8);
     using NN::Activation;
     const auto activation = static_cast<Activation>(header.bytes[0] + 1);
