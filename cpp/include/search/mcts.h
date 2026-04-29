@@ -10,16 +10,13 @@
 #include <util/random.h>
 
 #include <chrono>
-#include <iostream>
-#include <type_traits>
-
-#include "../extern/lrsnash/src/lib.h"
-
 #include <cmath>
+#include <iostream>
 #include <random>
+#include <type_traits>
 #include <unordered_map>
 
-#include <typeinfo>
+#include "../extern/lrsnash/src/lib.h"
 
 namespace MCTS {
 struct MonteCarlo {};
