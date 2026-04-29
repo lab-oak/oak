@@ -248,7 +248,7 @@ struct Provider {
       NN::Build::Network test_network{};
       std::ifstream file{network_path};
       if (!test_network.read_parameters(file)) {
-        throw std::runtime_error{"Can't ready build network path while kargs "
+        throw std::runtime_error{"Can't read build network path while kargs "
                                  "make teambuilding possible."};
       }
     }

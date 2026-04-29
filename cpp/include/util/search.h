@@ -104,23 +104,40 @@ struct Agent : AgentParams {
   bool is_network() const { return !is_monte_carlo() && !is_foul_play(); }
 
   void initialize_network(const pkmn_gen1_battle &b) {
+    struct FdGuard {
+      int fd;
+      ~FdGuard() {
+        flock(fd, LOCK_UN);
+        close(fd);
+      }
+    };
 
     const auto try_open_file = [this]() {
       constexpr auto tries = 3;
       for (auto i = 0; i < tries; ++i) {
-        std::fstream file{eval};
-        if (file) {
-          return file;
+        int fd = open(eval.c_str(), O_RDONLY);
+        if (fd == -1) {
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+          continue;
         }
+        if (flock(fd, LOCK_SH) == -1) {
+          close(fd);
+          throw std::runtime_error{"Agent: could not lock file: " + eval};
+        }
+        std::string fd_path = "/proc/self/fd/" + std::to_string(fd);
+        std::fstream file{fd_path};
+        if (file) {
+          return std::make_pair(std::move(file), fd);
+        }
+        flock(fd, LOCK_UN);
+        close(fd);
         std::this_thread::sleep_for(std::chrono::seconds(1));
       }
       throw std::runtime_error{"Agent: could not open file at: " + eval};
     };
-    auto file = try_open_file();
 
-    struct Header {
-      uint8_t bytes[8];
-    };
+    auto [file, fd] = try_open_file();
+    FdGuard guard{fd};
 
     const auto read_parameters_and_maybe_quantize = [&](auto &network) {
       if (!network->read_parameters(file)) {

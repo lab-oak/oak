@@ -1,6 +1,7 @@
 import argparse
 import time
 import os
+import fcntl
 from typing import List
 
 import oak
@@ -142,8 +143,11 @@ def save_and_decay(args: argparse.ArgumentParser, network, opt, step: int, ext: 
     if ((step + 1) % args.checkpoint) == 0:
         ckpt_path = ""
         ckpt_path = os.path.join(args.dir, f"{step + 1}{ext}")
+
         with open(ckpt_path, "wb") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
             network.write_parameters(f)
+            fcntl.flock(f, fcntl.LOCK_UN)
         print(f"Checkpoint saved at step {step + 1}: {ckpt_path}")
 
     time.sleep(args.sleep)
