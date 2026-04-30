@@ -222,11 +222,8 @@ class MainNet(nn.Module):
         self.fc0.activation = act
         self.fc1.activation = act
         self.value_fc1.activation = act
-        self.value_fc2.activation = act
         self.policy1_fc1.activation = act
-        self.policy1_fc2.activation = act
         self.policy2_fc1.activation = act
-        self.policy2_fc2.activation = act
 
     def read_parameters(self, f):
         self.fc0.read_parameters(f)

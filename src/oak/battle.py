@@ -359,11 +359,12 @@ def main():
         )
 
         optimizer.zero_grad()
+        print_flag = (step % args.checkpoint) == 0
         loss_value = loss(
             encoded_frames_torch,
             output_buffer_torch,
             args,
-            (step % args.checkpoint) == 0,
+            print_flag,
         )
         loss_value.backward()
         optimizer.step()
