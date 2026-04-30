@@ -233,6 +233,7 @@ def main():
         f"--dir={data_dir}",
         f"--threads={args.generate_threads}",
         "--buffer-size=1",
+        "--max-battles=0",
         f"--max-battle-length={args.max_battle_length}",
         f"--fast-search-prob={args.fast_search_prob}",
         f"--teams={args.teams}",

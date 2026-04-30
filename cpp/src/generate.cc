@@ -350,7 +350,8 @@ void generate(const ProgramArgs *args_ptr) {
       frame_buffer_write_index += n_bytes_frames;
       // data
       RuntimeData::frame_counter.fetch_add(training_frames.updates.size());
-      if ((1 + RuntimeData::battle_counter.fetch_add(1)) >= args.max_battles) {
+      if ((args.max_battles > 0) &&
+          (1 + RuntimeData::battle_counter.fetch_add(1)) >= args.max_battles) {
         RuntimeData::terminated = true;
       }
       if (frame_buffer_write_index >= training_frames_target_size) {
@@ -411,8 +412,10 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
           (double)RuntimeData::update_counter.load();
       std::cout << "keep node ratio: " << keep_node_ratio << std::endl;
     }
-    const auto progress = (double)frames_more / args.max_battles * 100;
-    std::cout << "progress: " << progress << "%" << std::endl;
+    if (args.max_battles > 0) {
+      const auto progress = (double)frames_more / args.max_battles * 100;
+      std::cout << "progress: " << progress << "%" << std::endl;
+    }
 
     frames_done = frames_more;
     traj_done = traj_more;
