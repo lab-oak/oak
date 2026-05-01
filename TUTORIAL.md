@@ -498,16 +498,13 @@ The last piece is the Input class, which encodedes the information of a determin
 
 A search Input is defined via a battle string, in the same format as the `chall` program inputs
 
-The only way to input
-
-
-### Ancillary Data
+TODO
 
 # Training a Team-Building Network
 
 The team building network architechture and infrastructure is much simpler than that for battling.
 
-
+TODO
 
 # RL
 
@@ -515,6 +512,13 @@ The `rl` program is very simple. It runs `generate` and the training scripts `ba
 
 This means that, in addition to saving the updated network parameters in the usual way (i.e. "working-dir/step.battle.net"), it will save the latest parameters the path that `generate` reads from. Each self-play worker reads the parameters again at the start of each battle
 
+```bash
+(.venv) $ rl --budget=2048 --fast-budget=128 --fast-search-prob=.935 --bandit=pucb-0.25 --policy-mode=e0.9x0.1 --fast-policy-mode=x --batch-size=2048 --lr=.0001 --build-batch-size=0 --build-lr=0 --build-trajectories-per-step=0 --build-keep-prob=0 --sleep=4 --data-window=16 --delete-window=32
+```
+
+The above is an example of a fast run with no team-building. The latter only takes place when `--team-modify-prob` is non-zero, among other conditions. The lack of `--discrete` flag means the net will use ReLU activations and won't be quantizable. The battle learner will use only the most recently generated files, set by `--data-window`. Any file outside of `--delete-window` will be automatically deleted (so always set it larget than data window.)
+
+`--sleep` sets a mandatory wait period (in seconds) between each step of the `battle` learner. This is because RL is almost always bottle-necked by the speed of data generation. We slow the learner down so it isn't seeing the same data all the time.
 
 ### Args
 

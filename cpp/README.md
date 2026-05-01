@@ -1,6 +1,6 @@
-# Warning: Incomplete/WIP
+# Warning: Incomplete/Incorrect
 
-This readme is probably at least 50% done and is intended to aid developers. However there may be information here which ought to be in [TUTORIAL.md](../../TUTORIAL.md)
+This readme is probably at least 50% done and is intended to aid developers. It is also out-of-date; Some parts of the code have been refactored since this document was last updated.
 
 # Project Structure
 
