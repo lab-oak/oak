@@ -392,11 +392,14 @@ void print_thread_fn(const ProgramArgs *args_ptr) {
   size_t frames_done = 0;
   size_t traj_done = 0;
   while (true) {
+    while (RuntimeData::suspended) {
+      std::this_thread::sleep_for(std::chrono::seconds{1});
+    }
     for (int i = 0; i < args.print_interval; ++i) {
       if (RuntimeData::terminated) {
         return;
       }
-      std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::this_thread::sleep_for(std::chrono::seconds{1});
     }
     const auto frames_more = RuntimeData::frame_counter.load();
     const auto traj_more = RuntimeData::traj_counter.load();
@@ -501,7 +504,8 @@ void cleanup(const auto &args) {
 
 void handle_suspend(int signal) {
   RuntimeData::suspended = !RuntimeData::suspended;
-  std::cout << (RuntimeData::suspended ? "Suspended." : "Resumed.")
+  std::cout << (RuntimeData::suspended ? "Suspended. Ctrl + Z to resume."
+                                       : "Resumed.")
             << std::endl;
 }
 
