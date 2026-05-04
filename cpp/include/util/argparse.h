@@ -69,8 +69,7 @@ MAKE_AGENT_POLICY_ARGS(FastAgentPolicyArgs, AgentPolicyArgs, std::optional,
 MAKE_AGENT_ARGS(FastAgentArgs, FastAgentPolicyArgs, std::optional, fast_,
                 "fast-")
 MAKE_AGENT_ARGS(T1AgentArgs, FastAgentArgs, std::optional, t1_, "t1-")
-MAKE_AGENT_ARGS(AfterAgentArgs, T1AgentArgs, std::optional, after_, "after-")
-using GenerateArgs = AfterAgentArgs;
+using GenerateArgs = T1AgentArgs;
 
 MAKE_AGENT_POLICY_ARGS(AgentOptionalPolicyArgs, AgentArgsOptional,
                        std::optional, , "")
