@@ -159,7 +159,7 @@ gengar confuseray explosion hypnosis thunderbolt; chansey icebeam softboiled thu
 * `--fast-search-prob=`
 * `--fast-budget=`
 
-With this, the full search budget is only used for some of the steps, otherwise we use a reduced budget. This is an innovation of [EfficientZero](https://arxiv.org/abs/2111.00210); It reduces cost of data gen while balancing value and policy learning.
+With this, the full search budget is only used for some of the steps, otherwise we use a reduced budget. This is an innovation of [Accelerating Self-Play Learning in Go](https://arxiv.org/abs/1902.10565); It reduces cost of data gen while balancing value and policy learning.
 
 * `--threads=`
 
