@@ -8,8 +8,8 @@ directory = "Debug" if "OAK_DEBUG" in os.environ else "Release"
 
 def _run_binary(binary_name, prefix=f"_bin/{directory}"):
     bin_path = os.path.join(os.path.dirname(__file__), prefix, binary_name)
-    # if os.name != "nt":
-    # os.chmod(bin_path, 0o755)
+    if os.name != "nt":
+        signal.signal(signal.SIGTSTP, signal.SIG_IGN)
     proc = subprocess.Popen([bin_path, *sys.argv[1:]])
     try:
         return_code = proc.wait()
