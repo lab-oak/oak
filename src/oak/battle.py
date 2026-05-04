@@ -6,6 +6,7 @@ import datetime
 import itertools
 import sys
 import numpy as np
+import signal
 
 import oak
 
@@ -148,6 +149,22 @@ def add_local_args(parser, prefix: str = "", rl: bool = False):
 
 
 add_local_args(parser)
+
+
+suspended = False
+
+
+def handle_sigtstp(signum, frame):
+    global suspended
+    suspended = not suspended
+
+    if suspended:
+        print("Paused (Ctrl+Z to resume)")
+    else:
+        print("Resumed")
+
+
+signal.signal(signal.SIGTSTP, handle_sigtstp)
 
 
 def main():
@@ -322,6 +339,9 @@ def main():
     skipped_steps = 0
 
     for s in step_iterator:
+
+        while suspended:
+            time.sleep(0.1)
 
         step = s - skipped_steps
 
