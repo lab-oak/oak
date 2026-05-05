@@ -5,8 +5,8 @@
 
 /*
 
-Here we define what actions are legal in a given 'format' (i.e. Smogon standard
-tiers)
+inline Here we define what actions are legal in a given 'format' (i.e. Smogon
+standard tiers)
 
 Here is where we enforce species clause and use the format data to know which
 pokemon are legal and what their moves are

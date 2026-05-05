@@ -62,7 +62,7 @@ consteval bool check_pp_byte() {
 
 static_assert(check_pp_byte());
 
-uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
+inline uint8_t pokemon_key(const PKMN::Pokemon &pokemon, const uint8_t sleep) {
   uint8_t key = pp_byte(std::bit_cast<uint64_t>(pokemon.moves));
   if (static_cast<bool>(pokemon.status)) {
     key |= (Status::get_status_index(pokemon.status, sleep) + 1) << 4;
@@ -76,7 +76,7 @@ inline constexpr uint8_t ceil_log2_u8(uint8_t x) {
   return (uint8_t)(31 - __builtin_clz((2 * x + 1)));
 }
 
-consteval bool is_bucket_step(const auto i) {
+inline consteval bool is_bucket_step(const auto i) {
   return (ceil_log2_u8(i) + 1) == ceil_log2_u8(i + 1);
 }
 

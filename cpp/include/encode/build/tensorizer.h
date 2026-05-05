@@ -10,7 +10,7 @@
 Here is where we define a tensor encoding and associated storage for build
 trajectories in the game we defined in actions.h
 
-The actions (singleton additions) are encoded as u16s
+inline The actions (singleton additions) are encoded as u16s
 
 */
 

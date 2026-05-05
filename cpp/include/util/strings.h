@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-std::string get_current_datetime() {
+inline std::string get_current_datetime() {
   auto now = std::chrono::system_clock::now();
   auto now_sec = std::chrono::floor<std::chrono::seconds>(now);
   std::time_t t = std::chrono::system_clock::to_time_t(now_sec);
@@ -20,7 +20,8 @@ std::string get_current_datetime() {
 
 namespace Parse {
 
-std::vector<std::string> split(const std::string &input, const char delim) {
+inline std::vector<std::string> split(const std::string &input,
+                                      const char delim) {
   std::vector<std::string> result{};
   std::string token{};
 
@@ -44,7 +45,7 @@ std::vector<std::string> split(const std::string &input, const char delim) {
 
 namespace MCTS {
 
-void print_side(const Output::Side &side) {
+inline void print_side(const Output::Side &side) {
   constexpr auto label_width = 8;
   auto print_arr = [](const auto &arr, size_t k) {
     for (size_t i = 0; i < k; ++i) {
@@ -57,8 +58,8 @@ void print_side(const Output::Side &side) {
   print_arr(side.beta, side.k);
 }
 
-auto output_string(const Output &output, const pkmn_gen1_battle &battle,
-                   const auto &p1_labels, const auto &p2_labels) {
+inline auto output_string(const Output &output, const pkmn_gen1_battle &battle,
+                          const auto &p1_labels, const auto &p2_labels) {
   constexpr auto label_width = 8;
   std::stringstream ss{};
 
@@ -143,8 +144,8 @@ auto output_string(const Output &output, const pkmn_gen1_battle &battle,
   return ss.str();
 }
 
-std::string output_string(const MCTS::Output &output,
-                          const MCTS::Input &input) {
+inline std::string output_string(const MCTS::Output &output,
+                                 const MCTS::Input &input) {
 
   const auto [p1_labels, p2_labels] =
       PKMN::choice_labels(input.battle, input.result);

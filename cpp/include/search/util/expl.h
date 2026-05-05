@@ -2,9 +2,9 @@
 
 #include <search/mcts.h>
 
-std::tuple<double, double, double> expl(const MCTS::Output &a,
-                                        const MCTS::Output &o,
-                                        const RuntimePolicy::Options &p) {
+inline std::tuple<double, double, double>
+expl(const MCTS::Output &a, const MCTS::Output &o,
+     const RuntimePolicy::Options &p) {
   auto p1_policy = RuntimePolicy::get_policy(o.p1, p);
   auto p2_policy = RuntimePolicy::get_policy(o.p2, p);
   std::array<double, 9> p1_rewards{};

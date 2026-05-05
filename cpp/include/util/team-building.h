@@ -11,7 +11,7 @@
 
 namespace TeamBuilding {
 
-const auto team_string(const auto &team) {
+inline const auto team_string(const auto &team) {
   std::stringstream ss{};
   for (const auto &set : team) {
     ss << PKMN::species_string(set.species) << ": ";
@@ -23,7 +23,7 @@ const auto team_string(const auto &team) {
   return ss.str();
 };
 
-auto softmax(auto &x) {
+inline auto softmax(auto &x) {
   auto y = x;
   std::transform(y.begin(), y.end(), y.begin(),
                  [](const auto v) { return std::exp(v); });
@@ -33,8 +33,8 @@ auto softmax(auto &x) {
   return y;
 }
 
-[[nodiscard]] auto rollout_build_network(auto &device, auto &network,
-                                         const auto &team) {
+[[nodiscard]] inline auto rollout_build_network(auto &device, auto &network,
+                                                const auto &team) {
   using namespace Train::Build;
 
   Trajectory trajectory{};

@@ -5,9 +5,8 @@
 #include <array>
 
 namespace Learnset {
-// the 'learnset data' of all mons at level 100.
-// these structs cannot encode move conflicts. This is all we use for now, so we
-// ignore move conflicts
+// Older gcc does not support constexpr vector so we use these bool arrays.
+// They can't encode for illegal combinations and so those are ignored.
 using Data = std::array<std::array<bool, PKMN::Data::all_moves.size()>,
                         PKMN::Data::all_species.size()>;
 

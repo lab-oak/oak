@@ -6,7 +6,7 @@ constexpr bool debug = false;
 constexpr bool debug = true;
 #endif
 
-void debug_print(const auto &data, const bool newline = true) {
+inline void debug_print(const auto &data, const bool newline = true) {
   if constexpr (!debug) {
     return;
   }
@@ -16,7 +16,7 @@ void debug_print(const auto &data, const bool newline = true) {
   }
 }
 
-void debug_print_container(const auto &data, const bool newline = true) {
+inline void debug_print_container(const auto &data, const bool newline = true) {
   if constexpr (!debug) {
     return;
   }
@@ -28,14 +28,14 @@ void debug_print_container(const auto &data, const bool newline = true) {
   }
 }
 
-void print(const auto &data, const bool newline = true) {
+inline void print(const auto &data, const bool newline = true) {
   std::cout << data;
   if (newline) {
     std::cout << '\n';
   }
 }
 
-void print_vec(const auto &data, const bool newline = true) {
+inline void print_vec(const auto &data, const bool newline = true) {
   for (const auto &x : data) {
     std::cout << x << ' ';
   }

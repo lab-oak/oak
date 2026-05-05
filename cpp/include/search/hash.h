@@ -5,7 +5,7 @@
 
 namespace Hash {
 
-void initialize(auto &device, auto &arr) {
+inline void initialize(auto &device, auto &arr) {
   for (auto &x : arr) {
     x = device.uniform_64();
   }

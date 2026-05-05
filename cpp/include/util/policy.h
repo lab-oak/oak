@@ -19,7 +19,7 @@ enum class Mode : char {
   beta = 'b',
 };
 
-std::array<double, 9> get_policy(const auto &side, const auto &options) {
+inline std::array<double, 9> get_policy(const auto &side, const auto &options) {
   const auto &prior = side.prior;
   const auto &empirical = side.empirical;
   const auto &nash = side.nash;
@@ -97,8 +97,8 @@ std::array<double, 9> get_policy(const auto &side, const auto &options) {
   return policy;
 }
 
-int process_and_sample(auto &device, const auto &side,
-                       const auto &policy_options) {
+inline int process_and_sample(auto &device, const auto &side,
+                              const auto &policy_options) {
   const auto p = get_policy(side, policy_options);
   const auto index = device.sample_pdf(p);
   assert(p[index] > 0);

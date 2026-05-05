@@ -104,14 +104,6 @@ template <typename JointBandit> struct Table {
   std::unordered_map<Key, JointBandit> entries;
 };
 
-size_t count(const auto &heap) {
-  size_t c = 1;
-  for (const auto &pair : heap.children) {
-    c += count(pair.second);
-  }
-  return c;
-}
-
 // wrapper to use for enabling matrix ucb at root heap
 template <typename BanditParams> struct MatrixUCBParams {
   BanditParams bandit_params;

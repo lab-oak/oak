@@ -1,6 +1,5 @@
 #include <teams/benchmark-teams.h>
 #include <util/argparse.h>
-#include <util/random.h>
 #include <util/search.h>
 
 struct ProgramArgs : public BenchmarkArgs {

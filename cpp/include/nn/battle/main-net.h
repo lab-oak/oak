@@ -181,7 +181,8 @@ struct MainNet {
 //       const auto p1_c = p1_choice_index[i];
 //       assert(p1_c < Encode::Battle::Policy::n_dim);
 //       const float logit =
-//           p1_policy_fc3.weights.row(p1_c).dot(Eigen::Map<const Eigen::VectorXf>(
+//           p1_policy_fc3.weights.row(p1_c).dot(Eigen::Map<const
+//           Eigen::VectorXf>(
 //               p1_policy_buffer.data(), p1_policy_fc2.out_dim)) +
 //           p1_policy_fc3.biases[p1_c];
 //       assert(!std::isnan(logit));
@@ -192,7 +193,8 @@ struct MainNet {
 //       const auto p2_c = p2_choice_index[i];
 //       assert(p2_c < Encode::Battle::Policy::n_dim);
 //       const float logit =
-//           p2_policy_fc3.weights.row(p2_c).dot(Eigen::Map<const Eigen::VectorXf>(
+//           p2_policy_fc3.weights.row(p2_c).dot(Eigen::Map<const
+//           Eigen::VectorXf>(
 //               p2_policy_buffer.data(), p2_policy_fc2.out_dim)) +
 //           p2_policy_fc3.biases[p2_c];
 //       assert(!std::isnan(logit));

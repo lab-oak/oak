@@ -14,16 +14,16 @@ Accurate randomizing means randomly sampling those variables, the distributions
 of which are dependent on public observations of how long the status condition
 has been.
 
-This means a state (in the markov sense) is not represented by the the bytes of
-the battle But instead by the battle, excluding the hidden value bytes, and
-including the durations bytes
+inline This means a state (in the markov sense) is not represented by the the
+bytes of the battle But instead by the battle, excluding the hidden value bytes,
+and including the durations bytes
 
 */
 
 namespace MCTS {
 
-void randomize_hidden_variables(pkmn_gen1_battle &b,
-                                const pkmn_gen1_chance_durations &d) {
+inline void randomize_hidden_variables(pkmn_gen1_battle &b,
+                                       const pkmn_gen1_chance_durations &d) {
 
   static constexpr std::array<std::array<uint8_t, 40>, 4> multi{
       std::array<uint8_t, 40>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -96,7 +96,7 @@ void randomize_hidden_variables(pkmn_gen1_battle &b,
   }
 }
 
-consteval auto get_hidden_values_mask() {
+inline consteval auto get_hidden_values_mask() {
   PKMN::Battle battle{};
   battle.rng = static_cast<uint64_t>(-1);
   for (auto &side : battle.sides) {
@@ -118,7 +118,7 @@ consteval auto get_hidden_values_mask() {
 
 constexpr auto hidden_values_mask = get_hidden_values_mask();
 
-void clear_rng(pkmn_gen1_battle &battle) {
+inline void clear_rng(pkmn_gen1_battle &battle) {
   auto &b =
       *reinterpret_cast<std::remove_cvref_t<decltype(hidden_values_mask)> *>(
           &battle);

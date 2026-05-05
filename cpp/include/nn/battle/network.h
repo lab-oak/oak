@@ -185,7 +185,7 @@ using QNetwork =
                 Activation::clamp>;
 
 namespace Impl {
-auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
+inline auto invalid(const std::string &msg) -> std::unique_ptr<NetworkBase> {
   throw std::runtime_error{"Invalid layer size for quantized net " + msg +
                            " (check code for valid sizes)."};
 }
@@ -262,9 +262,9 @@ auto visit_network_1(int hidden, int value_hidden, int policy_hidden,
 }
 } // namespace Impl
 
-auto visit_quantized_network(int in, int hidden, int value_hidden,
-                             int policy_hidden, const auto &F,
-                             std::unique_ptr<NetworkBase> network = {}) {
+inline auto visit_quantized_network(int in, int hidden, int value_hidden,
+                                    int policy_hidden, const auto &F,
+                                    std::unique_ptr<NetworkBase> network = {}) {
   switch (in) {
   case 768:
     return Impl::visit_network_1<768>(hidden, value_hidden, policy_hidden, F,

@@ -57,7 +57,8 @@ constexpr auto battle(const auto &p1, const auto &p2,
 }
 
 #ifdef LOG
-pkmn_gen1_battle_options options(const pkmn_gen1_log_options &log_options) {
+inline pkmn_gen1_battle_options
+options(const pkmn_gen1_log_options &log_options) {
   if (!log_options.buf) {
     throw std::runtime_error{
         "Trying to initialize options when the log has null buffer."};
@@ -67,43 +68,43 @@ pkmn_gen1_battle_options options(const pkmn_gen1_log_options &log_options) {
   return options;
 }
 #else
-constexpr pkmn_gen1_battle_options options() { return {}; }
+inline constexpr pkmn_gen1_battle_options options() { return {}; }
 #endif
 
-constexpr pkmn_gen1_chance_durations durations() { return {}; }
+inline constexpr pkmn_gen1_chance_durations durations() { return {}; }
 
-auto &durations(pkmn_gen1_battle_options &options) {
+inline auto &durations(pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
 }
 
-const auto &durations(const pkmn_gen1_battle_options &options) {
+inline const auto &durations(const pkmn_gen1_battle_options &options) {
   return *pkmn_gen1_battle_options_chance_durations(&options);
 }
 
-auto log_options(auto &buffer) {
+inline auto log_options(auto &buffer) {
   return pkmn_gen1_log_options{buffer.data(), buffer.size()};
 }
 
-void set(pkmn_gen1_battle_options &options) {
+inline void set(pkmn_gen1_battle_options &options) {
   return pkmn_gen1_battle_options_set(&options, nullptr, nullptr, nullptr);
 }
-void set(pkmn_gen1_battle_options &options,
-         pkmn_gen1_log_options &log_options) {
+inline void set(pkmn_gen1_battle_options &options,
+                pkmn_gen1_log_options &log_options) {
   return pkmn_gen1_battle_options_set(&options, &log_options, nullptr, nullptr);
 }
-void set(pkmn_gen1_battle_options &options,
-         pkmn_gen1_chance_options &chance_options) {
+inline void set(pkmn_gen1_battle_options &options,
+                pkmn_gen1_chance_options &chance_options) {
   return pkmn_gen1_battle_options_set(&options, nullptr, &chance_options,
                                       nullptr);
 }
-void set(pkmn_gen1_battle_options &options,
-         pkmn_gen1_calc_options &calc_options) {
+inline void set(pkmn_gen1_battle_options &options,
+                pkmn_gen1_calc_options &calc_options) {
   return pkmn_gen1_battle_options_set(&options, nullptr, nullptr,
                                       &calc_options);
 }
 
-[[nodiscard]] pkmn_result update(auto &b, const auto c1, const auto c2,
-                                 pkmn_gen1_battle_options &options) {
+[[nodiscard]] inline pkmn_result update(auto &b, const auto c1, const auto c2,
+                                        pkmn_gen1_battle_options &options) {
   const auto get_choice = [](const auto c, const uint8_t *side) -> pkmn_choice {
     using Choice = std::remove_cv<decltype(c)>::type;
     if constexpr (std::is_same_v<Choice, Data::Species>) {
@@ -137,7 +138,7 @@ void set(pkmn_gen1_battle_options &options,
       get_choice(c2, battle.bytes + Layout::Sizes::Side), &options);
 }
 
-auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
+inline auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
     -> std::pair<std::vector<pkmn_choice>, std::vector<pkmn_choice>> {
   std::vector<pkmn_choice> p1_choices;
   std::vector<pkmn_choice> p2_choices;
@@ -154,7 +155,8 @@ auto choices(const pkmn_gen1_battle &battle, const pkmn_result result)
   return {p1_choices, p2_choices};
 }
 
-auto choice_labels(const pkmn_gen1_battle &battle, const pkmn_result result)
+inline auto choice_labels(const pkmn_gen1_battle &battle,
+                          const pkmn_result result)
     -> std::pair<std::vector<std::string>, std::vector<std::string>> {
   const auto [p1_choices, p2_choices] = choices(battle, result);
   std::vector<std::string> p1_labels{};
@@ -230,7 +232,7 @@ constexpr pkmn_result result(Result result = Result::None,
          (static_cast<uint8_t>(p2) << 6);
 }
 
-pkmn_result result(const pkmn_gen1_battle &b) {
+inline pkmn_result result(const pkmn_gen1_battle &b) {
   const auto &battle = PKMN::view(b);
   const auto &p1 = battle.sides[0];
   const auto &p2 = battle.sides[1];

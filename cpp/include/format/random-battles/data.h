@@ -106,7 +106,8 @@ consteval std::array<uint8_t, 6> getImportantWeaknesses(const Species species) {
   };
 }
 
-consteval std::array<std::array<uint8_t, 6>, 152> IMPORTANT_WEAKNESSES() {
+inline consteval std::array<std::array<uint8_t, 6>, 152>
+IMPORTANT_WEAKNESSES() {
   std::array<std::array<uint8_t, 6>, 152> result{};
   for (int i = 0; i < 152; ++i) {
     result[i] = getImportantWeaknesses(static_cast<Species>(i));

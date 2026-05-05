@@ -105,7 +105,7 @@ auto parse_set(const auto &words) {
 //   std::array<MoveSlot, 4> moves;
 // };
 
-auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
+inline auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
     -> std::pair<PKMN::ActivePokemon, PKMN::Duration> {
   PKMN::Duration duration{};
   PKMN::ActivePokemon active = PKMN::switch_in(pokemon);
@@ -236,7 +236,7 @@ auto parse_active(PKMN::Pokemon &pokemon, const auto &words)
   return {active, duration};
 }
 
-auto parse_side(const std::string &side_string)
+inline auto parse_side(const std::string &side_string)
     -> std::pair<PKMN::Side, PKMN::Duration> {
   const auto set_strings = split(side_string, ';');
   const auto n_sets = set_strings.size();
@@ -260,7 +260,7 @@ auto parse_side(const std::string &side_string)
   return {side, duration};
 }
 
-std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>
+inline std::pair<pkmn_gen1_battle, pkmn_gen1_chance_durations>
 parse_battle(const std::string &battle_string, uint64_t seed = 0x123456) {
   const auto side_strings = split(battle_string, '|');
   if (side_strings.size() != 2) {

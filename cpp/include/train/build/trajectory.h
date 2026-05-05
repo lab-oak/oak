@@ -63,7 +63,7 @@ void apply_basic_action(auto &team, const BasicAction &action) {
   }
 }
 
-void apply_action(auto &team, const Action &action) {
+inline void apply_action(auto &team, const Action &action) {
   for (const auto &basic : action) {
     apply_basic_action(team, basic);
   }

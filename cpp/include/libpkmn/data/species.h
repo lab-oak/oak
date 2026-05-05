@@ -936,7 +936,7 @@ constexpr std::array<SpeciesData, 151> SPECIES_DATA{
         {Type::Psychic, Type::Psychic},
     }};
 
-consteval auto get_all_species() {
+inline consteval auto get_all_species() {
   std::array<Species, 152> all_species{};
   for (auto i = 0; i < 152; ++i) {
     all_species[i] = static_cast<Species>(i);

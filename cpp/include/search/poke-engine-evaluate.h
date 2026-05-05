@@ -49,7 +49,7 @@ constexpr float CONFUSION = -20;
 constexpr float REFLECT = 20;
 constexpr float LIGHT_SCREEN = 20;
 
-float get_boost_multiplier(int8_t boost) {
+inline float get_boost_multiplier(int8_t boost) {
   switch (boost) {
   case 6:
     return POKEMON_BOOST_MULTIPLIER_6;
@@ -83,7 +83,7 @@ float get_boost_multiplier(int8_t boost) {
   }
 }
 
-float evaluate_burned(const PKMN::Pokemon &pokemon) noexcept {
+inline float evaluate_burned(const PKMN::Pokemon &pokemon) noexcept {
   float multiplier = 0;
 
   for (int m = 0; m < 4; ++m) {
@@ -101,7 +101,7 @@ float evaluate_burned(const PKMN::Pokemon &pokemon) noexcept {
   return multiplier * POKEMON_BURNED;
 }
 
-float evaluate_status(const PKMN::Pokemon &pokemon) noexcept {
+inline float evaluate_status(const PKMN::Pokemon &pokemon) noexcept {
   switch (pokemon.status) {
   case Status::Burn: {
     return evaluate_burned(pokemon);
@@ -128,7 +128,7 @@ float evaluate_status(const PKMN::Pokemon &pokemon) noexcept {
   }
 }
 
-float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
+inline float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
   float score = 0;
   if (pokemon.hp) {
     score += (POKEMON_HP * pokemon.hp) / pokemon.stats.hp;
@@ -139,8 +139,8 @@ float evaluate_pokemon(const PKMN::Pokemon &pokemon) noexcept {
   return score;
 }
 
-float evaluate_active(const PKMN::ActivePokemon &active,
-                      const PKMN::Pokemon &stored) noexcept {
+inline float evaluate_active(const PKMN::ActivePokemon &active,
+                             const PKMN::Pokemon &stored) noexcept {
   float score = 0;
   if (stored.hp) {
     score += evaluate_pokemon(stored);
@@ -169,7 +169,7 @@ float evaluate_active(const PKMN::ActivePokemon &active,
   return score;
 }
 
-float evaluate_side(const PKMN::Side &side) noexcept {
+inline float evaluate_side(const PKMN::Side &side) noexcept {
   float score = 0;
   score += evaluate_active(side.active, side.stored());
   for (auto slot = 2; slot <= 6; ++slot) {
@@ -181,7 +181,7 @@ float evaluate_side(const PKMN::Side &side) noexcept {
   return score;
 }
 
-float evaluate_battle(const PKMN::Battle &battle) noexcept {
+inline float evaluate_battle(const PKMN::Battle &battle) noexcept {
   float score = evaluate_side(battle.sides[0]) - evaluate_side(battle.sides[1]);
   return score;
 }

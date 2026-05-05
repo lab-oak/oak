@@ -27,7 +27,7 @@ constexpr const uint8_t *get_pokemon_from_slot(const uint8_t *side,
   return side + 24 * index;
 }
 
-std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
+inline std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
   const auto choice_type = choice & 3;
   const auto choice_data = choice >> 2;
   switch (choice_type) {
@@ -50,13 +50,13 @@ std::string side_choice_string(const uint8_t *side, pkmn_choice choice) {
   }
 }
 
-bool match(const auto &A, const auto &B) {
+inline bool match(const auto &A, const auto &B) {
   return std::equal(
       A.begin(), A.begin() + std::min(A.size(), B.size()), B.begin(), B.end(),
       [](char a, char b) { return std::tolower(a) == std::tolower(b); });
 }
 
-auto find_unique(const auto &container, const auto &value) {
+inline auto find_unique(const auto &container, const auto &value) {
   const auto matches = [&value](const auto &x) { return match(x, value); };
   auto it = std::find_if(container.begin(), container.end(), matches);
   if (it != container.end()) {
@@ -74,7 +74,7 @@ auto find_unique(const auto &container, const auto &value) {
   return it;
 }
 
-int unique_index(const auto &container, const auto &value) {
+inline int unique_index(const auto &container, const auto &value) {
   const auto it = find_unique(container, value);
   if (it == container.end()) {
     return -1;
@@ -82,7 +82,7 @@ int unique_index(const auto &container, const auto &value) {
   return std::distance(container.begin(), it);
 }
 
-std::string status_string(const auto status) {
+inline std::string status_string(const auto status) {
   const auto byte = static_cast<uint8_t>(status);
   if (byte == 0) {
     return "";
@@ -111,7 +111,7 @@ std::string status_string(const auto status) {
   };
 }
 
-std::string pokemon_to_string(const uint8_t *const data) {
+inline std::string pokemon_to_string(const uint8_t *const data) {
   std::stringstream sstream{};
   sstream << species_string(data[21]);
   if (data[23] != 100) {
@@ -127,7 +127,7 @@ std::string pokemon_to_string(const uint8_t *const data) {
   return sstream.str();
 }
 
-std::string volatiles_to_string(const PKMN::Volatiles &vol) {
+inline std::string volatiles_to_string(const PKMN::Volatiles &vol) {
   std::stringstream ss{};
   if (vol.bide())
     ss << "(bide)";
@@ -184,8 +184,9 @@ std::string volatiles_to_string(const PKMN::Volatiles &vol) {
   return ss.str();
 }
 
-std::string battle_data_to_string(const pkmn_gen1_battle &battle,
-                                  const pkmn_gen1_chance_durations &durations) {
+inline std::string
+battle_data_to_string(const pkmn_gen1_battle &battle,
+                      const pkmn_gen1_chance_durations &durations) {
   std::stringstream ss{};
   const auto &b = PKMN::view(battle);
   for (auto s = 0; s < 2; ++s) {
@@ -301,15 +302,15 @@ std::string battle_data_to_string(const pkmn_gen1_battle &battle,
   return ss.str();
 }
 
-std::string to_string(const pkmn_gen1_battle &battle) {
+inline std::string to_string(const pkmn_gen1_battle &battle) {
   return battle_data_to_string(battle, {});
 }
 
-std::string to_string(const auto &battle_data) {
+inline std::string to_string(const auto &battle_data) {
   return battle_data_to_string(battle_data.battle, battle_data.durations);
 }
 
-Species string_to_species(const std::string &str) {
+inline Species string_to_species(const std::string &str) {
   const int index = unique_index(PKMN::Data::SPECIES_CHAR_ARRAY, str);
   if (index < 0) {
     throw std::runtime_error{"Could not match string to Species"};
@@ -319,7 +320,7 @@ Species string_to_species(const std::string &str) {
   }
 }
 
-Move string_to_move(const std::string &str) {
+inline Move string_to_move(const std::string &str) {
   const int index = unique_index(PKMN::Data::MOVE_CHAR_ARRAY, str);
   if (index < 0) {
     throw std::runtime_error{"Could not match string to Move"};

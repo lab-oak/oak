@@ -52,7 +52,7 @@ constexpr auto read(const float *t) {
   return stats;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"HP", "ATK", "DEF", "SPE", "SPC"}};
 }
@@ -92,7 +92,7 @@ constexpr auto read(const float *t) {
   return move_slots;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   for (auto i = 0; i < MoveSlots::n_dim; ++i) {
     result[i] = PKMN::Data::MOVE_CHAR_ARRAY[i + 1];
@@ -158,7 +158,7 @@ constexpr void write(const auto status, const auto sleep, float *&t,
   offset += n_dim;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   return std::array<std::array<char, 5>, n_dim>{
       {"PSN", "BRN", "FRZ", "PAR", "SLP1", "SLP2", "SLP3", "SLP4", "SLP5",
        "SLP6", "SLP7", "RST1", "RST2", "RST3"}};
@@ -213,7 +213,7 @@ constexpr void write(const PKMN::Pokemon &pokemon, auto sleep, float *&t,
   Types::write(pokemon.types, t, index, offset);
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   const auto copy = [](const auto &src, auto &dest) {
     for (auto i = 0; i < src.size(); ++i) {
@@ -285,7 +285,7 @@ constexpr void write(const PKMN::ActivePokemon &active, float *&t,
   offset += n_dim;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   return std::array<std::array<char, 4>, n_dim>{
       {"atk", "def", "spe", "spc", "acc", "eva"}};
 }
@@ -356,7 +356,7 @@ constexpr void write(const PKMN::Volatiles &vol, float *&t, uint16_t *&index,
   offset += n_dim;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   return std::array<std::array<char, 13>, n_dim>{
       {"bide", "thrashing", "charging", "binding", "invulner", "confusion",
        "mist", "focus_energy", "substitute", "recharging", "rage", "leech_seed",
@@ -426,7 +426,7 @@ constexpr void write(const PKMN::Duration &duration, float *&t,
   offset += n_binding;
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 10>, n_dim> result;
 
   auto index = 0;
@@ -488,7 +488,7 @@ constexpr void write(const PKMN::ActivePokemon &active,
   Duration::write(duration, t, index, offset);
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
 
   const auto copy = [](const auto &src, auto &dest) {
@@ -550,7 +550,7 @@ constexpr void write(const PKMN::Pokemon &pokemon,
   Pokemon::write(pokemon, duration.sleep(0), t, index, offset);
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   const auto copy = [](const auto &src, auto &dest) {
     for (auto i = 0; i < src.size(); ++i) {

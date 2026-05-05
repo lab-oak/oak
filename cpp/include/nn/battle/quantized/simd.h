@@ -22,7 +22,7 @@
 
 namespace NN::Battle::Quantized::Simd {
 
-[[maybe_unused]] static int m256_hadd(__m256i sum, int bias) {
+[[maybe_unused]] inline static int m256_hadd(__m256i sum, int bias) {
   __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(sum),
                                  _mm256_extracti128_si256(sum, 1));
   sum128 = _mm_add_epi32(sum128, _mm_shuffle_epi32(sum128, _MM_PERM_BADC));
@@ -30,8 +30,8 @@ namespace NN::Battle::Quantized::Simd {
   return _mm_cvtsi128_si32(sum128) + bias;
 }
 
-[[maybe_unused]] static void m256_add_dpbusd_epi32(__m256i &acc, __m256i a,
-                                                   __m256i b) {
+[[maybe_unused]] inline static void
+m256_add_dpbusd_epi32(__m256i &acc, __m256i a, __m256i b) {
 
   __m256i product0 = _mm256_maddubs_epi16(a, b);
   product0 = _mm256_madd_epi16(product0, _mm256_set1_epi16(1));

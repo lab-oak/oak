@@ -156,7 +156,7 @@ constexpr int8_t decode_i4(uint8_t x) {
   return static_cast<int8_t>((x ^ 0x08) - 0x08);
 }
 
-consteval bool i4_conversion_is_valid() {
+inline consteval bool i4_conversion_is_valid() {
   bool valid = true;
   for (int8_t b = -6; b <= 6; ++b) {
     valid &= decode_i4(encode_i4(b)) == b;

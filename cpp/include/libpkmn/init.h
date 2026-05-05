@@ -56,7 +56,7 @@ constexpr uint16_t boost(uint16_t stat, int b) {
   return std::min(999, stat * pair[0] / pair[1]);
 }
 
-void apply_boosts(PKMN::ActivePokemon &active, const auto &boosts) {
+inline void apply_boosts(PKMN::ActivePokemon &active, const auto &boosts) {
   if constexpr (requires { boosts.atk; }) {
     active.stats.atk = boost(active.stats.atk, boosts.atk);
     active.boosts.set_atk(boosts.atk);
@@ -153,7 +153,7 @@ constexpr PKMN::Side init_side(const auto &sets) {
   return side;
 }
 
-void init_sleeps(const auto &sets, PKMN::Duration &duration) {
+inline void init_sleeps(const auto &sets, PKMN::Duration &duration) {
   for (auto i = 0; i < sets.size(); ++i) {
     const auto &set = sets[i];
     if constexpr (requires { set.sleeps; }) {

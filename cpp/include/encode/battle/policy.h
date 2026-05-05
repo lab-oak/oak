@@ -15,8 +15,8 @@ possible when theres one move, so no policy inference is needed.
 The rest is self explanatory. Moves are encoded as themselves, and switches as
 the incoming Pokemon's species.
 
-This encoding keeps the number of logits small (n_dim) and only 9 actions max
-are legal, so we don't have to compute the entire logit layer.
+inline This encoding keeps the number of logits small (n_dim) and only 9 actions
+max are legal, so we don't have to compute the entire logit layer.
 
 */
 
@@ -26,7 +26,7 @@ static constexpr int n_dim =
     static_cast<int>(PKMN::Data::Species::Mew) +
     (static_cast<int>(PKMN::Data::Move::Struggle) - 1); // no Struggle, None
 
-uint16_t get_index(const PKMN::Side &side, auto choice) {
+inline uint16_t get_index(const PKMN::Side &side, auto choice) {
   const auto choice_type = choice & 3;
   const auto choice_data = choice >> 2;
   switch (choice_type) {
@@ -57,7 +57,7 @@ uint16_t get_index(const PKMN::Side &side, auto choice) {
   }
 }
 
-consteval auto get_dim_labels() {
+inline consteval auto get_dim_labels() {
   std::array<std::array<char, 13>, n_dim> result{};
   const auto copy = [](const auto &src, auto &dest) {
     for (auto i = 0; i < src.size(); ++i) {

@@ -103,24 +103,24 @@ constexpr std::array<std::array<char, 9>, 15> TYPE_CHAR_ARRAY = {
 
 }; // namespace Data
 
-const char *species_char_array(const auto species) noexcept {
+inline const char *species_char_array(const auto species) noexcept {
   return Data::SPECIES_CHAR_ARRAY[static_cast<uint8_t>(species)].data();
 }
 
-const char *move_char_array(const auto move) noexcept {
+inline const char *move_char_array(const auto move) noexcept {
   return Data::MOVE_CHAR_ARRAY[static_cast<uint8_t>(move)].data();
 }
 
-std::string species_string(const auto species) noexcept {
+inline std::string species_string(const auto species) noexcept {
   return std::string{
       Data::SPECIES_CHAR_ARRAY[static_cast<uint8_t>(species)].data()};
 }
 
-std::string move_string(const auto move) noexcept {
+inline std::string move_string(const auto move) noexcept {
   return std::string{Data::MOVE_CHAR_ARRAY[static_cast<uint8_t>(move)].data()};
 }
 
-std::string types_string(const auto types) noexcept {
+inline std::string types_string(const auto types) noexcept {
   return std::string{
              Data::TYPE_CHAR_ARRAY[static_cast<uint8_t>(types) % 16].data()} +
          '/' +
